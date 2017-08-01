@@ -241,6 +241,11 @@ defmodule Exvif.Cam do
           })
   end
 
+  def fetch_camera(hostname, port, username, password) do
+    cam_url(hostname, port)
+    |> fetch_camera(username, password)
+  end
+
   def cam_url(hostname, port) when is_integer(port) do
     cam_url(hostname, Integer.to_string(port))
   end
