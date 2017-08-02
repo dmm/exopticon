@@ -21,3 +21,7 @@ erl_crash.dump
 
 # ignore stupid emacs files
 .\#*
+
+# ignore binaries
+apps/exopticon/src/captureserver
+apps/exopticon/src/playbackserver
