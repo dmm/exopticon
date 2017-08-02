@@ -23,6 +23,10 @@ defmodule Exopticon.Application do
     Supervisor.start_link(children, opts)
   end
 
+  def start_camera(c = %Exopticon.Video.Camera{}) do
+#    Supervisor.start_child(Exopticon.CameraSupervisor, [{c.id, c.rtsp_url, c.fps, 
+  end
+
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.
   def config_change(changed, _new, removed) do

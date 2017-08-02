@@ -1,0 +1,53 @@
+<h2>Show Camera</h2>
+
+<ul>
+
+  <li>
+    <strong>Name:</strong>
+    <%= @camera.name %>
+  </li>
+
+  <li>
+    <strong>Ip:</strong>
+    <%= @camera.ip %>
+  </li>
+
+  <li>
+    <strong>Onvif port:</strong>
+    <%= @camera.onvif_port %>
+  </li>
+
+  <li>
+    <strong>Fps:</strong>
+    <%= @camera.fps %>
+  </li>
+
+  <li>
+    <strong>Mac:</strong>
+    <%= @camera.mac %>
+  </li>
+
+  <li>
+    <strong>Username:</strong>
+    <%= @camera.username %>
+  </li>
+
+  <li>
+    <strong>Password:</strong>
+    <%= @camera.password %>
+  </li>
+
+  <li>
+    <strong>Rtsp url:</strong>
+    <%= @camera.rtsp_url %>
+  </li>
+
+  <li>
+    <strong>Type:</strong>
+    <%= @camera.type %>
+  </li>
+
+</ul>
+
+<span><%= link "Edit", to: camera_path(@conn, :edit, @camera) %></span>
+<span><%= link "Back", to: camera_path(@conn, :index) %></span>

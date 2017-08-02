@@ -23,6 +23,7 @@ defmodule ExopticonWeb do
       import Plug.Conn
       import ExopticonWeb.Router.Helpers
       import ExopticonWeb.Gettext
+      import ExopticonWeb.Auth, only: [authenticate_user: 2]
     end
   end
 
@@ -48,6 +49,7 @@ defmodule ExopticonWeb do
       use Phoenix.Router
       import Plug.Conn
       import Phoenix.Controller
+      import ExopticonWeb.Auth, only: [authenticate_user: 2]
     end
   end
 

@@ -1,0 +1,5 @@
+<h2>Edit Camera group</h2>
+
+<%= render "form.html", Map.put(assigns, :action, camera_group_path(@conn, :update, @camera_group)) %>
+
+<span><%= link "Back", to: camera_group_path(@conn, :index) %></span>

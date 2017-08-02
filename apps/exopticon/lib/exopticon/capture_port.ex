@@ -10,11 +10,10 @@ defmodule Exopticon.CapturePort do
   ### Server callbacks
   def init({id, url, fps, video_dir}) do
     Process.flag(:trap_exit, true)
-    IO.puts(Path.expand("."))
-    port = Port.open({:spawn, "./src/captureserver #{url} #{fps} #{video_dir} /tmp/shot.jpg"},
+    port = Port.open({:spawn, "apps/exopticon/src/captureserver #{url} #{fps} #{video_dir} /tmp/shot.jpg"},
       [:binary, { :packet, 4 }])
 #    port = Port.open({:spawn, "pwd"}, [:binary, {:packet, 4}])
-    {:ok, %{}}
+    {:ok, %{port: port}}
   end
 
   def handle_call(arg, _from, _names) do
@@ -30,6 +29,11 @@ defmodule Exopticon.CapturePort do
      %{frameJpeg: %Bson.Bin{bin: dec }} = Bson.decode(msg)
      ExopticonWeb.Endpoint.broadcast!("test:lobby", "jpg", %{ frameJpeg: dec })
      {:noreply, 3}
+  end
+
+  def terminate(_reason, %{port: port}) do
+    Port.close(port)
+    :normal
   end
 
 end

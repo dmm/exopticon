@@ -20,6 +20,8 @@ defmodule ExopticonWeb.Router do
     get "/", PageController, :index
     resources "/users", UserController
     resources "/sessions", SessionController, only: [:new, :create, :delete]
+    resources "/camera_groups", CameraGroupController
+    resources "/cameras", CameraController
   end
 
   # Other scopes may use custom stacks.

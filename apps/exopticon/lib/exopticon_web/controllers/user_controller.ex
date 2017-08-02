@@ -1,6 +1,8 @@
 defmodule ExopticonWeb.UserController do
   use ExopticonWeb, :controller
 
+  plug :authenticate_user
+
   alias Exopticon.Accounts
   alias Exopticon.Accounts.User
 

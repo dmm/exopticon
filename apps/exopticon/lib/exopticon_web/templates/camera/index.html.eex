@@ -1,0 +1,42 @@
+<h2>Listing Cameras</h2>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Ip</th>
+      <th>Onvif port</th>
+      <th>Fps</th>
+      <th>Mac</th>
+      <th>Username</th>
+      <th>Password</th>
+      <th>Rtsp url</th>
+      <th>Type</th>
+
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+<%= for camera <- @cameras do %>
+    <tr>
+      <td><%= camera.name %></td>
+      <td><%= camera.ip %></td>
+      <td><%= camera.onvif_port %></td>
+      <td><%= camera.fps %></td>
+      <td><%= camera.mac %></td>
+      <td><%= camera.username %></td>
+      <td><%= camera.password %></td>
+      <td><%= camera.rtsp_url %></td>
+      <td><%= camera.type %></td>
+
+      <td class="text-right">
+        <span><%= link "Show", to: camera_path(@conn, :show, camera), class: "btn btn-default btn-xs" %></span>
+        <span><%= link "Edit", to: camera_path(@conn, :edit, camera), class: "btn btn-default btn-xs" %></span>
+        <span><%= link "Delete", to: camera_path(@conn, :delete, camera), method: :delete, data: [confirm: "Are you sure?"], class: "btn btn-danger btn-xs" %></span>
+      </td>
+    </tr>
+<% end %>
+  </tbody>
+</table>
+
+<span><%= link "New Camera", to: camera_path(@conn, :new) %></span>

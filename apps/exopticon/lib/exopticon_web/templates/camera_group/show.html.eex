@@ -1,0 +1,23 @@
+<h2>Show Camera group</h2>
+
+<ul>
+
+  <li>
+    <strong>Name:</strong>
+    <%= @camera_group.name %>
+  </li>
+
+  <li>
+    <strong>Storage path:</strong>
+    <%= @camera_group.storage_path %>
+  </li>
+
+  <li>
+    <strong>Max storage size:</strong>
+    <%= @camera_group.max_storage_size %>
+  </li>
+
+</ul>
+
+<span><%= link "Edit", to: camera_group_path(@conn, :edit, @camera_group) %></span>
+<span><%= link "Back", to: camera_group_path(@conn, :index) %></span>

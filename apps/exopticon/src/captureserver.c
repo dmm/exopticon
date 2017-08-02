@@ -646,6 +646,11 @@ int checkforquit()
                         // the set, read!
                         read_size = fread(buf, 1, 1, stdin);
                 }
+
+                if (feof(stdin) != 0) {
+                        quit = 1;
+                }
+
                 // TODO change second loop condition to assert
                 for (size_t i = 0; i < read_size && i < sizeof(buf); ++i) {
                         if (buf[i] == 'q') {
