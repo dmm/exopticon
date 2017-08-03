@@ -51,6 +51,6 @@ function decodeMessage (rawdata) {
     return msg;
 }
 
-export default {  
+export default {
   convertToBinary
 };

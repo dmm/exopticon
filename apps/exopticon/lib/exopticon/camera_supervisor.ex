@@ -9,10 +9,10 @@ defmodule Exopticon.CameraSupervisor do
 
   def init(cameras) do
     children = [
-      worker(Exopticon.CapturePort, [], restart: :permanent)
+#      worker(Exopticon.CapturePort, [], restart: :permanent)
     ]
 
-    supervise(children, strategy: :simple_one_for_one)
+    supervise(children, strategy: :one_for_one)
   end
 
   def start_all_cameras([]) do
@@ -21,7 +21,7 @@ defmodule Exopticon.CameraSupervisor do
 
   def start_all_cameras(cameras) do
     [cam | tail] = cameras
-    Supervisor.start_child(Exopticon.CameraSupervisor, [{cam.id, cam.rtsp_url, cam.fps, cam.camera_group.storage_path}])
+    Supervisor.start_child(Exopticon.CameraSupervisor, Exopticon.CapturePort.child_spec(cam))
     start_all_cameras(tail)
   end
 

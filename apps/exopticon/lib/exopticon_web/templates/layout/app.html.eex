@@ -7,13 +7,14 @@
     <meta name="description" content="">
     <meta name="author" content="">
 
-    <title>Hello Exopticon!</title>
+    <title>EXOPTICON</title>
     <link rel="stylesheet" href="<%= static_path(@conn, "/css/app.css") %>">
   </head>
 
   <body>
-    <div class="container">
+    <div class="container-fluid">
       <header class="header">
+        <span class="logo"><img src="/images/eo_logo.png"></img></span>
         <ol class="breadcrumb text-right">
           <%= if @current_user do %>
           <li><%= @current_user.username %></li>
@@ -25,8 +26,6 @@
           <li><%= link "Log in", to: session_path(@conn, :new) %></li>
           <% end %>
         </ol>
-        <span class="logo"></span>
-
       </header>
 
       <p class="alert alert-info" role="alert"><%= get_flash(@conn, :info) %></p>

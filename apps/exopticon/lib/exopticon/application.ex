@@ -1,6 +1,8 @@
 defmodule Exopticon.Application do
   use Application
 
+  import Ecto.Query
+
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   def start(_type, _args) do
@@ -20,11 +22,13 @@ defmodule Exopticon.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Exopticon.Supervisor]
-    Supervisor.start_link(children, opts)
-  end
+    ret = Supervisor.start_link(children, opts)
 
-  def start_camera(c = %Exopticon.Video.Camera{}) do
-#    Supervisor.start_child(Exopticon.CameraSupervisor, [{c.id, c.rtsp_url, c.fps, 
+     # Start cameras
+    Exopticon.Repo.all(from camera in Exopticon.Video.Camera, preload: [:camera_group])
+    |> Exopticon.CameraSupervisor.start_all_cameras
+
+    ret
   end
 
   # Tell Phoenix to update the endpoint configuration

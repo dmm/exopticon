@@ -739,7 +739,6 @@ int main(int argc, char *argv[])
                 cam.ifcx->interrupt_callback.opaque = &cam;
                 cam.frame_begin_time.tv_sec = 0;
 
-
                 av_dict_set(&opts, "rtsp_transport", "udp", 0);
                 if (avformat_open_input(&(cam.ifcx), input_uri, NULL, &opts) !=
                     0) {

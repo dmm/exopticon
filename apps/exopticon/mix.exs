@@ -41,6 +41,7 @@ defmodule Exopticon.Mixfile do
       {:phoenix_live_reload, "~> 1.0", only: :dev},
       {:gettext, "~> 0.11"},
       {:cowboy, "~> 1.0"},
+      {:message_pack, "~> 0.2.0"},
       {:bson, "~> 0.4.4"},
       {:comeonin, "~> 4.0"},
       {:bcrypt_elixir, "~> 0.12.0"},
