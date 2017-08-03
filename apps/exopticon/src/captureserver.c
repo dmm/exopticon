@@ -642,6 +642,7 @@ int checkforquit()
                 ret = select(1, &rfds, NULL, NULL, &timeout);
                 size_t read_size = 0;
                 if (ret > 0 && FD_ISSET(0, &rfds)) {
+
                         // select return value is greater than 0 and stdin is in
                         // the set, read!
                         read_size = fread(buf, 1, 1, stdin);
@@ -651,6 +652,8 @@ int checkforquit()
                         quit = 1;
                 }
 
+
+
                 // TODO change second loop condition to assert
                 for (size_t i = 0; i < read_size && i < sizeof(buf); ++i) {
                         if (buf[i] == 'q') {
@@ -659,6 +662,7 @@ int checkforquit()
                         }
                 }
         } while (ret > 0 && quit == 0);
+
 
         return quit;
 }
@@ -729,10 +733,17 @@ int main(int argc, char *argv[])
         AVDictionary *opts = 0;
         av_dict_set(&opts, "rtsp_transport", "tcp", 0);
         if (avformat_open_input(&(cam.ifcx), input_uri, NULL, &opts) != 0) {
-                // try udp
+                // try udp, reset ifcx because the first call trashes it
+                cam.ifcx = avformat_alloc_context();
+                cam.ifcx->interrupt_callback.callback = interrupt_cb;
+                cam.ifcx->interrupt_callback.opaque = &cam;
+                cam.frame_begin_time.tv_sec = 0;
+
+
                 av_dict_set(&opts, "rtsp_transport", "udp", 0);
                 if (avformat_open_input(&(cam.ifcx), input_uri, NULL, &opts) !=
                     0) {
+
                         bs_print("ERROR: Cannot open input file");
                         // User allocated AVFormatContext is freed on error by
                         // avformat_open_input.
@@ -740,7 +751,6 @@ int main(int argc, char *argv[])
                         goto cleanup;
                 }
         }
-
         cam.ifcx->fps_probe_size = 500;
 
         if (avformat_find_stream_info(cam.ifcx, NULL) < 0) {
