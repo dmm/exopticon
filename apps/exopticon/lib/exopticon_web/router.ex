@@ -25,7 +25,9 @@ defmodule ExopticonWeb.Router do
   end
 
   # Other scopes may use custom stacks.
-  # scope "/api", ExopticonWeb do
-  #   pipe_through :api
-  # end
+  scope "/v1", ExopticonWeb do
+    pipe_through :api
+
+    resources "/cameras", V1.CameraController
+  end
 end

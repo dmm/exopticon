@@ -19,3 +19,33 @@ import "phoenix_html";
 // paths "./socket" or full ones "web/static/js/socket".
 
 import socket from "./socket";
+
+import CameraManager from "./camera_manager";
+
+function updateCameras() {
+
+    var request = new XMLHttpRequest();
+    request.open("GET", "v1/cameras", true);
+
+    request.onload = function() {
+        if (this.status >= 200 && this.status < 400) {
+            // Success!
+            var cameras = JSON.parse(this.response);
+            window.cameraManager.updateCameras(cameras);
+        } else {
+            console.log('reached server but something went wrong');
+        }
+    };
+
+    request.onerror = function() {
+        console.log('There was a connection error of some sort...');
+    };
+
+    request.send();
+}
+
+window.onload = function() {
+    window.cameraManager = new CameraManager(socket);
+    updateCameras();
+    setInterval(updateCameras, 5000);
+};

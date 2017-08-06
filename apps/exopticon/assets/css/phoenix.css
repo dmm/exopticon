@@ -1,3 +1,5 @@
+/* Another good color #6fc0ba */
+
 .breadcrumb {
     display: flex;
     align-items: center;
@@ -6,9 +8,9 @@
 }
 
 /* Implement background stripes */
-@media (min-width: 324px) {
+@media (min-width: 320px) {
     .breadcrumb {
-        background-image: repeating-linear-gradient(90deg, black, black 15px, orange 15px, orange 30px);
+        background-image: repeating-linear-gradient(130deg, black, black 15px, orange 15px, orange 30px);
     }
 }
 
@@ -18,7 +20,7 @@
 }
 
 .breadcrumb > .active {
-    color: #777;
+    color: orange;
 }
 
 .breadcrumb > li {
@@ -27,15 +29,15 @@
 }
 
 .breadcrumb > li {
-    color: black;
-    background-color: #777;
+    color: orange;
+    background-color: black;
     border-radius: 4px;
     padding: 3px;
     margin-right: 1px;
 }
 
 .breadcrumb a {
-    color: black;
+    color: orange;
     text-decoration: none;
 }
 
@@ -66,7 +68,7 @@ body, form, ul, table {
 
 .header span.logo img {
     height: 36px;
-    padding-right: 4px;
+    padding-right: 2px;
 }
 
 .header ol {
@@ -115,4 +117,8 @@ body, form, ul, table {
 
 .alert {
     background-color: #555;
+}
+
+#cameras img {
+    max-width: 100%;
 }

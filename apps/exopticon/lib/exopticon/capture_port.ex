@@ -25,9 +25,12 @@ defmodule Exopticon.CapturePort do
 
   ### Server callbacks
   def init({id, url, fps, video_dir}) do
-    Process.flag(:trap_exit, true)
-    port = Port.open({:spawn, "apps/exopticon/src/captureserver #{url} #{fps} #{video_dir} /tmp/shot.jpg"},
-      [:binary, { :packet, 4 }])
+    storage_path = video_dir
+    |> Path.expand
+    |> Path.join(Integer.to_string(id))
+    File.mkdir_p!(storage_path)
+    port = Port.open({:spawn, "apps/exopticon/src/captureserver #{url} #{fps} #{storage_path} /tmp/shot.jpg"},
+      [:binary, { :packet, 4 }, :exit_status])
 #    port = Port.open({:spawn, "pwd"}, [:binary, {:packet, 4}])
     {:ok, %{port: port, id: id}}
   end
@@ -42,14 +45,19 @@ defmodule Exopticon.CapturePort do
 
   # Handle messages from port
   def handle_info({ port, { :data, msg } }, %{port: port, id: id}) do
-#    IO.puts("Got frame from: " <> Integer.to_string(id))
     %{frameJpeg: %Bson.Bin{bin: dec }, pts: pts} = Bson.decode(msg)
     ExopticonWeb.Endpoint.broadcast!("camera:"<>Integer.to_string(id), "jpg", %{ frameJpeg: dec, pts: pts})
     {:noreply, %{port: port, id: id}}
   end
 
   def handle_info({:EXIT, _port, reason}, state) do
+    IO.puts "Capture port stoppped! The reason is: " <> Atom.to_string(reason)
     {:stop, reason, state}
+  end
+
+  def handle_info({_port, {:exit_status, status}}, state) do
+    IO.puts "Exit Status: " <> Integer.to_string(status)
+    {:stop, :normal, state}
   end
 
   def terminate(_reason, %{id: _, port: port}) do

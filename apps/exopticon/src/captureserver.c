@@ -25,6 +25,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
+#include <libavutil/error.h>
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixfmt.h>
@@ -684,6 +685,7 @@ static int interrupt_cb(void *ctx)
 
 int main(int argc, char *argv[])
 {
+        int return_value = EXIT_SUCCESS;
         struct CameraState cam;
         cam.ifcx = NULL;
         cam.ofcx = NULL;
@@ -747,6 +749,7 @@ int main(int argc, char *argv[])
                         // User allocated AVFormatContext is freed on error by
                         // avformat_open_input.
                         cam.ifcx = NULL;
+                        return_value = 1;
                         goto cleanup;
                 }
         }
@@ -779,10 +782,12 @@ int main(int argc, char *argv[])
         cam.icodec = avcodec_find_decoder(cam.iccx->codec_id);
         if (!cam.icodec) {
                 bs_log("Codec not found %d ", cam.iccx->codec_id);
+                return_value = 2;
                 goto cleanup;
         }
         if (avcodec_open2(cam.iccx, cam.icodec, NULL) < 0) {
                 bs_log("Could not open codec");
+                return_value = 2;
                 goto cleanup;
         }
         // Assume ist framerate is not accurate :(
@@ -830,6 +835,10 @@ int main(int argc, char *argv[])
         char buf[1024];
         av_strerror(ret, buf, sizeof(buf));
         bs_log("av_read_frame returned %d, %s exiting...", ret, buf);
+        ffmpeg(stderr, "av_read_frame returned %d, %s exiting...", ret, buf);
+        if (ret == AVERROR_IO) {
+                return_value = 1;
+        }
 cleanup:
         bs_log("Cleaning up!");
         if (cam.ofcx != NULL) {
@@ -847,5 +856,5 @@ cleanup:
 
         avformat_network_deinit();
 
-        return EXIT_SUCCESS;
+        return return_value;
 }
