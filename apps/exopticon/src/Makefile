@@ -16,7 +16,7 @@ development: captureserver.c
 playbackserver: playbackserver.c
 	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackserver.c -o playbackserver
 
-captureserver: captureserver.c
+captureserver: captureserver.c bson_frame.c
 	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureserver.c bson_frame.c -o captureserver
 
 .PHONY: clean

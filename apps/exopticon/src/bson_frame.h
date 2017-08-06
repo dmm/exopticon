@@ -24,3 +24,5 @@ struct FrameMessage {
 };
 
 void send_frame_message(struct FrameMessage *msg, FILE *stream);
+
+void send_new_file_message(char *filename, char *iso_begin_time);

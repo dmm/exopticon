@@ -47,6 +47,7 @@ const int MAX_FILE_SIZE = 10 * 1024 * 1024;
 const int CAPTURE_PERFORMANCE_SIZE = 50;
 
 int64_t timespec_to_ms(const struct timespec time);
+char *timespec_to_8601(struct timespec *ts);
 
 struct CameraState {
         time_t timenow, timestart;
@@ -166,9 +167,9 @@ void bs_log(const char *const fmt, ...)
 
 void report_new_file(char *filename, struct timespec begin_time)
 {
-        bs_print("{ \"type\": \"newFile\", \"filename\": \"%s\", "
-                 "\"beginTime\": %lld }",
-                 filename, (long long)timespec_to_ms(begin_time));
+        char *isotime = timespec_to_8601(&begin_time);
+        send_new_file_message(filename, isotime);
+        free(isotime);
 }
 void report_finished_file(char *filename, struct timespec begin_time,
                           struct timespec end_time)
@@ -835,10 +836,7 @@ int main(int argc, char *argv[])
         char buf[1024];
         av_strerror(ret, buf, sizeof(buf));
         bs_log("av_read_frame returned %d, %s exiting...", ret, buf);
-        ffmpeg(stderr, "av_read_frame returned %d, %s exiting...", ret, buf);
-        if (ret == AVERROR_IO) {
-                return_value = 1;
-        }
+
 cleanup:
         bs_log("Cleaning up!");
         if (cam.ofcx != NULL) {

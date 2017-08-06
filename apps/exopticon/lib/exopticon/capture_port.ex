@@ -45,9 +45,18 @@ defmodule Exopticon.CapturePort do
 
   # Handle messages from port
   def handle_info({ port, { :data, msg } }, %{port: port, id: id}) do
-    %{frameJpeg: %Bson.Bin{bin: dec }, pts: pts} = Bson.decode(msg)
-    ExopticonWeb.Endpoint.broadcast!("camera:"<>Integer.to_string(id), "jpg", %{ frameJpeg: dec, pts: pts})
+    {Bson.decode(msg), id}
+    |> handle_message
+
     {:noreply, %{port: port, id: id}}
+  end
+
+  def handle_message({%{frameJpeg: %Bson.Bin{bin: dec}, pts: pts}, id}) do
+    ExopticonWeb.Endpoint.broadcast!("camera:"<>Integer.to_string(id), "jpg", %{ frameJpeg: dec, pts: pts})
+  end
+
+  def handle_message({%{type: "newFile", filename: filename, beginTime: beginTime}, id}) do
+    IO.puts "Got new file from " <> Integer.to_string(id) <> "! " <> filename <> " at " <> beginTime
   end
 
   def handle_info({:EXIT, _port, reason}, state) do
