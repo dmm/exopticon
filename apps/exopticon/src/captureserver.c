@@ -385,11 +385,12 @@ char *generate_output_name(const char *output_directory_name, time_t time)
         int size = 256;
         char *name = calloc(1, size);
         char *isotime = calloc(1, size);
+        int nonce = rand();
 
         strftime(isotime, size, "%FT%H%M%S%z", localtime(&time));
 
-        int ret = snprintf(name, size, "%s/%lld_%s.mkv", output_directory_name,
-                           (long long)time, isotime);
+        int ret = snprintf(name, size, "%s/%lld_%s_%d.mkv", output_directory_name,
+                           (long long)time, isotime, nonce);
         bs_log("Generated filename: %s", name);
         if (ret < 0 || ret > size) {
                 // An error occured...
@@ -704,6 +705,9 @@ int main(int argc, char *argv[])
         input_uri = argv[1];
         cam.frames_per_second = atoi(argv[2]);
         cam.output_directory_name = argv[3];
+
+        // Seed rand
+        srand(time(NULL));
 
         // Initialize library
         av_log_set_level(AV_LOG_FATAL);
