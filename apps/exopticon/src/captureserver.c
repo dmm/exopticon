@@ -174,10 +174,9 @@ void report_new_file(char *filename, struct timespec begin_time)
 void report_finished_file(char *filename, struct timespec begin_time,
                           struct timespec end_time)
 {
-        bs_print("{ \"type\": \"finishedFile\", \"filename\": \"%s\", "
-                 "\"beginTime\": %lld, \"endTime\": %lld }",
-                 filename, (long long)timespec_to_ms(begin_time),
-                 (long long)timespec_to_ms(end_time));
+        char *isotime = timespec_to_8601(&end_time);
+        send_end_file_message(filename, isotime);
+        free(isotime);
 }
 
 time_t get_time()
@@ -292,12 +291,12 @@ char *timespec_to_8601(struct timespec *ts)
                 return NULL;
         }
 
-        result = strftime(date, sizeof(date), "%FT%H%M%S", &t);
+        result = strftime(date, sizeof(date), "%FT%H:%M:%S", &t);
         if (result == 0) {
                 goto error;
         }
 
-        result = snprintf(frac_secs, sizeof(frac_secs), ".%09ld", ts->tv_nsec);
+        result = snprintf(frac_secs, sizeof(frac_secs), ".%03ld", ts->tv_nsec);
         if (result < 0) {
                 goto error;
         }

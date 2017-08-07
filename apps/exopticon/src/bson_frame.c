@@ -184,3 +184,57 @@ void send_new_file_message(char *filename, char *iso_begin_time)
         fwrite(&null, 1, 1, stdout);
         fflush(stdout);
 }
+
+void send_end_file_message(char *filename, char *iso_end_time)
+{
+        const char *type_tagname = "type";
+        const char *type = "endFile";
+        const char *file_tagname = "filename";
+        const char *end_time_tagname = "endTime";
+
+        uint32_t msg_size = 0;
+        //
+        // Document total and ending null
+        //
+        msg_size += sizeof(msg_size) + 1;
+
+        //
+        // type element
+        //
+        msg_size += get_string_element_size(type, type_tagname);
+
+        //
+        // filename element
+        msg_size += get_string_element_size(filename, file_tagname);
+
+        //
+        // begin time element
+        //
+        msg_size += get_string_element_size(iso_end_time, end_time_tagname);
+
+        //
+        // output framing length
+        //
+        const uint32_t msg_size_be = htobe32(msg_size);
+        fwrite(&msg_size_be, sizeof msg_size_be, 1, stdout);
+
+        //
+        // Generate bson
+        //
+        const char null = 0x00;
+        // total message size
+        const uint32_t msg_size_le = htole32(msg_size);
+        fwrite(&msg_size_le, sizeof msg_size_le, 1, stdout);
+
+        // type element
+        write_string(type, type_tagname);
+
+        // filename element
+        write_string(filename, file_tagname);
+
+        // begin time element
+        write_string(iso_end_time, end_time_tagname);
+
+        fwrite(&null, 1, 1, stdout);
+        fflush(stdout);
+}
