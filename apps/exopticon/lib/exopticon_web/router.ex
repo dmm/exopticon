@@ -22,6 +22,7 @@ defmodule ExopticonWeb.Router do
     resources "/sessions", SessionController, only: [:new, :create, :delete]
     resources "/camera_groups", CameraGroupController
     resources "/cameras", CameraController
+    resources "/files", FileController
   end
 
   # Other scopes may use custom stacks.
@@ -29,5 +30,6 @@ defmodule ExopticonWeb.Router do
     pipe_through :api
 
     resources "/cameras", V1.CameraController
+    get "/files/:camera_id", V1.FileController, :index
   end
 end

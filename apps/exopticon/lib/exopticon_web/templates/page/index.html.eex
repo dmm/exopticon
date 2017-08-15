@@ -1,2 +1,3 @@
-<div id="cameras">
+<div id="allCameras">
+  <div id="cameras"></div>
 </div>

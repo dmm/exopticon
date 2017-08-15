@@ -1,5 +1,6 @@
 <h2>Show Camera</h2>
 
+<!---
 <ul>
 
   <li>
@@ -51,3 +52,11 @@
 
 <span><%= link "Edit", to: camera_path(@conn, :edit, @camera) %></span>
 <span><%= link "Back", to: camera_path(@conn, :index) %></span>
+
+-->
+
+<div id="singleCamera" data-id=<%= @camera.id %>>
+  <div id="cameras">
+  </div>
+  <input id="timeSelector" type="range"></input>
+</div>

@@ -142,4 +142,76 @@ defmodule Exopticon.VideoTest do
       assert %Ecto.Changeset{} = Video.change_camera(camera)
     end
   end
+
+  describe "files" do
+    alias Exopticon.Video.File
+
+    @valid_attrs %{begin_monotonic: 42, begin_time: "2010-04-17 14:00:00.000000Z", end_monotonic: 42, end_time: "2010-04-17 14:00:00.000000Z", filename: "some filename", monotonic_index: 42, size: 42}
+    @update_attrs %{begin_monotonic: 43, begin_time: "2011-05-18 15:01:01.000000Z", end_monotonic: 43, end_time: "2011-05-18 15:01:01.000000Z", filename: "some updated filename", monotonic_index: 43, size: 43}
+    @invalid_attrs %{begin_monotonic: nil, begin_time: nil, end_monotonic: nil, end_time: nil, filename: nil, monotonic_index: nil, size: nil}
+
+    def file_fixture(attrs \\ %{}) do
+      {:ok, file} =
+        attrs
+        |> Enum.into(@valid_attrs)
+        |> Video.create_file()
+
+      file
+    end
+
+    test "list_files/0 returns all files" do
+      file = file_fixture()
+      assert Video.list_files() == [file]
+    end
+
+    test "get_file!/1 returns the file with given id" do
+      file = file_fixture()
+      assert Video.get_file!(file.id) == file
+    end
+
+    test "create_file/1 with valid data creates a file" do
+      assert {:ok, %File{} = file} = Video.create_file(@valid_attrs)
+      assert file.begin_monotonic == 42
+      assert file.begin_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
+      assert file.end_monotonic == 42
+      assert file.end_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
+      assert file.filename == "some filename"
+      assert file.monotonic_index == 42
+      assert file.size == 42
+    end
+
+    test "create_file/1 with invalid data returns error changeset" do
+      assert {:error, %Ecto.Changeset{}} = Video.create_file(@invalid_attrs)
+    end
+
+    test "update_file/2 with valid data updates the file" do
+      file = file_fixture()
+      assert {:ok, file} = Video.update_file(file, @update_attrs)
+      assert %File{} = file
+      assert file.begin_monotonic == 43
+      assert file.begin_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
+      assert file.end_monotonic == 43
+      assert file.end_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
+      assert file.filename == "some updated filename"
+      assert file.monotonic_index == 43
+      assert file.size == 43
+    end
+
+    test "update_file/2 with invalid data returns error changeset" do
+      file = file_fixture()
+      assert {:error, %Ecto.Changeset{}} = Video.update_file(file, @invalid_attrs)
+      assert file == Video.get_file!(file.id)
+    end
+
+    test "delete_file/1 deletes the file" do
+      file = file_fixture()
+      assert {:ok, %File{}} = Video.delete_file(file)
+      assert_raise Ecto.NoResultsError, fn -> Video.get_file!(file.id) end
+    end
+
+    test "change_file/1 returns a file changeset" do
+      file = file_fixture()
+      assert %Ecto.Changeset{} = Video.change_file(file)
+    end
+  end
 end

@@ -1,0 +1,10 @@
+#singleCamera {
+    width: 100%;
+    padding: 0;
+}
+
+#singleCamera input {
+    width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+}

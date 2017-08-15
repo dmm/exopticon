@@ -1,0 +1,53 @@
+<%= form_for @changeset, @action, fn f -> %>
+  <%= if @changeset.action do %>
+    <div class="alert alert-danger">
+      <p>Oops, something went wrong! Please check the errors below.</p>
+    </div>
+  <% end %>
+
+  <div class="form-group">
+    <%= label f, :filename, class: "control-label" %>
+    <%= text_input f, :filename, class: "form-control" %>
+    <%= error_tag f, :filename %>
+  </div>
+
+  <div class="form-group">
+    <%= label f, :size, class: "control-label" %>
+    <%= number_input f, :size, class: "form-control" %>
+    <%= error_tag f, :size %>
+  </div>
+
+  <div class="form-group">
+    <%= label f, :begin_time, class: "control-label" %>
+    <%= datetime_select f, :begin_time, class: "form-control" %>
+    <%= error_tag f, :begin_time %>
+  </div>
+
+  <div class="form-group">
+    <%= label f, :end_time, class: "control-label" %>
+    <%= datetime_select f, :end_time, class: "form-control" %>
+    <%= error_tag f, :end_time %>
+  </div>
+
+  <div class="form-group">
+    <%= label f, :begin_monotonic, class: "control-label" %>
+    <%= number_input f, :begin_monotonic, class: "form-control" %>
+    <%= error_tag f, :begin_monotonic %>
+  </div>
+
+  <div class="form-group">
+    <%= label f, :end_monotonic, class: "control-label" %>
+    <%= number_input f, :end_monotonic, class: "form-control" %>
+    <%= error_tag f, :end_monotonic %>
+  </div>
+
+  <div class="form-group">
+    <%= label f, :monotonic_index, class: "control-label" %>
+    <%= number_input f, :monotonic_index, class: "form-control" %>
+    <%= error_tag f, :monotonic_index %>
+  </div>
+
+  <div class="form-group">
+    <%= submit "Submit", class: "btn btn-primary" %>
+  </div>
+<% end %>

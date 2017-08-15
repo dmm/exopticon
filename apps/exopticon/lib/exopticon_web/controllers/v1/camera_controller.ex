@@ -10,5 +10,4 @@ defmodule ExopticonWeb.V1.CameraController do
     cameras = Video.list_cameras()
     render(conn, "index.json", cameras: cameras)
   end
-
 end

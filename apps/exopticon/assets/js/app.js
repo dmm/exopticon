@@ -22,16 +22,26 @@ import socket from "./socket";
 
 import CameraManager from "./camera_manager";
 
-function updateCameras() {
+import SingleCamera from "./singleCamera";
+
+function updateCameras(cameraId) {
 
     var request = new XMLHttpRequest();
-    request.open("GET", "v1/cameras", true);
+    request.open("GET", "/v1/cameras", true);
 
     request.onload = function() {
         if (this.status >= 200 && this.status < 400) {
             // Success!
             var cameras = JSON.parse(this.response);
-            window.cameraManager.updateCameras(cameras);
+            if (cameraId === undefined) {
+                window.cameraManager.updateCameras(cameras);
+            } else {
+                cameras.forEach(function(c) {
+                    if (c.id == cameraId) {
+                        window.cameraManager.updateCameras([c]);
+                    }
+                });
+            }
         } else {
             console.log('reached server but something went wrong');
         }
@@ -44,8 +54,51 @@ function updateCameras() {
     request.send();
 }
 
+function fetchFiles(cameraId) {
+    var request = new XMLHttpRequest();
+    request.open("GET", "/v1/files/" + cameraId, true);
+
+    request.onload = function() {
+        setTimeSelector(processFiles(JSON.parse(this.response)));
+    };
+
+    request.onerror = function() {
+        console.log('There was a problem with the file connection...');
+    };
+
+    request.send();
+}
+
+function processFiles(files) {
+    let length = 0;
+
+    files.forEach(function (f) {
+        length += f.end_monotonic - f.begin_monotonic;
+    });
+
+    return {
+        length: length / 1000
+    };
+}
+
+function setTimeSelector(processedFiles) {
+    let s = document.getElementById('timeSelector');
+
+    s.min = 0;
+    s.max = processedFiles.length;
+}
+
 window.onload = function() {
-    window.cameraManager = new CameraManager(socket);
-    updateCameras();
-    setInterval(updateCameras, 5000);
+    if (document.getElementById("allCameras")) {
+        window.cameraManager = new CameraManager(socket);
+        updateCameras();
+        setInterval(updateCameras, 5000);
+    }
+
+    let cam = document.getElementById("singleCamera");
+    if (cam) {
+        window.cameraManager = new CameraManager(socket);
+        updateCameras(cam.dataset.id);
+        fetchFiles(cam.dataset.id);
+    }
 };

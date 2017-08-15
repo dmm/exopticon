@@ -1,0 +1,43 @@
+<h2>Show File</h2>
+
+<ul>
+
+  <li>
+    <strong>Filename:</strong>
+    <%= @file.filename %>
+  </li>
+
+  <li>
+    <strong>Size:</strong>
+    <%= @file.size %>
+  </li>
+
+  <li>
+    <strong>Begin time:</strong>
+    <%= @file.begin_time %>
+  </li>
+
+  <li>
+    <strong>End time:</strong>
+    <%= @file.end_time %>
+  </li>
+
+  <li>
+    <strong>Begin monotonic:</strong>
+    <%= @file.begin_monotonic %>
+  </li>
+
+  <li>
+    <strong>End monotonic:</strong>
+    <%= @file.end_monotonic %>
+  </li>
+
+  <li>
+    <strong>Monotonic index:</strong>
+    <%= @file.monotonic_index %>
+  </li>
+
+</ul>
+
+<span><%= link "Edit", to: file_path(@conn, :edit, @file) %></span>
+<span><%= link "Back", to: file_path(@conn, :index) %></span>
