@@ -202,6 +202,7 @@ function parseUtf8String(data, length, start) {
   var c = 0;
   var c1 = 0;
   var c2 = 0;
+  var c3 = 0;
 
   // If we have a BOM skip it
   if (length >= 3 && data[i] === 0xef && data[i+1] === 0xbb && data[i+2] === 0xbf) {

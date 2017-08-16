@@ -1,8 +1,6 @@
 defmodule Exopticon.CapturePort do
   use GenServer
 
-  import Exopticon.Repo
-  import Exopticon.Video.File
   import Ecto.Query
 
   ### Client API
@@ -59,19 +57,12 @@ defmodule Exopticon.CapturePort do
   #end
 
   # Handle messages from port
-  def handle_info({ port, { :data, msg } }, %{port: port, id: id, monotonic_index: monotonic_index}) do
-    {Bson.decode(msg), id, monotonic_index}
-    |> handle_message
 
-    {:noreply, %{port: port, id: id, monotonic_index: monotonic_index}}
+  def handle_message({%{"jpegFrame" => dec, "pts" =>  pts}, id, _}) do
+    ExopticonWeb.Endpoint.broadcast!("camera:"<>Integer.to_string(id), "jpg", %{ frameJpeg: Msgpax.Bin.new(dec), pts: pts})
   end
 
-  def handle_message({%{frameJpeg: %Bson.Bin{bin: dec}, pts: pts}, id, _}) do
-    ExopticonWeb.Endpoint.broadcast!("camera:"<>Integer.to_string(id), "jpg", %{ frameJpeg: dec, pts: pts})
-  end
-
-  def handle_message({%{type: "newFile", filename: filename, beginTime: beginTime}, id, monotonic_index}) do
-    IO.puts "Got new file from " <> Integer.to_string(id) <> "! " <> filename <> " at " <> beginTime
+  def handle_message({%{"filename" => filename, "beginTime" => beginTime}, id, monotonic_index}) do
     {:ok, start_time, _} = DateTime.from_iso8601(beginTime)
     monotonic_start = System.monotonic_time(:microsecond)
     {:ok, time} = Exopticon.Tsrange.cast([start_time, nil])
@@ -82,9 +73,8 @@ defmodule Exopticon.CapturePort do
 
   end
 
-  def handle_message({%{type: "endFile", filename: filename, endTime: endTime}, id, _}) do
+  def handle_message({%{"filename" => filename, "endTime" => endTime}, id, _}) do
     monotonic_stop = System.monotonic_time(:microsecond)
-    IO.puts "Got end file from " <> Integer.to_string(id) <> "! " <> filename <> " at " <> endTime
     {:ok, end_time, _} = DateTime.from_iso8601(endTime)
     file = Exopticon.Repo.get_by(Exopticon.Video.File, filename: filename)
     [start_time, _] = file.time
@@ -94,6 +84,13 @@ defmodule Exopticon.CapturePort do
     |> Ecto.Changeset.change(time: time)
     |> Ecto.Changeset.change(end_monotonic: monotonic_stop)
     |> Exopticon.Repo.update
+  end
+
+  def handle_info({ port, { :data, msg } }, %{port: port, id: id, monotonic_index: monotonic_index}) do
+    {Msgpax.unpack!(msg), id, monotonic_index}
+    |> handle_message
+
+    {:noreply, %{port: port, id: id, monotonic_index: monotonic_index}}
   end
 
   def handle_info({:EXIT, _port, reason}, state) do

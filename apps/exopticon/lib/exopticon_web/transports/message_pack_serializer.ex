@@ -50,6 +50,6 @@ defmodule ExopticonWeb.Transports.MessagePackSerializer do
   end
 
   defp pack_data(data) do
-    MessagePack.pack!(data, enable_string: true)
+    Msgpax.pack!(data, enable_string: true)
   end
 end
