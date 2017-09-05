@@ -615,7 +615,7 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         fwrite(&be_pkt_size, sizeof(be_pkt_size), 1, stdout);
         fwrite(output_frame_buffer, output_frame_size, 1, stdout);
         */
-        send_frame_message(&message, stdout);
+        send_frame_message(&message);
         clock_gettime(CLOCK_MONOTONIC, &write_end);
         frame_time->stream_write_time =
             timespec_to_ms_interval(write_begin, write_end);

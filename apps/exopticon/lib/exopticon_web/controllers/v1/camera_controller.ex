@@ -2,7 +2,7 @@ defmodule ExopticonWeb.V1.CameraController do
   use ExopticonWeb, :controller
 
   alias Exopticon.Video
-  alias Exopticon.Video.Camera
+#  alias Exopticon.Video.Camera
 
   plug :scrub_params, "post" when action in [:create, :update]
 

@@ -25,7 +25,7 @@
 
 #include "mpack_frame.h"
 
-void send_frame_message(struct FrameMessage *msg, FILE *stream)
+void send_frame_message(struct FrameMessage *msg)
 {
         char *data = NULL;
         size_t size = 0;
@@ -34,7 +34,7 @@ void send_frame_message(struct FrameMessage *msg, FILE *stream)
 
         mpack_start_map(&writer, 2);
         mpack_write_cstr(&writer, "jpegFrame");
-        mpack_write_bin(&writer, msg->jpeg, (uint32_t)msg->jpeg_size);
+        mpack_write_bin(&writer, (char*)msg->jpeg, (uint32_t)msg->jpeg_size);
         mpack_write_cstr(&writer, "pts");
         mpack_write_i64(&writer, msg->pts);
         mpack_finish_map(&writer);

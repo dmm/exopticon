@@ -16,6 +16,7 @@
  */
 #define _DEFAULT_SOURCE
 
+#include <arpa/inet.h>
 #include <endian.h>
 #include <fcntl.h>
 #include <libavcodec/avcodec.h>
@@ -32,6 +33,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "mpack_frame.h"
 
 #define BILLION 1000000000
 
@@ -52,12 +55,6 @@ struct PlayerState {
         struct timespec begin_time;
 };
 
-struct FrameMessage {
-        uint8_t *jpeg;
-        int32_t jpeg_size;
-        int64_t pts;
-};
-
 static struct timespec time_diff(struct timespec old_time, struct timespec time)
 {
         int64_t sec = time.tv_sec - old_time.tv_sec;
@@ -68,14 +65,14 @@ static struct timespec time_diff(struct timespec old_time, struct timespec time)
         }
         return (struct timespec){.tv_sec = sec, .tv_nsec = nsec};
 }
-
+/*
 static struct timespec time_since(struct timespec old_time)
 {
         struct timespec time;
         clock_gettime(CLOCK_MONOTONIC, &time);
         return time_diff(old_time, time);
 }
-
+*/
 // return 1 if a > b, -1 if b > a, 0 if a == b
 static int time_cmp(struct timespec a, struct timespec b)
 {
@@ -104,7 +101,7 @@ static void bs_print(const char *fmt, ...)
         buf[(sizeof buf) - 1] = '\0';
         const int32_t msg_length = strlen(buf);
         const int32_t be_msg_length = htonl(msg_length);
-        //        fwrite(&be_msg_length, sizeof be_msg_length, 1, stderr);
+        fwrite(&be_msg_length, sizeof be_msg_length, 1, stderr);
         fwrite(buf, 1, msg_length, stderr);
         fflush(stderr);
 
@@ -116,10 +113,11 @@ static void my_av_log_callback(void *avcl, int level, const char *fmt,
 {
         char output_message[2048];
 
+        return;
         if (av_log_get_level() < level) {
                 return;
         }
-
+        char *a = (char*)avcl;
         vsnprintf(output_message, sizeof(output_message), fmt, vl);
         output_message[(sizeof output_message) - 1] =
             '\0'; // I don't remember if vsnprintf always sets this...
@@ -136,11 +134,12 @@ void bs_log(const char *const fmt, ...)
         my_av_log_callback(NULL, 1, fmt, ap);
 }
 
-int encode_jpeg(AVCodecContext *in_ccx, AVFrame *frame, AVPacket *pkt)
+int encode_jpeg(const AVFrame *in_frame, AVPacket *pkt)
 {
         AVCodec *codec = NULL;
+        AVFrame *frame = NULL;
         AVCodecContext *ccx = NULL;
-        enum AVPixelFormat img_fmt = AV_PIX_FMT_YUVJ420P;
+        const enum AVPixelFormat img_fmt = AV_PIX_FMT_YUVJ420P;
         int ret = 0;
 
         // Find the mjpeg encoder
@@ -158,9 +157,9 @@ int encode_jpeg(AVCodecContext *in_ccx, AVFrame *frame, AVPacket *pkt)
                 goto cleanup;
         }
 
-        ccx->bit_rate = in_ccx->bit_rate;
-        ccx->width = in_ccx->width;
-        ccx->height = in_ccx->height;
+//        ccx->bit_rate = in_ccx->bit_rate;
+        ccx->width = in_frame->width;
+        ccx->height = in_frame->height;
         ccx->pix_fmt = img_fmt;
 
         // Set quality
@@ -179,23 +178,31 @@ int encode_jpeg(AVCodecContext *in_ccx, AVFrame *frame, AVPacket *pkt)
                 goto cleanup;
         }
 
+        frame = av_frame_clone(in_frame);
+        if (frame == NULL) {
+                bs_log("frame clone error!");
+                ret = 1;
+                goto cleanup;
+        }
+
         frame->pts = 1;
         frame->quality = ccx->global_quality;
         frame->format = img_fmt;
         frame->width = ccx->width;
         frame->height = ccx->height;
 
-        int got_frame = 0;
-        int encode_ret = avcodec_encode_video2(ccx, pkt, frame, &got_frame);
+        //        int encode_ret = avcodec_encode_video2(ccx, pkt, frame, &got_frame);
+        const int encode_ret = avcodec_send_frame(ccx, frame);
         if (encode_ret != 0) {
                 bs_log("Error encoding jpeg");
                 ret = 1;
+                goto cleanup;
         }
-        if (got_frame == 1) {
-                ret = 0;
-        } else {
-                bs_log("got no frame :(");
-                ret = 1;
+        int receive_ret = avcodec_receive_packet(ccx, pkt);
+        if (receive_ret != 0) {
+          bs_log("Error receiving encoded packet");
+          ret = 1;
+          goto cleanup;
         }
 
 cleanup:
@@ -204,78 +211,38 @@ cleanup:
         return ret;
 }
 
-// check out http://bsonspec.org/spec.html to make sense of this
-void send_frame_message(struct FrameMessage *msg)
+int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRational time_base)
 {
-        const char int64_tag = 0x12;
-        const char binary_tag = 0x05;
-        const char *jpeg_name = "frameJpeg";
-        const char *pts_name = "pts";
+        AVPacket jpeg_packet;
+        av_init_packet(&jpeg_packet);
+        encode_jpeg(frame, &jpeg_packet);
+        struct FrameMessage message;
+        message.jpeg = jpeg_packet.buf->data;
+        message.jpeg_size = jpeg_packet.buf->size;
+        message.pts = frame->pts;
 
-        uint32_t msg_size = 0;
-        //
-        // Document total and ending null
-        //
-        msg_size += sizeof(msg_size) + 1;
+        do {
+                AVRational nsec = av_make_q(1, BILLION);
+                struct timespec pts_ts;
+                pts_ts.tv_sec = (frame->pts * time_base.num) / time_base.den;
+                int64_t frac_sec =
+                    frame->pts - ((pts_ts.tv_sec * time_base.den) / time_base.num);
+                pts_ts.tv_nsec =
+                    av_rescale_q(frac_sec, time_base, nsec);
 
-        //
-        // jpeg element
-        //
-        // jpeg element tag
-        msg_size += 1;
-        // jpeg element name + ending null
-        msg_size += strlen(jpeg_name) + 1;
-        // jpeg element int32
-        msg_size += sizeof(int32_t);
-        // jpeg element subtype byte
-        msg_size += 1;
-        // jpeg element size
-        msg_size += msg->jpeg_size;
+                struct timespec cur_time;
+                clock_gettime(CLOCK_MONOTONIC, &cur_time);
+                struct timespec diff = time_diff(begin_time, cur_time);
+                if (time_cmp(diff, pts_ts) > -1) {
+                        break;
+                } else {
+                  //usleep(diff.tv_nsec / 1000 / 10);
+                  nanosleep(&diff, NULL);
+                }
 
-        //
-        // pts element
-        //
-        // pts element tag
-        msg_size += 1;
-        // pts element name + ending null
-        msg_size += strlen(pts_name) + 1;
-        // pts element
-        msg_size += sizeof msg->pts;
-
-        //
-        // output framing length
-        //
-        const uint32_t msg_size_be = htobe32(msg_size);
-        fwrite(&msg_size_be, sizeof msg_size_be, 1, stdout);
-        //
-        // Generate bson
-        //
-        const char null = 0x00;
-        // total message size
-        const uint32_t msg_size_le = htole32(msg_size);
-        fwrite(&msg_size_le, sizeof msg_size_le, 1, stdout);
-
-        // pts element
-        fwrite(&int64_tag, 1, 1, stdout);
-        fprintf(stdout, "%s", pts_name);
-        fwrite(&null, 1, 1, stdout);
-        fwrite(&msg->pts, sizeof msg->pts, 1, stdout);
-
-        // jpeg element, name
-        fwrite(&binary_tag, 1, 1, stdout);
-        fprintf(stdout, "%s", jpeg_name);
-        fwrite(&null, 1, 1, stdout);
-        // jpeg element, size
-        const uint32_t jpeg_size_le = htole32(msg->jpeg_size);
-        fwrite(&jpeg_size_le, sizeof jpeg_size_le, 1, stdout);
-        // jpeg element subtype, generic binary type (null, \x00)
-        fwrite(&null, 1, 1, stdout);
-        // jpeg element, data
-        fwrite(msg->jpeg, 1, msg->jpeg_size, stdout);
-
-        // terminal null
-        fwrite(&null, 1, 1, stdout);
-        fflush(stdout);
+        } while (1);
+        send_frame_message(&message);
+        return 0;
 }
 
 int handle_packet(struct PlayerState *state)
@@ -296,53 +263,24 @@ int handle_packet(struct PlayerState *state)
                 state->got_key_frame = 1;
         }
 
-        int got_frame = 0;
-        AVPacket decode_packet;
-        const int64_t pts = state->pkt.pts;
-
-        int len = avcodec_decode_video2(state->ccx, state->frame, &got_frame,
-                                        &state->pkt);
-
-        if (len <= 0 || got_frame == 0) {
-                bs_log("Error decoding frame! len %d got_frame %d", len,
-                       got_frame);
-                exit(1);
+        const int decode_ret = avcodec_send_packet(state->ccx, &state->pkt);
+        if (decode_ret != 0) {
+                bs_log("Error decoding packet!");
                 goto cleanup;
         }
 
-        AVPacket jpeg_packet;
-        av_init_packet(&jpeg_packet);
-        encode_jpeg(state->ccx, state->frame, &jpeg_packet);
-        struct FrameMessage frame;
-        frame.jpeg = jpeg_packet.buf->data;
-        frame.jpeg_size = jpeg_packet.buf->size;
-        frame.pts = pts;
-
-        // Wait for correct frame time
+        int receive_ret = 0;
         do {
-                AVRational nsec;
-                nsec.num = 1;
-                nsec.den = BILLION;
-                struct timespec pts_ts;
-                pts_ts.tv_sec =
-                    (pts * state->st->time_base.num) / state->st->time_base.den;
-                int64_t frac_sec =
-                    pts - ((pts_ts.tv_sec * state->st->time_base.den) /
-                           state->st->time_base.num);
-                pts_ts.tv_nsec =
-                    av_rescale_q(frac_sec, state->st->time_base, nsec);
-
-                struct timespec cur_time;
-                clock_gettime(CLOCK_MONOTONIC, &cur_time);
-                struct timespec diff = time_diff(state->begin_time, cur_time);
-                if (time_cmp(diff, pts_ts) > -1) {
-                        break;
-                } else {
-                        usleep(diff.tv_nsec / 1000 / 10);
+                receive_ret = avcodec_receive_frame(state->ccx, state->frame);
+                if (receive_ret == AVERROR(EINVAL)) {
+                        bs_log("Error decoding packet!");
+                        goto cleanup;
                 }
 
-        } while (1);
-        send_frame_message(&frame);
+                send_frame(state->frame, state->begin_time, state->st->time_base);
+
+        } while (receive_ret != AVERROR(EOF));
+
         return 0;
 
 cleanup:
@@ -354,6 +292,9 @@ int main(int argc, char *argv[])
         struct PlayerState player;
 
         const char *program_name = argv[0];
+        if (argc < 3) {
+          fprintf(stderr, "USAGE: ./%s <input filename> <offset in ms>\n", program_name);
+        }
 
         // Initialize ffmpeg
         av_log_set_level(AV_LOG_FATAL);
@@ -365,6 +306,10 @@ int main(int argc, char *argv[])
         player.frame = av_frame_alloc();
         player.begin_time.tv_sec = 0;
         player.begin_time.tv_nsec = 0;
+
+        // Determine offset
+        long long ms_offset = 0;
+        sscanf(argv[2], "%lld", &ms_offset);
 
         if (avformat_open_input(&player.fcx, argv[1], NULL, NULL) != 0) {
                 bs_log("Could not open input!");
@@ -394,7 +339,23 @@ int main(int argc, char *argv[])
         }
 
         //        player.ccx = avcodec_alloc_context3(player.codec;)
-        player.ccx = player.fcx->streams[player.i_index]->codec;
+        player.codec = avcodec_find_decoder(player.codecpar->codec_id);
+        if (player.codec == NULL) {
+                bs_log("Codec!");
+                goto cleanup;
+        }
+
+        player.ccx = avcodec_alloc_context3(player.codec);
+        if (player.ccx == NULL) {
+                bs_log("codec context!");
+                goto cleanup;
+        }
+
+        int avcodec_ret = avcodec_parameters_to_context(player.ccx, player.codecpar);
+        if (avcodec_ret < 0) {
+                bs_log("codec create!");
+                goto cleanup;
+        }
 
         if (avcodec_open2(player.ccx, player.codec, NULL) < 0) {
                 bs_log("PLAYER!");

@@ -1,13 +1,11 @@
 defmodule Exopticon.CameraSupervisor do
   use Supervisor
 
-  import Ecto.Query
-
   def start_link do
     Supervisor.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  def init(cameras) do
+  def init(_) do
     children = [
 #      worker(Exopticon.CapturePort, [], restart: :permanent)
     ]

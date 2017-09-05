@@ -14,11 +14,11 @@ development: captureserver.c
 	${CC}  -O0 -g $(mycflags) $(devcflags) $(CFLAGS) $(LIBRARIES) captureserver.c mpack.c mpack_frame.c -o captureserver
 
 playbackserver: playbackserver.c mpack_frame.c
-	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackserver.c -o playbackserver
+	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackserver.c mpack.c mpack_frame.c -o playbackserver
 
 captureserver: captureserver.c mpack_frame.c
 	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureserver.c mpack.c mpack_frame.c -o captureserver
 
 .PHONY: clean
 clean:
-	-rm captureserver
+	-rm -f captureserver playbackserver
