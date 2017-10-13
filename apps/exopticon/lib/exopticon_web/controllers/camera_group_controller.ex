@@ -20,6 +20,7 @@ defmodule ExopticonWeb.CameraGroupController do
         conn
         |> put_flash(:info, "Camera group created successfully.")
         |> redirect(to: camera_group_path(conn, :show, camera_group))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "new.html", changeset: changeset)
     end
@@ -44,6 +45,7 @@ defmodule ExopticonWeb.CameraGroupController do
         conn
         |> put_flash(:info, "Camera group updated successfully.")
         |> redirect(to: camera_group_path(conn, :show, camera_group))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "edit.html", camera_group: camera_group, changeset: changeset)
     end

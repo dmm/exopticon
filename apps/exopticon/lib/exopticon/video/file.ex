@@ -3,15 +3,14 @@ defmodule Exopticon.Video.File do
   import Ecto.Changeset
   alias Exopticon.Video.File
 
-
   schema "files" do
-    field :time, Exopticon.Tsrange
-    field :begin_monotonic, :integer
-    field :end_monotonic, :integer
-    field :filename, :string
-    field :monotonic_index, :integer
-    field :size, :integer
-    field :camera_id, :id
+    field(:time, Exopticon.Tsrange)
+    field(:begin_monotonic, :integer)
+    field(:end_monotonic, :integer)
+    field(:filename, :string)
+    field(:monotonic_index, :integer)
+    field(:size, :integer)
+    field(:camera_id, :id)
 
     timestamps()
   end
@@ -19,7 +18,23 @@ defmodule Exopticon.Video.File do
   @doc false
   def changeset(%File{} = file, attrs) do
     file
-    |> cast(attrs, [:filename, :size, :begin_time, :end_time, :begin_monotonic, :end_monotonic, :monotonic_index])
-    |> validate_required([:filename, :size, :begin_time, :end_time, :begin_monotonic, :end_monotonic, :monotonic_index])
+    |> cast(attrs, [
+         :filename,
+         :size,
+         :begin_time,
+         :end_time,
+         :begin_monotonic,
+         :end_monotonic,
+         :monotonic_index
+       ])
+    |> validate_required([
+         :filename,
+         :size,
+         :begin_time,
+         :end_time,
+         :begin_monotonic,
+         :end_monotonic,
+         :monotonic_index
+       ])
   end
 end

@@ -298,11 +298,14 @@ defmodule Exopticon.Video do
   Returns video for single camera
   """
   def get_files_between(camera_id, begin_time, end_time) do
-    query = from f in File,
-      where: f.camera_id == ^camera_id
-    and fragment("? && tsrange(?, ?)", f.time, ^begin_time, ^end_time)
-    and not is_nil(f.end_monotonic),
-    order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
+    query =
+      from(
+        f in File,
+        where: f.camera_id == ^camera_id and
+          fragment("? && tsrange(?, ?)", f.time, ^begin_time, ^end_time) and
+          not is_nil(f.end_monotonic),
+        order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
+      )
 
     Repo.all(query)
   end

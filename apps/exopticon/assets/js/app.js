@@ -24,6 +24,11 @@ import CameraManager from "./camera_manager";
 
 import SingleCamera from "./singleCamera";
 
+import PageIndexView from "./page_index_view.js";
+
+var $ = document.querySelect;
+var $$ = document.querySelectAll;
+
 function updateCameras(cameraId) {
 
     var request = new XMLHttpRequest();
@@ -86,6 +91,14 @@ function setTimeSelector(processedFiles) {
 
     s.min = 0;
     s.max = processedFiles.length;
+}
+
+function registerPage(pageName, fun) {
+    if (window.pageRegistry == undefined) {
+        window.pageRegistry = {};
+    }
+
+    window.pageRegistry[pageName] = fun;
 }
 
 window.onload = function() {

@@ -3,19 +3,18 @@ defmodule Exopticon.Video.Camera do
   import Ecto.Changeset
   alias Exopticon.Video.Camera
 
-
   schema "cameras" do
-    field :fps, :integer
-    field :ip, :string
-    field :mac, :string
-    field :name, :string
-    field :onvif_port, :integer
-    field :password, :string
-    field :rtsp_url, :string
-    field :type, :string
-    field :username, :string
-#    field :camera_group_id, :id
-    belongs_to :camera_group, Exopticon.Video.CameraGroup
+    field(:fps, :integer)
+    field(:ip, :string)
+    field(:mac, :string)
+    field(:name, :string)
+    field(:onvif_port, :integer)
+    field(:password, :string)
+    field(:rtsp_url, :string)
+    field(:type, :string)
+    field(:username, :string)
+    #    field :camera_group_id, :id
+    belongs_to(:camera_group, Exopticon.Video.CameraGroup)
 
     timestamps()
   end

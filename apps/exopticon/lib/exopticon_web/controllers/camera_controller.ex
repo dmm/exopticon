@@ -20,6 +20,7 @@ defmodule ExopticonWeb.CameraController do
         conn
         |> put_flash(:info, "Camera created successfully.")
         |> redirect(to: camera_path(conn, :show, camera))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "new.html", changeset: changeset)
     end
@@ -44,6 +45,7 @@ defmodule ExopticonWeb.CameraController do
         conn
         |> put_flash(:info, "Camera updated successfully.")
         |> redirect(to: camera_path(conn, :show, camera))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "edit.html", camera: camera, changeset: changeset)
     end

@@ -20,6 +20,7 @@ defmodule ExopticonWeb.FileController do
         conn
         |> put_flash(:info, "File created successfully.")
         |> redirect(to: file_path(conn, :show, file))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "new.html", changeset: changeset)
     end
@@ -44,6 +45,7 @@ defmodule ExopticonWeb.FileController do
         conn
         |> put_flash(:info, "File updated successfully.")
         |> redirect(to: file_path(conn, :show, file))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "edit.html", file: file, changeset: changeset)
     end

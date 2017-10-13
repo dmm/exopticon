@@ -1,7 +1,7 @@
 defmodule ExopticonWeb.UserController do
   use ExopticonWeb, :controller
 
-  plug :authenticate_user
+  plug(:authenticate_user)
 
   alias Exopticon.Accounts
   alias Exopticon.Accounts.User
@@ -22,6 +22,7 @@ defmodule ExopticonWeb.UserController do
         conn
         |> put_flash(:info, "User created successfully.")
         |> redirect(to: user_path(conn, :show, user))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "new.html", changeset: changeset)
     end
@@ -46,6 +47,7 @@ defmodule ExopticonWeb.UserController do
         conn
         |> put_flash(:info, "User updated successfully.")
         |> redirect(to: user_path(conn, :show, user))
+
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, "edit.html", user: user, changeset: changeset)
     end

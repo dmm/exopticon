@@ -6,10 +6,10 @@ defmodule Exopticon.Accounts.User do
   import Comeonin.Bcrypt, only: [hashpwsalt: 1]
 
   schema "users" do
-    field :name, :string
-    field :password, :string, virtual: true
-    field :password_hash, :string
-    field :username, :string
+    field(:name, :string)
+    field(:password, :string, virtual: true)
+    field(:password_hash, :string)
+    field(:username, :string)
 
     timestamps()
   end
@@ -22,7 +22,7 @@ defmodule Exopticon.Accounts.User do
     |> unique_constraint(:username)
   end
 
-  def registration_changeset(%User{} = user, attrs) do
+  def registration_changeset(%User{} = user, attrs \\ :empty) do
     user
     |> changeset(attrs)
     |> cast(attrs, ~w(password), [])
@@ -34,8 +34,9 @@ defmodule Exopticon.Accounts.User do
     case changeset do
       %Ecto.Changeset{valid?: true, changes: %{password: pass}} ->
         put_change(changeset, :password_hash, hashpwsalt(pass))
-      _ -> changeset
+
+      _ ->
+        changeset
     end
   end
-
 end

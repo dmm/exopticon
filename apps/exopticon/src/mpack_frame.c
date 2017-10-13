@@ -109,3 +109,31 @@ void send_end_file_message(char *filename, char *iso_end_time)
         fflush(stdout);
         free(data);
 }
+
+void send_log_message(char *message)
+{
+        char *data = NULL;
+        size_t size = 0;
+        uint32_t frame_size = 0;
+        mpack_writer_t writer;
+        mpack_writer_init_growable(&writer, &data, &size);
+
+        mpack_start_map(&writer, 2);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_cstr(&writer, "log");
+        mpack_write_cstr(&writer, "message");
+        mpack_write_cstr(&writer, message);
+        mpack_finish_map(&writer);
+
+        if (mpack_writer_destroy(&writer) != mpack_ok) {
+                // Error!
+                exit(5);
+        }
+
+        // Write the total message size for framing
+        frame_size = htobe32((uint32_t)size);
+        fwrite(&frame_size, sizeof(frame_size), 1, stdout);
+        fwrite(data, size, 1, stdout);
+        fflush(stdout);
+        free(data);
+}

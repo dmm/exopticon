@@ -15,5 +15,5 @@ defmodule ExopticonWeb.V1.CameraView do
       name: camera.name,
       fps: camera.fps
     }
-end
+  end
 end

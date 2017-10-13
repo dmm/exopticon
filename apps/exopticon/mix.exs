@@ -42,7 +42,6 @@ defmodule Exopticon.Mixfile do
       {:gettext, "~> 0.11"},
       {:cowboy, "~> 1.0"},
       {:msgpax, "~> 2.0"},
-      {:bson, "~> 0.4.4"},
       {:comeonin, "~> 4.0"},
       {:bcrypt_elixir, "~> 0.12.0"},
     ]

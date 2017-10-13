@@ -99,12 +99,7 @@ static void bs_print(const char *fmt, ...)
         va_start(ap, fmt);
         vsnprintf(buf, sizeof(buf), fmt, ap);
         buf[(sizeof buf) - 1] = '\0';
-        const int32_t msg_length = strlen(buf);
-        const int32_t be_msg_length = htonl(msg_length);
-        fwrite(&be_msg_length, sizeof be_msg_length, 1, stderr);
-        fwrite(buf, 1, msg_length, stderr);
-        fflush(stderr);
-
+        send_log_message(buf);
         pthread_mutex_unlock(&log_mutex);
 }
 
@@ -172,8 +167,12 @@ int encode_jpeg(const AVFrame *in_frame, AVPacket *pkt)
 
         pkt->data = NULL;
         pkt->size = 0;
-        if (avcodec_open2(ccx, codec, NULL) < 0) {
+        int codec_open_ret = avcodec_open2(ccx, codec, NULL);
+        if (codec_open_ret < 0) {
                 bs_log("Failed to open codec");
+                char error[256];
+                av_strerror(codec_open_ret, error, 256);
+                fprintf(stderr, "%s", error);
                 ret = 1;
                 goto cleanup;
         }
@@ -191,7 +190,6 @@ int encode_jpeg(const AVFrame *in_frame, AVPacket *pkt)
         frame->width = ccx->width;
         frame->height = ccx->height;
 
-        //        int encode_ret = avcodec_encode_video2(ccx, pkt, frame, &got_frame);
         const int encode_ret = avcodec_send_frame(ccx, frame);
         if (encode_ret != 0) {
                 bs_log("Error encoding jpeg");
@@ -206,6 +204,7 @@ int encode_jpeg(const AVFrame *in_frame, AVPacket *pkt)
         }
 
 cleanup:
+        av_frame_free(&frame);
         avcodec_close(ccx);
         av_free(ccx);
         return ret;
@@ -236,12 +235,12 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRationa
                 if (time_cmp(diff, pts_ts) > -1) {
                         break;
                 } else {
-                  //usleep(diff.tv_nsec / 1000 / 10);
-                  nanosleep(&diff, NULL);
+                        nanosleep(&diff, NULL);
                 }
 
         } while (1);
         send_frame_message(&message);
+        av_packet_unref(&jpeg_packet);
         return 0;
 }
 
@@ -272,7 +271,7 @@ int handle_packet(struct PlayerState *state)
         int receive_ret = 0;
         do {
                 receive_ret = avcodec_receive_frame(state->ccx, state->frame);
-                if (receive_ret == AVERROR(EINVAL)) {
+                if (receive_ret != 0) {
                         bs_log("Error decoding packet!");
                         goto cleanup;
                 }
@@ -302,6 +301,7 @@ int main(int argc, char *argv[])
         avcodec_register_all();
         avformat_network_init();
 
+        player.got_key_frame = 0;
         player.fcx = avformat_alloc_context();
         player.frame = av_frame_alloc();
         player.begin_time.tv_sec = 0;
@@ -374,7 +374,6 @@ int main(int argc, char *argv[])
                 av_init_packet(&player.pkt);
                 count++;
         }
-        bs_log("Frame count! %d\n", count);
 
 cleanup:
         if (player.fcx != NULL) {
@@ -385,6 +384,10 @@ cleanup:
 
         if (player.fcx != NULL) {
                 avformat_close_input(&player.fcx);
+        }
+
+        if (player.ccx != NULL) {
+                avcodec_free_context(&player.ccx);
         }
 
         avformat_network_deinit();

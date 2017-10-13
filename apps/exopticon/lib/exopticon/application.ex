@@ -16,7 +16,8 @@ defmodule Exopticon.Application do
       supervisor(ExopticonWeb.Endpoint, []),
       # Start your own worker by calling: Exopticon.Worker.start_link(arg1, arg2, arg3)
       # worker(Exopticon.Worker, [arg1, arg2, arg3]),
-      supervisor(Exopticon.CameraSupervisor, [])
+      supervisor(Exopticon.CameraSupervisor, []),
+      supervisor(Exopticon.PlaybackSupervisor, [])
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -24,9 +25,9 @@ defmodule Exopticon.Application do
     opts = [strategy: :one_for_one, name: Exopticon.Supervisor]
     ret = Supervisor.start_link(children, opts)
 
-     # Start cameras
-    Exopticon.Repo.all(from camera in Exopticon.Video.Camera, preload: [:camera_group])
-    |> Exopticon.CameraSupervisor.start_all_cameras
+    # Start cameras
+    Exopticon.Repo.all(from(camera in Exopticon.Video.Camera, preload: [:camera_group]))
+    |> Exopticon.CameraSupervisor.start_all_cameras()
 
     ret
   end

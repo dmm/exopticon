@@ -3,11 +3,10 @@ defmodule Exopticon.Video.CameraGroup do
   import Ecto.Changeset
   alias Exopticon.Video.CameraGroup
 
-
   schema "camera_groups" do
-    field :max_storage_size, :integer
-    field :name, :string
-    field :storage_path, :string
+    field(:max_storage_size, :integer)
+    field(:name, :string)
+    field(:storage_path, :string)
 
     timestamps()
   end

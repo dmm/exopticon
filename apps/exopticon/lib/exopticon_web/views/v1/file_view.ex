@@ -15,6 +15,6 @@ defmodule ExopticonWeb.V1.FileView do
       monotonic_index: f.monotonic_index,
       filename: f.filename,
       size: f.size
-      }
+    }
   end
 end

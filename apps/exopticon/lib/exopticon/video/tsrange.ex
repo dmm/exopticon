@@ -18,8 +18,11 @@ defmodule Exopticon.Tsrange do
 
   def dump([lower, upper]) do
     case apply_func([lower, upper], &Ecto.DateTime.dump/1) do
-      {:ok, [lower, upper]} -> {:ok, %Postgrex.Range{lower: lower, upper: upper, upper_inclusive: false}}
-      :error -> :error
+      {:ok, [lower, upper]} ->
+        {:ok, %Postgrex.Range{lower: lower, upper: upper, upper_inclusive: false}}
+
+      :error ->
+        :error
     end
   end
 

@@ -2,10 +2,13 @@ defmodule ExopticonWeb.UserSocket do
   use Phoenix.Socket
 
   ## Channels
-  channel "camera:*", ExopticonWeb.CameraChannel
+  channel("camera:*", ExopticonWeb.CameraChannel)
+  channel("playback:*", ExopticonWeb.PlaybackChannel)
   ## Transports
-  transport :websocket, Phoenix.Transports.WebSocket,
-    serializer: [{ExopticonWeb.Transports.MessagePackSerializer, "~> 2.0.0"}]
+  transport(:websocket, Phoenix.Transports.WebSocket, serializer: [
+    {ExopticonWeb.Transports.MessagePackSerializer, "~> 2.0.0"}
+  ])
+
   # transport :longpoll, Phoenix.Transports.LongPoll
 
   # Socket params are passed from the client and can

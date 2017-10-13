@@ -10,4 +10,7 @@ defmodule Exopticon.PlaybackSupervisor do
     supervise(children, strategy: :one_for_one)
   end
 
+  def start_playback(job) do
+    Supervisor.start_child(Exopticon.PlaybackSupervisor, Exopticon.PlaybackPort.child_spec(job))
+  end
 end

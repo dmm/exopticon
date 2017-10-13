@@ -25,3 +25,5 @@ erl_crash.dump
 # ignore binaries
 apps/exopticon/src/captureserver
 apps/exopticon/src/playbackserver
+apps/exopticon/lib/exopticon/captureserver
+apps/exopticon/lib/exopticon/playbackserver
