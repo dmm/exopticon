@@ -20,7 +20,6 @@ defmodule Exopticon.CapturePort do
       id: camera.id,
       start: {Exopticon.CapturePort, :start_link, [args]},
       restart: :permanent,
-      shutdown: 1000,
       type: :worker
     }
   end
