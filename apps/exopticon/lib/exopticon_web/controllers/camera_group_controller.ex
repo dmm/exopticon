@@ -1,6 +1,8 @@
 defmodule ExopticonWeb.CameraGroupController do
   use ExopticonWeb, :controller
 
+  plug(:authenticate_user)
+
   alias Exopticon.Video
   alias Exopticon.Video.CameraGroup
 

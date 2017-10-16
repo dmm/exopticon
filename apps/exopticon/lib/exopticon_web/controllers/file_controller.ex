@@ -1,6 +1,8 @@
 defmodule ExopticonWeb.FileController do
   use ExopticonWeb, :controller
 
+  plug(:authenticate_user)
+
   alias Exopticon.Video
   alias Exopticon.Video.File
 
