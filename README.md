@@ -1,4 +1,0 @@
-# Exopticon
-
-**TODO: Add description**
-

@@ -36,7 +36,7 @@
 
 #include "mpack_frame.h"
 
-#define BILLION 1000000000
+#define BILLION 1E9
 
 struct PlayerState {
         AVFormatContext *fcx;
@@ -231,14 +231,37 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRationa
 
                 struct timespec cur_time;
                 clock_gettime(CLOCK_MONOTONIC, &cur_time);
+
                 struct timespec diff = time_diff(begin_time, cur_time);
-                if (time_cmp(diff, pts_ts) > -1) {
+/*
+                fprintf(stderr, "frame->pts: %lld, time_base: %lld,%lld\n",
+                        frame->pts,
+                        time_base.num,
+                        time_base.den);
+                fprintf(stderr, "Comparing diff: %lld.%lld, pts_ts: %lld.%lld\n",
+                        (long long)diff.tv_sec,
+                        (long long)diff.tv_nsec,
+                        (long long)pts_ts.tv_sec,
+                        (long long)pts_ts.tv_nsec);
+                */
+                if (time_cmp(diff, pts_ts) == 1) {
+                        /*
+                        fprintf(stderr, "\nPlaying frame!\n");
+                        fflush(stderr);
+                        */
                         break;
                 } else {
-                        nanosleep(&diff, NULL);
+                        struct timespec remaining = time_diff(diff, pts_ts);
+                        /*
+                        fprintf(stderr, "Time remaining: %lld.%lld\n",
+                                (long long)remaining.tv_sec,
+                                (long long)remaining.tv_nsec);
+                        */
+                        nanosleep(&remaining, NULL);
                 }
 
         } while (1);
+
         send_frame_message(&message);
         av_packet_unref(&jpeg_packet);
         return 0;

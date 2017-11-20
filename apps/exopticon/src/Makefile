@@ -7,19 +7,17 @@ LIBRARIES= -lavformat -lavutil -lavcodec
 CC ?= gcc
 BINDIR ?= ../lib/exopticon
 
-all: production
+all: ${BINDIR}/captureworker ${BINDIR}/playbackworker
 
-production: captureserver playbackserver
+development: captureworker.c
+	${CC}  -O0 -g $(mycflags) $(devcflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c -o ${BINDIR}/captureworker
 
-development: captureserver.c
-	${CC}  -O0 -g $(mycflags) $(devcflags) $(CFLAGS) $(LIBRARIES) captureserver.c mpack.c mpack_frame.c -o ${BINDIR}/captureserver
+${BINDIR}/playbackworker: playbackworker.c mpack_frame.c
+	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackworker.c mpack.c mpack_frame.c -o ${BINDIR}/playbackworker
 
-playbackserver: playbackserver.c mpack_frame.c
-	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackserver.c mpack.c mpack_frame.c -o ${BINDIR}/playbackserver
-
-captureserver: captureserver.c mpack_frame.c
-	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureserver.c mpack.c mpack_frame.c -o ${BINDIR}/captureserver
+${BINDIR}/captureworker: captureworker.c mpack_frame.c
+	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c -o ${BINDIR}/captureworker
 
 .PHONY: clean
 clean:
-	-rm -f ${BINDIR}/captureserver ${BINDIR}/playbackserver
+	-rm -f ${BINDIR}/captureworker ${BINDIR}/playbackworker

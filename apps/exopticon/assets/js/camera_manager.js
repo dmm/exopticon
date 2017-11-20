@@ -36,10 +36,13 @@ CameraManager.prototype = {
     startNewCamera: function(newCamera) {
         let channel = this.socket.channel("camera:" + newCamera.id);
         newCamera.channel = channel;
+        let imgDiv = document.createElement('div');
+        imgDiv.id = 'camera' + newCamera.id;
+        imgDiv.className = 'camera';
         let img = document.createElement("img");
-        img.id = 'camera' + newCamera.id;
-        let videoContainer = document.getElementById("cameras");
-        videoContainer.appendChild(img);
+        imgDiv.appendChild(img);
+        let videoContainer = document.getElementById("allCameras");
+        videoContainer.appendChild(imgDiv);
         channel.on("jpg", function(data) {
             renderFrame(img, data.frameJpeg);
         });

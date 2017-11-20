@@ -6,6 +6,7 @@ defmodule ExopticonWeb.UserSocket do
   ## Channels
   channel("camera:*", ExopticonWeb.CameraChannel)
   channel("playback:*", ExopticonWeb.PlaybackChannel)
+
   ## Transports
   transport(:websocket, Phoenix.Transports.WebSocket, serializer: [
     {ExopticonWeb.Transports.MessagePackSerializer, "~> 2.0.0"}

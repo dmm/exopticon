@@ -8,17 +8,10 @@ defmodule Exopticon.PlaybackPort do
     GenServer.start_link(__MODULE__, state, opts)
   end
 
-  def child_spec({channel_topic, file, offset}) do
-    args = {
-      channel_topic,
-      file.filename,
-      offset
-    }
-
+  def child_spec() do
     %{
-      id: channel_topic,
-      start: {Exopticon.PlaybackPort, :start_link, [args]},
-      restart: :permanent,
+      start: {Exopticon.PlaybackPort, :start_link, []},
+      restart: :transient,
       shutdown: 5000,
       type: :worker
     }
@@ -26,14 +19,13 @@ defmodule Exopticon.PlaybackPort do
 
   ### Server callbacks
   def init({id, filename, offset}) do
-    #    offset_string = Integer.to_string(offset)
-    #   IO.puts "Initializing playback port: "<> filename <> " " <> offset_string
-    #  IO.puts "CWD: " <> System.cwd
+    IO.puts("Starting playback port! " <> id <> "," <> filename)
+
     port =
       Port.open(
         {
           :spawn,
-          "/home/dmm/code/1.3/exopticon/apps/exopticon/src/playbackserver #{filename} #{offset}"
+          "apps/exopticon/lib/exopticon/playbackworker #{filename} #{offset}"
         },
         [:binary, {:packet, 4}, :exit_status]
       )
@@ -57,9 +49,13 @@ defmodule Exopticon.PlaybackPort do
     IO.puts("Terminate!")
   end
 
+  def terminate(:normal, _state) do
+    IO.puts("Normal termination of playback port!")
+  end
+
   ### Handle messages from port
-  def handle_message({%{"jpegFrame" => dec, "pts" => pts}, state}) do
-    ExopticonWeb.Endpoint.broadcast!("camera:2", "jpg", %{
+  def handle_message({%{"jpegFrame" => dec, "pts" => pts}, %{id: id, port: _, offset: _} = state}) do
+    ExopticonWeb.Endpoint.broadcast!(id, "jpg", %{
       frameJpeg: Msgpax.Bin.new(dec),
       pts: pts
     })

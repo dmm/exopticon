@@ -1,0 +1,11 @@
+# Exopticon
+
+* Stuff To Do
+** Project
+*** TODO Integrate building of c workers
+*** TODO Implement SELinux for c workers
+** captureserver
+*** TODO Fix pts calculation
+**** Fix autodetection or use realtime pts
+*** TODO Fix FFMPEG deprecation warnings
+

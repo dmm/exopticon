@@ -3,6 +3,10 @@
 <ul>
 
   <li>
+    <strong>Id:</strong>
+    <span id="fileId"><%= @file.id %></span>
+  </li>
+  <li>
     <strong>Filename:</strong>
     <%= @file.filename %>
   </li>
@@ -41,3 +45,4 @@
 
 <span><%= link "Edit", to: file_path(@conn, :edit, @file) %></span>
 <span><%= link "Back", to: file_path(@conn, :index) %></span>
+<div class="video"></div>

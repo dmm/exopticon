@@ -10,15 +10,11 @@ defmodule ExopticonWeb.PlaybackChannel do
   end
 
   def join("playback:" <> params, _payload, socket) do
-    [nonce, file_id, offset] = String.split(params, ",") |> Enum.map(&String.to_integer/1)
+    [_, file_id, offset] = String.split(params, ",") |> Enum.map(&String.to_integer/1)
     file = Exopticon.Repo.get!(Exopticon.Video.File, file_id)
-    IO.puts("String process...")
     Exopticon.PlaybackSupervisor.start_playback({"playback:" <> params, file, offset})
-    IO.puts("process started!")
-    {:ok, socket}
-  end
 
-  def terminate({:shutdown, reason}, arg1) do
+    {:ok, socket}
   end
 
   # Channels can be used in a request/response fashion

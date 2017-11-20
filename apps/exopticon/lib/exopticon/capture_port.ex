@@ -53,7 +53,7 @@ defmodule Exopticon.CapturePort do
     Port.open(
       {
         :spawn,
-        "apps/exopticon/lib/exopticon/captureserver #{url} #{fps} #{storage_path} /tmp/shot.jpg"
+        "apps/exopticon/lib/exopticon/captureworker #{url} #{fps} #{storage_path} /tmp/shot.jpg"
       },
       [:binary, {:packet, 4}, :exit_status]
     )
