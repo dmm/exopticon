@@ -75,7 +75,7 @@ struct CameraState {
         // Begin, End time for frame
         struct timespec frame_begin_time;
         struct timespec frame_end_time;
-        int64_t last_pts;
+        int64_t first_pts, last_pts;
 
         AVPacket pkt;
         AVFrame *frame;
@@ -334,17 +334,28 @@ int initialize_output_stream(struct CameraState *cam, const char *out_filename)
         cam->ost->sample_aspect_ratio.den = cam->iccx->sample_aspect_ratio.den;
 
         // Assume r_frame_rate is accurate
-        bs_log("AVStream time_base: %d / %d, Framerate: %d / %d",
+        fprintf(stderr, "AVStream time_base: %d / %d, Framerate: %d / %d",
                cam->ist->time_base.num, cam->ist->time_base.den,
                cam->ist->r_frame_rate.num, cam->ist->r_frame_rate.den);
         bs_log("cam->ist ticks_per_fram: %d", cam->ist->codec->ticks_per_frame);
 
-        AVRational output_fps;
-        output_fps.num = cam->frames_per_second;
-        output_fps.den = 1;
         AVRational output_timebase;
-        output_timebase.num = 1;
-        output_timebase.den = 1000;
+        AVRational output_fps;
+        if (cam->frames_per_second > 0) {
+                output_fps.num = cam->frames_per_second;
+                output_fps.den = 1;
+
+                output_timebase.num = 1;
+                output_timebase.den = 1000;
+        } else if (cam->frames_per_second == 0) {  // cam->frames_per_second == 0
+
+                output_fps = cam->ist->r_frame_rate;
+                output_timebase.num = cam->ist->time_base.num;
+                output_timebase.den = cam->ist->time_base.den;
+        } else { // cam->frames_per_second < 0
+                bs_log("Invalid frames_per_second: %d\n", cam->frames_per_second);
+                exit(1);
+        }
         cam->ost->avg_frame_rate = output_fps;
         // cam->ost->time_base = av_inv_q(cam->ost->r_frame_rate);
         cam->ost->time_base = output_timebase;
@@ -374,6 +385,7 @@ int initialize_output_stream(struct CameraState *cam, const char *out_filename)
         }
 
         cam->last_pts = 0;
+        cam->first_pts = (int64_t)LLONG_MAX;
 
         snprintf(cam->ofcx->filename, sizeof(cam->ofcx->filename), "%s",
                  out_filename);
@@ -545,13 +557,27 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         }
         cam->got_key_frame = 1;
 
-        // Don't trust any of the stream timing information. Instead reconstruct
-        // it from the given fps.
-        cam->pkt.stream_index = cam->ost->id;
-        cam->pkt.pts = cam->last_pts;
-        cam->pkt.dts = cam->pkt.pts;
-        cam->last_pts += av_rescale_q(1, av_inv_q(cam->ost->avg_frame_rate),
-                                      cam->ost->time_base);
+        if (cam->frames_per_second > 0) {
+                // Don't trust any of the stream timing information. Instead reconstruct
+                // it from the given fps.
+                cam->pkt.stream_index = cam->ost->id;
+//        fprintf(stderr, "PTS: %lld. %d/%d\n", cam->pkt.pts, cam->ist->time_base.num,
+//                cam->ist->time_base.den);
+                cam->pkt.pts = cam->last_pts;
+                cam->pkt.dts = cam->pkt.pts;
+                cam->last_pts += av_rescale_q(1, av_inv_q(cam->ost->avg_frame_rate),
+                                              cam->ost->time_base);
+        } else {
+                if (cam->first_pts < cam->pkt.pts) {
+                        cam->first_pts = cam->pkt.pts;
+                }
+                cam->pkt.stream_index = cam->ost->id;
+                cam->pkt.pts -= cam->first_pts;
+                cam->pkt.pts = av_rescale_q(cam->pkt.pts,
+                                            cam->ist->time_base,
+                                            cam->ost->time_base);
+                cam->pkt.dts = cam->pkt.pts;
+        }
 
         AVPacket decode_packet;
         struct timespec write_begin;
@@ -814,7 +840,9 @@ int main(int argc, char *argv[])
         struct timespec read_begin, read_end;
         clock_gettime(CLOCK_MONOTONIC, &read_begin);
         while ((ret = av_read_frame(cam.ifcx, &cam.pkt)) >= 0) {
+                struct timespec old_read = read_end;
                 clock_gettime(CLOCK_MONOTONIC, &read_end);
+
                 handle_packet(&cam, &frame_time);
                 frame_time.read_time =
                     timespec_to_ms_interval(read_begin, read_end);
