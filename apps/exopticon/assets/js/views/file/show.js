@@ -32,7 +32,8 @@ export default class View extends MainView {
       console.log('ShowFileView mounted');
       var fileId = document.getElementById("fileId").textContent;
       var nonce = getRandomInt(0, 999999);
-      let channel = socket.channel(`playback:${nonce},${fileId},0`);
+      const topic = `playback:${nonce},${fileId},0`;
+      let channel = socket.channel(topic);
       channel.onError( (reason) => console.log("there was an error! " + reason ));
       channel.onClose( () => console.log("the channel has gone away gracefully") );
       let videoDiv = document.querySelector('.video');
@@ -42,6 +43,8 @@ export default class View extends MainView {
           renderFrame(img, data.frameJpeg);
       });
       channel.join();
+      channel.push("start_player", { topic: topic }, 10000);
+      window.chan1 = channel;
   }
 
   unmount() {

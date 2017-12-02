@@ -12,6 +12,8 @@ defmodule Exopticon.Video.Camera do
     field(:password, :string)
     field(:rtsp_url, :string)
     field(:type, :string)
+    field(:ptz_type, :string)
+    field(:ptz_profile_token, :string)
     field(:username, :string)
     #    field :camera_group_id, :id
     belongs_to(:camera_group, Exopticon.Video.CameraGroup)
@@ -22,7 +24,7 @@ defmodule Exopticon.Video.Camera do
   @doc false
   def changeset(%Camera{} = camera, attrs) do
     camera
-    |> cast(attrs, [:name, :ip, :onvif_port, :fps, :mac, :username, :password, :rtsp_url, :type])
+    |> cast(attrs, [:name, :ip, :onvif_port, :fps, :mac, :username, :password, :rtsp_url, :type, :ptz_type, :ptz_profile_token])
     |> validate_required([:name, :ip, :fps, :mac, :username, :type])
     |> put_change(:camera_group_id, 1)
   end

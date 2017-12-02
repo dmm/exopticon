@@ -25,4 +25,11 @@ defmodule Exopticon.PlaybackSupervisor do
     args = {id, file.filename, offset}
     Supervisor.start_child(Exopticon.PlaybackSupervisor, [args])
   end
+
+  def stop_playback(id) do
+    [{ pid, _ }] = Registry.lookup(Registry.PlayerRegistry, id)
+    IO.puts("terminating : " <> pid);
+    Supervisor.terminate_child(Exopticon.PlaybackSupervisor, pid)
+  end
+
 end

@@ -10,11 +10,21 @@ defmodule ExopticonWeb.PlaybackChannel do
   end
 
   def join("playback:" <> params, _payload, socket) do
+
+    {:ok, socket}
+  end
+
+  def handle_in("start_player", %{"topic" => "playback:" <> params}, socket) do
     [_, file_id, offset] = String.split(params, ",") |> Enum.map(&String.to_integer/1)
     file = Exopticon.Repo.get!(Exopticon.Video.File, file_id)
     Exopticon.PlaybackSupervisor.start_playback({"playback:" <> params, file, offset})
+    {:noreply, socket}
+  end
 
-    {:ok, socket}
+  def handle_in("kill_player", %{"topic" => topic}, socket) do
+    IO.puts("Stopping player: " <> topic)
+    Exopticon.PlaybackSupervisor.stop_playback(topic)
+    {:noreply, socket}
   end
 
   # Channels can be used in a request/response fashion

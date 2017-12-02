@@ -4,8 +4,8 @@ defmodule Exopticon.PlaybackPort do
   import Ecto.Query
 
   ### Client API
-  def start_link(state, opts \\ []) do
-    GenServer.start_link(__MODULE__, state, opts)
+  def start_link({id, _, _} = state) do
+    GenServer.start_link(__MODULE__, state, name: via_tuple(id))
   end
 
   def child_spec() do
@@ -49,8 +49,9 @@ defmodule Exopticon.PlaybackPort do
     IO.puts("Terminate!")
   end
 
-  def terminate(:normal, _state) do
+  def terminate(:normal, {id, _, _}) do
     IO.puts("Normal termination of playback port!")
+    ExopticonWeb.Endpoint.broadcast(id, "stop", %{})
   end
 
   ### Handle messages from port
@@ -66,5 +67,10 @@ defmodule Exopticon.PlaybackPort do
   def handle_message({%{"type" => "log", "message" => message}, state}) do
     IO.puts("playback message: " <> message)
     {:noreply, state}
+  end
+
+  defp via_tuple(topic) do
+
+    {:via, Registry, {Registry.PlayerRegistry, topic}}
   end
 end

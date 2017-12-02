@@ -5,7 +5,6 @@ import socket from '../socket.js';
 var $ = document.querySelect;
 var $$ = document.querySelectAll;
 
-
 export default class View extends MainView {
     updateCameras(cameraId) {
         var request = new XMLHttpRequest();
@@ -41,5 +40,8 @@ export default class View extends MainView {
         window.cameraManager = new CameraManager(socket);
         this.updateCameras();
         setInterval(this.updateCameras, 5000);
+        document.addEventListener('visibilitychange', function() {
+            console.log('visibility change!');
+        });
     }
 }

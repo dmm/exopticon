@@ -13,7 +13,9 @@ defmodule ExopticonWeb.V1.CameraView do
     %{
       id: camera.id,
       name: camera.name,
-      fps: camera.fps
+      fps: camera.fps,
+      type: camera.type,
+      ptzType: camera.ptz_type
     }
   end
 end

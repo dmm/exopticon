@@ -12,6 +12,8 @@ defmodule ExopticonWeb.Router do
 
   pipeline :api do
     plug(:accepts, ["json"])
+    plug(:fetch_session)
+    plug(ExopticonWeb.Auth, repo: Exopticon.Repo)
   end
 
   scope "/", ExopticonWeb do
@@ -31,6 +33,7 @@ defmodule ExopticonWeb.Router do
     pipe_through(:api)
 
     resources("/cameras", V1.CameraController)
+    post("/cameras/:id/relativeMove", V1.CameraController, :relativeMove)
     get("/files/:camera_id", V1.FileController, :index)
   end
 end

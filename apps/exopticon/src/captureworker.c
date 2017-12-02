@@ -334,9 +334,6 @@ int initialize_output_stream(struct CameraState *cam, const char *out_filename)
         cam->ost->sample_aspect_ratio.den = cam->iccx->sample_aspect_ratio.den;
 
         // Assume r_frame_rate is accurate
-        fprintf(stderr, "AVStream time_base: %d / %d, Framerate: %d / %d",
-               cam->ist->time_base.num, cam->ist->time_base.den,
-               cam->ist->r_frame_rate.num, cam->ist->r_frame_rate.den);
         bs_log("cam->ist ticks_per_fram: %d", cam->ist->codec->ticks_per_frame);
 
         AVRational output_timebase;

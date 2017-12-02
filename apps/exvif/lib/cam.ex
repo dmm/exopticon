@@ -105,11 +105,19 @@ defmodule Exvif.Cam do
     request(url, body)
   end
 
-  def to_int(number_string) do
+  def to_int(number_string) when is_binary(number_string) do
     case Integer.parse(number_string) do
       {:error, reason} -> 0
       {number, _} -> number
     end
+  end
+
+  def to_int(number) when is_integer(number) do
+    number
+  end
+
+  def to_int(nil) do
+    0
   end
 
   def parse_profile(doc, token) do
@@ -222,6 +230,39 @@ defmodule Exvif.Cam do
   def fetch_stream_uri(url, username, password, profile_token) do
     request_stream_uri(url, username, password, profile_token)
     |> handle_stream_uri(username, password)
+  end
+
+  def request_ptz_configurations(url, username, password) do
+    body =
+      envelope_header(username, password) <>
+        """
+        <GetConfigurations xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+        </GetConfigurations>
+        """ <> envelope_footer()
+
+    request(url, body)
+  end
+
+  def ptz_vectors(x, y) do
+    """
+    <PanTilt x="#{x}" y="#{y}" xmlns="http://www.onvif.org/ver10/schema"/>
+    """
+  end
+
+  def request_ptz_relative_move(url, username, password, profile_token, x, y) do
+    vectors = ptz_vectors(x, y)
+    body =
+    envelope_header(username, password) <>
+    """
+    <RelativeMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+		  <ProfileToken>#{profile_token}</ProfileToken>
+		  <Translation>
+        #{vectors}
+		  </Translation>
+    </RelativeMove>
+    """
+    <> envelope_footer()
+    request(url, body)
   end
 
   def fetch_camera(url, username, password) do
