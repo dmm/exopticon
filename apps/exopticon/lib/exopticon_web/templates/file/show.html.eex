@@ -13,7 +13,7 @@
 
   <li>
     <strong>Size:</strong>
-    <%= @file.size %>
+    <%= @file.size %> (<%= @file.size / 1024 / 1024 %> MiB)
   </li>
 
   <li>

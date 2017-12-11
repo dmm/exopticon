@@ -107,9 +107,11 @@ defmodule Exopticon.CapturePort do
     file = Exopticon.Repo.get_by(Exopticon.Video.File, filename: filename)
     [start_time, _] = file.time
     {:ok, time} = Exopticon.Tsrange.cast([start_time, end_time])
+    %{size: size} = File.stat!(filename)
 
     file
     |> Ecto.Changeset.change(time: time)
+    |> Ecto.Changeset.change(size: size)
     |> Ecto.Changeset.change(end_monotonic: monotonic_stop)
     |> Exopticon.Repo.update()
   end

@@ -50,7 +50,7 @@ defmodule ExopticonWeb.CameraChannel do
       true ->
         # should never happen
     end
-    IO.puts("Current live: " <> Integer.to_string(cur_live) <> " " <> Integer.to_string(max_live))
+
     {:noreply, socket}
   end
 
