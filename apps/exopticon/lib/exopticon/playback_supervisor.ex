@@ -27,9 +27,11 @@ defmodule Exopticon.PlaybackSupervisor do
   end
 
   def stop_playback(id) do
-    [{ pid, _ }] = Registry.lookup(Registry.PlayerRegistry, id)
-    IO.puts("terminating : " <> pid);
-    Supervisor.terminate_child(Exopticon.PlaybackSupervisor, pid)
-  end
+    regs = Registry.lookup(Registry.PlayerRegistry, id)
+    pids = Enum.map(regs, fn {pid, _} -> pid end)
 
+    Enum.map(pids, fn p ->
+      Supervisor.terminate_child(Exopticon.PlaybackSupervisor, p)
+    end)
+  end
 end

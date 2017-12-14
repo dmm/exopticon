@@ -70,7 +70,6 @@ defmodule Exopticon.PlaybackPort do
   end
 
   defp via_tuple(topic) do
-
     {:via, Registry, {Registry.PlayerRegistry, topic}}
   end
 end

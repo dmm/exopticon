@@ -251,17 +251,18 @@ defmodule Exvif.Cam do
 
   def request_ptz_relative_move(url, username, password, profile_token, x, y) do
     vectors = ptz_vectors(x, y)
+
     body =
-    envelope_header(username, password) <>
-    """
-    <RelativeMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
-		  <ProfileToken>#{profile_token}</ProfileToken>
-		  <Translation>
-        #{vectors}
-		  </Translation>
-    </RelativeMove>
-    """
-    <> envelope_footer()
+      envelope_header(username, password) <>
+        """
+        <RelativeMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+        <ProfileToken>#{profile_token}</ProfileToken>
+        <Translation>
+            #{vectors}
+        </Translation>
+        </RelativeMove>
+        """ <> envelope_footer()
+
     request(url, body)
   end
 

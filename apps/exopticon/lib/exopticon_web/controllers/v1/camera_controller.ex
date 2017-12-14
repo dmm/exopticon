@@ -13,15 +13,24 @@ defmodule ExopticonWeb.V1.CameraController do
     render(conn, "index.json", cameras: cameras)
   end
 
-  def relativeMove(conn, %{ "id" => id } = params) do
+  def relativeMove(conn, %{"id" => id} = params) do
     IO.puts("getting camera")
     camera = Video.get_camera!(id)
     IO.puts("got camera")
     url = Exvif.Cam.cam_url(camera.ip, camera.onvif_port)
-    %{ "x" => x, "y" => y} = params
+    %{"x" => x, "y" => y} = params
     IO.puts("beginning request")
-    ret = Exvif.Cam.request_ptz_relative_move(url, camera.username, camera.password,
-      camera.ptz_profile_token, x, y)
+
+    ret =
+      Exvif.Cam.request_ptz_relative_move(
+        url,
+        camera.username,
+        camera.password,
+        camera.ptz_profile_token,
+        x,
+        y
+      )
+
     IO.puts("request done")
     json(conn, %{id: id})
   end

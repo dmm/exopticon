@@ -18,7 +18,7 @@ defmodule Exopticon.Application do
       # worker(Exopticon.Worker, [arg1, arg2, arg3]),
       supervisor(Registry, [:unique, Registry.PlayerRegistry]),
       supervisor(Exopticon.CameraSupervisor, []),
-      supervisor(Exopticon.PlaybackSupervisor, []),
+      supervisor(Exopticon.PlaybackSupervisor, [])
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

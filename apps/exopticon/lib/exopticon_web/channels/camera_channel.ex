@@ -1,7 +1,7 @@
 defmodule ExopticonWeb.CameraChannel do
   use ExopticonWeb, :channel
 
-  intercept ["jpg"]
+  intercept(["jpg"])
 
   def join("camera:lobby", payload, socket) do
     if authorized?(payload) do
@@ -44,11 +44,14 @@ defmodule ExopticonWeb.CameraChannel do
       cur_live < max_live ->
         push(socket, "jpg", params)
         socket = assign(socket, :cur_live, cur_live + 1)
+
       cur_live == max_live ->
-        new_max = Enum.max([div(max_live,2), 1])
+        new_max = Enum.max([div(max_live, 2), 1])
         socket = assign(socket, :max_live, new_max)
+
       true ->
         # should never happen
+        nil
     end
 
     {:noreply, socket}

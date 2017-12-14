@@ -701,8 +701,7 @@ static int interrupt_cb(void *ctx)
         clock_gettime(CLOCK_MONOTONIC, &cur);
 
         // If tv_sec is zero, capture hasn't started so don't kill anything.
-        const int64_t interval =
-            beg.tv_sec ? timespec_to_ms_interval(beg, cur) : 0;
+        const int64_t interval = timespec_to_ms_interval(beg, cur);
 
         return (interval > timeout) || checkforquit();
 }
@@ -756,7 +755,7 @@ int main(int argc, char *argv[])
          */
         cam.ifcx->interrupt_callback.callback = interrupt_cb;
         cam.ifcx->interrupt_callback.opaque = &cam;
-        cam.frame_begin_time.tv_sec = 0;
+        clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
 
         // open rtsp
         AVDictionary *opts = 0;
@@ -767,6 +766,7 @@ int main(int argc, char *argv[])
                 cam.ifcx->interrupt_callback.callback = interrupt_cb;
                 cam.ifcx->interrupt_callback.opaque = &cam;
                 cam.frame_begin_time.tv_sec = 0;
+                clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
 
                 av_dict_set(&opts, "rtsp_transport", "udp", 0);
                 if (avformat_open_input(&(cam.ifcx), input_uri, NULL, &opts) !=
@@ -836,7 +836,10 @@ int main(int argc, char *argv[])
         memset(&frame_time, 0, sizeof(frame_time));
         struct timespec read_begin, read_end;
         clock_gettime(CLOCK_MONOTONIC, &read_begin);
+        clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
         while ((ret = av_read_frame(cam.ifcx, &cam.pkt)) >= 0) {
+                // Set frame begin time so we know when to timeout in interrupt_cb
+                clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
                 struct timespec old_read = read_end;
                 clock_gettime(CLOCK_MONOTONIC, &read_end);
 
