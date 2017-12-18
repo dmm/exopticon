@@ -298,11 +298,13 @@ defmodule Exopticon.Video do
   Returns video for single camera
   """
   def get_files_between(camera_id, begin_time, end_time) do
+    {:ok, times } = Exopticon.Tsrange.cast([begin_time, end_time])
+    {:ok, time_range} = Exopticon.Tsrange.dump(times)
     query =
       from(
         f in File,
         where: f.camera_id == ^camera_id and
-          fragment("? && tsrange(?, ?)", f.time, ^begin_time, ^end_time) and
+          fragment("? && ?", f.time, ^time_range) and
           not is_nil(f.end_monotonic),
         order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
       )
