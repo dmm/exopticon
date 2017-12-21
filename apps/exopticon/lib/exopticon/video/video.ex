@@ -298,15 +298,42 @@ defmodule Exopticon.Video do
   Returns video for single camera
   """
   def get_files_between(camera_id, begin_time, end_time) do
-    {:ok, times } = Exopticon.Tsrange.cast([begin_time, end_time])
+    {:ok, times} = Exopticon.Tsrange.cast([begin_time, end_time])
     {:ok, time_range} = Exopticon.Tsrange.dump(times)
+
     query =
       from(
         f in File,
-        where: f.camera_id == ^camera_id and
-          fragment("? && ?", f.time, ^time_range) and
+        where: f.camera_id == ^camera_id and fragment("? && ?", f.time, ^time_range) and
           not is_nil(f.end_monotonic),
         order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
+      )
+
+    Repo.all(query)
+  end
+
+  def get_total_video_size(camera_group_id) do
+    query =
+      from(
+        f in File,
+        join: c in Camera,
+        on: f.camera_id == c.id,
+        select: sum(f.size),
+        where: c.camera_group_id == ^camera_group_id
+      )
+
+    Repo.one(query)
+  end
+
+  def get_oldest_files_in_group(camera_group_id, count \\ 100) do
+    query =
+      from(
+        f in File,
+        join: c in Camera,
+        on: f.camera_id == c.id,
+        where: c.camera_group_id == ^camera_group_id,
+        order_by: [asc: f.monotonic_index, asc: f.begin_monotonic],
+        limit: ^count
       )
 
     Repo.all(query)
