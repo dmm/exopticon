@@ -7,6 +7,7 @@ defmodule ExopticonWeb.V1.FileView do
 
   def render("file.json", %{file: f}) do
     %{
+      id: f.id,
       camera_id: f.camera_id,
       begin_time: List.first(f.time),
       end_time: List.last(f.time),
