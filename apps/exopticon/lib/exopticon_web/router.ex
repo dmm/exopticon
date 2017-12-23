@@ -26,6 +26,8 @@ defmodule ExopticonWeb.Router do
     resources("/camera_groups", CameraGroupController)
     resources("/cameras", CameraController)
     resources("/files", FileController)
+
+    get("/cameras/:id/playback", CameraController, :playback)
   end
 
   # Other scopes may use custom stacks.

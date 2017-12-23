@@ -41,17 +41,15 @@ defmodule Exopticon.PlaybackPort do
 
   def handle_info({port, {:exit_status, status}}, %{id: id, port: port, offset: _}) do
     IO.puts("Got exit status! " <> Integer.to_string(status))
+    ExopticonWeb.Endpoint.broadcast!(id, "stop", %{
+          id: id
+                                    })
     {:stop, :normal, %{}}
   end
 
   ## Handle port termination
   def terminate(_reason, _state) do
     IO.puts("Terminate!")
-  end
-
-  def terminate(:normal, {id, _, _}) do
-    IO.puts("Normal termination of playback port!")
-    ExopticonWeb.Endpoint.broadcast(id, "stop", %{})
   end
 
   ### Handle messages from port

@@ -61,4 +61,9 @@ defmodule ExopticonWeb.CameraController do
     |> put_flash(:info, "Camera deleted successfully.")
     |> redirect(to: camera_path(conn, :index))
   end
+
+  def playback(conn, %{"id" => id}) do
+    camera = Video.get_camera!(id)
+    render(conn, "playback.html", camera: camera)
+  end
 end
