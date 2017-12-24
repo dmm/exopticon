@@ -322,7 +322,12 @@ defmodule Exopticon.Video do
         where: c.camera_group_id == ^camera_group_id
       )
 
-    Repo.one(query)
+    size = Repo.one(query)
+
+    if size == nil do
+      0
+    end
+    size
   end
 
   def get_oldest_files_in_group(camera_group_id, count \\ 100) do
