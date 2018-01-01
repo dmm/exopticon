@@ -7,6 +7,20 @@ Array.prototype.diff = function(a) {
     });
 };
 
+function isVisible(element) {
+    let rec = element.getBoundingClientRect();
+    let viewportHeight = window.innerHeight;
+    let y = window.scrollY;
+    let bottomEdge = y + viewportHeight;
+
+    if ((rec.bottom > 0 && rec.bottom < viewportHeight)
+        || (rec.top > 0 && rec.top < viewportHeight)) {
+        return true;
+    }
+
+    return false;
+}
+
 function renderFrame(img, imageArrayBuffer) {
     var blob  = new Blob([imageArrayBuffer],{type: "image/jpeg"});
     img.onload = function (e) {
@@ -68,6 +82,30 @@ var CameraManager = function(socket) {
     this.cameras = new Map();
     this.channels = new Map();
     this.socket = socket;
+    this.visibleCameras = new Map();
+    this.checkingVisibility = false;
+    this.lastScrollPosition = 0;
+    let self = this;
+    window.addEventListener('scroll', (e) => {
+        this.lastScrollPosition = window.scrollY;
+
+        if (!this.checkingVisibility) {
+            this.checkingVisibility = true;
+            window.requestAnimationFrame(() => {
+                self.visibleCameras.clear();
+                self.cameras.forEach(function (value, key) {
+                    let element = document.querySelector('#camera' + key);
+                    if (isVisible(element)) {
+                        console.log(key + ' is visible.');
+                        self.visibleCameras.set(key, true);
+                    } else {
+                        console.log(key + ' is not visible.');
+                    }
+                });
+                this.checkingVisibility = false;
+            });
+        }
+    });
 };
 
 CameraManager.prototype = {
@@ -86,10 +124,14 @@ CameraManager.prototype = {
 
         let videoContainer = document.getElementById("allCameras");
         videoContainer.appendChild(imgDiv);
-        channel.on("jpg", function(data) {
-            renderFrame(img, data.frameJpeg);
+        channel.on("jpg", (data) => {
+            if (this.visibleCameras.has(newCamera.id)) {
+                renderFrame(img, data.frameJpeg);
+            }
+
             channel.push("ack", "");
         });
+        this.visibleCameras.set(newCamera.id, true);
         channel.join();
         this.cameras.set(newCamera.id, newCamera);
     },
