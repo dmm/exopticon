@@ -5,3 +5,11 @@
   -moz-box-sizing: border-box;
   box-sizing: border-box;
 }
+
+html, body, main, .container-fluid {
+    height: 100%;
+}
+
+main {
+    height: calc(100% - 36px);
+}

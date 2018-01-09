@@ -1,5 +1,3 @@
-<h2>Show Camera</h2>
-
 <!---
 <ul>
 
@@ -56,7 +54,7 @@
 -->
 
 <div id="singleCamera" data-id=<%= @camera.id %>>
-  <div id="cameras">
+  <div id="allCameras">
   </div>
   <div id="video-controls" class="controls" data-state="visible">
     <button id="playpause" type="button" data-state="play">Play/Pause</button>

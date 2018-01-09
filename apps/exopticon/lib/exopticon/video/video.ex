@@ -212,7 +212,21 @@ defmodule Exopticon.Video do
   def list_files do
     Repo.all(File)
   end
+  @doc """
+  Returns list of files for single camera.
 
+  ## Examples
+  iex> list_files(9)
+  [%File{}, ...]
+  """
+  def list_files(camera_id) do
+    query = from(
+      f in File,
+      where: f.camera_id == ^camera_id
+    )
+
+    Repo.all(query)
+  end
   @doc """
   Gets a single file.
 

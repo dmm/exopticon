@@ -13,6 +13,11 @@ defmodule ExopticonWeb.V1.CameraController do
     render(conn, "index.json", cameras: cameras)
   end
 
+  def show(conn, %{"id" => id}) do
+    camera = Video.get_camera!(id)
+    render(conn, "show.json", camera: camera)
+  end
+
   def relativeMove(conn, %{"id" => id} = params) do
     IO.puts("getting camera")
     camera = Video.get_camera!(id)

@@ -8,8 +8,13 @@ defmodule ExopticonWeb.FileController do
   alias Exopticon.Video
   alias Exopticon.Video.File
 
-  def index(conn, _params) do
+  def index(conn, %{}) do
     files = Video.list_files()
+    render(conn, "index.html", files: files)
+  end
+
+  def index(conn, %{"camera_id" => camera_id}) do
+    files = Video.list_files(camera_id)
     render(conn, "index.html", files: files)
   end
 
