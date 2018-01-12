@@ -1,5 +1,10 @@
+'use strict';
 
-
+import React from 'react';
+import ReactDOM from 'react-dom';
+import CameraOverlay from './components/camera_overlay';
+import CameraPlayer from './camera_player';
+import CameraView from './components/camera_view';
 
 Array.prototype.diff = function(a) {
     return this.filter(function(i) {
@@ -7,32 +12,20 @@ Array.prototype.diff = function(a) {
     });
 };
 
-function isVisible(element) {
-    let rec = element.getBoundingClientRect();
-    let viewportHeight = window.innerHeight;
-    let y = window.scrollY;
-    let bottomEdge = y + viewportHeight;
+function renderFrame(img, imageArrayBuffer, callback) {
+  var blob  = new Blob([imageArrayBuffer],{type: "image/jpeg"});
+  img.onload = function (e) {
+    window.URL.revokeObjectURL(img.src);
+    img = null;
+    if (callback) callback();
+  };
 
-    if ((rec.bottom > 0 && rec.bottom < viewportHeight)
-        || (rec.top > 0 && rec.top < viewportHeight)) {
-        return true;
-    }
-
-    return false;
-}
-
-function renderFrame(img, imageArrayBuffer) {
-    var blob  = new Blob([imageArrayBuffer],{type: "image/jpeg"});
-    img.onload = function (e) {
-        window.URL.revokeObjectURL(img.src);
-        img = null;
-    };
-
-    img.onerror = img.onabort = function () {
-        console.log('error loading image!');
-        img = null;
-    };
-    img.src = window.URL.createObjectURL(blob);
+  img.onerror = img.onabort = function () {
+    console.log('error loading image!');
+    img = null;
+    if (callback) callback();
+  };
+  img.src = window.URL.createObjectURL(blob);
 }
 
 var camera = function(id, name) {
@@ -85,7 +78,8 @@ var CameraManager = function(socket) {
     this.visibleCameras = new Map();
     this.checkingVisibility = false;
     this.lastScrollPosition = 0;
-    let self = this;
+  let self = this;
+  /*
     window.addEventListener('scroll', (e) => {
         this.lastScrollPosition = window.scrollY;
 
@@ -106,65 +100,56 @@ var CameraManager = function(socket) {
             });
         }
     });
+  */
 };
 
 CameraManager.prototype = {
-    startNewCamera: function(newCamera) {
-        let channel = this.socket.channel("camera:" + newCamera.id);
-        newCamera.channel = channel;
-        let imgDiv = document.createElement('div');
-        imgDiv.id = 'camera' + newCamera.id;
-        imgDiv.className = 'camera';
-        if (newCamera.ptzType !== null) {
-            imgDiv.className += ' ptz';
-            imgDiv.appendChild(getPtzElement(newCamera.id));
-        }
-        let img = document.createElement("img");
-        imgDiv.appendChild(img);
+  startNewCamera: function(newCamera) {
+    let player = new CameraPlayer(newCamera, this.socket);
+    let camDiv = document.createElement('div');
+    ReactDOM.render(React.createElement(CameraView,
+                                          {
+                                            camera: newCamera,
+                                            cameraPlayer: player
+                                          }),
+                    camDiv
+                   );
+    let cameraContainer = document.getElementById('allCameras');
+    cameraContainer.appendChild(camDiv);
 
-        let videoContainer = document.getElementById("allCameras");
-        videoContainer.appendChild(imgDiv);
-        channel.on("jpg", (data) => {
-            if (this.visibleCameras.has(newCamera.id)) {
-                renderFrame(img, data.frameJpeg);
-            }
+    this.cameras.set(newCamera.id, newCamera);
+  },
 
-            channel.push("ack", "");
-        });
-        this.visibleCameras.set(newCamera.id, true);
-        channel.join();
-        this.cameras.set(newCamera.id, newCamera);
-    },
+  removeCamera: function(oldCamera) {
+    return;
+    var channel = this.oldCamera.channel;
+    channel.leave();
+    this.cameras = _.filter(this.cameras, function(c) {
+      return c.id != oldCamera.id;
+    });
+    var element = document.getElementById('camera'+oldCamera.id);
+    element.outerHTML = '';
+    this.cameras.delete(oldCamera.id);
+  },
 
-    removeCamera: function(oldCamera) {
-        var channel = this.oldCamera.channel;
-        channel.leave();
-        this.cameras = _.filter(this.cameras, function(c) {
-            return c.id != oldCamera.id;
-        });
-        var element = document.getElementById('camera'+oldCamera.id);
-        element.outerHTML = '';
-        this.cameras.delete(oldCamera.id);
-    },
+  updateCameras: function(allCameras) {
+    let curMap = new Map();
+    let self = this;
 
-    updateCameras: function(allCameras) {
-        let curMap = new Map();
-        let self = this;
+    allCameras.forEach(function(c) {
+      curMap.set(c.id, c);
+      if (!self.cameras.has(c.id)) {
+        self.startNewCamera(c);
+      }
+    });
 
-        allCameras.forEach(function(c) {
-            curMap.set(c.id, c);
-            if (!self.cameras.has(c.id)) {
-                self.startNewCamera(c);
-            }
-        });
-
-        for (var [key, value] of this.cameras) {
-            if (!curMap.has(key)) {
-                // Camera has been removed
-                self.removeCamera(value);
-            }
-        }
+    for (var [key, value] of this.cameras) {
+      if (!curMap.has(key)) {
+        // Camera has been removed
+        self.removeCamera(value);
+      }
     }
+  }
 };
 
 export default CameraManager;
