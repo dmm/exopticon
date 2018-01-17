@@ -1,49 +1,33 @@
 'use strict';
 
 import React from 'react';
+import verge from 'verge';
 import CameraOverlay from './camera_overlay';
+import StatusOverlay from './status_overlay';
 
 class CameraView extends React.Component {
   constructor(props) {
     super(props);
 
+    this.state = { playing: true };
     this.handleScroll = this.handleScroll.bind(this);
-  }
-
-  isVisible(element) {
-    let rec = element.getBoundingClientRect();
-    let viewportHeight = window.innerHeight;
-    let y = window.scrollY;
-    let bottomEdge = y + viewportHeight;
-
-    if ((rec.bottom > 0 && rec.bottom < viewportHeight)
-        || (rec.top > 0 && rec.top < viewportHeight)) {
-        return true;
-    }
-
-    return false;
-  }
-
-  isElementInViewport (el) {
-
-    var rect = el.getBoundingClientRect();
-
-    return (
-        rect.top >= 0 &&
-        rect.left >= 0 &&
-        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) && /*or $(window).height() */
-        rect.right <= (window.innerWidth || document.documentElement.clientWidth) /*or $(window).width() */
-    );
+    this.isScrolling = true;
   }
 
   handleScroll() {
-    const visible = this.isVisible(this._img);
-    if (this._img && visible && !this.props.cameraPlayer.playing) {
-      //      this.props.cameraPlayer.unpause();
-      this.props.cameraPlayer.playRealtime(this._img);
-    } else if (this._img && !visible && this.props.cameraPlayer.playing) {
-      this.props.cameraPlayer.stop();
-    }
+    window.clearTimeout(this.isScrolling);
+
+    this.isScrolling = setTimeout(() => {
+      const visible = verge.inY(this._img);
+      if (this._img && visible && !this.props.cameraPlayer.playing) {
+        this.props.cameraPlayer.playRealtime(this._img);
+        this.setState({playing: true});
+      } else if (this._img && !visible && this.props.cameraPlayer.playing) {
+        this.props.cameraPlayer.stop();
+        this.setState({playing: false});
+      }
+
+    }, 33);
   }
 
   componentDidMount() {
@@ -58,9 +42,23 @@ class CameraView extends React.Component {
 
   render() {
     const id = 'camera' + this.props.camera.id.toString();
+    var status = undefined;
+
+    if (!this.state.playing) {
+      status = (
+        <StatusOverlay status="paused" />
+      );
+    }
     return (
-      <div id={id} className="camera">
+      <div id={id}
+           className="camera"
+           ref={
+             (el) => {
+               this._container = el;
+             }
+           }>
         <CameraOverlay camera={this.props.cameraPlayer} />
+        { status }
         <img ref={
                (el) => {
                  this._img = el;

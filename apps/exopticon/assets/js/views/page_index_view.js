@@ -38,8 +38,7 @@ export default class View extends MainView {
     mount() {
         console.log('Mounting page index view.');
         window.cameraManager = new CameraManager(socket);
-        this.updateCameras();
-        setInterval(this.updateCameras, 5000);
+
         document.addEventListener('visibilitychange', function() {
             console.log('visibility change!');
         });
