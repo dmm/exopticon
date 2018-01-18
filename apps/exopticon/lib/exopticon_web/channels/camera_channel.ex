@@ -14,8 +14,13 @@ defmodule ExopticonWeb.CameraChannel do
   end
 
   def join("camera:stream", _params, socket) do
-    push(socket, "subscribe", %{})
+    send(self, :after_join)
     {:ok, socket}
+  end
+
+  def handle_info(:after_join, socket) do
+    push(socket, "subscribe", %{})
+    {:noreply, socket}
   end
 
   def handle_in("watch" <> camera_id = topic, _payload, socket) do
@@ -55,29 +60,29 @@ defmodule ExopticonWeb.CameraChannel do
     max_live
   end
 
-    def adjust_max_live(true, cur_live, max_live) when cur_live >= max_live do
+  def adjust_max_live(true, cur_live, max_live) when cur_live >= max_live do
     Enum.max([max_live - 1, 1])
   end
 
-    def adjust_max_live(true, cur_live, max_live) when cur_live < max_live and cur_live == 0 do
-      Enum.min([max_live + 1, 20])
-    end
+  def adjust_max_live(true, cur_live, max_live) when cur_live < max_live and cur_live == 0 do
+    Enum.min([max_live + 1, 20])
+  end
 
-    def adjust_max_live(false, _cur_live, max_live) do
-      max_live
-    end
+  def adjust_max_live(false, _cur_live, max_live) do
+    max_live
+  end
 
-    def adjust_cur_live(true, cur_live, max_live) when cur_live < max_live do
-      cur_live + 1
-    end
+  def adjust_cur_live(true, cur_live, max_live) when cur_live < max_live do
+    cur_live + 1
+  end
 
-    def adjust_cur_live(true, cur_live, max_live) when cur_live >= max_live do
-      cur_live
-    end
+  def adjust_cur_live(true, cur_live, max_live) when cur_live >= max_live do
+    cur_live
+  end
 
-    def adjust_cur_live(false, cur_live, max_live) do
-        cur_live
-    end
+  def adjust_cur_live(false, cur_live, max_live) do
+    cur_live
+  end
 
   def handle_out("jpg", params, socket) do
     cur_live = socket.assigns[:cur_live]
@@ -98,9 +103,8 @@ defmodule ExopticonWeb.CameraChannel do
       push(socket, "jpg" <> Integer.to_string(camera_id), params)
     end
 
-      {:noreply, socket}
-    end
-
+    {:noreply, socket}
+  end
 
   # Add authorization logic here as required.
   defp authorized?(_payload) do
