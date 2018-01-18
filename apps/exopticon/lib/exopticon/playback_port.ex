@@ -41,9 +41,11 @@ defmodule Exopticon.PlaybackPort do
 
   def handle_info({port, {:exit_status, status}}, %{id: id, port: port, offset: _}) do
     IO.puts("Got exit status! " <> Integer.to_string(status))
+
     ExopticonWeb.Endpoint.broadcast!(id, "stop", %{
-          id: id
-                                    })
+      id: id
+    })
+
     {:stop, :normal, %{}}
   end
 

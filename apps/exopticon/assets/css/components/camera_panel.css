@@ -1,0 +1,52 @@
+.camera-panel {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.camera-panel .wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.camera-panel .camera-width {
+    /* Enforce 16:9 aspect ratio */
+    padding-top: 56.25%;
+}
+
+.camera-panel .content {
+   position: absolute;
+   top: 0; left: 0; bottom: 0; right: 0;
+   font-size: 1.5rem;
+   color: #444;
+}
+
+.camera-panel .wrapper {
+    width: calc(100% - 2px);
+}
+
+@media screen and (min-width: 767px) {
+    .camera-panel .wrapper {
+        width: calc(100% - 2px);
+    }
+}
+
+@media screen and (min-width: 980px) {
+    .camera-panel .wrapper {
+        width: calc(50% - 2px);
+    }
+}
+
+@media screen and (min-width: 1200px) {
+    .camera-panel .wrapper {
+        width: calc(25% - 2px);
+    }
+}
+
+div.panel-col-1 div.camera-width {
+    width: calc(100% - 2px);
+}
+
+div.panel-col-2 div.camera-width {
+    width: calc(50% - 2px);
+}

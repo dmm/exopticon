@@ -4,14 +4,15 @@ import socket from './socket.js';
 import renderFrame from './render_frame.js';
 
 class CameraPlayer {
-  constructor(camera, socket) {
+  constructor(camera, channel) {
     this.camera = camera;
-    this.socket = socket;
     this.relativeMoveUrl = `/v1/cameras/${camera.id}/relativeMove`;
     this.playing = false;
-    this.channel = null;
+    this.channel = channel;
     this.isDrawing = false;
     this.drawImg = null;
+    this.img = null;
+    this.subTimer = null;
 
     this.checkFrame = this.checkFrame.bind(this);
     this.renderFrame = this.renderFrame.bind(this);
@@ -20,13 +21,28 @@ class CameraPlayer {
     this.right = this.right.bind(this);
     this.up = this.up.bind(this);
     this.down = this.down.bind(this);
+
+
+    this.channel.on('jpg' + this.camera.id.toString(), (data) => {
+      this.channel.push("ack", "");
+      if (this.playing && this.img !== null) {
+        this.renderFrame(this.img, data.frameJpeg);
+      }
+    });
+
+    this.channel.on('subscribe', () => {
+      console.log('got subscribe!');
+      if (this.playing === true) {
+        console.log('rejoining!');
+        this.playRealtime(this.img);
+      }
+    });
   }
 
   checkFrame() {
     if (this.isDrawing && this.drawImg.complete) {
       this.isDrawing = false;
       this.drawImg = null;
-      this.channel.push("ack", "");
     }
 
     window.requestAnimationFrame(this.checkFrame);
@@ -49,38 +65,34 @@ class CameraPlayer {
         img = null;
         if (callback) callback();
       };
-
-      window.requestAnimationFrame(this.checkFrame);
-
       img.src = window.URL.createObjectURL(blob);
+      window.requestAnimationFrame(this.checkFrame);
+    } else {
+      console.log('Skipping render ' + this.camera.id.toString());
     }
   }
 
   playRealtime(img) {
-    if (this.channel !== null) {
-      this.stop();
-    }
-    this.channel = this.socket.channel('camera:' + this.camera.id.toString());
-    this.channel.on('jpg', (data) => {
-      if (this.playing) {
-        this.renderFrame(img, data.frameJpeg);
+    console.log('playing...' + this.camera.id.toString());
+    this.channel.push('watch' + this.camera.id.toString(), "");
+    this.subTimer = setInterval(() => {
+      if (this.playing === true) {
+        this.channel.push('watch' + this.camera.id.toString(), "");
       }
-
-//      this.channel.push("ack", "");
-    });
-    this.channel.join();
+    }, 1000);
     this.playing = true;
+    this.img = img;
   }
 
   play(timeUtc) {
   }
 
   stop() {
-    if (this.channel) {
-      this.channel.leave();
-    }
-    this.channel = null;
+    console.log('stopping...' + this.camera.id.toString());
+    clearInterval(this.subTimer);
+    this.channel.push('close' + this.camera.id.toString(), "");
     this.playing = false;
+    this.img = null;
   }
 
   hasPtz() {

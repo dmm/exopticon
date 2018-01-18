@@ -1,0 +1,23 @@
+.camera {
+    position: relative; /* Make a positioned element so it will contain ptz-controls */
+    -webkit-box-sizing: content-box;
+    -moz-box-sizing: content-box;
+    box-sizing: content-box;
+    margin: 1px;
+}
+
+.camera:hover {
+    border: 1px solid orange;
+    margin: 0;
+}
+
+.camera img {
+    display: block;
+    width: 100%;
+    user-drag: none;
+    user-select: none;
+    -moz-user-select: none;
+    -webkit-user-drag: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+}
