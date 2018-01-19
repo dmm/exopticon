@@ -26,6 +26,11 @@ function convertToBinary(socket){
     let ref = msg.ref;
 
     this.log("receive", (payload.status || "") + " " + topic + " " + event + " " + (ref && "(" + ref + ")" || ""), payload);
+
+    // The default implementation of onConnMessage does this to reset the heartbeat timeout.
+    // Duplicate this because we are never calling the default implementation, for now.
+    if(ref && ref === this.pendingHeartbeatRef){ this.pendingHeartbeatRef = null; }
+
     this.channels.filter(function (channel) {
       return channel.isMember(topic);
     }).forEach(function (channel) {
