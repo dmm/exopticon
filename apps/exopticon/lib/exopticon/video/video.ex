@@ -4,6 +4,7 @@ defmodule Exopticon.Video do
   """
 
   import Ecto.Query, warn: false
+  import Logger
   alias Exopticon.Repo
 
   alias Exopticon.Video.CameraGroup
@@ -196,6 +197,39 @@ defmodule Exopticon.Video do
   """
   def change_camera(%Camera{} = camera) do
     Camera.changeset(camera, %{})
+  end
+
+  @doc """
+  Requests a relative move from the camera.
+  """
+  def relative_move_camera(%Camera{ptz_type: "onvif"} = camera, x, y) do
+    url = Exvif.Cam.cam_url(camera.ip, camera.onvif_port)
+
+    ret =
+      Exvif.Cam.request_ptz_relative_move(
+        url,
+        camera.username,
+        camera.password,
+        camera.ptz_profile_token,
+        x,
+        y
+      )
+  end
+
+  def relative_move_camera(%Camera{ptz_type: "onvif_continuous"} = camera, x, y) do
+    url = Exvif.Cam.cam_url(camera.ip, camera.onvif_port)
+
+    Exvif.Cam.request_ptz_continuous_move(
+      url,
+      camera.username,
+      camera.password,
+      camera.ptz_profile_token,
+      x,
+      y
+    )
+
+    Process.sleep(1000)
+    Exvif.Cam.request_ptz_stop(url, camera.username, camera.password, camera.ptz_profile_token)
   end
 
   alias Exopticon.Video.File

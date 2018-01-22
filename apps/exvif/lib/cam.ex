@@ -266,6 +266,46 @@ defmodule Exvif.Cam do
     request(url, body)
   end
 
+  def request_ptz_continuous_move(url, username, password, profile_token, x, y, timeout \\ 0) do
+    vectors = ptz_vectors(x, y)
+    timeout_seconds = timeout / 1000
+
+    timeout_element =
+      if timeout == 0 do
+        ""
+      else
+        """
+        <Timeout>#{timeout_seconds}S</Timeout>
+        """
+      end
+
+    body =
+      envelope_header(username, password) <>
+        """
+        <ContinuousMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+          <ProfileToken>#{profile_token}</ProfileToken>
+            <Velocity>
+              #{vectors}
+            </Velocity>
+            #{timeout_element}
+        </ContinuousMove>
+        """ <> envelope_footer()
+
+    request(url, body)
+  end
+
+  def request_ptz_stop(url, username, password, profile_token) do
+    body =
+      envelope_header(username, password) <>
+        """
+        <Stop xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+          <ProfileToken>#{profile_token}</ProfileToken>
+        </Stop>
+        """ <> envelope_footer()
+
+    request(url, body)
+  end
+
   def fetch_camera(url, username, password) do
     profiles = fetch_profiles(url, username, password)
 
