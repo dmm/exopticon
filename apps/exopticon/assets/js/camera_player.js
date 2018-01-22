@@ -6,13 +6,16 @@ import renderFrame from './render_frame.js';
 class CameraPlayer {
   constructor(camera, channel) {
     this.camera = camera;
+    Object.assign(this, camera);
     this.relativeMoveUrl = `/v1/cameras/${camera.id}/relativeMove`;
     this.playing = false;
+    this.status = 'paused';
     this.channel = channel;
     this.isDrawing = false;
     this.drawImg = null;
     this.img = null;
     this.subTimer = null;
+    this.statusCallback = () => {};
 
     this.checkFrame = this.checkFrame.bind(this);
     this.renderFrame = this.renderFrame.bind(this);
@@ -24,8 +27,9 @@ class CameraPlayer {
 
 
     this.channel.on('jpg' + this.camera.id.toString(), (data) => {
-      this.channel.push("ack", "");
+      this.channel.push("ack", { ts: data.ts });
       if (this.playing && this.img !== null) {
+        this.status = 'playing';
         this.renderFrame(this.img, data.frameJpeg);
       }
     });
@@ -34,7 +38,7 @@ class CameraPlayer {
       console.log('got subscribe!');
       if (this.playing === true) {
         console.log('rejoining!');
-        this.playRealtime(this.img);
+        this.playRealtime(this.img, this.startCb);
       }
     });
   }
@@ -72,16 +76,27 @@ class CameraPlayer {
     }
   }
 
+  setStatus(newStatus) {
+    this.status = newStatus;
+    this.statusCallback(newStatus);
+  }
+
   playRealtime(img) {
-    console.log('playing...' + this.camera.id.toString());
     this.channel.push('watch' + this.camera.id.toString(), "");
     this.subTimer = setInterval(() => {
       if (this.playing === true) {
         this.channel.push('watch' + this.camera.id.toString(), "");
       }
-    }, 1000);
+    }, 5000);
     this.playing = true;
+    this.setStatus('loading');
     this.img = img;
+
+    let cb = () => {
+      this.setStatus('playing');
+      img.removeEventListener('load', cb);
+    };
+    img.addEventListener('load', cb);
   }
 
   play(timeUtc) {
@@ -92,6 +107,7 @@ class CameraPlayer {
     clearInterval(this.subTimer);
     this.channel.push('close' + this.camera.id.toString(), "");
     this.playing = false;
+    this.setStatus('paused');
     this.img = null;
   }
 

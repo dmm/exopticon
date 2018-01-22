@@ -14,7 +14,7 @@ defmodule ExopticonWeb.CameraChannel do
   end
 
   def join("camera:stream", _params, socket) do
-    send(self, :after_join)
+    send(self(), :after_join)
     {:ok, socket}
   end
 
@@ -43,9 +43,27 @@ defmodule ExopticonWeb.CameraChannel do
     {:reply, {:ok, payload}, socket}
   end
 
-  def handle_in("ack", _payload, socket) do
+  def handle_in("ack", payload, socket) do
     cur_live = socket.assigns[:cur_live]
+    max_live = socket.assigns[:max_live]
+    cur_time = System.monotonic_time(:milliseconds)
+    %{"ts" => ts} = payload
+    {ts_int, _} = Integer.parse(ts)
+    old_rtt = socket.assigns[:rtt]
+    new_rtt = cur_time - ts_int
+    rtt = (new_rtt + old_rtt) / 2
+
+    max_live =
+      if new_rtt > 2 * old_rtt do
+        Enum.max([div(max_live, 2), 1])
+      else
+        Enum.min([max_live + 1, 10])
+      end
+
+    socket = assign(socket, :max_live, max_live)
     socket = assign(socket, :cur_live, cur_live - 1)
+    socket = assign(socket, :rtt, rtt)
+    #    Logger.info("Ack: " <> to_string(cur_live))
     {:noreply, socket}
   end
 
@@ -60,15 +78,15 @@ defmodule ExopticonWeb.CameraChannel do
     max_live
   end
 
-  def adjust_max_live(true, cur_live, max_live) when cur_live >= max_live do
+  def adjust_max_live(_active, cur_live, max_live) when cur_live >= max_live do
     Enum.max([max_live - 1, 1])
   end
 
-  def adjust_max_live(true, cur_live, max_live) when cur_live < max_live and cur_live == 0 do
-    Enum.min([max_live + 1, 20])
+  def adjust_max_live(_active, cur_live, max_live) when cur_live == 0 do
+    Enum.min([max_live + 2, 50])
   end
 
-  def adjust_max_live(false, _cur_live, max_live) do
+  def adjust_max_live(_active, _cur_live, max_live) do
     max_live
   end
 
@@ -93,16 +111,20 @@ defmodule ExopticonWeb.CameraChannel do
     camera_active = Map.has_key?(watch_camera, camera_id)
     frame_active = camera_active and cur_live < max_live
 
-    new_max_live = adjust_max_live(camera_active, cur_live, max_live)
-    new_cur_live = adjust_cur_live(camera_active, cur_live, max_live)
+    #    Logger.info(
+    #      "liveness: " <> to_string(cur_live) <> "/" <> to_string(max_live) <> to_string(camera_active) <> " " <> to_string(socket.assigns[:rtt])
+    #    )
+    new_cur_live =
+      if frame_active do
+        cur_time = System.monotonic_time(:milliseconds)
+        params = Map.put(params, :ts, to_string(cur_time))
+        push(socket, "jpg" <> Integer.to_string(camera_id), params)
+        cur_live + 1
+      else
+        cur_live
+      end
 
-    socket = assign(socket, :max_live, new_max_live)
     socket = assign(socket, :cur_live, new_cur_live)
-
-    if frame_active do
-      push(socket, "jpg" <> Integer.to_string(camera_id), params)
-    end
-
     {:noreply, socket}
   end
 
