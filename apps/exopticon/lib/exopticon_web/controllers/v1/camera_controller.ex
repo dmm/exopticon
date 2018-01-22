@@ -10,7 +10,7 @@ defmodule ExopticonWeb.V1.CameraController do
 
   def index(conn, _params) do
     cameras = Video.list_cameras()
-    render(conn, "index.json", cameras: cameras)
+    render(conn, "index.json", cameras: Enum.sort(cameras))
   end
 
   def show(conn, %{"id" => id}) do
