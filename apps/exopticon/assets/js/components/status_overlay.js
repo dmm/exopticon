@@ -11,7 +11,9 @@ class StatusOverlay extends React.Component {
   render() {
     return (
         <div className="status-overlay">
-          <span>{this.props.status}</span>
+          <div className="status-message">
+            {this.props.status}: {this.props.cameraName}
+          </div>
         </div>
     );
   }

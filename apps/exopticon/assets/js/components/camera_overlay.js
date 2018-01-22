@@ -33,34 +33,39 @@ class CameraOverlay extends React.Component {
   }
 
   render() {
+    let ptz = undefined;
     if (this.props.camera.hasPtz()) {
-    return (
-      <div style={{opacity: this.state.opacity}}
-           className="camera-overlay"
-           onMouseEnter={this.mouseEnter}
-           onMouseLeave={this.mouseLeave}
-           onTouchStart={this.touchStart}>
-        <OverlayButton
-          label="◀"
-          extraClass="left-arrow"
-          onClick={this.props.camera.left} />
-        <OverlayButton
-          label="▶"
-          extraClass="right-arrow"
-          onClick={this.props.camera.right} />
-        <OverlayButton
-          label="▲"
-          extraClass="up-arrow"
-          onClick={this.props.camera.up} />
-        <OverlayButton
-          label="▼"
-          extraClass="down-arrow"
-          onClick={this.props.camera.down} />
+      ptz = (
+        <div className="ptz-controls">
+          <OverlayButton
+            label="◀"
+            extraClass="left-arrow"
+            onClick={this.props.camera.left} />
+          <OverlayButton
+            label="▶"
+            extraClass="right-arrow"
+            onClick={this.props.camera.right} />
+          <OverlayButton
+            label="▲"
+            extraClass="up-arrow"
+            onClick={this.props.camera.up} />
+          <OverlayButton
+            label="▼"
+            extraClass="down-arrow"
+            onClick={this.props.camera.down} />
+        </div>
+      );
+    }
+    return ( 
+        <div style={{opacity: this.state.opacity}}
+             className="camera-overlay"
+             onMouseEnter={this.mouseEnter}
+             onMouseLeave={this.mouseLeave}
+             onTouchStart={this.touchStart}>
+        { ptz }
+        <div className="camera-name">{this.props.camera.name}</div>
       </div>
     );
-    } else {
-      return <div />;
-    }
   }
 }
 

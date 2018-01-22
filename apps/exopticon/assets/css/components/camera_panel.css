@@ -17,8 +17,6 @@
 .camera-panel .content {
    position: absolute;
    top: 0; left: 0; bottom: 0; right: 0;
-   font-size: 1.5rem;
-   color: #444;
 }
 
 .camera-panel .wrapper {
