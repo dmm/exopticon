@@ -1,9 +1,10 @@
 {
   "repository": {},
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "scripts": {
-    "deploy": "brunch build --production",
-    "watch": "brunch watch --stdin"
+    "deploy": "webpack -p",
+    "watch": "webpack --watch-stdin --progress --color",
+    "test": "jest"
   },
   "dependencies": {
     "phoenix": "file:../deps/phoenix",
@@ -14,11 +15,31 @@
     "verge": "^1.10.2"
   },
   "devDependencies": {
-    "babel-brunch": "~6.0",
+    "babel-core": "^6.26.0",
+    "babel-jest": "^22.1.0",
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.1",
     "babel-preset-latest": "^6",
-    "babel-preset-react": "~6.22",
-    "brunch": "^2",
-    "clean-css-brunch": "2.10.0",
-    "uglify-js-brunch": "2.10.0"
+    "babel-preset-react": "^6.22.0",
+    "copy-webpack-plugin": "^4.3.1",
+    "css-loader": "^0.28.9",
+    "extract-text-webpack-plugin": "^3.0.2",
+    "jest": "^22.1.4",
+    "style-loader": "^0.19.1",
+    "webpack": "^3.10.0"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "jsx"
+    ],
+    "moduleDirectories": [
+      "node_modules",
+      "bower_components",
+      "shared"
+    ],
+    "moduleNameMapper": {
+      "\\.(css|less)$": "<rootDir>/__mocks__/styleMock.js"
+    }
   }
 }

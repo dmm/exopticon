@@ -5,6 +5,8 @@ import verge from 'verge';
 import CameraOverlay from './camera_overlay';
 import StatusOverlay from './status_overlay';
 
+import '../../css/components/camera_view.css';
+
 class CameraView extends React.Component {
   constructor(props) {
     super(props);
