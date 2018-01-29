@@ -4,6 +4,8 @@ import React from 'react';
 import CameraView from './camera_view';
 import CameraPlayer from '../camera_player';
 
+import './../../css/components/camera_panel.css';
+
 class CameraPanel extends React.Component {
   constructor(props) {
     super(props);
