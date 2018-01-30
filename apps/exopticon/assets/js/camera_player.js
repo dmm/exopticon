@@ -1,5 +1,7 @@
 'use strict';
 
+import SuperImage from './super_image';
+
 import socket from './socket.js';
 import renderFrame from './render_frame.js';
 
@@ -16,31 +18,14 @@ class CameraPlayer {
     this.subTimer = null;
     this.statusCallback = () => {};
 
+    // Bind functions so they can be used as callbacks
+    // and use 'this'.
     this.checkFrame = this.checkFrame.bind(this);
     this.renderFrame = this.renderFrame.bind(this);
-
     this.left = this.left.bind(this);
     this.right = this.right.bind(this);
     this.up = this.up.bind(this);
     this.down = this.down.bind(this);
-
-/*
-    this.channel.on('jpg' + this.camera.id.toString(), (data) => {
-      this.channel.push("ack", { ts: data.ts });
-      if (this.status !== 'paused' && this.img !== null) {
-        this.setStatus('playing');
-        this.renderFrame(this.img, data.frameJpeg);
-      }
-    });
-
-    this.channel.on('subscribe', () => {
-      console.log('got subscribe!');
-      if (this.status !== 'paused') {
-        console.log('rejoining!');
-        this.playRealtime(this.img, this.startCb);
-      }
-    });
-*/
   }
 
   checkFrame() {
@@ -76,6 +61,11 @@ class CameraPlayer {
     }
   }
 
+  bufferToBlob(imageArrayBuffer) {
+    var blob = new Blob([imageArrayBuffer],{type: "image/jpeg"});
+    return window.URL.createObjectURL(blob);
+  }
+
   setStatus(newStatus) {
     const oldStatus = this.status;
     this.status = newStatus;
@@ -86,16 +76,14 @@ class CameraPlayer {
 
   playRealtime(img) {
     this.setStatus('loading');
-    this.img = img;
+    this.img = new SuperImage(img);
 
     this.channel.join(this.camera.id, (data) => {
       if (this.status !== 'paused' && this.img !== null) {
         this.setStatus('playing');
-        this.renderFrame(this.img, data.frameJpeg);
+        this.img.renderIfReady(this.bufferToBlob(data.frameJpeg));
       }
-
     });
-
   }
 
   play(timeUtc) {
