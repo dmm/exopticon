@@ -24,7 +24,7 @@ class CameraPlayer {
     this.up = this.up.bind(this);
     this.down = this.down.bind(this);
 
-
+/*
     this.channel.on('jpg' + this.camera.id.toString(), (data) => {
       this.channel.push("ack", { ts: data.ts });
       if (this.status !== 'paused' && this.img !== null) {
@@ -40,15 +40,16 @@ class CameraPlayer {
         this.playRealtime(this.img, this.startCb);
       }
     });
+*/
   }
 
   checkFrame() {
     if (this.isDrawing && this.drawImg.complete) {
       this.isDrawing = false;
       this.drawImg = null;
+    } else {
+      window.requestAnimationFrame(this.checkFrame);
     }
-
-    window.requestAnimationFrame(this.checkFrame);
   }
 
   renderFrame(img, imageArrayBuffer, callback) {
@@ -84,30 +85,24 @@ class CameraPlayer {
   }
 
   playRealtime(img) {
-    this.channel.push('watch' + this.camera.id.toString(), "");
-    this.subTimer = setInterval(() => {
-      if (this.status !== 'paused') {
-        this.channel.push('watch' + this.camera.id.toString(), "");
-      }
-    }, 5000);
-
     this.setStatus('loading');
     this.img = img;
 
-    let cb = () => {
-      this.setStatus('playing');
-      img.removeEventListener('load', cb);
-    };
-    img.addEventListener('load', cb);
+    this.channel.join(this.camera.id, (data) => {
+      if (this.status !== 'paused' && this.img !== null) {
+        this.setStatus('playing');
+        this.renderFrame(this.img, data.frameJpeg);
+      }
+
+    });
+
   }
 
   play(timeUtc) {
   }
 
   stop() {
-    console.log('stopping...' + this.camera.id.toString());
-    clearInterval(this.subTimer);
-    this.channel.push('close' + this.camera.id.toString(), "");
+    this.channel.leave(this.camera.id);
     this.setStatus('paused');
     this.img = null;
   }

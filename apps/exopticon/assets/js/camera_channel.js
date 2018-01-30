@@ -13,6 +13,12 @@ class CameraChannel {
     this.channel.on('subscribe', () => {
       this.subscribe(this.watchedCameraIds());
     });
+    this.channel.onMessage = (event, payload, ref) => {
+      if (event.match(/jpg([0-9]+)/)) {
+        this.channel.push('ack', { ts: payload.ts });
+      }
+      return payload;
+    };
   }
 
   watchedCameraIds() {
@@ -38,11 +44,9 @@ class CameraChannel {
   join(cameraId, callback) {
     this.leave(cameraId);
 
-    const ref = this.channel.on(`jpg${cameraId}`, (data) => {
-      this.channel.push('ack', { ts: data.ts });
-      callback(data);
-    });
+    this.channel.off(`jpg${cameraId}`, ref);
 
+    const ref = this.channel.on(`jpg${cameraId}`, callback);
     this.watchedCameras.set(cameraId, ref);
 
     this.subscribe([cameraId]);
@@ -50,7 +54,7 @@ class CameraChannel {
 
   leave(cameraId) {
     const ref = this.watchedCameras.get(cameraId);
-    if (ref !== undefined) {
+    if (false && ref !== undefined) { // ref doesn't work yet :(
       this.channel.off(`jpg${cameraId}`, ref);
     }
     this.unsubscribe([cameraId]);

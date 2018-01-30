@@ -1,6 +1,7 @@
 'use strict';
 
 import React from 'react';
+import CameraChannel from '../camera_channel';
 import CameraView from './camera_view';
 import CameraPlayer from '../camera_player';
 
@@ -52,9 +53,10 @@ class CameraPanel extends React.Component {
       cameraPanelClass += `panel-col-${this.state.viewColumns.toString()}`;
     }
     this.cameraElements.clear();
-    const cameras =[];
+    const cameras = [];
+    const cameraChannel = new CameraChannel(this.state.channel);
     this.state.cameras.forEach((cam) => {
-      let player = new CameraPlayer(cam, this.state.channel);
+      let player = new CameraPlayer(cam, cameraChannel);
       cameras.push(
         <div key={cam.id} className="wrapper">
           <div className="camera-width"></div>
