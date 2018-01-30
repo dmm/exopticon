@@ -3,6 +3,8 @@
 import React from 'react';
 import OverlayButton from './overlay_button';
 
+import '../../css/components/camera_overlay.css';
+
 class CameraOverlay extends React.Component {
   constructor(props) {
     super(props);

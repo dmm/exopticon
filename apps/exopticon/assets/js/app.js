@@ -19,6 +19,9 @@ import "phoenix_html";
 // paths "./socket" or full ones "web/static/js/socket".
 import loadView from './views/loader';
 
+import '../css/phoenix.css';
+import '../css/components/orange_theme.css';
+
 function handleDomContentLoaded() {
     // Get the current view name
     const viewName = document.getElementsByTagName('body')[0].dataset.jsViewName;

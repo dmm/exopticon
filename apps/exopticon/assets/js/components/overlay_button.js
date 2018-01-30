@@ -2,6 +2,8 @@
 
 import React from 'react';
 
+import '../../css/components/overlay_button.css';
+
 class OverlayButton extends React.Component {
   render() {
     return (
