@@ -4,7 +4,6 @@ import CameraManager from '../../camera_manager.js';
 import socket from '../../socket';
 import renderFrame from '../../render_frame.js';
 
-
 export default class view extends MainView {
     fetchCamera(cameraId) {
         var request = new XMLHttpRequest();
@@ -58,5 +57,4 @@ export default class view extends MainView {
     unmount() {
 
     }
-        
 }

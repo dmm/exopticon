@@ -53,6 +53,6 @@ config :exopticon, Exopticon.Repo,
   username: "postgres",
   password: "postgres",
   database: "exopticon_dev",
-  hostname: "localhost",
+  hostname: "amy",
   pool_size: 10,
   log_level: :info

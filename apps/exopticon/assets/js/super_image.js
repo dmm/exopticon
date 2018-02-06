@@ -27,6 +27,17 @@ class SuperImage {
       window.requestAnimationFrame(this.checkFrame);
     }
   }
+
+  renderArrayIfReady(arrayBuffer, callback) {
+    this.callback = callback;
+
+    if (this.isDrawing === false) {
+      this.isDrawing = true;
+      var blob = new Blob([arrayBuffer],{type: "image/jpeg"});
+      this.img.src = window.URL.createObjectURL(blob);
+      window.requestAnimationFrame(this.checkFrame);
+    }
+  }
 }
 
 export default SuperImage;
