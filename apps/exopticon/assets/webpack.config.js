@@ -1,5 +1,6 @@
 const ExtractTextPlugin = require("extract-text-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
+const UglifyJSPlugin = require("uglifiyjs-webpack-plugin");
 
 module.exports = {
   entry: ['./js/app.js', './css/app.css'],
