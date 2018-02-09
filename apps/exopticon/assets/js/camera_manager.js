@@ -30,11 +30,21 @@ class CameraManager {
                             initialCameras: new Map()
                           });
 
-    ReactDOM.render(this.panel, document.getElementById('main'));
+    this.panelComponent = ReactDOM.render(this.panel, document.getElementById('main'));
+    this.updateCameras();
   }
 
-  updateCameras(allCameras) {
-    this.panel.setState({cameras: allCameras});
+  updateCameras() {
+    fetch('/v1/cameras', {
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then((response) => {
+      return response.json();
+    }).then((cameras) => {
+      this.panelComponent.setState({cameras: cameras});
+    });
   }
 }
 

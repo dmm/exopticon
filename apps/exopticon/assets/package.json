@@ -3,7 +3,7 @@
   "license": "GPL-3.0-or-later",
   "scripts": {
     "deploy": "webpack -p",
-    "watch": "webpack --watch-stdin --progress --color --devtool cheap-eval-source-map",
+    "watch": "webpack --watch-stdin --progress --color --devtool inline-source-map",
     "test": "jest"
   },
   "dependencies": {

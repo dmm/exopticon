@@ -1,60 +1,90 @@
-import MainView from '../main';
+'use strict';
 
-import CameraManager from '../../camera_manager.js';
+
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import CameraOverlay from '../../components/camera_overlay';
+import CameraPlayer from '../../camera_player';
+import CameraView from '../../components/camera_view';
+import CameraPanel from '../../components/camera_panel';
+import MainView from '../main';
 import socket from '../../socket';
-import renderFrame from '../../render_frame.js';
 
 export default class view extends MainView {
-    fetchCamera(cameraId) {
-        var request = new XMLHttpRequest();
-        request.open('GET', '/v1/cameras/' + cameraId, true);
-        request.onload = function() {
-            if (this.status >= 200 && this.status < 400) {
-                // Success!
-                var camera = JSON.parse(this.response);
-                window.cameraManager.updateCameras([camera]);
-            } else {
-                console.log('reached server but something went wrong');
-            }
-        };
+  fetchCamera(cameraId) {
+    var request = new XMLHttpRequest();
+    request.open('GET', '/v1/cameras/' + cameraId, true);
+    request.onload = function() {
+      if (this.status >= 200 && this.status < 400) {
+        // Success!
+        var camera = JSON.parse(this.response);
+        window.cameraManager.updateCameras([camera]);
+      } else {
+        console.log('reached server but something went wrong');
+      }
+    };
 
-        request.onerror = function() {
-            console.log('There was a connection error of some sort...');
-        };
+    request.onerror = function() {
+      console.log('There was a connection error of some sort...');
+    };
 
-        request.send();
-    }
+    request.send();
+  }
 
-    fetchFiles(cameraId, beginTime, endTime) {
-        var request = new XMLHttpRequest();
-        request.open('GET', `/v1/files?cameraId=${cameraId}&beginTime=${beginTime}&endTime=${endTime}`, true);
-        request.onload = function() {
-            if (this.status >= 200 && this.status < 400) {
-                // Success!
-                var files = JSON.parse(this.response);
-            } else {
-                console.log('reached server but something went wrong');
-            }
-        };
+  fetchFiles(cameraId, beginTime, endTime) {
+    var request = new XMLHttpRequest();
+    request.open('GET', `/v1/files?cameraId=${cameraId}&beginTime=${beginTime}&endTime=${endTime}`, true);
+    request.onload = function() {
+      if (this.status >= 200 && this.status < 400) {
+        // Success!
+        var files = JSON.parse(this.response);
+      } else {
+        console.log('reached server but something went wrong');
+      }
+    };
 
-        request.onerror = function() {
-            console.log('There was a connection error of some sort...');
-        };
+    request.onerror = function() {
+      console.log('There was a connection error of some sort...');
+    };
 
-        request.send();
-    }
+    request.send();
 
-    mount() {
-        super.mount();
-        console.log('ShowCameraView mounted.');
+  }
+  updateCameras(cameraId) {
+    var self = this;
+    fetch('/v1/cameras', {
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then((response) => {
+      return response.json();
+    }).then((cameras) => {
 
-        let cameraId = parseInt(document.getElementById('singleCamera').getAttribute('data-id'), 10);
-        window.cameraManager = new CameraManager(socket);
-        this.fetchCamera(cameraId);
-        this.fetchFiles();
-    }
+      cameras.forEach((c) => {
+        if (c.id == cameraId) {
+          self.panelComponent.setState({cameras: [c]});
+        }
+      });
+    });
+  }
 
-    unmount() {
+  mount() {
+    super.mount();
+    console.log('ShowCameraView mounted.');
 
-    }
+    let cameraId = parseInt(document.getElementById('singleCamera').getAttribute('data-id'), 10);
+    this.panel = React.createElement(CameraPanel,
+                                     {
+                                       socket: socket,
+                                       initialCameras: new Map()
+                                     });
+    this.panelComponent = ReactDOM.render(this.panel, document.getElementById('main'));
+    this.updateCameras(cameraId);
+  }
+
+  unmount() {
+    super.unmount();
+  }
 }
