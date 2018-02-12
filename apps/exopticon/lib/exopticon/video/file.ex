@@ -4,7 +4,8 @@ defmodule Exopticon.Video.File do
   alias Exopticon.Video.File
 
   schema "files" do
-    field(:time, Exopticon.Tsrange)
+    field(:begin_time, :utc_datetime)
+    field(:end_time, :utc_datetime)
     field(:begin_monotonic, :integer)
     field(:end_monotonic, :integer)
     field(:filename, :string)

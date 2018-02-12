@@ -95,7 +95,8 @@ defmodule Exopticon.CapturePort do
     %Exopticon.Video.File{
       filename: filename,
       camera_id: id,
-      time: time,
+      begin_time: start_time,
+      end_time: nil,
       begin_monotonic: monotonic_start,
       monotonic_index: monotonic_index
     }
@@ -106,12 +107,10 @@ defmodule Exopticon.CapturePort do
     monotonic_stop = System.monotonic_time(:microsecond)
     {:ok, end_time, _} = DateTime.from_iso8601(endTime)
     file = Exopticon.Repo.get_by(Exopticon.Video.File, filename: filename)
-    [start_time, _] = file.time
-    {:ok, time} = Exopticon.Tsrange.cast([start_time, end_time])
     %{size: size} = File.stat!(filename)
 
     file
-    |> Ecto.Changeset.change(time: time)
+    |> Ecto.Changeset.change(end_time: end_time)
     |> Ecto.Changeset.change(size: size)
     |> Ecto.Changeset.change(end_monotonic: monotonic_stop)
     |> Exopticon.Repo.update()

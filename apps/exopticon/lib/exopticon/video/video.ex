@@ -351,8 +351,10 @@ defmodule Exopticon.Video do
     query =
       from(
         f in File,
-        where: f.camera_id == ^camera_id and fragment("? && ?", f.time, ^time_range) and
-          not is_nil(f.end_monotonic),
+        where: f.camera_id == ^camera_id
+        and ^end_time >= f.begin_time
+        and ^begin_time <= f.end_time
+        and not is_nil(f.end_monotonic),
         order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
       )
 

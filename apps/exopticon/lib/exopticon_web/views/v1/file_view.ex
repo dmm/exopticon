@@ -9,8 +9,8 @@ defmodule ExopticonWeb.V1.FileView do
     %{
       id: f.id,
       camera_id: f.camera_id,
-      begin_time: List.first(f.time),
-      end_time: List.last(f.time),
+      begin_time: f.begin_time,
+      end_time: f.end_time,
       begin_monotonic: f.begin_monotonic,
       end_monotonic: f.end_monotonic,
       monotonic_index: f.monotonic_index,

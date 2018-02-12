@@ -21,12 +21,12 @@ class ProgressBar extends React.Component {
     console.log('Processing ' + files.length + ' files.');
     files.forEach((f) => {
       const begin = ZonedDateTime.parse(f.begin_time);
-      const end = end ? ZonedDateTime.parse(f.end_time) : null;
+      const end = ZonedDateTime.parse(f.end_time);
       if (begin.isBefore(this.beginTime)) {
         this.beginTime = begin;
       }
 
-      if(end && end.isAfter(this.endTime)) {
+      if(end.isAfter(this.endTime)) {
         this.endTime = end;
       }
     });
