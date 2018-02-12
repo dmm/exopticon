@@ -1,60 +1,69 @@
-import MainView from '../main';
+import { use as jsJodaUse, ZonedDateTime, ZoneOffset } from 'js-joda';
+import jsJodaTimeZone from 'js-joda-timezone';
+import React from 'react';
+import ReactDOM from 'react-dom';
 
 import CameraManager from '../../camera_manager.js';
+import MainView from '../main';
+import ProgressBar from '../../components/progress_bar';
 import socket from '../../socket';
-import renderFrame from '../../render_frame.js';
 
 export default class view extends MainView {
-    fetchCamera(cameraId) {
-        var request = new XMLHttpRequest();
-        request.open('GET', '/v1/cameras/' + cameraId, true);
-        request.onload = function() {
-            if (this.status >= 200 && this.status < 400) {
-                // Success!
-                var camera = JSON.parse(this.response);
-                window.cameraManager.updateCameras([camera]);
-            } else {
-                console.log('reached server but something went wrong');
-            }
-        };
+  fetchCamera(cameraId) {
+    var request = new XMLHttpRequest();
+    request.open('GET', '/v1/cameras/' + cameraId, true);
+    request.onload = function() {
+      if (this.status >= 200 && this.status < 400) {
+        // Success!
+        var camera = JSON.parse(this.response);
+        window.cameraManager.updateCameras([camera]);
+      } else {
+        console.log('reached server but something went wrong');
+      }
+    };
 
-        request.onerror = function() {
-            console.log('There was a connection error of some sort...');
-        };
+    request.onerror = function() {
+      console.log('There was a connection error of some sort...');
+    };
 
-        request.send();
-    }
+    request.send();
+  }
 
-    fetchFiles(cameraId, beginTime, endTime) {
-        var request = new XMLHttpRequest();
-        request.open('GET', `/v1/files?cameraId=${cameraId}&beginTime=${beginTime}&endTime=${endTime}`, true);
-        request.onload = function() {
-            if (this.status >= 200 && this.status < 400) {
-                // Success!
-                var files = JSON.parse(this.response);
-            } else {
-                console.log('reached server but something went wrong');
-            }
-        };
+  fetchFiles(cameraId, beginTime, endTime, progress) {
+    fetch(`/v1/files/${cameraId}?begin_time=${beginTime}&end_time=${endTime}`, {
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then((response) => {
+      return response.json();
+    }).then((files) => {
+      console.log('Got ' + files.length + ' files. Setting state...');
+      progress.setState({ files: files });
+    }).catch((error) => {
+      console.log('There was an error fetching files: ' + error);
+    });
+  }
 
-        request.onerror = function() {
-            console.log('There was a connection error of some sort...');
-        };
+  mount() {
+    super.mount();
+    console.log('ShowCameraView mounted.');
 
-        request.send();
-    }
+    let cameraId = parseInt(document.getElementById('singleCamera').getAttribute('data-id'), 10);
+    window.cameraManager = new CameraManager(socket);
+    this.fetchCamera(cameraId);
+    const now = ZonedDateTime.now(ZoneOffset.UTC);
+    const then = now.minusHours(12);
 
-    mount() {
-        super.mount();
-        console.log('ShowCameraView mounted.');
+    var progressBar = React.createElement(ProgressBar,
+                                          {
 
-        let cameraId = parseInt(document.getElementById('singleCamera').getAttribute('data-id'), 10);
-        window.cameraManager = new CameraManager(socket);
-        this.fetchCamera(cameraId);
-        this.fetchFiles();
-    }
+                                          });
+    this.progressComponent = ReactDOM.render(progressBar, document.getElementById('progress'));
+    this.fetchFiles(cameraId, then.toString(), now.toString(), this.progressComponent);
+  }
 
-    unmount() {
+  unmount() {
 
-    }
+  }
 }

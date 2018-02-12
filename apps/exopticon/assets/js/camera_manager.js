@@ -21,8 +21,6 @@ class CameraManager {
     this.checkingVisibility = false;
     this.lastScrollPosition = 0;
 
-    this.updateCameras = this.updateCameras.bind(this);
-
     this.panel =
       React.createElement(CameraPanel,
                           {
@@ -30,11 +28,11 @@ class CameraManager {
                             initialCameras: new Map()
                           });
 
-    ReactDOM.render(this.panel, document.getElementById('main'));
+    this.panelComponent = ReactDOM.render(this.panel, document.getElementById('allCameras'));
   }
 
   updateCameras(allCameras) {
-    this.panel.setState({cameras: allCameras});
+    this.panelComponent.setState({cameras: allCameras});
   }
 }
 

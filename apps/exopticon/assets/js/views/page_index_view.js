@@ -6,41 +6,26 @@ var $ = document.querySelect;
 var $$ = document.querySelectAll;
 
 export default class View extends MainView {
-    updateCameras(cameraId) {
-        var request = new XMLHttpRequest();
-        request.open("GET", "/v1/cameras", true);
+  updateCameras() {
+    fetch('/v1/cameras', {
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then((response) => {
+      return response.json();
+    }).then((cameras) => {
+      window.cameraManager.updateCameras(cameras);
+    });
+  }
 
-        request.onload = function() {
-            if (this.status >= 200 && this.status < 400) {
-                // Success!
-                var cameras = JSON.parse(this.response);
-                if (cameraId === undefined) {
-                    window.cameraManager.updateCameras(cameras);
-                } else {
-                    cameras.forEach(function(c) {
-                        if (c.id == cameraId) {
-                            window.cameraManager.updateCameras([c]);
-                        }
-                    });
-                }
-            } else {
-                console.log('reached server but something went wrong');
-            }
-        };
+  mount() {
+    console.log('Mounting page index view.');
+    window.cameraManager = new CameraManager(socket);
+    this.updateCameras();
 
-        request.onerror = function() {
-            console.log('There was a connection error of some sort...');
-        };
-
-        request.send();
-    }
-
-    mount() {
-        console.log('Mounting page index view.');
-        window.cameraManager = new CameraManager(socket);
-
-        document.addEventListener('visibilitychange', function() {
-            console.log('visibility change!');
-        });
-    }
+    document.addEventListener('visibilitychange', function() {
+      console.log('visibility change!');
+    });
+  }
 }

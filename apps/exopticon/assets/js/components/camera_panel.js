@@ -11,8 +11,6 @@ class CameraPanel extends React.Component {
   constructor(props) {
     super(props);
 
-    this.updateCameras = this.updateCameras.bind(this);
-    this.updateCameras();
     this.cameraElements = new Map();
 
     var channel = props.socket.channel('camera:stream');
@@ -31,19 +29,6 @@ class CameraPanel extends React.Component {
 
   componentWillUnmount() {
     this.state.channel.leave();
-  }
-
-  updateCameras() {
-    fetch('/v1/cameras', {
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    }).then((response) => {
-      return response.json();
-    }).then((cameras) => {
-      this.setState({cameras: cameras});
-    });
   }
 
   render() {
