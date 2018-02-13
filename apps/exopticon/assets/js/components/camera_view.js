@@ -1,18 +1,46 @@
-'use strict';
+/*
+ * This file is part of Exopticon (https://github.com/dmm/exopticon).
+ * Copyright (c) 2018 David Matthew Mattli
+ *
+ * Exopticon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Exopticon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
+import PropTypes from 'prop-types';
 import React from 'react';
 import verge from 'verge';
+
 import CameraOverlay from './camera_overlay';
 import StatusOverlay from './status_overlay';
 
 import '../../css/components/camera_view.css';
 
+/**
+ * CameraView class implements a components that shows video for a
+ * single camera. It implements logic that pauses playback when the
+ * component is not in the viewport.
+ *
+ */
 class CameraView extends React.Component {
+  /**
+   * CameraView constructor
+   * @param {Object} props - accepts cameraPlayer and camera props
+   */
   constructor(props) {
     super(props);
 
     this.state = {
-      status: 'loading'
+      status: 'loading',
     };
     this.props.cameraPlayer.statusCallback = (newStatus) => {
       this.setState({status: newStatus});
@@ -25,6 +53,10 @@ class CameraView extends React.Component {
     this.isResizing = true;
   }
 
+  /**
+   * callback that checks if view within viewport, if not it pauses playback
+   * @private
+   */
   visibilityCheck() {
     const visible = verge.inY(this._container);
     if (this._img && visible
@@ -36,22 +68,37 @@ class CameraView extends React.Component {
     }
   }
 
+  /**
+   * scroll event handler, debounces by setting a timer and then calls
+   * visibilityCheck
+   * @private
+   */
   handleScroll() {
     window.clearTimeout(this.isScrolling);
     this.isScrolling = window.setTimeout(this.visibilityCheck, 33);
   }
 
+  /**
+   * resize event handler. It debounces by setting a timer and then calls
+   * visibilityCheck
+   * @private
+   */
   handleResize() {
     window.clearTimeout(this.isResizing);
     this.isResizing = window.setTimeout(this.visibilityCheck, 33);
   }
 
+  /**
+   * react mount handler.
+   * adds event handlers and starts playback if visible
+   * @private
+   */
   componentDidMount() {
     window.addEventListener('scroll', this.handleScroll);
     window.addEventListener('resize', this.handleResize);
     setTimeout(() => {
       if (verge.inY(this._container)) {
-        this.setState({ status: 'loading' });
+        this.setState({status: 'loading'});
         this.props.cameraPlayer.playRealtime(this._img, () => {
           this.setState({status: 'playing'});
         });
@@ -59,18 +106,25 @@ class CameraView extends React.Component {
         this.setState({status: 'paused'});
       }
     }, 500);
-
   }
 
+  /**
+   * react umount handler
+   * removes event handlers and stops player
+   */
   componentWillUnmount() {
     window.removeEventListener('scroll', this.handleScroll);
     window.removeEventListener('resize', this.handleResize);
     this.props.cameraPlayer.stop();
   }
 
+  /**
+   * react render function
+   * @return {Object} react entity
+   */
   render() {
     const id = 'camera' + this.props.camera.id.toString();
-    var status = undefined;
+    let status;
 
     if (this.state.status === 'paused') {
       status = (
@@ -100,5 +154,10 @@ class CameraView extends React.Component {
     );
   }
 }
+
+CameraView.propTypes = {
+  camera: PropTypes.object.isRequired,
+  cameraPlayer: PropTypes.object.isRequired,
+};
 
 export default CameraView;

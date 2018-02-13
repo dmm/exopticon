@@ -40,36 +40,41 @@ let formats = {
   map16: 0xDE,
   map32: 0xDF,
   negativeFixIntStart: 0xE0,
-  negativeFixIntEnd: 0xFF
-}
+  negativeFixIntEnd: 0xFF,
+};
 
 /*
-Decode returns two element [pos, data] arrays: index 0 holds the new position of the parser, and index 1 contains the parsed data. We carry around the original binary data array to avoid copying to new slices, while updating the parser position and recursively calling decode until we've consumed all the buffer.
-Missing from this implementation is extension support- add it if you need it.
+Decode returns two element [pos, data] arrays: index 0 holds the new
+position of the parser, and index 1 contains the parsed data. We carry
+around the original binary data array to avoid copying to new slices,w
+hile updating the parser position and recursively calling decode
+until we've consumed all the buffer.  Missing from this implementation
+is extension support- add it if you need it.
 */
-let decode = function(binaryData, start){
+let decode = function(binaryData, start) {
   start = start || 0;
   let format = binaryData[start];
 
-  if(format <= formats.positiveFixIntEnd){
+  if (format <= formats.positiveFixIntEnd) {
     return [start + 1, format - formats.positiveFixIntStart];
   }
-  if(format <= formats.fixMapEnd){
+  if (format <= formats.fixMapEnd) {
     let keyCount = format - formats.fixMapStart;
     return parseMap(binaryData, keyCount, start + 1);
   }
-  if(format <= formats.fixArrEnd){
+  if (format <= formats.fixArrEnd) {
     let len = format - formats.fixArrStart;
     return parseArray(binaryData, len, start + 1);
   }
-  if(format <= formats.fixStrEnd){
+  if (format <= formats.fixStrEnd) {
     let len = format - formats.fixStrStart;
     return parseUtf8String(binaryData, len, start + 1);
   }
 
-  let pos, len;
+  let pos;
+  let len;
 
-  switch(format){
+  switch (format) {
     case formats.nil:
       return [start + 1, null];
     case formats.bFalse:
@@ -128,17 +133,26 @@ let decode = function(binaryData, start){
       return parseMap(binaryData, len, pos);
   }
 
-  if(format >= formats.negativeFixIntStart && format <= formats.negativeFixIntEnd){
+  if (format >= formats.negativeFixIntStart
+      && format <= formats.negativeFixIntEnd) {
     return [start + 1, - (formats.negativeFixIntEnd - format + 1)];
   }
 
-  throw new Error("I don't know how to decode format ["+format+"]");
-}
+  throw new Error(`I don't know how to decode format [${format}])`);
+};
 
+/**
+ * @private
+ * @param {ArrayBuffer} binaryData
+ * @param {number} keyCount
+ * @param {number} start - array offset to begin parsing
+ * @return {Array} array with two values: [offset to first unparsed
+ *                 value in binaryData, parsed array]
+ */
 function parseMap(binaryData, keyCount, start) {
   let ret = {};
   let pos = start;
-  for(let i = 0; i < keyCount; i++){
+  for (let i = 0; i < keyCount; i++) {
     let [keypos, key] = decode(binaryData, pos);
     pos = keypos;
     let [valpos, value] = decode(binaryData, pos);
@@ -148,10 +162,18 @@ function parseMap(binaryData, keyCount, start) {
   return [pos, ret];
 }
 
+/**
+ * @private
+ * @param {ArrayBuffer} binaryData
+ * @param {number} length - length of the array to be parsed
+ * @param {number} start - offset into binaryData to begin parsing
+ * @return {Array} array with two values: [offset to first unparsed
+ *                 value in binaryData, parsed array]
+ */
 function parseArray(binaryData, length, start) {
   let ret = [];
   let pos = start;
-  for(let i = 0; i < length; i++){
+  for (let i = 0; i < length; i++) {
     let [newpos, data] = decode(binaryData, pos);
     pos = newpos;
     ret.push(data);
@@ -159,11 +181,19 @@ function parseArray(binaryData, length, start) {
   return [pos, ret];
 }
 
+/**
+ * @private
+ * @param {ArrayBuffer} binaryData
+ * @param {number} length - number of unsigned ints to parse
+ * @param {number} start - offset into binaryData to begin parsing
+ * @return {Array} array with two values: [offset to first unparsed
+ *                  value in binaryData, parsed uint]
+ */
 function parseUint(binaryData, length, start) {
   let num = 0;
   let pos = start;
   let count = length;
-  while (count > 0){
+  while (count > 0) {
     count-= 8;
     num += binaryData[pos] << count;
     pos++;
@@ -171,41 +201,72 @@ function parseUint(binaryData, length, start) {
   return [pos, num];
 }
 
+/**
+ * @private
+ * @param {ArrayBuffer} binaryData
+ * @param {number} length
+ * @param {number} start - offset into binaryData to begin parsing
+ * @return {Array} array with two values: [offset to first unparsed
+ *                  value in binaryData, parsed int]
+ */
 function parseInt(binaryData, length, start) {
   let [pos, unum] = parseUint(binaryData, length, start);
   let s = 64 - length;
-  //https://github.com/inexorabletash/polyfill/blob/master/typedarray.js
+  // https://github.com/inexorabletash/polyfill/blob/master/typedarray.js
   return [pos, (unum << s) >> s];
 }
 
+/**
+ * @private
+ * @param {ArrayBuffer} binaryData
+ * @param {number} length
+ * @param {number} start
+ * @return {Array} [next unparsed offset, parsed value]
+ */
 function parseBinaryArray(binaryData, length, start) {
   let m = binaryData.subarray || binaryData.slice;
   let pos = start + length;
   return [pos, m.call(binaryData, start, pos)];
 }
 
+/**
+ * @private
+ * @param {ArrayBuffer} binaryData
+ * @param {number} length
+ * @param {number} start
+ * @return {Array} [next unparsed offset, parsed value]
+ */
 function parseFloat(binaryData, length, start) {
   let bytecount = length / 8;
   let view = new DataView(new ArrayBuffer(length));
-  for(let i = start; i < bytecount; i++){
+  for (let i = start; i < bytecount; i++) {
     view.setUint8(i-start, binaryData[i]);
   }
-  let fnName = "getFloat"+length;
+  let fnName = 'getFloat'+length;
   let result = view[fnName](0, false);
   return [start + bytecount, result];
 }
 
+/**
+ * @private
+ * @param {ArrayBuffer} data
+ * @param {number} length
+ * @param {number} start
+ * @return {Array} [next unparsed offset, parsed value]
+ */
 function parseUtf8String(data, length, start) {
-  //from https://gist.github.com/boushley/5471599
-  var result = [];
-  var i = start;
-  var c = 0;
-  var c1 = 0;
-  var c2 = 0;
-  var c3 = 0;
+  // from https://gist.github.com/boushley/5471599
+  let result = [];
+  let i = start;
+  let c = 0;
+  let c2 = 0;
+  let c3 = 0;
 
   // If we have a BOM skip it
-  if (length >= 3 && data[i] === 0xef && data[i+1] === 0xbb && data[i+2] === 0xbf) {
+  if (length >= 3
+      && data[i] === 0xef
+      && data[i+1] === 0xbb
+      && data[i+2] === 0xbf) {
     i += 3;
   }
 
@@ -216,15 +277,19 @@ function parseUtf8String(data, length, start) {
       result.push(String.fromCharCode(c));
       i++;
     } else if (c > 191 && c < 224) {
-      if( i+1 >= data.length ) {
-        throw "UTF-8 Decode failed. Two byte character was truncated.";
+      if ( i+1 >= data.length ) {
+        throw new Error(
+          'UTF-8 Decode failed. Two byte character was truncated.'
+        );
       }
       c2 = data[i+1];
       result.push(String.fromCharCode( ((c&31)<<6) | (c2&63) ));
       i += 2;
     } else {
       if (i+2 >= data.length) {
-        throw "UTF-8 Decode failed. Multi byte character was truncated.";
+        throw new Error(
+          'UTF-8 Decode failed. Multi byte character was truncated.'
+        );
       }
       c2 = data[i+1];
       c3 = data[i+2];
@@ -238,7 +303,7 @@ function parseUtf8String(data, length, start) {
 let msgpack = {
   decode: function(binaryArray) {
     return decode(binaryArray)[1];
-  }
+  },
 };
 
 export default msgpack;

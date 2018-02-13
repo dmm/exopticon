@@ -36,6 +36,6 @@ defmodule ExopticonWeb.Router do
 
     resources("/cameras", V1.CameraController)
     post("/cameras/:id/relativeMove", V1.CameraController, :relativeMove)
-    get("/files/:camera_id", V1.FileController, :index)
+    get("/files/", V1.FileController, :index)
   end
 end

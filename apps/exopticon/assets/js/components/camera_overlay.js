@@ -1,11 +1,21 @@
 'use strict';
 
+import PropTypes from 'prop-types';
 import React from 'react';
+
 import OverlayButton from './overlay_button';
 
 import '../../css/components/camera_overlay.css';
 
+/**
+ * CameraOverlay - class implementing ptz and camera name overlay for
+ *                 CameraViews
+ * @class
+ */
 class CameraOverlay extends React.Component {
+  /**
+   * @param {Object} props
+   */
   constructor(props) {
     super(props);
     this.state = {opacity: 0};
@@ -14,11 +24,14 @@ class CameraOverlay extends React.Component {
 
     this.mouseEnter = this.mouseEnter.bind(this);
     this.mouseLeave = this.mouseLeave.bind(this);
-    this.touchStart = this.touchStart.bind(this);
     this.touchMove = this.touchMove.bind(this);
     this.touchEnd = this.touchEnd.bind(this);
   }
 
+  /**
+   * callback called when mouse enters overlay
+   * @private
+   */
   mouseEnter() {
     if (this.touchEnabled) {
       return;
@@ -31,17 +44,27 @@ class CameraOverlay extends React.Component {
     }
   }
 
+  /**
+   * callback called when mouse leave overlay
+   * @private
+   */
   mouseLeave() {
     this.setState({opacity: 0.0});
   }
 
-  touchStart(e) {
-  }
-
+  /**
+   * callback called on touchmove event
+   * @private
+   */
   touchMove() {
     this.touchMoving = true;
   }
 
+  /**
+   * callback called on touchend event
+   * @param {Object} e - event object
+   * @private
+   */
   touchEnd(e) {
     this.touchEnabled = true;
 
@@ -69,6 +92,10 @@ class CameraOverlay extends React.Component {
     }
   }
 
+  /**
+   * render CameraOverlay
+   * @return {Object} returns react instance for camera overlay
+   */
   render() {
     let ptz = (
       <div className="ptz-controls"
@@ -118,6 +145,10 @@ class CameraOverlay extends React.Component {
     );
   }
 }
+
+CameraOverlay.propTypes = {
+  camera: PropTypes.object,
+};
 
 export default CameraOverlay;
 

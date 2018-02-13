@@ -2,19 +2,17 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import CameraOverlay from './components/camera_overlay';
-import CameraPlayer from './camera_player';
-import CameraView from './components/camera_view';
+
 import CameraPanel from './components/camera_panel';
 
-var camera = function(id, name) {
-    this.id = id;
-    this.name = name;
-
-    return this;
-};
-
+/**
+ * Supervisor class slowly being replaced with react components
+ * @Class
+ */
 class CameraManager {
+  /**
+   * @param {Pheonix.socket} socket - phoenix socket to use as camera transport
+   */
   constructor(socket) {
     this.socket = socket;
     this.visibleCameras = new Map();
@@ -25,14 +23,18 @@ class CameraManager {
       React.createElement(CameraPanel,
                           {
                             socket: this.socket,
-                            initialCameras: new Map()
+                            initialCameras: new Map(),
                           });
 
-    this.panelComponent = ReactDOM.render(this.panel, document.getElementById('allCameras'));
+    this.component = ReactDOM.render(this.panel,
+                                     document.getElementById('allCameras'));
   }
-
+  /**
+   * @param {Array} allCameras - array of exopticon camera objects to
+   * be used by camera manager
+   */
   updateCameras(allCameras) {
-    this.panelComponent.setState({cameras: allCameras});
+    this.component.setState({cameras: allCameras});
   }
 }
 

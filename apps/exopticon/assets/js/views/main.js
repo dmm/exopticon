@@ -1,8 +1,15 @@
+/**
+ * View super class
+ */
 export default class MainView {
+  /**
+   * main view entry point
+   */
     mount() {
-        console.log('Mounting main view');
     }
-
+  /**
+   * main view exit callback
+   */
     unmount() {
     }
 }

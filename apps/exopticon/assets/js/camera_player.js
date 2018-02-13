@@ -2,9 +2,15 @@
 
 import SuperImage from './super_image';
 
-import socket from './socket.js';
-
+/**
+ * CameraPlayer controls a camera stream
+ * @class
+ */
 class CameraPlayer {
+  /**
+   * @param {Exopticon.Camera} camera - Camera object to play
+   * @param {Exopticon.CameraChannel} channel - channel to play over
+   */
   constructor(camera, channel) {
     this.camera = camera;
     Object.assign(this, camera);
@@ -21,15 +27,23 @@ class CameraPlayer {
     this.up = this.up.bind(this);
     this.down = this.down.bind(this);
   }
-
+  /**
+   * Change player status, firing callbacks if different
+   * @param {string} newStatus - status to change to
+   * @private
+   */
   setStatus(newStatus) {
     const oldStatus = this.status;
     this.status = newStatus;
-    if (this.oldStatus !== newStatus) {
+    if (oldStatus !== newStatus) {
       this.statusCallback(newStatus);
     }
   }
 
+  /**
+   * begin realtime playback of camera to given Image object
+   * @param {Image} img - image object to stream video to
+   */
   playRealtime(img) {
     this.setStatus('loading');
     this.img = new SuperImage(img);
@@ -42,15 +56,18 @@ class CameraPlayer {
     });
   }
 
-  play(timeUtc) {
-  }
-
+  /**
+   * stop all playback of given camera
+   */
   stop() {
     this.channel.leave(this.camera.id);
     this.setStatus('paused');
     this.img = null;
   }
 
+  /**
+   * @return {boolean} true if camera report ptz capability
+   */
   hasPtz() {
     if (this.camera.ptzType === null) {
       return false;
@@ -59,35 +76,52 @@ class CameraPlayer {
     }
   }
 
+  /**
+   * request relative movement from camera
+   * @param {number} x - number between -1 and 1 specifying amount to
+                         move horizontally
+   * @param {number} y - number between -1 and 1 specifying amount to
+                         move vertically
+   * @param {Function} callback - movement complete callback
+   */
   relativeMove(x, y, callback) {
-    var myInit = { method: 'POST' };
-    console.log('relative move!');
-    fetch(this.relativeMoveUrl, {
-      method: 'post',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({x: x, y: y})
+    fetch(this.relativeMoveUrl,
+          {
+            method: 'post',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({x: x, y: y}),
     }).then(function(response) {
-      console.log('Move complete');
       if (callback) callback(response);
     });
   }
 
+  /**
+   * move camera left
+   */
   left() {
     this.relativeMove('-0.05', '0.0');
   }
 
+  /**
+   * move camera right
+   */
   right() {
     this.relativeMove('0.05', '0.0');
   }
 
+  /**
+   * move camera up
+   */
   up() {
-    console.log('up1');
     this.relativeMove('0.0', '0.1');
   }
 
+  /**
+   * move camera down
+   */
   down() {
     this.relativeMove('0.0', '-0.1');
   }

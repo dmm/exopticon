@@ -11,7 +11,7 @@
 //
 // If you no longer want to use a dependency, remember
 // to also remove its path from "config.paths.watched".
-import "phoenix_html";
+import 'phoenix_html';
 
 // Import local files
 //
@@ -22,9 +22,14 @@ import loadView from './views/loader';
 import '../css/phoenix.css';
 import '../css/components/orange_theme.css';
 
+/**
+ * called on dom content loaded event, determines the current view and
+ * calls the view function
+ */
 function handleDomContentLoaded() {
     // Get the current view name
-    const viewName = document.getElementsByTagName('body')[0].dataset.jsViewName;
+  const viewName = document.getElementsByTagName('body')[0]
+        .dataset.jsViewName;
 
     // Load view class and mount it
     const ViewClass = loadView(viewName);
@@ -34,6 +39,9 @@ function handleDomContentLoaded() {
     window.currentView = view;
 }
 
+/**
+ * called on document unloaded event, intiates the chain of unmount calls
+ */
 function handleDocumentUnload() {
     window.currentView.unmount();
 }
