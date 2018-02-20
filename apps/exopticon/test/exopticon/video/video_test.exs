@@ -1,4 +1,6 @@
 defmodule Exopticon.VideoTest do
+  use ExUnit.Case
+  @moduletag integration: true
   use Exopticon.DataCase
 
   alias Exopticon.Video

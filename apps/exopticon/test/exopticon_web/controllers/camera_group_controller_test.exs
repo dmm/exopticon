@@ -1,4 +1,6 @@
 defmodule ExopticonWeb.CameraGroupControllerTest do
+  use ExUnit.Case
+  @moduletag integration: true
   use ExopticonWeb.ConnCase
 
   alias Exopticon.Video

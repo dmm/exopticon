@@ -1,4 +1,6 @@
 defmodule ExopticonWeb.FileControllerTest do
+  use ExUnit.Case
+  @moduletag integration: true
   use ExopticonWeb.ConnCase
 
   alias Exopticon.Video

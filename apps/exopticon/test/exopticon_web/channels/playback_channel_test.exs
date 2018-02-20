@@ -1,4 +1,7 @@
 defmodule ExopticonWeb.PlaybackChannelTest do
+  use ExUnit.Case
+  @moduletag integration: true
+
   use ExopticonWeb.ChannelCase
 
   alias ExopticonWeb.PlaybackChannel

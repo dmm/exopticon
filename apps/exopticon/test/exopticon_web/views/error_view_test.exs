@@ -1,4 +1,6 @@
 defmodule ExopticonWeb.ErrorViewTest do
+  use ExUnit.Case
+  @moduletag integration: true
   use ExopticonWeb.ConnCase, async: true
 
   # Bring render/3 and render_to_string/3 for testing custom views

@@ -1,4 +1,6 @@
 defmodule ExopticonWeb.CameraChannelTest do
+  use ExUnit.Case
+  @moduletag integration: true
   use ExopticonWeb.ChannelCase
 
   alias ExopticonWeb.CameraChannel
