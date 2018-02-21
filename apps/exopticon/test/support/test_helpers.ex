@@ -18,9 +18,9 @@ defmodule Exopticon.TestHelpers do
   alias Exopticon.Repo
 
   def insert_user(attrs \\ %{}) do
-    changes = Dict.merge(%{
+    changes = Map.merge(%{
           name: "Some User",
-          username: "user#{Base.encode16(:crypto.rand_bytes(8))}",
+          username: "user#{Base.encode16(:crypto.strong_rand_bytes(8))}",
           password: "supersecret",
                          }, attrs)
     %Exopticon.Accounts.User{}
