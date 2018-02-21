@@ -10,7 +10,8 @@ defmodule Exopticon.Mixfile do
       compilers: [:phoenix, :gettext] ++ Mix.compilers,
       start_permanent: Mix.env == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      dialyzer: [plt_add_deps: :transitive]
     ]
   end
 
@@ -20,7 +21,7 @@ defmodule Exopticon.Mixfile do
   def application do
     [
       mod: {Exopticon.Application, []},
-      extra_applications: [:logger, :runtime_tools, :comeonin]
+      extra_applications: [:logger, :runtime_tools, :comeonin, :timex]
     ]
   end
 
@@ -44,7 +45,10 @@ defmodule Exopticon.Mixfile do
       {:msgpax, "~> 2.0"},
       {:comeonin, "~> 4.0"},
       {:bcrypt_elixir, "~> 0.12.0"},
-      {:credo, github: "rrrene/credo", only: [:dev, :test], runtime: false}
+      {:credo, github: "rrrene/credo", only: [:dev, :test], runtime: false},
+      {:dialyzex, "~> 1.1.0", only: :dev},
+      {:timex, "~> 3.1"}
+#      {:dialyxir, "~> 0.5.1", only: [:dev], runtime: false}
     ]
   end
 

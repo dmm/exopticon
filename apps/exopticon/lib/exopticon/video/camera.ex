@@ -25,18 +25,18 @@ defmodule Exopticon.Video.Camera do
   def changeset(%Camera{} = camera, attrs) do
     camera
     |> cast(attrs, [
-         :name,
-         :ip,
-         :onvif_port,
-         :fps,
-         :mac,
-         :username,
-         :password,
-         :rtsp_url,
-         :type,
-         :ptz_type,
-         :ptz_profile_token
-       ])
+      :name,
+      :ip,
+      :onvif_port,
+      :fps,
+      :mac,
+      :username,
+      :password,
+      :rtsp_url,
+      :type,
+      :ptz_type,
+      :ptz_profile_token
+    ])
     |> validate_required([:name, :ip, :fps, :mac, :username, :type])
     |> put_change(:camera_group_id, 1)
   end

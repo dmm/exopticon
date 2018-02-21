@@ -20,22 +20,22 @@ defmodule Exopticon.Video.File do
   def changeset(%File{} = file, attrs) do
     file
     |> cast(attrs, [
-         :filename,
-         :size,
-         :begin_time,
-         :end_time,
-         :begin_monotonic,
-         :end_monotonic,
-         :monotonic_index
-       ])
+      :filename,
+      :size,
+      :begin_time,
+      :end_time,
+      :begin_monotonic,
+      :end_monotonic,
+      :monotonic_index
+    ])
     |> validate_required([
-         :filename,
-         :size,
-         :begin_time,
-         :end_time,
-         :begin_monotonic,
-         :end_monotonic,
-         :monotonic_index
-       ])
+      :filename,
+      :size,
+      :begin_time,
+      :end_time,
+      :begin_monotonic,
+      :end_monotonic,
+      :monotonic_index
+    ])
   end
 end

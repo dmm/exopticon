@@ -345,20 +345,24 @@ defmodule Exopticon.Video do
   Returns video for single camera
   """
   def get_files_between(camera_id, begin_time, end_time) do
-    {:ok, times} = Exopticon.Tsrange.cast([begin_time, end_time])
-    {:ok, time_range} = Exopticon.Tsrange.dump(times)
-
     query =
       from(
         f in File,
-        where: f.camera_id == ^camera_id
-        and ^end_time >= f.begin_time
-        and ^begin_time <= f.end_time
-        and not is_nil(f.end_monotonic),
+        where:
+          f.camera_id == ^camera_id and ^end_time >= f.begin_time and ^begin_time <= f.end_time and
+            not is_nil(f.end_monotonic),
         order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
       )
 
     Repo.all(query)
+  end
+
+  @doc """
+  Returns video coverage for given camera and begin and end times
+  """
+  def get_video_coverage(camera_id, begin_time, end_time) do
+    get_files_between(camera_id, begin_time, end_time)
+    |> Exopticon.FileLibrary.calculate_availability()
   end
 
   def get_total_video_size(camera_group_id) do

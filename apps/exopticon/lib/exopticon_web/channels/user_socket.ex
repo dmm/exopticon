@@ -8,9 +8,13 @@ defmodule ExopticonWeb.UserSocket do
   channel("playback:*", ExopticonWeb.PlaybackChannel)
 
   ## Transports
-  transport(:websocket, Phoenix.Transports.WebSocket, serializer: [
-    {ExopticonWeb.Transports.MessagePackSerializer, "~> 2.0.0"}
-  ])
+  transport(
+    :websocket,
+    Phoenix.Transports.WebSocket,
+    serializer: [
+      {ExopticonWeb.Transports.MessagePackSerializer, "~> 2.0.0"}
+    ]
+  )
 
   # transport :longpoll, Phoenix.Transports.LongPoll
 
