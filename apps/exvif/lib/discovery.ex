@@ -2,25 +2,24 @@ defmodule Exvif.Discovery do
   def probe(timeout \\ 1000) do
     message_id = UUID.uuid1()
 
-    request =
-      """
-      <Envelope xmlns="http://www.w3.org/2003/05/soap-envelope" xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
-      <Header>
-       <wsa:MessageID xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">#{message_id}</wsa:MessageID>
-        <wsa:To xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">urn:schemas-xmlsoap-org:ws:2005:04:discovery</wsa:To>
-      	<wsa:Action xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action>
-        </Header>
-       <Body>
-        <Probe xmlns="http://schemas.xmlsoap.org/ws/2005/04/discovery" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      	  <Types>dn:NetworkVideoTransmitter</Types>
-          <Scopes />
-      	</Probe>
-      </Body>
-      </Envelope>
-      """
+    request_body = """
+    <Envelope xmlns="http://www.w3.org/2003/05/soap-envelope" xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
+    <Header>
+     <wsa:MessageID xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">#{message_id}</wsa:MessageID>
+      <wsa:To xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">urn:schemas-xmlsoap-org:ws:2005:04:discovery</wsa:To>
+    	<wsa:Action xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action>
+      </Header>
+     <Body>
+      <Probe xmlns="http://schemas.xmlsoap.org/ws/2005/04/discovery" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    	  <Types>dn:NetworkVideoTransmitter</Types>
+        <Scopes />
+    	</Probe>
+    </Body>
+    </Envelope>
+    """
 
     {:ok, socket} = :gen_udp.open(3702, [:binary, active: false, multicast_ttl: 2])
-    :gen_udp.send(socket, '239.255.255.250', 3702, request)
+    :ok = :gen_udp.send(socket, '239.255.255.250', 3702, request_body)
 
     cameras = listen(socket, timeout, [])
 

@@ -28,17 +28,26 @@ defmodule ExopticonWeb.V1.CameraController do
   end
 
   def availability(conn, %{"id" => id} = params) do
-    end_time = Map.get(params, "end_time", Timex.now() |> Timex.format("{ISO:Extended}"))
+    end_time_string = Map.get(params, "end_time", Timex.now() |> Timex.format("{ISO:Extended}"))
 
-    begin_time = Map.get(params, "begin_time", end_time |> Timex.shift(hours: -6))
+    {:ok, end_time} = Timex.parse(end_time_string, "{ISO:Extended}")
+
+    begin_time_string =
+      Map.get(
+        params,
+        "begin_time",
+        end_time |> Timex.shift(hours: -6) |> Timex.format("{ISO:Extended}")
+      )
+
+    {:ok, begin_time} = Timex.parse(begin_time_string, "{ISO:Extended}")
 
     chunks = Video.get_video_coverage(id, begin_time, end_time)
 
     json(conn, %{
       camera_id: id,
-      begin_time: begin_time,
-      end_time: end_time,
-      availability: chunks
+      begin_time: chunks.begin_time,
+      end_time: chunks.end_time,
+      availability: chunks.availability
     })
   end
 end

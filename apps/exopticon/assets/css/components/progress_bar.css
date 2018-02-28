@@ -4,3 +4,21 @@
     height: 25px;
     border: 1px solid green;
 }
+
+.progress-element {
+    display: inline-block;
+    height: 100%;
+    background-color: green;
+}
+
+.progress-element.no-video {
+    background-color: black;
+}
+
+.progress-bar .time-label {
+    position: absolute;
+    display: none;
+    height: 50px;
+    width: 100px;
+    background-color: orange;
+}

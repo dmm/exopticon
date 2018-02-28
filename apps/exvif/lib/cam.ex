@@ -73,12 +73,13 @@ defmodule Exvif.Cam do
       token: token,
       name: sel.("//tt:Name"),
       address: sel.("//tt:IPv4//tt:Address") |> List.wrap() |> List.first(),
-      mac: sel.("//tt:HwAddress")
-           |> String.upcase()
-           |> String.replace(~r/[\:\-\.]/, "")
-           |> String.to_charlist()
-           |> Enum.chunk(2)
-           |> Enum.join("-"),
+      mac:
+        sel.("//tt:HwAddress")
+        |> String.upcase()
+        |> String.replace(~r/[\:\-\.]/, "")
+        |> String.to_charlist()
+        |> Enum.chunk(2)
+        |> Enum.join("-"),
       dhcp: sel.("//tt:DHCP")
     }
   end
@@ -107,7 +108,7 @@ defmodule Exvif.Cam do
 
   def to_int(number_string) when is_binary(number_string) do
     case Integer.parse(number_string) do
-      {:error, reason} -> 0
+      {:error, _} -> 0
       {number, _} -> number
     end
   end
@@ -143,15 +144,12 @@ defmodule Exvif.Cam do
         },
         quality: to_int(sel.("/tt:VideoEncoderConfiguration/tt:Quality")),
         rate_control: %{
-          frame_rate_limit: to_int(
-            sel.("/tt:VideoEncoderConfiguration/tt:RateControl/tt:FrameRateLimit")
-          ),
-          encoding_interval: to_int(
-            sel.("/tt:VideoEncoderConfiguration/tt:RateControl/tt:EncodingInterval")
-          ),
-          bitrate_limit: to_int(
-            sel.("/tt:VideoEncoderConfiguration/tt:RateControl/tt:BitrateLimit")
-          )
+          frame_rate_limit:
+            to_int(sel.("/tt:VideoEncoderConfiguration/tt:RateControl/tt:FrameRateLimit")),
+          encoding_interval:
+            to_int(sel.("/tt:VideoEncoderConfiguration/tt:RateControl/tt:EncodingInterval")),
+          bitrate_limit:
+            to_int(sel.("/tt:VideoEncoderConfiguration/tt:RateControl/tt:BitrateLimit"))
         }
       }
     }

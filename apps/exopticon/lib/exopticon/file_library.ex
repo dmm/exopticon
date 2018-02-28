@@ -18,6 +18,22 @@ defmodule Exopticon.FileLibrary do
   # microseconds
   @max_gap 500 * 1000
 
+  defp earliest(date1, date2) do
+    if Timex.before?(date1, date2) do
+      date1
+    else
+      date2
+    end
+  end
+
+  defp latest(date1, date2) do
+    if Timex.after?(date1, date2) do
+      date1
+    else
+      date2
+    end
+  end
+
   defp append_file([], file) do
     [
       %{
@@ -62,18 +78,25 @@ defmodule Exopticon.FileLibrary do
     new_chunks ++ rest
   end
 
-  defp calculate_availability(chunks, []) do
-    chunks |> Enum.reverse()
+  defp calculate_availability(begin_time, end_time, chunks, []) do
+    %{
+      begin_time: begin_time,
+      end_time: end_time,
+      availability: chunks |> Enum.reverse()
+    }
   end
 
-  defp calculate_availability(chunks, files) do
+  defp calculate_availability(begin_time, end_time, chunks, files) do
     [next_file | rest] = files
+
+    begin_time = earliest(begin_time, next_file.begin_time)
+    end_time = latest(begin_time, next_file.end_time)
     new_chunks = append_file(chunks, next_file)
 
-    calculate_availability(new_chunks, rest)
+    calculate_availability(begin_time, end_time, new_chunks, rest)
   end
 
-  def calculate_availability(files) do
-    calculate_availability([], files)
+  def calculate_availability(files, begin_time, end_time) do
+    calculate_availability(begin_time, end_time, [], files)
   end
 end

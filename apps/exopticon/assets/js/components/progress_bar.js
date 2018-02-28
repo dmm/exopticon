@@ -16,13 +16,21 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {use as jsJodaUse, ZonedDateTime} from 'js-joda';
+import {
+  use as jsJodaUse,
+  DateTimeFormatter,
+  Duration,
+  ZonedDateTime,
+  ZoneId,
+} from 'js-joda';
 import jsJodaTimeZone from 'js-joda-timezone';
 import React from 'react';
 
 import './../../css/components/progress_bar.css';
 
 jsJodaUse(jsJodaTimeZone);
+
+const LOCAL_TZ = 'America/Chicago';
 
 /**
  * ProgressBar - class implementing a bar showing a time interval
@@ -34,42 +42,88 @@ class ProgressBar extends React.Component {
    */
   constructor() {
     super();
-    this.state = {files: []};
-    this.beginTime = ZonedDateTime.parse('9999-12-31T23:59:59.999Z');
-    this.endTime = ZonedDateTime.parse('1970-01-01T00:00:00.000Z');
+    this.state = {
+      availability: {
+        availability: [],
+        begin_time: ZonedDateTime.parse('9999-12-31T23:59:59.999Z'),
+        end_time: ZonedDateTime.parse('1970-01-01T00:00:00.000Z'),
+      },
+        timeLabel: '',
+    };
     this.gaps = [];
+
+    this.onMouseMove = this.onMouseMove.bind(this);
+    this.onMouseLeave = this.onMouseLeave.bind(this);
   }
 
   /**
-   * processFiles
-   * @param {Array} files
-   *
+   * onMouseMove
+   * @param {object} e
    */
-  processFiles(files) {
-    console.log('Processing ' + files.length + ' files.');
-    files.forEach((f) => {
-      const begin = ZonedDateTime.parse(f.begin_time);
-      const end = ZonedDateTime.parse(f.end_time);
-      if (begin.isBefore(this.beginTime)) {
-        this.beginTime = begin;
-      }
+  onMouseMove(e) {
+    this._label.style.display = 'block';
+    const ratio = (e.clientX - e.currentTarget.offsetLeft)
+          / e.currentTarget.clientWidth;
 
-      if (end.isAfter(this.endTime)) {
-        this.endTime = end;
-      }
+    const timeOffset =
+          Duration.between(this.state.availability.begin_time,
+                           this.state.availability.end_time).toMillis()
+          * ratio;
+
+    const zone = ZoneId.of(LOCAL_TZ);
+    const newTime = this.state.availability.begin_time
+          .plusSeconds(timeOffset / 1000)
+          .withZoneSameInstant(zone);
+    const formattedDate =
+          newTime.format(DateTimeFormatter.ofPattern('yyyy-MM-dd HH:mm:ss'));
+    this.setState({
+      timeLabel: formattedDate,
     });
-
-    console.log(`Begin time: ${this.beginTime.toString()}`
-                + `End time: ${this.endTime.toString()}`);
+    console.log(`percentage: ${ratio} ${formattedDate}`);
   }
+
+  /**
+   * onMouseLeave
+   */
+  onMouseLeave() {
+    this._label.style.display = 'none';
+  }
+
   /**
    * react render function
    * @return {object} react
    */
   render() {
-    this.processFiles(this.state.files);
+    const chunks = this.state.availability.availability;
+    const duration =
+          Duration.between(this.state.availability.begin_time,
+                           this.state.availability.end_time).toMillis();
+    let elm = [];
+    chunks.forEach((c, i) => {
+      const chunkLength = Duration.between(c.begin_time, c.end_time).toMillis();
+      const percentage = ((chunkLength / duration) * 100);
+      w += percentage;
+      elm.push((
+        <div className={`progress-element ${c.type}`}
+        key={i} style={{width: percentage+'%'}} />
+      ));
+    });
+
     return (
-       <div className='progress-bar'></div>
+      <div className='progress-bar'
+           onMouseMove={this.onMouseMove}
+           onMouseLeave={this.onMouseLeave}
+           >
+        { elm }
+        <div className='time-label'
+             ref={
+               (el) => {
+                 this._label = el;
+               }
+          }>
+          <span>{this.state.timeLabel}</span>
+        </div>
+      </div>
     );
   }
 }

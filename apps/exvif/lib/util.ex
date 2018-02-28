@@ -76,6 +76,9 @@ defmodule Exvif.Util do
       {"charset", "utf-8"}
     ]
 
-    HTTPoison.post(url, body, headers)
+    case HTTPoison.post(url, body, headers) do
+      {:ok, response} -> {:ok, response}
+      {:error, error} -> {:error, error}
+    end
   end
 end

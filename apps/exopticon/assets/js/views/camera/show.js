@@ -60,23 +60,45 @@ export default class view extends MainView {
   /**
    * fetches files for camera between two datetimes
    * @param {number} cameraId
+   * @param {object} progress - progresbar component
    * @param {string} beginTime - iso8601 datetime
    * @param {string} endTime - iso8601 datetime
-   * @param {object} progress - progresbar component
    */
-  fetchFiles(cameraId, beginTime, endTime, progress) {
-    fetch(`/v1/files/${cameraId}?begin_time=${beginTime}&end_time=${endTime}`, {
+  fetchCoverage(cameraId, progress, beginTime, endTime) {
+    let url = `/v1/cameras/${cameraId}/availability`;
+    if (beginTime !== undefined) {
+      url += `?begin_time=${beginTime}`;
+    }
+    if (endTime !== undefined) {
+      url += `&end_time=${endTime}`;
+    }
+    fetch(url, {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
       },
     }).then((response) => {
       return response.json();
-    }).then((files) => {
-      console.log('Got ' + files.length + ' files. Setting state...');
-      progress.setState({files: files});
+    }).then((availability) => {
+      const beginTime = ZonedDateTime.parse(availability.begin_time);
+      const endTime = ZonedDateTime.parse(availability.end_time);
+      let chunks = [];
+      availability.availability.forEach((ch) => {
+        chunks.push({
+          type: ch.type,
+          begin_time: ZonedDateTime.parse(ch.begin_time),
+          end_time: ZonedDateTime.parse(ch.end_time),
+        });
+      });
+      progress.setState({
+        availability: {
+          begin_time: beginTime,
+          end_time: endTime,
+          availability: chunks,
+        },
+      });
     }).catch((error) => {
-      console.log('There was an error fetching files: ' + error);
+      console.log('There was an error fetching availability: ' + error);
     });
   }
 
@@ -92,7 +114,7 @@ export default class view extends MainView {
     window.cameraManager = new CameraManager(socket);
     this.fetchCamera(cameraId);
     const now = ZonedDateTime.now(ZoneOffset.UTC);
-    const then = now.minusHours(12);
+    const then = now.minusHours(6);
 
     let progressBar = React.createElement(ProgressBar,
                                           {
@@ -100,8 +122,8 @@ export default class view extends MainView {
                                           });
     this.progressComponent =
       ReactDOM.render(progressBar, document.getElementById('progress'));
-    this.fetchFiles(cameraId, then.toString(),
-                    now.toString(),
-                    this.progressComponent);
+    this.fetchCoverage(cameraId, this.progressComponent,
+                       then.toString(),
+                       now.toString());
   }
 }

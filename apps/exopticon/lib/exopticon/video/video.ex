@@ -362,7 +362,7 @@ defmodule Exopticon.Video do
   """
   def get_video_coverage(camera_id, begin_time, end_time) do
     get_files_between(camera_id, begin_time, end_time)
-    |> Exopticon.FileLibrary.calculate_availability()
+    |> Exopticon.FileLibrary.calculate_availability(begin_time, end_time)
   end
 
   def get_total_video_size(camera_group_id) do
