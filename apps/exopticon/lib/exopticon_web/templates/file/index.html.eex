@@ -19,8 +19,8 @@
     <tr>
       <td><%= file.filename %></td>
       <td><%= file.size %></td>
-      <td><%= Enum.at(file.time, 0) %></td>
-      <td><%= Enum.at(file.time, 1)  %></td>
+      <td><%= file.begin_time %></td>
+      <td><%= file.end_time  %></td>
       <td><%= file.begin_monotonic %></td>
       <td><%= file.end_monotonic %></td>
       <td><%= file.monotonic_index %></td>

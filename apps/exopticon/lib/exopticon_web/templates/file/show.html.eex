@@ -18,12 +18,12 @@
 
   <li>
     <strong>Begin time:</strong>
-    <%= Enum.at(@file.time, 0) %>
+    <%= @file.begin_time %>
   </li>
 
   <li>
     <strong>End time:</strong>
-    <%= Enum.at(@file.time, 1) %>
+    <%= @file.end_time %>
   </li>
 
   <li>
