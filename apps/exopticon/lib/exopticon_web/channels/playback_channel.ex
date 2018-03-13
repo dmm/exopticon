@@ -17,12 +17,25 @@ defmodule ExopticonWeb.PlaybackChannel do
     [_, file_id, offset] = String.split(params, ",") |> Enum.map(&String.to_integer/1)
     file = Exopticon.Repo.get!(Exopticon.Video.File, file_id)
     Exopticon.PlaybackSupervisor.start_playback({"playback:" <> params, file, offset})
+    socket = assign(socket, :topic, "playback:" <> params)
     {:noreply, socket}
   end
 
   def handle_in("kill_player", %{"topic" => topic}, socket) do
     IO.puts("Stopping player: " <> topic)
     Exopticon.PlaybackSupervisor.stop_playback(topic)
+    {:noreply, socket}
+  end
+
+  def handle_in("ack", _payload, socket) do
+    topic = socket.assigns[:topic]
+    regs = Registry.lookup(Registry.PlayerRegistry, topic)
+    pids = Enum.map(regs, fn {pid, _} -> pid end)
+
+    Enum.map(pids, fn p ->
+      GenServer.cast(p, :ack)
+    end)
+
     {:noreply, socket}
   end
 

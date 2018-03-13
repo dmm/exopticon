@@ -30,16 +30,17 @@ defmodule Exopticon.PlaybackPort do
         [:binary, {:packet, 4}, :exit_status]
       )
 
-    {:ok, %{id: id, port: port, offset: offset}}
+    schedule_check()
+    {:ok, %{id: id, port: port, offset: offset, timeout: System.monotonic_time()}}
   end
 
   ## Handle message callback
-  def handle_info({port, {:data, msg}}, %{id: id, port: port, offset: offset}) do
-    {Msgpax.unpack!(msg), %{id: id, port: port, offset: offset}}
+  def handle_info({port, {:data, msg}}, state) do
+    {Msgpax.unpack!(msg), state}
     |> handle_message
   end
 
-  def handle_info({port, {:exit_status, status}}, %{id: id, port: port, offset: _}) do
+  def handle_info({port, {:exit_status, status}}, %{id: id, port: port} = state) do
     IO.puts("Got exit status! " <> Integer.to_string(status))
 
     ExopticonWeb.Endpoint.broadcast!(id, "stop", %{
@@ -67,6 +68,29 @@ defmodule Exopticon.PlaybackPort do
   def handle_message({%{"type" => "log", "message" => message}, state}) do
     IO.puts("playback message: " <> message)
     {:noreply, state}
+  end
+
+  ## Handle ack cast
+  def handle_cast(:ack, state) do
+    {:noreply, Map.put(state, :timeout, System.monotonic_time())}
+  end
+
+  ## Handle timeout check
+  def handle_info(:timeout_check, %{timeout: timeout} = state) do
+    cur = System.convert_time_unit(System.monotonic_time(), :native, :seconds)
+    prev = System.convert_time_unit(timeout, :native, :seconds) + 5
+
+    if cur > prev do
+      # five seconds have passed since an Ack, close port
+      {:stop, :normal, %{}}
+    else
+      schedule_check()
+      {:noreply, state}
+    end
+  end
+
+  defp schedule_check() do
+    Process.send_after(self(), :timeout_check, 1000)
   end
 
   defp via_tuple(topic) do

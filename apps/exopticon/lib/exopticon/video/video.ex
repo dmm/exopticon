@@ -378,6 +378,16 @@ defmodule Exopticon.Video do
     Repo.one(query) || 0
   end
 
+  def get_file_for_time(camera_id, time) do
+    query =
+      from(
+        f in File,
+        where: f.camera_id == ^camera_id and f.begin_time <= ^time and f.end_time >= ^time
+      )
+
+    Repo.one(query)
+  end
+
   def get_oldest_files_in_group(camera_group_id, count \\ 100) do
     query =
       from(
