@@ -78,6 +78,21 @@ defmodule Exopticon.FileLibrary do
     new_chunks ++ rest
   end
 
+  defp calculate_availability(begin_time, end_time, [], []) do
+    # Handle special case where we have no files
+    %{
+      begin_time: begin_time,
+      end_time: end_time,
+      availability: [
+        %{
+          begin_time: begin_time,
+          end_time: end_time,
+          type: :no_video
+        }
+      ]
+    }
+  end
+
   defp calculate_availability(begin_time, end_time, chunks, []) do
     %{
       begin_time: begin_time,
