@@ -47,7 +47,7 @@ defmodule Exopticon.Mixfile do
       {:bcrypt_elixir, "~> 0.12.0"},
       {:credo, github: "rrrene/credo", only: [:dev, :test], runtime: false},
       {:dialyzex, "~> 1.1.0", only: :dev},
-      {:timex, "~> 3.1"}
+      {:timex, "~> 3.2.1"}
 #      {:dialyxir, "~> 0.5.1", only: [:dev], runtime: false}
     ]
   end

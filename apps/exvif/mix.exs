@@ -24,7 +24,7 @@ defmodule Exvif.Mixfile do
       {:httpoison, "~> 1.0"},
       {:exml, "~> 0.1.1"},
       {:uuid, "~> 1.1"},
-      {:timex, "~> 3.1.25"},
+      {:timex, "~> 3.2.1"},
       {:dialyzex, "~> 1.1.0", only: :dev}
     ]
   end
