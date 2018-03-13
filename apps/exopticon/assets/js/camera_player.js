@@ -79,9 +79,9 @@ class CameraPlayer {
   /**
    * request relative movement from camera
    * @param {number} x - number between -1 and 1 specifying amount to
-                         move horizontally
+   *                     move horizontally
    * @param {number} y - number between -1 and 1 specifying amount to
-                         move vertically
+   *                     move vertically
    * @param {Function} callback - movement complete callback
    */
   relativeMove(x, y, callback) {

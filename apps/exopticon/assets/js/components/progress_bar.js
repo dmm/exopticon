@@ -98,11 +98,15 @@ class ProgressBar extends React.Component {
     const duration =
           Duration.between(this.state.availability.begin_time,
                            this.state.availability.end_time).toMillis();
+   let w = 0;
     let elm = [];
     chunks.forEach((c, i) => {
       const chunkLength = Duration.between(c.begin_time, c.end_time).toMillis();
       const percentage = ((chunkLength / duration) * 100);
       w += percentage;
+      const style = {
+        width: percentage.toString() + '%',
+      };
       elm.push((
         <div className={`progress-element ${c.type}`}
         key={i} style={{width: percentage+'%'}} />

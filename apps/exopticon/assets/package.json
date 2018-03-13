@@ -13,8 +13,7 @@
     "phoenix_html": "file:../deps/phoenix_html",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
-    "verge": "^1.10.2",
-    "webpack-bundle-size-analyzer": "^2.7.0"
+    "verge": "^1.10.2"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
@@ -23,6 +22,7 @@
     "babel-preset-env": "^1.6.1",
     "babel-preset-latest": "^6",
     "babel-preset-react": "^6.24.1",
+    "compression-webpack-plugin": "^1.1.10",
     "copy-webpack-plugin": "^4.4.1",
     "css-loader": "^0.28.9",
     "eslint": "^4.18.1",

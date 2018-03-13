@@ -18,6 +18,7 @@
 
 import MainView from '../main';
 import socket from '../../socket';
+import SuperImage from '../../super_image';
 
 /**
  * @param {number} min
@@ -48,15 +49,19 @@ export default class View extends MainView {
     let nonce = getRandomInt(0, 999999);
     const topic = `playback:${nonce},${fileId},0`;
     let channel = socket.channel(topic);
+
     channel.onError( (reason) => console.log('there was an error! ' + reason ));
     channel.onClose( () => {
       console.log('the channel has gone away gracefully');
     });
+
     let videoDiv = document.querySelector('.video');
     let img = document.createElement('img');
+    let superImage = new SuperImage(img);
     videoDiv.appendChild(img);
     channel.on('jpg', function(data) {
-      //          renderFrame(img, data.frameJpeg);
+      channel.push('ack', {ts: data.ts});
+      superImage.renderArrayIfReady(data.frameJpeg);
     });
     channel.join();
     channel.push('start_player', {topic: topic}, 10000);
