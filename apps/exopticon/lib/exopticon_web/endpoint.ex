@@ -11,7 +11,7 @@ defmodule ExopticonWeb.Endpoint do
     Plug.Static,
     at: "/",
     from: :exopticon,
-    gzip: false,
+    gzip: true,
     only: ~w(css fonts images js favicon.ico robots.txt)
   )
 
