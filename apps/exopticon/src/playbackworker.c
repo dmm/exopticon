@@ -210,6 +210,23 @@ cleanup:
         return ret;
 }
 
+int seek_to_offset(struct PlayerState *state, int64_t ms_offset)
+{
+        AVRational millisecond;
+        millisecond.num = 1;
+        millisecond.den = 1000;
+
+        int64_t offset = av_rescale_q(ms_offset,
+                                      millisecond,
+                                      state->fcx->streams[state->i_index]->time_base);
+
+        int flags = AVSEEK_FLAG_FRAME | AVSEEK_FLAG_BACKWARD;
+
+        av_seek_frame(state->fcx, state->i_index, offset, flags);
+        avcodec_flush_buffers(state->ccx);
+        return 0;
+}
+
 int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRational time_base)
 {
         AVPacket jpeg_packet;
@@ -309,6 +326,48 @@ cleanup:
         return 1;
 }
 
+int checkforquit()
+{
+        int ret = 0;
+        int quit = 0;
+        char buf[1024];
+        fd_set rfds;
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+
+        FD_ZERO(&rfds);
+        FD_SET(0, &rfds);
+
+        do {
+                ret = select(1, &rfds, NULL, NULL, &timeout);
+                size_t read_size = 0;
+                if (ret > 0 && FD_ISSET(0, &rfds)) {
+
+                        // select return value is greater than 0 and stdin is in
+                        // the set, read!
+                        read_size = fread(buf, 1, 1, stdin);
+                }
+
+                if (feof(stdin) != 0) {
+                        quit = 1;
+                }
+
+
+
+                // TODO change second loop condition to assert
+                for (size_t i = 0; i < read_size && i < sizeof(buf); ++i) {
+                        if (buf[i] == 'q') {
+                                quit = 1;
+                                break;
+                        }
+                }
+        } while (ret > 0 && quit == 0);
+
+
+        return quit;
+}
+
 int main(int argc, char *argv[])
 {
         struct PlayerState player;
@@ -323,6 +382,7 @@ int main(int argc, char *argv[])
         av_register_all();
         avcodec_register_all();
         avformat_network_init();
+        // End Initialize ffmpeg
 
         player.got_key_frame = 0;
         player.fcx = avformat_alloc_context();
@@ -361,7 +421,6 @@ int main(int argc, char *argv[])
                 goto cleanup;
         }
 
-        //        player.ccx = avcodec_alloc_context3(player.codec;)
         player.codec = avcodec_find_decoder(player.codecpar->codec_id);
         if (player.codec == NULL) {
                 bs_log("Codec!");
@@ -390,7 +449,8 @@ int main(int argc, char *argv[])
 
         int ret = 0;
         int count = 0;
-        while ((ret = av_read_frame(player.fcx, &player.pkt)) >= 0) {
+        seek_to_offset(&player, ms_offset);
+        while (checkforquit() != 1 && (ret = av_read_frame(player.fcx, &player.pkt)) >= 0) {
                 // handle packet
                 handle_packet(&player);
                 av_packet_unref(&player.pkt);
@@ -399,20 +459,8 @@ int main(int argc, char *argv[])
         }
 
 cleanup:
-        if (player.fcx != NULL) {
-                //                close_output_file(&player);
-        }
-
-        //        av_frame_free(&player.frame);
-
-        if (player.fcx != NULL) {
-                avformat_close_input(&player.fcx);
-        }
-
-        if (player.ccx != NULL) {
-                avcodec_free_context(&player.ccx);
-        }
-
+        avcodec_close(player.ccx);
+        //        avformat_close_input(player.fcx);
         avformat_network_deinit();
 
         return 0;
