@@ -19,6 +19,8 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 
+import OverlayButton from './overlay_button';
+
 import '../../css/components/status_overlay.css';
 
 /**
@@ -41,6 +43,11 @@ class StatusOverlay extends React.Component {
   render() {
     return (
         <div className="status-overlay">
+        <OverlayButton
+          label="👁"
+          extra-class="camera-link"
+          link-to=""
+        />
           <div className="status-message">
             {this.props.status}: {this.props.cameraName}
           </div>

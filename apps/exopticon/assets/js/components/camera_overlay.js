@@ -104,7 +104,12 @@ class CameraOverlay extends React.Component {
            onTouchStart={this.touchStart}
            onTouchMove={this.touchMove}
            onTouchEnd={this.touchEnd}
-           />
+           >
+        <OverlayButton
+          label="👁"
+          extraClass="camera-link"
+          />
+      </div>
     );
 
     if (this.props.camera.hasPtz()) {
@@ -116,6 +121,10 @@ class CameraOverlay extends React.Component {
              onTouchMove={this.touchMove}
              onTouchEnd={this.touchEnd}
              >
+          <OverlayButton
+            label="👁"
+            extraClass="camera-link"
+            />
           <OverlayButton
             label="◀"
             extraClass="left-arrow"
