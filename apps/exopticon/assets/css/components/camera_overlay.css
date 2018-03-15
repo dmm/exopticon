@@ -49,3 +49,45 @@
     background-color: rgba(0, 0, 0, 0.5);
     border-radius: 5px;
 }
+
+.ptz-controls > .camera-link {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 3px;
+    border-radius: 5px;
+}
+
+/* Animation button on click */
+.camera-overlay button:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, .2);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+@keyframes ripple {
+    0% {
+        transform: scale(0, 0);
+        opacity: 1;
+    }
+    20% {
+        transform: scale(12.5, 12.5);
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: scale(20, 20);
+    }
+}
+
+.camera-overlay button:focus:not(:active)::after {
+    animation: ripple 0.5s ease-out;
+}
