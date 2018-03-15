@@ -13,3 +13,37 @@ html, body, main, .container-fluid {
 main {
     height: calc(100% - 36px);
 }
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-width: 300px;
+    margin-right: auto;
+    margin-left: auto;
+    margin-top: 10%;
+    padding-left: 15px;
+    padding-right: 15px;
+    padding-bottom: 15px;
+    border: 1px solid;
+}
+
+.login-form h1 {
+    text-align: center;
+}
+
+.login-form button {
+    margin-top: 15px;
+}
+
+.login-form form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.login-form form input {
+    margin: 15px 0 0 0;
+    max-width: 200px;
+    font-size: 20pt;
+}
