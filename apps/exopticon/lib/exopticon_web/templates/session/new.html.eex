@@ -2,7 +2,7 @@
   <h1>Login to EXOPTICON</h1>
 
   <%= form_for @conn, session_path(@conn, :create), [as: :session], fn f-> %>
-    <%= text_input f, :username, placeholder: "Username", class: "form-control" %>
+    <%= text_input f, :username, placeholder: "Username", class: "form-control", autofocus: "true" %>
     <%= password_input f, :password, placeholder: "Password", class: "form-control" %>
   <%= submit "login", class: "btn btn-primary" %>
   <% end %>
