@@ -51,6 +51,7 @@ class CameraView extends React.Component {
 
     this.isScrolling = true; // junk value to be replaced by timer
     this.isResizing = true;
+    this.initialTimeout = true; // junk value to be replaced by timer
   }
 
   /**
@@ -96,7 +97,7 @@ class CameraView extends React.Component {
   componentDidMount() {
     window.addEventListener('scroll', this.handleScroll);
     window.addEventListener('resize', this.handleResize);
-    setTimeout(() => {
+    this.initialTimeout = setTimeout(() => {
       if (verge.inY(this._container)) {
         this.setState({status: 'loading'});
         this.props.cameraPlayer.playRealtime(this._img, () => {
@@ -113,6 +114,7 @@ class CameraView extends React.Component {
    * removes event handlers and stops player
    */
   componentWillUnmount() {
+    clearTimeout(this.initialTimeout);
     window.removeEventListener('scroll', this.handleScroll);
     window.removeEventListener('resize', this.handleResize);
     this.props.cameraPlayer.stop();
