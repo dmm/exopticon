@@ -25,7 +25,6 @@ defmodule Exvif.Mixfile do
       {:exml, "~> 0.1.1"},
       {:uuid, "~> 1.1"},
       {:timex, "~> 3.2.1"},
-      {:dialyzex, "~> 1.1.0", only: :dev}
     ]
   end
 end
