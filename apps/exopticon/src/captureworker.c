@@ -29,6 +29,7 @@
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixfmt.h>
+#include <libswscale/swscale.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -188,7 +189,7 @@ time_t get_time()
         return tv.tv_sec;
 }
 
-int encode_jpeg(AVCodecContext *in_ccx, AVFrame *frame, AVPacket *pkt)
+int encode_jpeg(AVFrame *frame, AVPacket *pkt)
 {
         AVCodec *codec = NULL;
         AVCodecContext *ccx = NULL;
@@ -210,14 +211,13 @@ int encode_jpeg(AVCodecContext *in_ccx, AVFrame *frame, AVPacket *pkt)
                 goto cleanup;
         }
 
-        ccx->bit_rate = in_ccx->bit_rate;
-        ccx->width = in_ccx->width;
-        ccx->height = in_ccx->height;
+        ccx->width = frame->width;
+        ccx->height = frame->height;
         ccx->pix_fmt = img_fmt;
 
         // Set quality
-        ccx->qmin = 2;
-        ccx->qmax = 10;
+        ccx->qmin = 1;
+        ccx->qmax = 15;
         ccx->mb_lmin = ccx->qmin * FF_QP2LAMBDA;
         ccx->mb_lmax = ccx->qmax * FF_QP2LAMBDA;
 
@@ -518,6 +518,74 @@ int64_t timespec_to_ms_interval(const struct timespec beg,
         return (end_time - begin_time) / million;
 }
 
+AVFrame* scale_frame(AVFrame *input, int width, int height)
+{
+        AVFrame* resizedFrame = av_frame_alloc();
+        if (resizedFrame == NULL) {
+                return NULL;
+        }
+
+        resizedFrame->format = input->format;
+        resizedFrame->width = width;
+        resizedFrame->height = height;
+        int ret = av_image_alloc(resizedFrame->data,
+                                 resizedFrame->linesize,
+                                 resizedFrame->width,
+                                 resizedFrame->height,
+                                 resizedFrame->format,
+                                 32);
+        if (ret < 0) {
+                av_frame_free(&resizedFrame);
+                return NULL;
+        }
+
+        struct SwsContext *sws_context = sws_getCachedContext(NULL,
+                                                              input->width,
+                                                              input->height,
+                                                              input->format,
+                                                              resizedFrame->width,
+                                                              resizedFrame->height,
+                                                              resizedFrame->format,
+                                                              SWS_BICUBIC,
+                                                              NULL,
+                                                              NULL,
+                                                              NULL);
+        sws_scale(sws_context,
+                  input->data,
+                  input->linesize,
+                  0,
+                  input->height,
+                  resizedFrame->data,
+                  resizedFrame->linesize);
+
+        sws_freeContext(sws_context);
+        return resizedFrame;
+}
+
+int send_scaled_frame(AVFrame *frame, const int pts, const int width, const int height)
+{
+        struct FrameMessage message;
+        message.pts = pts;
+
+        AVPacket jpeg_pkt;
+        av_init_packet(&jpeg_pkt);
+
+        AVFrame *scaledFrame = NULL;
+        scaledFrame = scale_frame(frame, width, height);
+
+        // jpeg encode frame
+        encode_jpeg(scaledFrame, &jpeg_pkt);
+        message.jpeg = jpeg_pkt.buf->data;
+        message.jpeg_size = jpeg_pkt.buf->size;
+
+        send_scaled_frame_message(&message, scaledFrame->height);
+
+cleanup:
+        av_freep(&(scaledFrame->data));
+        av_frame_free(&scaledFrame);
+        av_packet_unref(&jpeg_pkt);
+}
+
 int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
 {
         // Make sure packet is video
@@ -622,7 +690,7 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         } else {
                 // The video codec is not jpeg so we need to encode a jpeg
                 // frame.
-                encode_jpeg(cam->iccx, cam->frame, &jpegPkt);
+                encode_jpeg(cam->frame, &jpegPkt);
                 output_frame_size = jpegPkt.buf->size;
                 output_frame_buffer = jpegPkt.buf->data;
 
@@ -639,6 +707,7 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         fwrite(output_frame_buffer, output_frame_size, 1, stdout);
         */
         send_frame_message(&message);
+        send_scaled_frame(cam->frame, cam->frame->pts, 640, 360);
         clock_gettime(CLOCK_MONOTONIC, &write_end);
         frame_time->stream_write_time =
             timespec_to_ms_interval(write_begin, write_end);

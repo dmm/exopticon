@@ -53,6 +53,36 @@ void send_frame_message(struct FrameMessage *msg)
         free(data);
 }
 
+void send_scaled_frame_message(struct FrameMessage *msg, const int32_t height)
+{
+        char *data = NULL;
+        size_t size = 0;
+        mpack_writer_t writer;
+        mpack_writer_init_growable(&writer, &data, &size);
+
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "jpegFrameScaled");
+        mpack_write_bin(&writer, (char*)msg->jpeg, (uint32_t)msg->jpeg_size);
+        mpack_write_cstr(&writer, "height");
+        mpack_write_i32(&writer, height);
+        mpack_write_cstr(&writer, "pts");
+        mpack_write_i64(&writer, msg->pts);
+        mpack_finish_map(&writer);
+
+        if (mpack_writer_destroy(&writer) != mpack_ok) {
+                exit(5);
+        }
+
+        // Write the total message size for framing
+        const uint32_t frame_size = htobe32((uint32_t)size);
+        fwrite(&frame_size, sizeof(frame_size), 1, stdout);
+
+        // Write message
+        fwrite(data, size, 1, stdout);
+        fflush(stdout);
+        free(data);
+}
+
 void send_new_file_message(char *filename, char *iso_begin_time)
 {
         char *data = NULL;

@@ -3,7 +3,7 @@ mycflags= -W -Wall -Wextra -Wcast-align -Wpointer-arith -Wsign-compare -Wformat=
           -std=c99 -flto
 devcflags= -fsanitize=undefined -fsanitize=address
 
-LIBRARIES= -lavformat -lavutil -lavcodec
+LIBRARIES= -lavformat -lavutil -lavcodec -lswscale
 CC ?= gcc
 BINDIR ?= ../lib/exopticon
 
