@@ -52,7 +52,7 @@ export default class View extends MainView {
 
     document.addEventListener('visibilitychange', () => {
       console.log('visibility change!');
-      if (document["hidden"]) {
+      if (document['hidden']) {
         // Clear cameras until visible again
         window.cameraManager.updateCameras([]);
       } else {
