@@ -16,6 +16,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+let globalIsDrawing = false;
+
 /**
  * SuperImage class - Implements an image that drops render requests
  * as needed
@@ -37,7 +39,8 @@ class SuperImage {
    */
   checkFrame() {
     if (this.img.complete) {
-      this.isDrawing = false;
+      //      this.isDrawing = false;
+      globalIsDrawing = false;
       window.URL.revokeObjectURL(this.img.src);
       if (this.callback) this.callback();
     } else {
@@ -53,8 +56,10 @@ class SuperImage {
   renderIfReady(src, callback) {
     this.callback = callback;
 
-    if (this.isDrawing === false) {
-      this.isDrawing = true;
+    //    if (this.isDrawing === false) {
+    if (globalIsDrawing === false) {
+      //      this.isDrawing = true;
+      globalIsDrawing = true;
       this.img.src = src;
       window.requestAnimationFrame(this.checkFrame);
     }
@@ -68,9 +73,24 @@ class SuperImage {
   renderArrayIfReady(arrayBuffer, callback) {
     this.callback = callback;
 
-    if (this.isDrawing === false) {
-      this.isDrawing = true;
+    if (globalIsDrawing === false) {
+      globalIsDrawing = true;
       let blob = new Blob([arrayBuffer], {type: 'image/jpeg'});
+      this.img.src = window.URL.createObjectURL(blob);
+      window.requestAnimationFrame(this.checkFrame);
+    }
+  }
+
+  /**
+   * renders specified blob as image/jpeg if ready
+   * @param {Blob} blob - image blob to render
+   * @param {function} callback - called if image renders
+   */
+  renderBlobIfReady(blob, callback) {
+    this.callback = callback;
+
+    if (globalIsDrawing === false) {
+      globalIsDrawing = true;
       this.img.src = window.URL.createObjectURL(blob);
       window.requestAnimationFrame(this.checkFrame);
     }
