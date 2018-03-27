@@ -6,9 +6,7 @@ defmodule Exopticon.CameraSupervisor do
   end
 
   def init(_) do
-    children = [
-      #      worker(Exopticon.CapturePort, [], restart: :permanent)
-    ]
+    children = []
 
     supervise(children, strategy: :one_for_one)
   end

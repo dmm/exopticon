@@ -14,12 +14,10 @@ defmodule Exopticon.Application do
       supervisor(Exopticon.Repo, []),
       # Start the endpoint when the application starts
       supervisor(ExopticonWeb.Endpoint, []),
-      # Start your own worker by calling: Exopticon.Worker.start_link(arg1, arg2, arg3)
-      # worker(Exopticon.Worker, [arg1, arg2, arg3]),
       supervisor(Registry, [:unique, Registry.PlayerRegistry]),
       supervisor(Exopticon.CameraSupervisor, []),
       supervisor(Exopticon.PlaybackSupervisor, []),
-      supervisor(Exopticon.Video.FileDeletionSupervisor, [[1, 1024 * 1024]])
+      supervisor(Exopticon.Video.FileDeletionSupervisor, [])
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -27,7 +25,7 @@ defmodule Exopticon.Application do
     opts = [strategy: :one_for_one, name: Exopticon.Supervisor]
     ret = Supervisor.start_link(children, opts)
 
-    # Start cameras
+    # Start Cameras
     Exopticon.Repo.all(from(camera in Exopticon.Video.Camera, preload: [:camera_group]))
     |> Exopticon.CameraSupervisor.start_all_cameras()
 

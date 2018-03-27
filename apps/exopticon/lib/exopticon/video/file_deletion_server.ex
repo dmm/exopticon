@@ -3,19 +3,30 @@ require Logger
 defmodule Exopticon.Video.FileDeletionServer do
   use GenServer
 
-  def start_link(arg) do
-    GenServer.start_link(__MODULE__, [arg], name: __MODULE__)
+  def start_link do
+    GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  def init([[_camera_group_id, _max_size] = state]) do
+  def init(_) do
     schedule_work()
-    {:ok, state}
+    {:ok, []}
   end
 
-  def handle_info(:work, state) do
-    run(state)
+  def handle_info(:work, []) do
+    Exopticon.Video.list_camera_groups()
+    |> handle_groups()
+
     schedule_work()
-    {:noreply, state}
+    {:noreply, []}
+  end
+
+  defp handle_groups([]) do
+  end
+
+  defp handle_groups([group | tail]) do
+    run([group.id, group.max_storage_size])
+
+    handle_groups(tail)
   end
 
   defp run([camera_group_id, max_size] = state) do
@@ -48,9 +59,10 @@ defmodule Exopticon.Video.FileDeletionServer do
       "Deleting file #{inspect(file)}"
     end)
 
+    stat = File.stat!(file.filename)
     File.rm(file.filename)
     Exopticon.Video.delete_file(file)
-    file.size
+    stat.size / 1024
   end
 
   defp schedule_work() do
