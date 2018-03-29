@@ -1,22 +1,23 @@
 # Exopticon
 
-* 1.0 Features
-** Capture video
-
-
+* Exopticon
 * Stuff To Do
 ** Project
-*** TODO Integrate building of c workers
+*** DONE Integrate building of c workers
 *** TODO Implement SELinux for c workers
 *** TODO "Add Camera" workflow
+*** DONE "Sleeping" message while inactive due to non-visibility
+** playback
+*** TODO Implement timeline playback
+*** TODO Implement file-based playback
 ** playbackworker
 *** TODO Implement player abstraction over playback worker
 ** captureworker
-*** TODO Fix pts calculation
-**** Fix autodetection or use realtime pts
+*** DONE Fix pts calculation
+*** TODO Fix autodetection or use realtime pts
 *** TODO Fix FFMPEG deprecation warnings
 ** Exvif
-*** TODO pan-tilt controls
+*** DONE pan-tilt controls
 *** TODO time setting
 *** TODO find camera by MAC?
 *** TODO refactor around struct
