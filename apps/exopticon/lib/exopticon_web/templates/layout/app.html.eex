@@ -14,7 +14,7 @@
   <body data-js-view-name="<%= js_view_name(@conn, @view_template) %>">
     <div class="container-fluid">
       <header class="header">
-        <span class="logo"><img src="/images/eo_logo.png"></img></span>
+        <span class="logo"><img src="/images/eo_logo.svg"></img></span>
         <ol class="breadcrumb text-right">
           <%= if @current_user do %>
           <li><%= @current_user.username %></li>
