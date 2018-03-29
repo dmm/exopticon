@@ -5,19 +5,19 @@ devcflags= -fsanitize=undefined -fsanitize=address
 
 LIBRARIES= -lavformat -lavutil -lavcodec -lswscale
 CC ?= gcc
-BINDIR ?= ../lib/exopticon
+EXWORKER_BINDIR ?= ../lib/exopticon
 
-all: ${BINDIR}/captureworker ${BINDIR}/playbackworker
+all: ${EXWORKER_BINDIR}/captureworker ${EXWORKER_BINDIR}/playbackworker
 
 development: captureworker.c
-	${CC}  -O0 -g $(mycflags) $(devcflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c -o ${BINDIR}/captureworker
+	${CC}  -O0 -g $(mycflags) $(devcflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c -o ${EXWORKER_BINDIR}/captureworker
 
-${BINDIR}/playbackworker: playbackworker.c mpack_frame.c
-	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackworker.c mpack.c mpack_frame.c -o ${BINDIR}/playbackworker
+${EXWORKER_BINDIR}/playbackworker: playbackworker.c mpack_frame.c
+	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackworker.c mpack.c mpack_frame.c -o ${EXWORKER_BINDIR}/playbackworker
 
-${BINDIR}/captureworker: captureworker.c mpack_frame.c
-	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c -o ${BINDIR}/captureworker
+${EXWORKER_BINDIR}/captureworker: captureworker.c mpack_frame.c
+	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c -o ${EXWORKER_BINDIR}/captureworker
 
 .PHONY: clean
 clean:
-	-rm -f ${BINDIR}/captureworker ${BINDIR}/playbackworker
+	-rm -f ${EXWORKER_BINDIR}/captureworker ${EXWORKER_BINDIR}/playbackworker

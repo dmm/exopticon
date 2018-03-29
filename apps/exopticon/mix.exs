@@ -1,3 +1,21 @@
+defmodule Mix.Tasks.Compile.NativeWorkers do
+  def run(_args) do
+    {result, _errcode} = System.cmd("make", [], stderr_to_stdout: true,
+      cd: __DIR__ <> "/src/")
+    IO.binwrite(result)
+  end
+end
+
+defmodule Mix.Tasks.Compile.Javascript do
+  def run(_args) do
+    if Mix.env == :prod do
+      {result, _errcode} = System.cmd("npm", ["run", "deploy"], stderr_to_stdout: true, cd: __DIR__ <> "/assets")
+      IO.binwrite(result)
+    end
+    :ok
+  end
+end
+
 defmodule Exopticon.Mixfile do
   use Mix.Project
 
@@ -7,7 +25,7 @@ defmodule Exopticon.Mixfile do
       version: "0.0.1",
       elixir: "~> 1.4",
       elixirc_paths: elixirc_paths(Mix.env),
-      compilers: [:phoenix, :gettext] ++ Mix.compilers,
+      compilers: [:phoenix, :gettext, :native_workers, :javascript] ++ Mix.compilers,
       start_permanent: Mix.env == :prod,
       aliases: aliases(),
       deps: deps(),
