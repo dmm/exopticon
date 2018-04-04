@@ -10,6 +10,7 @@ defmodule Exopticon.Accounts.User do
     field(:password, :string, virtual: true)
     field(:password_hash, :string)
     field(:username, :string)
+    field(:timezone, :string)
 
     timestamps()
   end
@@ -17,8 +18,8 @@ defmodule Exopticon.Accounts.User do
   @doc false
   def changeset(%User{} = user, attrs) do
     user
-    |> cast(attrs, [:name, :username, :password])
-    |> validate_required([:name, :username, :password])
+    |> cast(attrs, [:name, :username, :password, :timezone])
+    |> validate_required([:name, :username, :password, :timezone])
     |> unique_constraint(:username)
   end
 

@@ -12,6 +12,11 @@
     <%= @user.username %>
   </li>
 
+  <li>
+    <strong>Timezone:</strong>
+    <%= @user.timezone %>
+  </li>
+
 </ul>
 
 <span><%= link "Edit", to: user_path(@conn, :edit, @user) %></span>
