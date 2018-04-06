@@ -41,7 +41,7 @@
     }
 }
 
-div.panel-col-1 div.camera-width {
+.camera-panel.panel-col-1 div.wrapper {
     width: calc(100% - 2px);
 }
 

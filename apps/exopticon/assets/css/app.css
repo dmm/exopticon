@@ -6,12 +6,9 @@
   box-sizing: border-box;
 }
 
-html, body, main, .container-fluid {
+html, body, .container-fluid {
     height: 100%;
-}
-
-main {
-    height: calc(100% - 36px);
+    
 }
 
 .login-form {

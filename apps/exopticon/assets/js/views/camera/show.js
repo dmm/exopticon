@@ -21,7 +21,8 @@ import jsJodaTimeZone from 'js-joda-timezone';
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import CameraManager from '../../camera_manager.js';
+import CameraManager from '../../camera_manager';
+import FileLibrary from '../../file_library';
 import MainView from '../main';
 import ProgressBar from '../../components/progress_bar';
 import socket from '../../socket';
@@ -33,6 +34,11 @@ jsJodaUse(jsJodaTimeZone);
  * Implements page that shows a single camera
  */
 export default class view extends MainView {
+  constructor() {
+    super();
+    this.fileLibrary = new FileLibrary([]);
+  }
+
   /**
    * fetches camera details
    * @param {number} cameraId
@@ -66,6 +72,7 @@ export default class view extends MainView {
    */
   fetchCoverage(cameraId, progress, beginTime, endTime) {
     let url = `/v1/cameras/${cameraId}/availability`;
+
     if (beginTime !== undefined) {
       url += `?begin_time=${beginTime}`;
     }
@@ -97,6 +104,7 @@ export default class view extends MainView {
           availability: chunks,
         },
       });
+      this.fileLibrary = new FileLibrary(availability.files);
     }).catch((error) => {
       console.log('There was an error fetching availability: ' + error);
     });
@@ -111,14 +119,16 @@ export default class view extends MainView {
 
     let cameraId = parseInt(document.getElementById('singleCamera')
                             .getAttribute('data-id'), 10);
-    window.cameraManager = new CameraManager(socket);
+    window.cameraManager = new CameraManager(socket, 1);
     this.fetchCamera(cameraId);
     const now = ZonedDateTime.now(ZoneOffset.UTC);
     const then = now.minusHours(6);
 
     let progressBar = React.createElement(ProgressBar,
                                           {
-
+                                            onMouseUp: (t) => {
+                                              console.log(this.fileLibrary.getFileForTime(t));
+                                            }
                                           });
     this.progressComponent =
       ReactDOM.render(progressBar, document.getElementById('progress'));

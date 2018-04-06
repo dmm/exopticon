@@ -31,7 +31,7 @@ class CameraPanel extends React.Component {
     this.state = {
       cameras: props.initialCameras,
       channel: channel,
-      viewColumns: 0,
+      viewColumns: props.initialColumns,
     };
   }
 
@@ -51,7 +51,7 @@ class CameraPanel extends React.Component {
     let cameraPanelClass = 'camera-panel';
 
     if (this.state.viewColumns !== 0) {
-      cameraPanelClass += `panel-col-${this.state.viewColumns.toString()}`;
+      cameraPanelClass += ` panel-col-${this.state.viewColumns.toString()}`;
     }
     this.cameraElements.clear();
     const cameras = [];

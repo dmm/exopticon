@@ -13,7 +13,7 @@ class CameraManager {
   /**
    * @param {Pheonix.socket} socket - phoenix socket to use as camera transport
    */
-  constructor(socket) {
+  constructor(socket, columns = 0) {
     this.socket = socket;
     this.visibleCameras = new Map();
     this.checkingVisibility = false;
@@ -24,6 +24,7 @@ class CameraManager {
                           {
                             socket: this.socket,
                             initialCameras: new Map(),
+                            initialColumns: columns
                           });
 
     this.component = ReactDOM.render(this.panel,
