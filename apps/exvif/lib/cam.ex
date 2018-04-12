@@ -1,4 +1,8 @@
 defmodule Exvif.Cam do
+  @moduledoc """
+  Provides onvif camera querying and manipulation
+  """
+
   import Exvif.Util
 
   def request_date_and_time(url) do
@@ -18,17 +22,15 @@ defmodule Exvif.Cam do
 
     [time, date] = Exml.get(doc, "//tt:UTCDateTime")
 
-    time = Enum.map(time, fn x -> Integer.parse(x) |> elem(0) end)
-    date = Enum.map(date, fn x -> Integer.parse(x) |> elem(0) end)
-
-    [hour, minute, sec] = time
-    [year, month, day] = date
+    time = Enum.map(time, fn x -> x |> Integer.parse() |> elem(0) end)
+    date = Enum.map(date, fn x -> x |> Integer.parse() |> elem(0) end)
 
     {:ok, Timex.to_datetime({List.to_tuple(date), List.to_tuple(time)}, "Etc/UTC")}
   end
 
   def fetch_date_and_time(url) do
-    request_date_and_time(url)
+    url
+    |> request_date_and_time
     |> handle_date_and_time
   end
 
@@ -51,7 +53,8 @@ defmodule Exvif.Cam do
   end
 
   def fetch_capabilities(url, username, password) do
-    request_capabilities(url, username, password)
+    url
+    |> request_capabilities(username, password)
     |> handle_capabilities
   end
 
@@ -74,7 +77,8 @@ defmodule Exvif.Cam do
       name: sel.("//tt:Name"),
       address: sel.("//tt:IPv4//tt:Address") |> List.wrap() |> List.first(),
       mac:
-        sel.("//tt:HwAddress")
+        "//tt:HwAddress"
+        |> sel.()
         |> String.upcase()
         |> String.replace(~r/[\:\-\.]/, "")
         |> String.to_charlist()
@@ -92,7 +96,8 @@ defmodule Exvif.Cam do
   end
 
   def fetch_network_interfaces(url, username, password) do
-    request_network_interfaces(url, username, password)
+    url
+    |> request_network_interfaces(username, password)
     |> handle_network_interfaces
   end
 
@@ -163,7 +168,8 @@ defmodule Exvif.Cam do
   end
 
   def fetch_profiles(url, username, password) do
-    request_profiles(url, username, password)
+    url
+    |> request_profiles(username, password)
     |> handle_profiles
   end
 
@@ -190,7 +196,8 @@ defmodule Exvif.Cam do
   end
 
   def fetch_device_information(url, username, password) do
-    request_device_information(url, username, password)
+    url
+    |> request_device_information(username, password)
     |> handle_device_information
   end
 
@@ -219,14 +226,16 @@ defmodule Exvif.Cam do
 
     uri = Exml.get(doc, "//tt:Uri")
 
-    cond do
-      String.match?(uri, ~r/:\/\/.*:.*@.*/) -> uri
-      true -> Regex.replace(~r/:\/\//, uri, "://#{username}:#{password}@")
+    if String.match?(uri, ~r/:\/\/.*:.*@.*/) do
+      uri
+    else
+      Regex.replace(~r/:\/\//, uri, "://#{username}:#{password}@")
     end
   end
 
   def fetch_stream_uri(url, username, password, profile_token) do
-    request_stream_uri(url, username, password, profile_token)
+    url
+    |> request_stream_uri(username, password, profile_token)
     |> handle_stream_uri(username, password)
   end
 
@@ -329,7 +338,8 @@ defmodule Exvif.Cam do
   end
 
   def fetch_camera(hostname, port, username, password) do
-    cam_url(hostname, port)
+    hostname
+    |> cam_url(port)
     |> fetch_camera(username, password)
   end
 

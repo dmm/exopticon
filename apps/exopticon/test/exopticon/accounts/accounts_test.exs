@@ -8,8 +8,18 @@ defmodule Exopticon.AccountsTest do
   describe "users" do
     alias Exopticon.Accounts.User
 
-    @valid_attrs %{name: "some name", password: "some password", password_hash: "some password_hash", username: "some username"}
-    @update_attrs %{name: "some updated name", password: "some updated password", password_hash: "some updated password_hash", username: "some updated username"}
+    @valid_attrs %{
+      name: "some name",
+      password: "some password",
+      password_hash: "some password_hash",
+      username: "some username"
+    }
+    @update_attrs %{
+      name: "some updated name",
+      password: "some updated password",
+      password_hash: "some updated password_hash",
+      username: "some updated username"
+    }
     @invalid_attrs %{name: nil, password: nil, password_hash: nil, username: nil}
 
     def user_fixture(attrs \\ %{}) do

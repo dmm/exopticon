@@ -1,4 +1,7 @@
 defmodule Exopticon.Application do
+  @moduledoc """
+  Provides main application initialization for Exopticon.
+  """
   use Application
 
   import Ecto.Query
@@ -26,8 +29,9 @@ defmodule Exopticon.Application do
     ret = Supervisor.start_link(children, opts)
 
     # Start Cameras
-    Exopticon.Repo.all(from(camera in Exopticon.Video.Camera, preload: [:camera_group]))
-    |> Exopticon.CameraSupervisor.start_all_cameras()
+    Exopticon.CameraSupervisor.start_all_cameras(
+      Exopticon.Repo.all(from(camera in Exopticon.Video.Camera, preload: [:camera_group]))
+    )
 
     ret
   end

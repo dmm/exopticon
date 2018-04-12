@@ -1,4 +1,5 @@
 defmodule Exvif.Util do
+  @moduledoc false
   @user_agent [{"User-agent", "Exvif onvif client"}]
   @timeout 60
 
@@ -12,9 +13,9 @@ defmodule Exvif.Util do
     {:ok, timestamp_buffer} = Timex.format(timestamp, "{ISO:Extended:Z}")
 
     nonce =
-      <<:random.uniform(max)::little-size(32)>> <>
-        <<:random.uniform(max)::little-size(32)>> <>
-        <<:random.uniform(max)::little-size(32)>> <> <<:random.uniform(max)::little-size(32)>>
+      <<:rand.uniform(max)::little-size(32)>> <>
+        <<:rand.uniform(max)::little-size(32)>> <>
+        <<:rand.uniform(max)::little-size(32)>> <> <<:rand.uniform(max)::little-size(32)>>
 
     digest = :crypto.hash(:sha, nonce <> timestamp_buffer <> password)
 
@@ -52,31 +53,30 @@ defmodule Exvif.Util do
   end
 
   def envelope_header(username, password) do
-    """
+    ~s(
     <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing">
     <s:Header>
-    """ <>
-      security_block(username, password) <>
-      """
+      #{security_block(username, password)}
       </s:Header>
       <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-      """
+      )
   end
 
-  def envelope_footer() do
+  def envelope_footer do
     """
     </s:Body></s:Envelope>
     """
   end
 
   def request(url, body) do
-    headers = [
-      {"Content-Type", "application/soap+xml"},
-      {"Content-Length", byte_size(body)},
-      {"charset", "utf-8"}
-    ]
+    headers =
+      [
+        {"Content-Type", "application/soap+xml"},
+        {"Content-Length", byte_size(body)},
+        {"charset", "utf-8"}
+      ] ++ @user_agent
 
-    case HTTPoison.post(url, body, headers) do
+    case HTTPoison.post(url, body, headers, timeout: @timeout) do
       {:ok, response} -> {:ok, response}
       {:error, error} -> {:error, error}
     end

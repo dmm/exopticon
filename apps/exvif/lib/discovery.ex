@@ -1,4 +1,8 @@
 defmodule Exvif.Discovery do
+  @moduledoc """
+  Provides onvif discovery of cameras
+  """
+
   def probe(timeout \\ 1000) do
     message_id = UUID.uuid1()
 
@@ -32,7 +36,8 @@ defmodule Exvif.Discovery do
     begin_time = :os.system_time(:millisecond)
 
     cameras =
-      :gen_udp.recv(socket, 0, timeout)
+      socket
+      |> :gen_udp.recv(0, timeout)
       |> handle_message
       |> update_cameras(cameras)
 
@@ -58,7 +63,8 @@ defmodule Exvif.Discovery do
     doc = Exml.parse(body)
 
     ip =
-      Tuple.to_list(ip)
+      ip
+      |> Tuple.to_list()
       |> Enum.join(".")
 
     {ip, Exml.get(doc, "//*[local-name()='XAddrs']")}

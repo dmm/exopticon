@@ -1,14 +1,18 @@
 defmodule Exopticon.PlaybackPort do
+  @moduledoc """
+  Provides port which plays video files
+  """
   use GenServer
 
-  import Ecto.Query
+  alias ExopticonWeb.Endpoint
+  alias Msgpax.Bin
 
   ### Client API
   def start_link({id, _, _} = state) do
     GenServer.start_link(__MODULE__, state, name: via_tuple(id))
   end
 
-  def child_spec() do
+  def child_spec do
     %{
       start: {Exopticon.PlaybackPort, :start_link, []},
       restart: :transient,
@@ -35,44 +39,19 @@ defmodule Exopticon.PlaybackPort do
   end
 
   ## Handle message callback
-  def handle_info({port, {:data, msg}}, state) do
+  def handle_info({_port, {:data, msg}}, state) do
     {Msgpax.unpack!(msg), state}
     |> handle_message
   end
 
-  def handle_info({port, {:exit_status, status}}, %{id: id, port: port} = state) do
+  def handle_info({port, {:exit_status, status}}, %{id: id, port: port}) do
     IO.puts("Got exit status! " <> Integer.to_string(status))
 
-    ExopticonWeb.Endpoint.broadcast!(id, "stop", %{
+    Endpoint.broadcast!(id, "stop", %{
       id: id
     })
 
     {:stop, :normal, %{}}
-  end
-
-  ## Handle port termination
-  def terminate(_reason, _state) do
-    IO.puts("Terminate!")
-  end
-
-  ### Handle messages from port
-  def handle_message({%{"jpegFrame" => dec, "pts" => pts}, %{id: id, port: _, offset: _} = state}) do
-    ExopticonWeb.Endpoint.broadcast!(id, "jpg", %{
-      frameJpeg: Msgpax.Bin.new(dec),
-      pts: pts
-    })
-
-    {:noreply, state}
-  end
-
-  def handle_message({%{"type" => "log", "message" => message}, state}) do
-    IO.puts("playback message: " <> message)
-    {:noreply, state}
-  end
-
-  ## Handle ack cast
-  def handle_cast(:ack, state) do
-    {:noreply, Map.put(state, :timeout, System.monotonic_time())}
   end
 
   ## Handle timeout check
@@ -89,7 +68,32 @@ defmodule Exopticon.PlaybackPort do
     end
   end
 
-  defp schedule_check() do
+  ## Handle port termination
+  def terminate(_reason, _state) do
+    IO.puts("Terminate!")
+  end
+
+  ### Handle messages from port
+  def handle_message({%{"jpegFrame" => dec, "pts" => pts}, %{id: id, port: _, offset: _} = state}) do
+    Endpoint.broadcast!(id, "jpg", %{
+      frameJpeg: Bin.new(dec),
+      pts: pts
+    })
+
+    {:noreply, state}
+  end
+
+  def handle_message({%{"type" => "log", "message" => message}, state}) do
+    IO.puts("playback message: " <> message)
+    {:noreply, state}
+  end
+
+  ## Handle ack cast
+  def handle_cast(:ack, state) do
+    {:noreply, Map.put(state, :timeout, System.monotonic_time())}
+  end
+
+  defp schedule_check do
     Process.send_after(self(), :timeout_check, 1000)
   end
 

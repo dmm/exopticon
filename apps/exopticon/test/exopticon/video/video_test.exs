@@ -9,7 +9,11 @@ defmodule Exopticon.VideoTest do
     alias Exopticon.Video.CameraGroup
 
     @valid_attrs %{max_storage_size: 42, name: "some name", storage_path: "some storage_path"}
-    @update_attrs %{max_storage_size: 43, name: "some updated name", storage_path: "some updated storage_path"}
+    @update_attrs %{
+      max_storage_size: 43,
+      name: "some updated name",
+      storage_path: "some updated storage_path"
+    }
     @invalid_attrs %{max_storage_size: nil, name: nil, storage_path: nil}
 
     def camera_group_fixture(attrs \\ %{}) do
@@ -72,9 +76,39 @@ defmodule Exopticon.VideoTest do
   describe "cameras" do
     alias Exopticon.Video.Camera
 
-    @valid_attrs %{fps: 42, ip: "some ip", mac: "some mac", name: "some name", onvif_port: 42, password: "some password", rtsp_url: "some rtsp_url", type: "some type", username: "some username"}
-    @update_attrs %{fps: 43, ip: "some updated ip", mac: "some updated mac", name: "some updated name", onvif_port: 43, password: "some updated password", rtsp_url: "some updated rtsp_url", type: "some updated type", username: "some updated username"}
-    @invalid_attrs %{fps: nil, ip: nil, mac: nil, name: nil, onvif_port: nil, password: nil, rtsp_url: nil, type: nil, username: nil}
+    @valid_attrs %{
+      fps: 42,
+      ip: "some ip",
+      mac: "some mac",
+      name: "some name",
+      onvif_port: 42,
+      password: "some password",
+      rtsp_url: "some rtsp_url",
+      type: "some type",
+      username: "some username"
+    }
+    @update_attrs %{
+      fps: 43,
+      ip: "some updated ip",
+      mac: "some updated mac",
+      name: "some updated name",
+      onvif_port: 43,
+      password: "some updated password",
+      rtsp_url: "some updated rtsp_url",
+      type: "some updated type",
+      username: "some updated username"
+    }
+    @invalid_attrs %{
+      fps: nil,
+      ip: nil,
+      mac: nil,
+      name: nil,
+      onvif_port: nil,
+      password: nil,
+      rtsp_url: nil,
+      type: nil,
+      username: nil
+    }
 
     def camera_fixture(attrs \\ %{}) do
       {:ok, camera} =
@@ -148,9 +182,33 @@ defmodule Exopticon.VideoTest do
   describe "files" do
     alias Exopticon.Video.File
 
-    @valid_attrs %{begin_monotonic: 42, begin_time: "2010-04-17 14:00:00.000000Z", end_monotonic: 42, end_time: "2010-04-17 14:00:00.000000Z", filename: "some filename", monotonic_index: 42, size: 42}
-    @update_attrs %{begin_monotonic: 43, begin_time: "2011-05-18 15:01:01.000000Z", end_monotonic: 43, end_time: "2011-05-18 15:01:01.000000Z", filename: "some updated filename", monotonic_index: 43, size: 43}
-    @invalid_attrs %{begin_monotonic: nil, begin_time: nil, end_monotonic: nil, end_time: nil, filename: nil, monotonic_index: nil, size: nil}
+    @valid_attrs %{
+      begin_monotonic: 42,
+      begin_time: "2010-04-17 14:00:00.000000Z",
+      end_monotonic: 42,
+      end_time: "2010-04-17 14:00:00.000000Z",
+      filename: "some filename",
+      monotonic_index: 42,
+      size: 42
+    }
+    @update_attrs %{
+      begin_monotonic: 43,
+      begin_time: "2011-05-18 15:01:01.000000Z",
+      end_monotonic: 43,
+      end_time: "2011-05-18 15:01:01.000000Z",
+      filename: "some updated filename",
+      monotonic_index: 43,
+      size: 43
+    }
+    @invalid_attrs %{
+      begin_monotonic: nil,
+      begin_time: nil,
+      end_monotonic: nil,
+      end_time: nil,
+      filename: nil,
+      monotonic_index: nil,
+      size: nil
+    }
 
     def file_fixture(attrs \\ %{}) do
       {:ok, file} =

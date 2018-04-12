@@ -1,4 +1,7 @@
 defmodule Exopticon.Video.CameraGroup do
+  @moduledoc """
+  Provides schema for Video.CameraGroup.
+  """
   use Ecto.Schema
   import Ecto.Changeset
   alias Exopticon.Video.CameraGroup

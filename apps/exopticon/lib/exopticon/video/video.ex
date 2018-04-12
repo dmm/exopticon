@@ -5,9 +5,11 @@ defmodule Exopticon.Video do
 
   import Ecto.Query, warn: false
   import Logger
-  alias Exopticon.Repo
 
+  alias Exopticon.FileLibrary
+  alias Exopticon.Repo
   alias Exopticon.Video.CameraGroup
+  alias Exvif.Cam
 
   @doc """
   Returns the list of camera_groups.
@@ -203,10 +205,10 @@ defmodule Exopticon.Video do
   Requests a relative move from the camera.
   """
   def relative_move_camera(%Camera{ptz_type: "onvif"} = camera, x, y) do
-    url = Exvif.Cam.cam_url(camera.ip, camera.onvif_port)
+    url = Cam.cam_url(camera.ip, camera.onvif_port)
 
     ret =
-      Exvif.Cam.request_ptz_relative_move(
+      Cam.request_ptz_relative_move(
         url,
         camera.username,
         camera.password,
@@ -217,9 +219,9 @@ defmodule Exopticon.Video do
   end
 
   def relative_move_camera(%Camera{ptz_type: "onvif_continuous"} = camera, x, y) do
-    url = Exvif.Cam.cam_url(camera.ip, camera.onvif_port)
+    url = Cam.cam_url(camera.ip, camera.onvif_port)
 
-    Exvif.Cam.request_ptz_continuous_move(
+    Cam.request_ptz_continuous_move(
       url,
       camera.username,
       camera.password,
@@ -229,7 +231,7 @@ defmodule Exopticon.Video do
     )
 
     Process.sleep(1000)
-    Exvif.Cam.request_ptz_stop(url, camera.username, camera.password, camera.ptz_profile_token)
+    Cam.request_ptz_stop(url, camera.username, camera.password, camera.ptz_profile_token)
   end
 
   alias Exopticon.Video.File
@@ -354,15 +356,16 @@ defmodule Exopticon.Video do
         order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
       )
 
-    Repo.all(query)
+    Repo.all(query) || []
   end
 
   @doc """
   Returns video coverage for given camera and begin and end times
   """
   def get_video_coverage(camera_id, begin_time, end_time) do
-    get_files_between(camera_id, begin_time, end_time)
-    |> Exopticon.FileLibrary.calculate_availability(begin_time, end_time)
+    camera_id
+    |> get_files_between(begin_time, end_time)
+    |> FileLibrary.calculate_availability(begin_time, end_time)
   end
 
   def get_total_video_size(camera_group_id) do

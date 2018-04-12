@@ -5,6 +5,7 @@ defmodule ExopticonWeb.FileController do
 
   plug(:authenticate_user)
 
+  alias Exopticon.Repo
   alias Exopticon.Video
   alias Exopticon.Video.File
 
@@ -71,7 +72,7 @@ defmodule ExopticonWeb.FileController do
 
   def indentify_for_deletion(camera_group_id) do
     max_size = Video.get_camera_group!(camera_group_id).max_storage_size * 1024 * 1024 * 1024
-    current_size = Exopticon.Repo.one(from(f in Exopticon.Video.File, select: sum(f.size)))
+    current_size = Repo.one(from(f in Exopticon.Video.File, select: sum(f.size)))
     size_to_remove = current_size - max_size
 
     files = Video.list_files()

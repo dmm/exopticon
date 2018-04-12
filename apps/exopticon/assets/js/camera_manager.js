@@ -12,6 +12,7 @@ import CameraPanel from './components/camera_panel';
 class CameraManager {
   /**
    * @param {Pheonix.socket} socket - phoenix socket to use as camera transport
+   * @param {Number} columns - number of columns in camera panel
    */
   constructor(socket, columns = 0) {
     this.socket = socket;
@@ -24,7 +25,7 @@ class CameraManager {
                           {
                             socket: this.socket,
                             initialCameras: new Map(),
-                            initialColumns: columns
+                            initialColumns: columns,
                           });
 
     this.component = ReactDOM.render(this.panel,
@@ -36,6 +37,13 @@ class CameraManager {
    */
   updateCameras(allCameras) {
     this.component.setState({cameras: allCameras});
+  }
+
+  /**
+   * @param {Number} columnCount - number of columns wide the view should be
+   */
+  setColumnCount(columnCount) {
+    this.component.setColumnCount(columnCount);
   }
 }
 

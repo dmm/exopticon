@@ -1,7 +1,7 @@
 [
   inputs: [
-    "apps/*/lib/*.{ex,exs}",
-    "apps/*/lib/**/*.{ex,exs}",
+    "apps/*/{lib,test,config}/**/**/*.{ex,exs}",
      "mix.exs"
-  ]
+  ],
+  line_length: 100
 ]

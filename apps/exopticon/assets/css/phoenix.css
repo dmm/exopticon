@@ -1,79 +1,80 @@
 /* Another good color #6fc0ba */
 
 .breadcrumb {
-    display: flex;
-    align-items: center;
-    list-style: none;
-    margin: 0;
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 /* Implement background stripes */
 @media (min-width: 320px) {
-    .breadcrumb {
-        background-image: repeating-linear-gradient(130deg, black, black 15px, orange 15px, orange 30px);
-    }
+  .breadcrumb {
+    background-image: repeating-linear-gradient(130deg, black, black 15px, orange 15px, orange 30px);
+  }
 }
 
 .breadcrumb.text-right {
-    justify-content: flex-end;
-    padding-right: 10px;
 }
 
 .breadcrumb > .active {
-    color: orange;
+  color: orange;
 }
 
 .breadcrumb > li {
-    display: inline-block;
+  display: inline-block;
 
 }
 
 .breadcrumb > li {
-    color: orange;
-    background-color: black;
-    border-radius: 4px;
-    padding: 3px;
-    margin-right: 1px;
+  color: orange;
+  background-color: black;
+  border-radius: 4px;
+  padding: 3px;
+  margin-right: 1px;
 }
 
 .breadcrumb a {
-    color: orange;
-    text-decoration: none;
+  color: orange;
+  text-decoration: none;
 }
 
 body, form, ul, table {
-    margin: 0px;
-    background-color: black;
-    color: orange;
+  margin: 0px;
+  background-color: black;
+  color: orange;
 }
 
 /* Phoenix flash messages */
 .alert:empty { display: none; }
 
 .container-fluid {
-    padding: 0;
+  padding: 0;
 }
 
 /* Custom page header */
 .header {
-    border-bottom: 1px solid orange;
-    padding: 0;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+  border-bottom: 1px solid orange;
+  padding: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
 
-    height: 36px;
-    background-color: orange;
+  height: 36px;
+  background-color: orange;
 }
 
 .header span.logo img {
-    height: 36px;
-    padding-right: 2px;
+  height: 36px;
+  object-fit: contain;
+  padding-right: 2px;
+  padding-left: 2px;
 }
 
 .header ol {
-    height: 36px;
-    flex-grow: 1;
+  height: 36px;
+  flex-grow: 1;
 }
 
 /* Customize container */
@@ -116,6 +117,6 @@ body, form, ul, table {
 }
 
 .alert {
-    background-color: #555;
+  background-color: #555;
 }
 

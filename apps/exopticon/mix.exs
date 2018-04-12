@@ -1,17 +1,26 @@
 defmodule Mix.Tasks.Compile.NativeWorkers do
   def run(_args) do
-    {result, _errcode} = System.cmd("make", [], stderr_to_stdout: true,
-      cd: __DIR__ <> "/src/")
+    {result, _errcode} =
+      System.cmd(
+        "make",
+        [],
+        stderr_to_stdout: true,
+        cd: __DIR__ <> "/src/"
+      )
+
     IO.binwrite(result)
   end
 end
 
 defmodule Mix.Tasks.Compile.Javascript do
   def run(_args) do
-    if Mix.env == :prod do
-      {result, _errcode} = System.cmd("npm", ["run", "deploy"], stderr_to_stdout: true, cd: __DIR__ <> "/assets")
+    if Mix.env() == :prod do
+      {result, _errcode} =
+        System.cmd("npm", ["run", "deploy"], stderr_to_stdout: true, cd: __DIR__ <> "/assets")
+
       IO.binwrite(result)
     end
+
     :ok
   end
 end
@@ -24,11 +33,11 @@ defmodule Exopticon.Mixfile do
       app: :exopticon,
       version: "0.0.1",
       elixir: "~> 1.4",
-      elixirc_paths: elixirc_paths(Mix.env),
-      compilers: [:phoenix, :gettext, :native_workers, :javascript] ++ Mix.compilers,
-      start_permanent: Mix.env == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
+      compilers: [:phoenix, :gettext, :native_workers, :javascript] ++ Mix.compilers(),
+      start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps(),
+      deps: deps()
     ]
   end
 
@@ -44,7 +53,7 @@ defmodule Exopticon.Mixfile do
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_),     do: ["lib"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Specifies your project dependencies.
   #
@@ -77,7 +86,7 @@ defmodule Exopticon.Mixfile do
     [
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      "test": ["ecto.create --quiet", "ecto.migrate", "test"]
+      test: ["ecto.create --quiet", "ecto.migrate", "test"]
     ]
   end
 end

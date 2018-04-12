@@ -15,14 +15,22 @@
 # along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 
 defmodule Exopticon.TestHelpers do
+  @moduledoc """
+  Provides helpers for Exopticon unit tests
+  """
   alias Exopticon.Repo
 
   def insert_user(attrs \\ %{}) do
-    changes = Map.merge(%{
+    changes =
+      Map.merge(
+        %{
           name: "Some User",
           username: "user#{Base.encode16(:crypto.strong_rand_bytes(8))}",
-          password: "supersecret",
-                         }, attrs)
+          password: "supersecret"
+        },
+        attrs
+      )
+
     %Exopticon.Accounts.User{}
     |> Exopticon.Accounts.User.registration_changeset(changes)
     |> Repo.insert!()

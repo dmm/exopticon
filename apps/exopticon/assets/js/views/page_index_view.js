@@ -27,6 +27,29 @@ import MainView from './main';
  */
 export default class View extends MainView {
   /**
+   * set the number of columns on the camera panel
+   * @param {Number} columnCount - number of columns on the panel
+   */
+  setCameraPanelWidth(columnCount) {
+    let panel = document.querySelector('#allCameras .camera-panel');
+    let cl = panel.classList;
+    const newClass = `panel-col-${columnCount}`;
+
+    if (typeof columnCount === 'string') {
+      columnCount = parseInt(columnCount, 10);
+    }
+
+    cl.remove('panel-col-1');
+    cl.remove('panel-col-2');
+    cl.remove('panel-col-3');
+    cl.remove('panel-col-4');
+
+    if (columnCount != 0) {
+      cl.add(newClass);
+    }
+  }
+
+  /**
    * fetches cameras and update camera panel
    */
   updateCameras() {
@@ -59,5 +82,21 @@ export default class View extends MainView {
         this.updateCameras();
       }
     });
+
+    let cameraPanelWidth = window.localStorage.getItem('camera-panel-width');
+
+    if (!cameraPanelWidth) {
+      cameraPanelWidth = '0';
+    }
+
+    this.setCameraPanelWidth(cameraPanelWidth);
+
+    let columnSelector = document.querySelector('#panel-width-select');
+    columnSelector.value = cameraPanelWidth;
+
+    columnSelector.onchange = function() {
+      window.cameraManager.setColumnCount(parseInt(this.value, 10));
+      window.localStorage.setItem('camera-panel-width', this.value);
+    };
   }
 }

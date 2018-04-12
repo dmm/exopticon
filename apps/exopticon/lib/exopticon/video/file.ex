@@ -1,4 +1,7 @@
 defmodule Exopticon.Video.File do
+  @moduledoc """
+  Provides schema for Video.File
+  """
   use Ecto.Schema
   import Ecto.Changeset
   alias Exopticon.Video.File

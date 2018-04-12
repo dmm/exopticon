@@ -1,0 +1,30 @@
+<div class="hamburger-menu-button"
+      onclick="(() => {document.getElementById('side-menu-container').classList.toggle('shown'); window.localStorage.setItem('show-menu', 'false');})()">&#10005;</div>
+
+<div class="current-user-list">
+  <%= if @current_user do %>
+          <span><%= @current_user.username %></span>
+  <span>
+    <%= link "Log out", to: session_path(@conn, :delete, @current_user),
+        method: "delete" %>
+  </span>
+  <% end %>
+</div>
+
+
+<ol class="navigation-list">
+  <li><%=  link("HOME", to: page_path(@conn, :index)) %></li>
+  <li><%= link("CAMERAS", to: camera_path(@conn, :index)) %></li>
+  <li><%= link("USERS", to: user_path(@conn, :index)) %></li>
+</ol>
+
+<div class="view-controls page-index-view">
+  <select id="panel-width-select">
+    <option value="0">AUTO</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+  </select>
+</div>
+

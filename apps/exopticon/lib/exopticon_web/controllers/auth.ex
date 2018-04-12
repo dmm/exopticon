@@ -1,8 +1,13 @@
 defmodule ExopticonWeb.Auth do
+  @moduledoc """
+  Provides authentication related functionality
+  """
   import Plug.Conn
   import Comeonin.Bcrypt, only: [checkpw: 2, dummy_checkpw: 0]
   import Phoenix.Controller
+  alias Exopticon.Accounts.User
   alias ExopticonWeb.Router.Helpers
+  alias Phoenix.Token
 
   def init(opts) do
     Keyword.fetch(opts, :repo)
@@ -31,16 +36,17 @@ defmodule ExopticonWeb.Auth do
   end
 
   defp put_current_user(conn, user) do
-    token = Phoenix.Token.sign(conn, "user socket", user.id)
+    token = Token.sign(conn, "user socket", user.id)
 
     conn
     |> assign(:current_user, user)
+    |> assign(:timezone, user.timezone)
     |> assign(:user_token, token)
   end
 
   def login_by_username_and_pass(conn, username, given_pass, opts) do
     repo = Keyword.fetch!(opts, :repo)
-    user = repo.get_by(Exopticon.Accounts.User, username: username)
+    user = repo.get_by(User, username: username)
 
     cond do
       user && checkpw(given_pass, user.password_hash) ->
@@ -65,7 +71,7 @@ defmodule ExopticonWeb.Auth do
     else
       conn
       |> put_flash(:error, "You must be logged in to access that page")
-      |> redirect(to: ExopticonWeb.Router.Helpers.session_path(conn, :new))
+      |> redirect(to: Helpers.session_path(conn, :new))
       |> halt()
     end
   end

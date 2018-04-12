@@ -34,6 +34,9 @@ jsJodaUse(jsJodaTimeZone);
  * Implements page that shows a single camera
  */
 export default class view extends MainView {
+  /**
+   * CameraShow constructor
+   */
   constructor() {
     super();
     this.fileLibrary = new FileLibrary([]);
@@ -124,11 +127,13 @@ export default class view extends MainView {
     const now = ZonedDateTime.now(ZoneOffset.UTC);
     const then = now.minusHours(6);
 
+    const barCallback = (t) => {
+      console.log(this.fileLibrary
+                  .getFileForTime(t));
+    };
     let progressBar = React.createElement(ProgressBar,
                                           {
-                                            onMouseUp: (t) => {
-                                              console.log(this.fileLibrary.getFileForTime(t));
-                                            }
+                                            onMouseUp: barCallback,
                                           });
     this.progressComponent =
       ReactDOM.render(progressBar, document.getElementById('progress'));

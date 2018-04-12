@@ -29,7 +29,7 @@ class SuperImage {
   constructor(img) {
     this.img = img;
     this.isDrawing = false;
-
+    this.callback = () => {};
     this.checkFrame = this.checkFrame.bind(this);
   }
 
@@ -45,6 +45,7 @@ class SuperImage {
       if (this.callback) this.callback();
     } else {
       window.requestAnimationFrame(this.checkFrame);
+      console.log('skipping draw!');
     }
   }
 

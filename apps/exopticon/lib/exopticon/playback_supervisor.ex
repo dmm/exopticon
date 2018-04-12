@@ -1,4 +1,7 @@
 defmodule Exopticon.PlaybackSupervisor do
+  @moduledoc """
+  Provides supervisor for playback port.
+  """
   use Supervisor
 
   def start_link do

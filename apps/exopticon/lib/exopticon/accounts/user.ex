@@ -1,4 +1,7 @@
 defmodule Exopticon.Accounts.User do
+  @moduledoc """
+  Provides Accounts.User schema.
+  """
   use Ecto.Schema
   import Ecto.Changeset
   alias Exopticon.Accounts.User

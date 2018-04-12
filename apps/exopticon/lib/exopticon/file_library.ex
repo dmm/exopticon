@@ -15,6 +15,9 @@
 # along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 
 defmodule Exopticon.FileLibrary do
+  @moduledoc """
+  Provides datastructure which allows for the organization of a sequence of video files.
+  """
   # microseconds
   @max_gap 500 * 1000
 
@@ -31,6 +34,50 @@ defmodule Exopticon.FileLibrary do
       date1
     else
       date2
+    end
+  end
+
+  defp generate_beginning_gap(_, []) do
+    []
+  end
+
+  defp generate_beginning_gap(begin_time, [first | _]) do
+    gap = Timex.diff(first.begin_time, begin_time, :microseconds)
+
+    case gap > @max_gap do
+      true ->
+        [
+          %{
+            begin_time: begin_time,
+            end_time: Timex.shift(first.begin_time, microseconds: -1),
+            type: :no_video
+          }
+        ]
+
+      false ->
+        []
+    end
+  end
+
+  defp generate_end_gap(_, nil) do
+    []
+  end
+
+  defp generate_end_gap(end_time, last_file) do
+    gap = Timex.diff(end_time, last_file.end_time, :microseconds)
+
+    case gap > @max_gap do
+      true ->
+        [
+          %{
+            begin_time: Timex.shift(last_file.end_time, microseconds: 1),
+            end_time: end_time,
+            type: :no_video
+          }
+        ]
+
+      false ->
+        []
     end
   end
 
@@ -79,26 +126,20 @@ defmodule Exopticon.FileLibrary do
   end
 
   defp calculate_availability(begin_time, end_time, [], []) do
-    # Handle special case where we have no files
-    %{
-      begin_time: begin_time,
-      end_time: end_time,
-      availability: [
-        %{
-          begin_time: begin_time,
-          end_time: end_time,
-          type: :no_video
-        }
-      ]
-    }
+    # handle case with no video
+    chunks = [
+      %{
+        begin_time: begin_time,
+        end_time: end_time,
+        type: :no_video
+      }
+    ]
+
+    calculate_availability(begin_time, end_time, chunks, [])
   end
 
   defp calculate_availability(begin_time, end_time, chunks, []) do
-    %{
-      begin_time: begin_time,
-      end_time: end_time,
-      availability: chunks |> Enum.reverse()
-    }
+    chunks |> Enum.reverse()
   end
 
   defp calculate_availability(begin_time, end_time, chunks, files) do
@@ -108,10 +149,17 @@ defmodule Exopticon.FileLibrary do
     end_time = latest(begin_time, next_file.end_time)
     new_chunks = append_file(chunks, next_file)
 
-    calculate_availability(begin_time, end_time, new_chunks, rest)
+    calculate_availability(next_file.end_time, end_time, new_chunks, rest)
   end
 
   def calculate_availability(files, begin_time, end_time) do
-    calculate_availability(begin_time, end_time, [], files)
+    gap = generate_beginning_gap(begin_time, files)
+    end_gap = generate_end_gap(end_time, List.last(files))
+
+    %{
+      begin_time: begin_time,
+      end_time: end_time,
+      availability: gap ++ calculate_availability(begin_time, end_time, [], files) ++ end_gap
+    }
   end
 end

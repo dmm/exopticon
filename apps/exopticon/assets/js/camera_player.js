@@ -43,8 +43,9 @@ class CameraPlayer {
   /**
    * begin realtime playback of camera to given Image object
    * @param {Image} img - image object to stream video to
+   * @param {Function} cb - function to call when playback starts
    */
-  playRealtime(img) {
+  playRealtime(img, cb = ()=>{}) {
     this.setStatus('loading');
     this.img = new SuperImage(img);
 
@@ -52,6 +53,7 @@ class CameraPlayer {
       if (this.status !== 'paused' && this.img !== null) {
         this.setStatus('playing');
         this.img.renderArrayIfReady(data.frameJpeg);
+        cb();
       }
     });
   }

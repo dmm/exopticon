@@ -21,7 +21,6 @@ import {
   DateTimeFormatter,
   Duration,
   ZonedDateTime,
-  ZoneId,
 } from 'js-joda';
 import jsJodaTimeZone from 'js-joda-timezone';
 import React from 'react';
@@ -29,8 +28,6 @@ import React from 'react';
 import './../../css/components/progress_bar.css';
 
 jsJodaUse(jsJodaTimeZone);
-
-const LOCAL_TZ = 'America/Chicago';
 
 /**
  * ProgressBar - class implementing a bar showing a time interval
@@ -54,6 +51,7 @@ class ProgressBar extends React.Component {
 
     this.onMouseMove = this.onMouseMove.bind(this);
     this.onMouseLeave = this.onMouseLeave.bind(this);
+    this.onMouseUp = this.onMouseUp.bind(this);
   }
 
   /**
@@ -70,16 +68,13 @@ class ProgressBar extends React.Component {
                            this.state.availability.end_time).toMillis()
           * ratio;
 
-    const zone = ZoneId.of(LOCAL_TZ);
     const newTime = this.state.availability.begin_time
-          .plusSeconds(timeOffset / 1000)
-          .withZoneSameInstant(zone);
+          .plusSeconds(timeOffset / 1000);
     const formattedDate =
           newTime.format(DateTimeFormatter.ofPattern('yyyy-MM-dd HH:mm:ss'));
     this.setState({
       timeLabel: formattedDate,
     });
-    console.log(`percentage: ${ratio} ${formattedDate}`);
   }
 
   /**
@@ -87,6 +82,25 @@ class ProgressBar extends React.Component {
    */
   onMouseLeave() {
     this._label.style.display = 'none';
+  }
+
+
+  /**
+   * onMouseUp
+   * @param {Object} e - event object
+   * @private
+   */
+  onMouseUp(e) {
+    const ratio = (e.clientX - e.currentTarget.offsetLeft)
+          / e.currentTarget.clientWidth;
+
+    const timeOffset =
+          Duration.between(this.state.availability.begin_time,
+                           this.state.availability.end_time).toMillis()
+          * ratio;
+    const newTime = this.state.availability.begin_time
+          .plusSeconds(timeOffset / 1000);
+    console.log(newTime.toString());
   }
 
   /**
@@ -112,6 +126,7 @@ class ProgressBar extends React.Component {
       <div className='progress-bar'
            onMouseMove={this.onMouseMove}
            onMouseLeave={this.onMouseLeave}
+           onMouseUp={this.onMouseUp}
            >
         { elm }
         <div className='time-label'

@@ -1,4 +1,7 @@
 defmodule Exopticon.CameraSupervisor do
+  @moduledoc """
+  Provides supervisor for capture port process.
+  """
   use Supervisor
 
   def start_link do

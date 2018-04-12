@@ -1,4 +1,7 @@
 defmodule Exopticon.Video.FileDeletionSupervisor do
+  @moduledoc """
+  Provides supervisor for FileDeletionServer.
+  """
   use Supervisor
 
   def start_link do

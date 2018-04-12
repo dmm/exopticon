@@ -1,5 +1,11 @@
 defmodule ExopticonWeb.PlaybackChannel do
+  @moduledoc """
+  Provides channel implementation for video file playback
+  """
   use ExopticonWeb, :channel
+
+  alias Exopticon.PlaybackSupervisor
+  alias Exopticon.Repo
 
   def join("playback:lobby", payload, socket) do
     if authorized?(payload) do
@@ -14,16 +20,16 @@ defmodule ExopticonWeb.PlaybackChannel do
   end
 
   def handle_in("start_player", %{"topic" => "playback:" <> params}, socket) do
-    [_, file_id, offset] = String.split(params, ",") |> Enum.map(&String.to_integer/1)
-    file = Exopticon.Repo.get!(Exopticon.Video.File, file_id)
-    Exopticon.PlaybackSupervisor.start_playback({"playback:" <> params, file, offset})
+    [_, file_id, offset] = params |> String.split(",") |> Enum.map(&String.to_integer/1)
+    file = Repo.get!(Exopticon.Video.File, file_id)
+    PlaybackSupervisor.start_playback({"playback:" <> params, file, offset})
     socket = assign(socket, :topic, "playback:" <> params)
     {:noreply, socket}
   end
 
   def handle_in("kill_player", %{"topic" => topic}, socket) do
     IO.puts("Stopping player: " <> topic)
-    Exopticon.PlaybackSupervisor.stop_playback(topic)
+    PlaybackSupervisor.stop_playback(topic)
     {:noreply, socket}
   end
 
@@ -32,7 +38,7 @@ defmodule ExopticonWeb.PlaybackChannel do
     regs = Registry.lookup(Registry.PlayerRegistry, topic)
     pids = Enum.map(regs, fn {pid, _} -> pid end)
 
-    Enum.map(pids, fn p ->
+    Enum.each(pids, fn p ->
       GenServer.cast(p, :ack)
     end)
 

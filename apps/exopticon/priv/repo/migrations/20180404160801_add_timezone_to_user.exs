@@ -3,7 +3,7 @@ defmodule Exopticon.Repo.Migrations.AddTimezoneToUser do
 
   def change do
     alter table(:users) do
-      add :timezone, :string, default: "UTC"
+      add(:timezone, :string, default: "UTC")
     end
   end
 end

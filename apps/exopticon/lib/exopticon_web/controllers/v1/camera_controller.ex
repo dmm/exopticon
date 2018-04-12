@@ -10,7 +10,12 @@ defmodule ExopticonWeb.V1.CameraController do
 
   def index(conn, _params) do
     cameras = Video.list_cameras()
-    cameras2 = Enum.map(cameras, fn(c) -> Map.put(c, :link, ExopticonWeb.Router.Helpers.camera_path(conn, :show, c.id)) end)
+
+    cameras2 =
+      Enum.map(cameras, fn c ->
+        Map.put(c, :link, ExopticonWeb.Router.Helpers.camera_path(conn, :show, c.id))
+      end)
+
     render(conn, "index.json", cameras: Enum.sort(cameras2))
   end
 
@@ -46,7 +51,7 @@ defmodule ExopticonWeb.V1.CameraController do
     chunks = Video.get_video_coverage(id, begin_time, end_time)
     files = Video.get_files_between(id, begin_time, end_time)
 
-    files2 = Enum.map(files, fn f -> Map.from_struct(f) |> Map.delete(:__meta__) end)
+    files2 = Enum.map(files, fn f -> f |> Map.from_struct() |> Map.delete(:__meta__) end)
 
     json(conn, %{
       camera_id: id,

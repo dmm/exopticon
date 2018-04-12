@@ -3,7 +3,7 @@ defmodule Exopticon.Repo.Migrations.AddPtzFieldToCamera do
 
   def change do
     alter table(:cameras) do
-      add :ptz_type, :string
+      add(:ptz_type, :string)
     end
   end
 end

@@ -12,31 +12,38 @@
   </head>
 
   <body data-js-view-name="<%= js_view_name(@conn, @view_template) %>">
+    <div class="content-wrapper">
+      <div id="side-menu-container">
+          <%= render "sidemenu.html", current_user: @current_user, conn: @conn %>
+        </div>
+
     <div class="container-fluid">
       <header class="header">
-        <span class="logo"><img src="/images/eo_logo.svg"></img></span>
+        <%= if @current_user do %>
+        <span class="hamburger-menu-button"
+              onclick="(() => {document.getElementById('side-menu-container').classList.toggle('shown'); window.localStorage.setItem('show-menu', 'true');})()">&#8801;</span>
+        <% end %>
         <ol class="breadcrumb text-right">
-          <%= if @current_user do %>
-          <li><%= @current_user.username %></li>
-          <li>
-            <%= link "Log out", to: session_path(@conn, :delete, @current_user),
-                method: "delete" %>
-          </li>
-          <% else %>
-          <li><%= link "Log in", to: session_path(@conn, :new) %></li>
-          <% end %>
         </ol>
+        <span class="logo">
+          <a href="<%= page_path(@conn, :index)%>">
+            <img src="/images/eo_logo.png"></img>
+          </a>
+        </span>
+
       </header>
 
       <p class="alert alert-info" role="alert"><%= get_flash(@conn, :info) %></p>
       <p class="alert alert-danger" role="alert"><%= get_flash(@conn, :error) %></p>
-
-      <main id="main" role="main">
-        <%= render @view_module, @view_template, assigns %>
-      </main>
-
+      <div class="content-wrapper">
+        <main id="main" role="main">
+          <%= render @view_module, @view_template, assigns %>
+        </main>
+      </div> <!-- /content-wrapper -->
     </div> <!-- /container -->
+    </div>
     <script>window.userToken = "<%= assigns[:user_token] %>"</script>
+    <script>window.userTimezone = "<%= assigns[:timezone] %>"</script>
     <script src="<%= static_path(@conn, "/js/app.js") %>"></script>
   </body>
 </html>

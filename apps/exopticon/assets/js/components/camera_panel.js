@@ -36,6 +36,16 @@ class CameraPanel extends React.Component {
   }
 
   /**
+   * @param {Number} columnCount - sets number of camera columns
+   */
+  setColumnCount(columnCount) {
+    this.setState({viewColumns: columnCount});
+    this.cameraElements.forEach((c) => {
+      c.visibilityCheck();
+    });
+  }
+
+  /**
    * closes the channel when component unmounts
    * @private
    */
@@ -85,6 +95,7 @@ class CameraPanel extends React.Component {
 CameraPanel.propTypes = {
   socket: PropTypes.object.isRequired,
   initialCameras: PropTypes.object,
+  initialColumns: PropTypes.number,
 };
 
 export default CameraPanel;

@@ -56,13 +56,15 @@ class CameraView extends React.Component {
 
   /**
    * callback that checks if view within viewport, if not it pauses playback
-   * @private
    */
   visibilityCheck() {
     const visible = verge.inY(this._container);
     if (this._img && visible
         && this.state.status === 'paused') {
-      this.props.cameraPlayer.playRealtime(this._img);
+      this.setState({status: 'loading'});
+      this.props.cameraPlayer.playRealtime(this._img, () => {
+        this.setState({status: 'playing'});
+      });
     } else if (this._img && !visible && this.state.status !== 'paused') {
       this.props.cameraPlayer.stop();
       console.log('stopping ' + this.props.camera.id.toString());

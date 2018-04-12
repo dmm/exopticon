@@ -20,7 +20,6 @@ defmodule Exopticon.FileLibraryTest do
   end
 
   def check_order([first, second | rest], _) do
-
     gap = Timex.diff(first.end_time, first.begin_time, :microseconds)
     file_gap = Timex.diff(second.begin_time, first.end_time, :microseconds)
 
@@ -38,7 +37,7 @@ defmodule Exopticon.FileLibraryTest do
 
     assert length(chunks.availability) == 1
 
-    [ head | _tail ] = chunks.availability
+    [head | _tail] = chunks.availability
     assert head.type == :no_video
     assert DateTime.diff(head.begin_time, begin_time) == 0
     assert DateTime.diff(head.end_time, end_time) == 0
@@ -62,6 +61,7 @@ defmodule Exopticon.FileLibraryTest do
   test "two continuous files result in single video chunk" do
     begin_time = Timex.parse!("2016-02-29T12:30:30.120+00:00", "{ISO:Extended}")
     end_time = Timex.shift(begin_time, minutes: 3)
+
     files = [
       %File{
         begin_time: begin_time,
@@ -88,6 +88,7 @@ defmodule Exopticon.FileLibraryTest do
   test "two discontiguous files results in three chunks" do
     begin_time = Timex.parse!("2016-02-29T12:30:30.120+00:00", "{ISO:Extended}")
     end_time = Timex.shift(begin_time, minutes: 3)
+
     files = [
       %File{
         begin_time: begin_time,
@@ -102,6 +103,42 @@ defmodule Exopticon.FileLibraryTest do
     chunks = FileLibrary.calculate_availability(files, begin_time, end_time)
 
     assert length(chunks.availability) == 3
+
+    assert check_order(chunks.availability, true), "not in order!"
+  end
+
+  test "check interval starting before first file" do
+    begin_time = Timex.parse!("2016-02-29T12:30:30.120+00:00", "{ISO:Extended}")
+    end_time = Timex.shift(begin_time, minutes: 2)
+
+    files = [
+      %File{
+        begin_time: Timex.shift(begin_time, seconds: 1),
+        end_time: Timex.shift(begin_time, seconds: 120)
+      }
+    ]
+
+    chunks = FileLibrary.calculate_availability(files, begin_time, end_time)
+
+    assert length(chunks.availability) == 2
+
+    assert check_order(chunks.availability, true), "not in order!"
+  end
+
+  test "check interval ending after last file" do
+    begin_time = Timex.parse!("2016-02-29T12:30:30.120+00:00", "{ISO:Extended}")
+    end_time = Timex.shift(begin_time, minutes: 2)
+
+    files = [
+      %File{
+        begin_time: begin_time,
+        end_time: Timex.shift(begin_time, seconds: 90)
+      }
+    ]
+
+    chunks = FileLibrary.calculate_availability(files, begin_time, end_time)
+
+    assert length(chunks.availability) == 2
 
     assert check_order(chunks.availability, true), "not in order!"
   end

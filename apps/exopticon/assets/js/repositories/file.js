@@ -16,19 +16,28 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {Socket} from 'phoenix';
+/**
+ * FileRepository fetches video files from the EXOPTICON server.
+ * @class
+ */
+class FileRepository {
+  /**
+   * @param {Number} cameraId - id of camera to get files for
+   * @param {ZonedDateTime} beginTime - time to start getting files for
+   * @param {ZonedDateTime} endTime - time to end getting files for
+   *
+   */
+  getFilesBetween(cameraId, beginTime, endTime) {
+    let url = `/v1/cameras/${cameraId}/availability`;
+    fetch(url, {
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }).then((response) => {
+      return response.json();
+    });
+  }
+}
 
-import binarySocket from './binarySocket';
-
-/*
-the type=msgpack param is only added to distinguish this connection
-from the phoenix live reload connection in the browser's network tab
-*/
-let socket = new Socket('/socket',
-                        {params: {type: 'msgpack', token: window.userToken}});
-
-socket = binarySocket.convertToBinary(socket);
-
-socket.connect();
-
-export default socket;
+export default FileRepository;

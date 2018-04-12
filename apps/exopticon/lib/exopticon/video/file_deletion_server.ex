@@ -1,7 +1,12 @@
 require Logger
 
 defmodule Exopticon.Video.FileDeletionServer do
+  @moduledoc """
+  Provides server that deletes video files as needed
+  """
   use GenServer
+
+  alias Exopticon.Video
 
   def start_link do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
@@ -13,7 +18,7 @@ defmodule Exopticon.Video.FileDeletionServer do
   end
 
   def handle_info(:work, []) do
-    Exopticon.Video.list_camera_groups()
+    Video.list_camera_groups()
     |> handle_groups()
 
     schedule_work()
@@ -30,12 +35,12 @@ defmodule Exopticon.Video.FileDeletionServer do
   end
 
   defp run([camera_group_id, max_size] = state) do
-    video_size = Exopticon.Video.get_total_video_size(camera_group_id)
+    video_size = Video.get_total_video_size(camera_group_id)
     max_size_kb = max_size * 1024 * 1024
     delete_amount = video_size - max_size_kb
 
     if delete_amount > 0 do
-      files = Exopticon.Video.get_oldest_files_in_group(camera_group_id, 1000)
+      files = Video.get_oldest_files_in_group(camera_group_id, 1000)
       delete_files(files, delete_amount)
       run(state)
     end
@@ -61,11 +66,11 @@ defmodule Exopticon.Video.FileDeletionServer do
 
     stat = File.stat!(file.filename)
     File.rm(file.filename)
-    Exopticon.Video.delete_file(file)
+    Video.delete_file(file)
     stat.size / 1024
   end
 
-  defp schedule_work() do
+  defp schedule_work do
     # after 5 seconds
     Process.send_after(self(), :work, 5000)
   end

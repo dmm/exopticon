@@ -1,7 +1,13 @@
 defmodule Exopticon.CapturePort do
+  @moduledoc """
+  Provides port implementation that captures, saves, and streams video from a live stream.
+  """
   use GenServer
 
   import Ecto.Query
+
+  alias Ecto.Changeset
+  alias Exopticon.Repo
 
   ### Client API
   def start_link(state, opts \\ []) do
@@ -27,7 +33,7 @@ defmodule Exopticon.CapturePort do
   ### Server callbacks
   defp get_monotonic_index_for_id(id) do
     index =
-      Exopticon.Repo.one(
+      Repo.one(
         from(
           f in "files",
           select: max(f.monotonic_index),
@@ -98,7 +104,6 @@ defmodule Exopticon.CapturePort do
       }) do
     {:ok, start_time, _} = DateTime.from_iso8601(beginTime)
     monotonic_start = System.monotonic_time(:microsecond)
-    {:ok, time} = Exopticon.Tsrange.cast([start_time, nil])
 
     %Exopticon.Video.File{
       filename: filename,
@@ -108,20 +113,20 @@ defmodule Exopticon.CapturePort do
       begin_monotonic: monotonic_start,
       monotonic_index: monotonic_index
     }
-    |> Exopticon.Repo.insert()
+    |> Repo.insert()
   end
 
   def handle_port_message({%{"filename" => filename, "endTime" => endTime}, id, _}) do
     monotonic_stop = System.monotonic_time(:microsecond)
     {:ok, end_time, _} = DateTime.from_iso8601(endTime)
-    file = Exopticon.Repo.get_by(Exopticon.Video.File, filename: filename)
+    file = Repo.get_by(Exopticon.Video.File, filename: filename)
     %{size: size} = File.stat!(filename)
 
     file
-    |> Ecto.Changeset.change(end_time: end_time)
-    |> Ecto.Changeset.change(size: size)
-    |> Ecto.Changeset.change(end_monotonic: monotonic_stop)
-    |> Exopticon.Repo.update()
+    |> Changeset.change(end_time: end_time)
+    |> Changeset.change(size: size)
+    |> Changeset.change(end_monotonic: monotonic_stop)
+    |> Repo.update()
   end
 
   def handle_info({port, {:data, msg}}, %{

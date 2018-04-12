@@ -1,4 +1,7 @@
 defmodule ExopticonWeb.CameraChannel do
+  @moduledoc """
+  Provides channel implementation of live camera streams
+  """
   use ExopticonWeb, :channel
 
   import Logger
@@ -111,9 +114,6 @@ defmodule ExopticonWeb.CameraChannel do
     camera_active = Map.has_key?(watch_camera, camera_id)
     frame_active = camera_active and cur_live < max_live
 
-    #    Logger.info(
-    #      "liveness: " <> to_string(cur_live) <> "/" <> to_string(max_live) <> to_string(camera_active) <> " " <> to_string(socket.assigns[:rtt])
-    #    )
     new_cur_live =
       if frame_active do
         cur_time = System.monotonic_time(:milliseconds)
