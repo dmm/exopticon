@@ -4,8 +4,6 @@ defmodule ExopticonWeb.CameraChannel do
   """
   use ExopticonWeb, :channel
 
-  import Logger
-
   intercept(["jpg"])
 
   def join("camera:lobby", payload, socket) do
@@ -26,7 +24,7 @@ defmodule ExopticonWeb.CameraChannel do
     {:noreply, socket}
   end
 
-  def handle_in("watch" <> camera_id = topic, _payload, socket) do
+  def handle_in("watch" <> camera_id = _topic, _payload, socket) do
     watch_cameras = socket.assigns[:watch_camera]
     new_watch = Map.put_new(watch_cameras, String.to_integer(camera_id), 1)
     socket = assign(socket, :watch_camera, new_watch)
@@ -101,7 +99,7 @@ defmodule ExopticonWeb.CameraChannel do
     cur_live
   end
 
-  def adjust_cur_live(false, cur_live, max_live) do
+  def adjust_cur_live(false, cur_live, _max_live) do
     cur_live
   end
 

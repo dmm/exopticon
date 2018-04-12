@@ -9,13 +9,6 @@ defmodule Exopticon.PlaybackSupervisor do
   end
 
   def init(_) do
-    child_spec = %{
-      start: {Exopticon.PlaybackPort, :start_link, []},
-      restart: :transient,
-      shutdown: 5000,
-      type: :worker
-    }
-
     children = [
       worker(Exopticon.PlaybackPort, [], restart: :transient)
     ]

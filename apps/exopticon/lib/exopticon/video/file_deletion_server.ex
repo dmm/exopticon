@@ -73,8 +73,6 @@ defmodule Exopticon.Video.FileDeletionServer do
     else
       0
     end
-
-
   end
 
   defp schedule_work do

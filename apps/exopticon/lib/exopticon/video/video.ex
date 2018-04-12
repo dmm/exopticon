@@ -4,7 +4,7 @@ defmodule Exopticon.Video do
   """
 
   import Ecto.Query, warn: false
-  import Logger
+  #  import Logger
 
   alias Exopticon.FileLibrary
   alias Exopticon.Repo
@@ -207,7 +207,6 @@ defmodule Exopticon.Video do
   def relative_move_camera(%Camera{ptz_type: "onvif"} = camera, x, y) do
     url = Cam.cam_url(camera.ip, camera.onvif_port)
 
-    ret =
       Cam.request_ptz_relative_move(
         url,
         camera.username,

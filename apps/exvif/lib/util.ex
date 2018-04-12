@@ -7,7 +7,7 @@ defmodule Exvif.Util do
     password_digest(username, password, 0)
   end
 
-  def password_digest(username, password, time_offset) do
+  def password_digest(_username, password, time_offset) do
     max = 0x100000000
     timestamp = Timex.now() |> Timex.shift(seconds: time_offset)
     {:ok, timestamp_buffer} = Timex.format(timestamp, "{ISO:Extended:Z}")

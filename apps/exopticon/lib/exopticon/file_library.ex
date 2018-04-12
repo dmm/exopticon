@@ -138,11 +138,11 @@ defmodule Exopticon.FileLibrary do
     calculate_availability(begin_time, end_time, chunks, [])
   end
 
-  defp calculate_availability(begin_time, end_time, chunks, []) do
+  defp calculate_availability(_begin_time, _end_time, chunks, []) do
     chunks |> Enum.reverse()
   end
 
-  defp calculate_availability(begin_time, end_time, chunks, files) do
+  defp calculate_availability(begin_time, _end_time, chunks, files) do
     [next_file | rest] = files
 
     begin_time = earliest(begin_time, next_file.begin_time)

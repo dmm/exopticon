@@ -1,11 +1,8 @@
 defmodule ExopticonWeb.FileController do
   use ExopticonWeb, :controller
 
-  import Ecto.Query
-
   plug(:authenticate_user)
 
-  alias Exopticon.Repo
   alias Exopticon.Video
   alias Exopticon.Video.File
 
@@ -68,13 +65,5 @@ defmodule ExopticonWeb.FileController do
     conn
     |> put_flash(:info, "File deleted successfully.")
     |> redirect(to: file_path(conn, :index))
-  end
-
-  def indentify_for_deletion(camera_group_id) do
-    max_size = Video.get_camera_group!(camera_group_id).max_storage_size * 1024 * 1024 * 1024
-    current_size = Repo.one(from(f in Exopticon.Video.File, select: sum(f.size)))
-    size_to_remove = current_size - max_size
-
-    files = Video.list_files()
   end
 end

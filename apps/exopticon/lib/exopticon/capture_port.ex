@@ -81,7 +81,7 @@ defmodule Exopticon.CapturePort do
   end
 
   # Handle messages from port
-  def handle_port_message({%{"jpegFrame" => dec, "pts" => pts}, id, _}) do
+  def handle_port_message({%{"jpegFrame" => _dec, "pts" => _pts}, _id, _}) do
     #    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
     #      cameraId: id,
     #      frameJpeg: Msgpax.Bin.new(dec),
@@ -116,7 +116,7 @@ defmodule Exopticon.CapturePort do
     |> Repo.insert()
   end
 
-  def handle_port_message({%{"filename" => filename, "endTime" => endTime}, id, _}) do
+  def handle_port_message({%{"filename" => filename, "endTime" => endTime}, _id, _}) do
     monotonic_stop = System.monotonic_time(:microsecond)
     {:ok, end_time, _} = DateTime.from_iso8601(endTime)
     file = Repo.get_by(Exopticon.Video.File, filename: filename)
@@ -147,7 +147,7 @@ defmodule Exopticon.CapturePort do
   end
 
   def handle_info({_port, {:exit_status, status}}, %{
-        port: port,
+        port: _port2,
         id: id,
         monotonic_index: monotonic_index,
         port_args: port_args

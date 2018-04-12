@@ -15,7 +15,7 @@ defmodule ExopticonWeb.PlaybackChannel do
     end
   end
 
-  def join("playback:" <> params, _payload, socket) do
+  def join("playback:" <> _params, _payload, socket) do
     {:ok, socket}
   end
 
