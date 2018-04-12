@@ -64,10 +64,14 @@ defmodule Exopticon.Video.FileDeletionServer do
       "Deleting file #{inspect(file)}"
     end)
 
-    stat = File.stat!(file.filename)
-    File.rm(file.filename)
+    stat = File.stat(file.filename)
+
+    if elem(stat, 0) == :ok do
+      File.rm(file.filename)
+      elem(stat, 1).size / 1024
+    end
+
     Video.delete_file(file)
-    stat.size / 1024
   end
 
   defp schedule_work do
