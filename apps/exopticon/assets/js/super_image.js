@@ -16,7 +16,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-let globalIsDrawing = false;
+let drawCount = 0;
+const drawMax = 2;
 
 /**
  * SuperImage class - Implements an image that drops render requests
@@ -29,8 +30,19 @@ class SuperImage {
   constructor(img) {
     this.img = img;
     this.isDrawing = false;
-    this.callback = () => {};
+
     this.checkFrame = this.checkFrame.bind(this);
+  }
+
+  /**
+   * Check if ready for draw
+   * @private
+   */
+  drawReady() {
+    if (drawCount < drawMax) {
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -40,29 +52,14 @@ class SuperImage {
   checkFrame() {
     if (this.img.complete) {
       //      this.isDrawing = false;
-      globalIsDrawing = false;
+      //      globalIsDrawing = false;
+      drawCount--;
+      this.isDrawing = false;
       window.URL.revokeObjectURL(this.img.src);
       if (this.callback) this.callback();
     } else {
       window.requestAnimationFrame(this.checkFrame);
-      console.log('skipping draw!');
-    }
-  }
 
-  /**
-   * renders the given source if SuperImage is ready.
-   * @param {string} src - src to render
-   * @param {function} callback - called if image is rendered
-   */
-  renderIfReady(src, callback) {
-    this.callback = callback;
-
-    //    if (this.isDrawing === false) {
-    if (globalIsDrawing === false) {
-      //      this.isDrawing = true;
-      globalIsDrawing = true;
-      this.img.src = src;
-      window.requestAnimationFrame(this.checkFrame);
     }
   }
 
@@ -74,26 +71,14 @@ class SuperImage {
   renderArrayIfReady(arrayBuffer, callback) {
     this.callback = callback;
 
-    if (globalIsDrawing === false) {
-      globalIsDrawing = true;
+    if (this.drawReady()) {
+      drawCount++;
+      this.isDrawing = true;
       let blob = new Blob([arrayBuffer], {type: 'image/jpeg'});
       this.img.src = window.URL.createObjectURL(blob);
       window.requestAnimationFrame(this.checkFrame);
-    }
-  }
-
-  /**
-   * renders specified blob as image/jpeg if ready
-   * @param {Blob} blob - image blob to render
-   * @param {function} callback - called if image renders
-   */
-  renderBlobIfReady(blob, callback) {
-    this.callback = callback;
-
-    if (globalIsDrawing === false) {
-      globalIsDrawing = true;
-      this.img.src = window.URL.createObjectURL(blob);
-      window.requestAnimationFrame(this.checkFrame);
+    } else {
+      console.log('skipping draw!');
     }
   }
 }

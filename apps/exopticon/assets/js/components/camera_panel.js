@@ -67,6 +67,9 @@ class CameraPanel extends React.Component {
     const cameras = [];
     const cameraChannel = new CameraChannel(this.state.channel);
     this.state.cameras.forEach((cam) => {
+      if (!this.props.showDisabled && cam.mode === 'disabled') {
+        return;
+      }
       let player = new CameraPlayer(cam, cameraChannel);
       cameras.push(
         <div key={cam.id} className="wrapper">
@@ -96,6 +99,11 @@ CameraPanel.propTypes = {
   socket: PropTypes.object.isRequired,
   initialCameras: PropTypes.object,
   initialColumns: PropTypes.number,
+  showDisabled: PropTypes.boolean,
+};
+
+CameraPanel.defaultProps = {
+  showDisabled: false,
 };
 
 export default CameraPanel;

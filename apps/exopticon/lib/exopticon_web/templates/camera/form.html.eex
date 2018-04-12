@@ -48,6 +48,12 @@
   </div>
 
   <div class="form-group">
+    <%= label f, :mode, class: "control-label" %>
+    <%= select f, :mode, ["enabled", "disabled"], class: "form-control" %>
+    <%= error_tag f, :mode %>
+  </div>
+
+  <div class="form-group">
     <%= label f, :rtsp_url, class: "control-label" %>
     <%= text_input f, :rtsp_url, class: "form-control" %>
     <%= error_tag f, :rtsp_url %>
@@ -65,7 +71,7 @@
     <%= error_tag f, :ptz_type %>
   </div>
 
-    <div class="form-group">
+  <div class="form-group">
     <%= label f, :ptz_profile_token, class: "control-label" %>
     <%= text_input f, :ptz_profile_token, class: "form-control" %>
     <%= error_tag f, :ptz_profile_token %>

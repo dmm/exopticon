@@ -16,7 +16,8 @@ defmodule ExopticonWeb.V1.CameraView do
       fps: camera.fps,
       type: camera.type,
       ptzType: camera.ptz_type,
-      link: camera.link
+      link: camera.link,
+      mode: camera.mode
     }
   end
 end

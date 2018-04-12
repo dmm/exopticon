@@ -153,7 +153,6 @@ defmodule Exopticon.CapturePort do
         port_args: port_args
       }) do
     # sleep for five seconds and then restart the port
-    IO.puts("Got exit message, status: " <> Integer.to_string(status))
     :timer.sleep(5000)
     new_port = start_port(port_args)
     {:noreply, %{port: new_port, id: id, monotonic_index: monotonic_index, port_args: port_args}}

@@ -122,7 +122,7 @@ export default class view extends MainView {
 
     let cameraId = parseInt(document.getElementById('singleCamera')
                             .getAttribute('data-id'), 10);
-    window.cameraManager = new CameraManager(socket, 1);
+    window.cameraManager = new CameraManager(socket, 1, true);
     this.fetchCamera(cameraId);
     const now = ZonedDateTime.now(ZoneOffset.UTC);
     const then = now.minusHours(6);

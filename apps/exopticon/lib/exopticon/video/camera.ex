@@ -18,7 +18,7 @@ defmodule Exopticon.Video.Camera do
     field(:ptz_type, :string)
     field(:ptz_profile_token, :string)
     field(:username, :string)
-    #    field :camera_group_id, :id
+    field(:mode, :string)
     belongs_to(:camera_group, Exopticon.Video.CameraGroup)
 
     timestamps()
@@ -38,9 +38,10 @@ defmodule Exopticon.Video.Camera do
       :rtsp_url,
       :type,
       :ptz_type,
-      :ptz_profile_token
+      :ptz_profile_token,
+      :mode
     ])
-    |> validate_required([:name, :ip, :fps, :mac, :username, :type])
+    |> validate_required([:name, :ip, :fps, :mac, :username, :type, :mode])
     |> put_change(:camera_group_id, 1)
   end
 end
