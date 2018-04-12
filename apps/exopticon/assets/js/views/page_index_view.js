@@ -69,6 +69,8 @@ export default class View extends MainView {
    * view entry point
    */
   mount() {
+    super.mount();
+
     console.log('Mounting page index view.');
     window.cameraManager = new CameraManager(socket);
     this.updateCameras();
