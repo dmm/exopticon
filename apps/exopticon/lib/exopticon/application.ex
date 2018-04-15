@@ -17,7 +17,8 @@ defmodule Exopticon.Application do
       supervisor(Exopticon.Repo, []),
       # Start the endpoint when the application starts
       supervisor(ExopticonWeb.Endpoint, []),
-      supervisor(Registry, [:unique, Registry.PlayerRegistry]),
+      supervisor(Registry, [:unique, Registry.PlayerRegistry], id: :PlayerRegistry),
+      supervisor(Registry, [:unique, Registry.CameraRegistry], id: :CameraRegistry),
       supervisor(Exopticon.CameraSupervisor, []),
       supervisor(Exopticon.PlaybackSupervisor, []),
       supervisor(Exopticon.Video.FileDeletionSupervisor, [])

@@ -10,8 +10,8 @@ defmodule Exopticon.CapturePort do
   alias Exopticon.Repo
 
   ### Client API
-  def start_link(state, opts \\ []) do
-    GenServer.start_link(__MODULE__, state, opts)
+  def start_link({id, _, _, _} = state, opts \\ []) do
+    GenServer.start_link(__MODULE__, state, name: via_tuple(id))
   end
 
   def child_spec(camera) do
@@ -163,5 +163,9 @@ defmodule Exopticon.CapturePort do
     end
 
     :normal
+  end
+
+    defp via_tuple(topic) do
+    {:via, Registry, {Registry.CameraRegistry, topic}}
   end
 end

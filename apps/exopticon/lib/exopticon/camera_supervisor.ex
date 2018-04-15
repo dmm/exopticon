@@ -1,6 +1,6 @@
 defmodule Exopticon.CameraSupervisor do
   @moduledoc """
-  Provides supervisor for capture port process.
+  Provides supervisor for capture port processes.
   """
   use Supervisor
 
@@ -9,9 +9,11 @@ defmodule Exopticon.CameraSupervisor do
   end
 
   def init(_) do
-    children = []
+    children = [
+      worker(Exopticon.CapturePort, [], restart: :permanent)
+    ]
 
-    supervise(children, strategy: :one_for_one)
+    supervise(children, strategy: :simple_one_for_one)
   end
 
   def start_all_cameras([]) do
@@ -19,7 +21,14 @@ defmodule Exopticon.CameraSupervisor do
 
   def start_all_cameras(cameras) do
     [cam | tail] = cameras
-    Supervisor.start_child(Exopticon.CameraSupervisor, Exopticon.CapturePort.child_spec(cam))
+    args = {
+      cam.id,
+      cam.rtsp_url,
+      cam.fps,
+      cam.camera_group.storage_path
+    }
+
+    ret = Supervisor.start_child(Exopticon.CameraSupervisor, [args])
     start_all_cameras(tail)
   end
 end
