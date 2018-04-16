@@ -99,7 +99,7 @@ static void bs_print(const char *fmt, ...)
         va_start(ap, fmt);
         vsnprintf(buf, sizeof(buf), fmt, ap);
         buf[(sizeof buf) - 1] = '\0';
-        send_log_message(buf);
+        send_log_message(1, buf);
         pthread_mutex_unlock(&log_mutex);
 }
 

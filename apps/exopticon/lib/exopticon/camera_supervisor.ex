@@ -21,6 +21,7 @@ defmodule Exopticon.CameraSupervisor do
 
   def start_all_cameras(cameras) do
     [cam | tail] = cameras
+
     args = {
       cam.id,
       cam.rtsp_url,

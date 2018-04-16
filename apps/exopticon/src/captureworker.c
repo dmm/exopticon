@@ -132,14 +132,12 @@ static void my_av_log_callback(void *avcl, int level, const char *fmt,
         if (av_log_get_level() < level) {
                 return;
         }
+        pthread_mutex_lock(&log_mutex);
 
         vsnprintf(output_message, sizeof(output_message), fmt, vl);
-        output_message[(sizeof output_message) - 1] =
-            '\0'; // I don't remember if vsnprintf always sets this...
-        bs_print(
-            stderr,
-            "{ \"type\": \"message\", \"level\": \"%d\", \"value\": \"%s\" }",
-            level, output_message);
+        send_log_message(level, output_message);
+
+        pthread_mutex_unlock(&log_mutex);
         return;
 }
 
@@ -525,7 +523,7 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
                 return NULL;
         }
 
-        resizedFrame->format = input->format;
+        resizedFrame->format = AV_PIX_FMT_YUV420P; //input->format;
         resizedFrame->width = width;
         resizedFrame->height = height;
         int ret = av_image_alloc(resizedFrame->data,
@@ -542,7 +540,7 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
         struct SwsContext *sws_context = sws_getCachedContext(NULL,
                                                               input->width,
                                                               input->height,
-                                                              input->format,
+                                                              AV_PIX_FMT_YUV420P,//input->format,
                                                               resizedFrame->width,
                                                               resizedFrame->height,
                                                               resizedFrame->format,
@@ -801,7 +799,8 @@ int main(int argc, char *argv[])
         srand(time(NULL));
 
         // Initialize library
-        av_log_set_level(AV_LOG_FATAL);
+        av_log_set_level(AV_LOG_INFO);
+        av_log_set_callback(my_av_log_callback);
         av_register_all();
         avcodec_register_all();
         avformat_network_init();

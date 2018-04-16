@@ -9,6 +9,8 @@ defmodule Exopticon.CapturePort do
   alias Ecto.Changeset
   alias Exopticon.Repo
 
+  require Logger
+
   ### Client API
   def start_link({id, _, _, _} = state, opts \\ []) do
     GenServer.start_link(__MODULE__, state, name: via_tuple(id))
@@ -129,6 +131,17 @@ defmodule Exopticon.CapturePort do
     |> Repo.update()
   end
 
+  def handle_port_message({%{"type" => "log", "level" => level, "message" => message}, id, _}) do
+    message2 = "capture_port " <> Integer.to_string(id) <> ":" <> message
+
+    case level do
+      "debug" -> Logger.debug(message2)
+      "info" -> Logger.info(message2)
+      "warning" -> Logger.warn(message2)
+      _ -> Logger.error(message2)
+    end
+  end
+
   def handle_info({port, {:data, msg}}, %{
         port: port,
         id: id,
@@ -165,7 +178,7 @@ defmodule Exopticon.CapturePort do
     :normal
   end
 
-    defp via_tuple(topic) do
+  defp via_tuple(topic) do
     {:via, Registry, {Registry.CameraRegistry, topic}}
   end
 end

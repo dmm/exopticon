@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include <libavutil/log.h>
+
 #include "mpack.h"
 
 #include "mpack_frame.h"
@@ -140,7 +142,37 @@ void send_end_file_message(char *filename, char *iso_end_time)
         free(data);
 }
 
-void send_log_message(char *message)
+char *get_log_level(int level)
+{
+        switch(level) {
+        case AV_LOG_QUIET:
+                return "quiet";
+                break;
+        case AV_LOG_PANIC:
+                return "panic";
+                break;
+        case AV_LOG_FATAL:
+                return "fatal";
+                break;
+        case AV_LOG_ERROR:
+                return "error";
+                break;
+        case AV_LOG_WARNING:
+                return "warning";
+                break;
+        case AV_LOG_INFO:
+                return "info";
+                break;
+        case AV_LOG_DEBUG:
+                return "debug";
+                break;
+        default:
+                return "unknown";
+        }
+        return "unknown";
+}
+
+void send_log_message(int level, char *message)
 {
         char *data = NULL;
         size_t size = 0;
@@ -148,9 +180,11 @@ void send_log_message(char *message)
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
-        mpack_start_map(&writer, 2);
+        mpack_start_map(&writer, 3);
         mpack_write_cstr(&writer, "type");
         mpack_write_cstr(&writer, "log");
+        mpack_write_cstr(&writer, "level");
+        mpack_write_cstr(&writer, get_log_level(level));
         mpack_write_cstr(&writer, "message");
         mpack_write_cstr(&writer, message);
         mpack_finish_map(&writer);
