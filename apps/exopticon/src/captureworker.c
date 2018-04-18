@@ -362,7 +362,7 @@ int initialize_output_stream(struct CameraState *cam, const char *out_filename)
                cam->ost->codec->ticks_per_frame);
 
         // Set global headers
-        cam->ost->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+        cam->ost->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
         // Set file begin time
         struct timespec ts;
