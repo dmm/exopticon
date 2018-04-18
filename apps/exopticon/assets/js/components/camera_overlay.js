@@ -27,6 +27,7 @@ class CameraOverlay extends React.Component {
     this.touchMove = this.touchMove.bind(this);
     this.touchEnd = this.touchEnd.bind(this);
     this.goToCamera = this.goToCamera.bind(this);
+    this.goToCameraEdit = this.goToCameraEdit.bind(this);
   }
 
   /**
@@ -101,6 +102,10 @@ class CameraOverlay extends React.Component {
     location.href = this.props.camera.link;
   }
 
+  goToCameraEdit() {
+    location.href = this.props.camera.link + '/edit';
+  }
+
   /**
    * render CameraOverlay
    * @return {Object} returns react instance for camera overlay
@@ -119,6 +124,11 @@ class CameraOverlay extends React.Component {
           extraClass="camera-link"
           onClick={this.goToCamera}
           />
+        <OverlayButton
+          label="&#9881;"
+          extraClass="camera-edit-link"
+          onClick={this.goToCameraEdit}
+          />
       </div>
     );
 
@@ -136,6 +146,12 @@ class CameraOverlay extends React.Component {
             extraClass="camera-link"
             onClick={this.goToCamera}
             />
+          <OverlayButton
+            label="&#9881;"
+            extraClass="camera-edit-link"
+            onClick={this.goToCameraEdit}
+            />
+
           <OverlayButton
             label="◀"
             extraClass="left-arrow"
