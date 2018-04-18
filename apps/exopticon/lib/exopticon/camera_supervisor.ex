@@ -29,7 +29,21 @@ defmodule Exopticon.CameraSupervisor do
       cam.camera_group.storage_path
     }
 
-    ret = Supervisor.start_child(Exopticon.CameraSupervisor, [args])
+    regs = Registry.lookup(Registry.CameraRegistry, cam.id)
+
+    if regs == [] do
+      Supervisor.start_child(Exopticon.CameraSupervisor, [args])
+    end
+
     start_all_cameras(tail)
+  end
+
+  def stop_camera(id) do
+    regs = Registry.lookup(Registry.CameraRegistry, id)
+    pids = Enum.map(regs, fn {pid, _} -> pid end)
+
+    Enum.map(pids, fn p ->
+      Supervisor.terminate_child(Exopticon.CameraSupervisor, p)
+    end)
   end
 end

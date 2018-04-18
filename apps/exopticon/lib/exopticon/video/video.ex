@@ -149,9 +149,12 @@ defmodule Exopticon.Video do
 
   """
   def create_camera(attrs \\ %{}) do
-    %Camera{}
-    |> Camera.changeset(attrs)
-    |> Repo.insert()
+    ret =
+      %Camera{}
+      |> Camera.changeset(attrs)
+      |> Repo.insert()
+
+    ret
   end
 
   @doc """
@@ -167,9 +170,28 @@ defmodule Exopticon.Video do
 
   """
   def update_camera(%Camera{} = camera, attrs) do
-    camera
-    |> Camera.changeset(attrs)
-    |> Repo.update()
+    ret =
+      camera
+      |> Camera.changeset(attrs)
+      |> Repo.update()
+
+    new_mode = Map.get(attrs, "mode")
+    {result, _} = ret
+
+    IO.inspect(ret)
+    IO.inspect(new_mode)
+
+    if result == :ok and new_mode == "enabled" do
+      IO.puts("STARTING CAMERA")
+      start_camera(camera.id)
+    end
+
+    if result == :ok and new_mode == "disabled" do
+      IO.puts("STOPPING CAMERA")
+      stop_camera(camera.id)
+    end
+
+    ret
   end
 
   @doc """
@@ -402,5 +424,21 @@ defmodule Exopticon.Video do
       )
 
     Repo.all(query)
+  end
+
+  def start_camera(camera_id) do
+    query =
+      from(
+        c in Camera,
+        where: c.id == ^camera_id,
+        preload: [:camera_group]
+      )
+
+    camera = Repo.one(query)
+    Exopticon.CameraSupervisor.start_all_cameras([camera])
+  end
+
+  def stop_camera(camera_id) do
+    Exopticon.CameraSupervisor.stop_camera(camera_id)
   end
 end

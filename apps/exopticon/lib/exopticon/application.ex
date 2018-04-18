@@ -27,15 +27,27 @@ defmodule Exopticon.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Exopticon.Supervisor]
-    ret = Supervisor.start_link(children, opts)
-
-    # Start Cameras
-    Exopticon.CameraSupervisor.start_all_cameras(
-      Exopticon.Repo.all(from(camera in Exopticon.Video.Camera, preload: [:camera_group]))
-    )
-
-    ret
+    Supervisor.start_link(children, opts)
   end
+
+  def start_phase(:start, :normal, [5]) do
+    IO.puts("start called!")
+    cameras = Exopticon.Repo.all(
+      from(camera in Exopticon.Video.Camera,
+        where: camera.mode == "enabled",
+        preload: [:camera_group]))
+    # Start Cameras
+    Exopticon.CameraSupervisor.start_all_cameras(cameras)
+
+
+    :ok
+  end
+
+  def start_phase(phase, start_type, phase_args),
+    do:
+      IO.puts(
+        "top_app:start_phase(#{inspect(phase)},#{inspect(start_type)},#{inspect(phase_args)})."
+      )
 
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.

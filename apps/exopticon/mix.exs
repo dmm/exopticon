@@ -47,7 +47,8 @@ defmodule Exopticon.Mixfile do
   def application do
     [
       mod: {Exopticon.Application, []},
-      extra_applications: [:logger, :runtime_tools, :comeonin, :timex]
+      extra_applications: [:logger, :runtime_tools, :comeonin, :timex],
+      start_phases: [{:start, [5]},{:admin, [4]}, {:stop, [3]}]
     ]
   end
 

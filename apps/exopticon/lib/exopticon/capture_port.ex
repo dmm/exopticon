@@ -51,6 +51,8 @@ defmodule Exopticon.CapturePort do
   end
 
   def start_port({id, url, fps, video_dir}) do
+    Logger.metadata(camera_id: id)
+
     storage_path =
       video_dir
       |> Path.expand()
@@ -131,14 +133,12 @@ defmodule Exopticon.CapturePort do
     |> Repo.update()
   end
 
-  def handle_port_message({%{"type" => "log", "level" => level, "message" => message}, id, _}) do
-    message2 = "capture_port " <> Integer.to_string(id) <> ":" <> message
-
+  def handle_port_message({%{"type" => "log", "level" => level, "message" => message}, _id, _}) do
     case level do
-      "debug" -> Logger.debug(message2)
-      "info" -> Logger.info(message2)
-      "warning" -> Logger.warn(message2)
-      _ -> Logger.error(message2)
+      "debug" -> Logger.debug(message)
+      "info" -> Logger.info(message)
+      "warning" -> Logger.warn(message)
+      _ -> Logger.error(message)
     end
   end
 
