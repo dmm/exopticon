@@ -16,6 +16,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import fscreen from 'fscreen';
 import PropTypes from 'prop-types';
 import React from 'react';
 import verge from 'verge';
@@ -48,6 +49,7 @@ class CameraView extends React.Component {
     this.visibilityCheck = this.visibilityCheck.bind(this);
     this.handleScroll = this.handleScroll.bind(this);
     this.handleResize = this.handleResize.bind(this);
+    this.fullscreenCallback = this.fullscreenCallback.bind(this);
 
     this.isScrolling = true; // junk value to be replaced by timer
     this.isResizing = true;
@@ -58,7 +60,9 @@ class CameraView extends React.Component {
    * callback that checks if view within viewport, if not it pauses playback
    */
   visibilityCheck() {
-    const visible = verge.inY(this._container);
+    const fullscreenNotMe = !(fscreen.fullscreenElement !== null
+                              && fscreen.fullscreenElement !== this._container);
+    const visible = verge.inY(this._container) && fullscreenNotMe;
     if (this._img && visible
         && this.state.status === 'paused') {
       this.setState({status: 'loading'});
@@ -91,6 +95,16 @@ class CameraView extends React.Component {
     this.isResizing = window.setTimeout(this.visibilityCheck, 33);
   }
 
+  /*
+   * fullscreen callback to pass to camera overlay
+   * @private
+   **/
+  fullscreenCallback() {
+    if (this.props.fullscreenHandler) {
+      this.props.fullscreenHandler(this._container);
+    }
+  }
+
   /**
    * react mount handler.
    * adds event handlers and starts playback if visible
@@ -99,6 +113,7 @@ class CameraView extends React.Component {
   componentDidMount() {
     window.addEventListener('scroll', this.handleScroll);
     window.addEventListener('resize', this.handleResize);
+    fscreen.addEventListener('fullscreenchange', this.handleFullscreen);
     this.initialTimeout = setTimeout(() => {
       if (verge.inY(this._container)) {
         this.setState({status: 'loading'});
@@ -119,6 +134,7 @@ class CameraView extends React.Component {
     clearTimeout(this.initialTimeout);
     window.removeEventListener('scroll', this.handleScroll);
     window.removeEventListener('resize', this.handleResize);
+    fscreen.removeEventListener('fullscreenchange', this.handleFullscreen);
     this.props.cameraPlayer.stop();
   }
 
@@ -147,7 +163,9 @@ class CameraView extends React.Component {
                this._container = el;
              }
         }>
-        <CameraOverlay camera={this.props.cameraPlayer} />
+        <CameraOverlay camera={this.props.cameraPlayer}
+                       fullscreenCallback={this.fullscreenCallback}
+                       />
         { status }
         <img ref={
                (el) => {
@@ -162,6 +180,7 @@ class CameraView extends React.Component {
 CameraView.propTypes = {
   camera: PropTypes.object.isRequired,
   cameraPlayer: PropTypes.object.isRequired,
+  fullscreenHandler: PropTypes.func,
 };
 
 export default CameraView;

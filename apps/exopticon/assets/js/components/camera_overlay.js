@@ -99,7 +99,7 @@ class CameraOverlay extends React.Component {
    *
    */
   goToCamera() {
-    location.href = this.props.camera.link;
+    this.props.fullscreenCallback();
   }
 
   goToCameraEdit() {
@@ -184,6 +184,7 @@ class CameraOverlay extends React.Component {
 
 CameraOverlay.propTypes = {
   camera: PropTypes.object,
+  fullscreenCallback: PropTypes.func,
 };
 
 export default CameraOverlay;
