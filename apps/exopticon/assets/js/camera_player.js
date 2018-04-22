@@ -68,6 +68,17 @@ class CameraPlayer {
   }
 
   /**
+   * allows configuration of video resolution
+   */
+  setResolution(resolution) {
+    if (resolution === 'hd') {
+      this.channel.setResolution(this.camera.id, 'hd');
+    } else if (resolution === 'sd') {
+      this.channel.setResolution(this.camera.id, 'sd');
+    }
+  }
+
+  /**
    * @return {boolean} true if camera report ptz capability
    */
   hasPtz() {

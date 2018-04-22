@@ -85,19 +85,21 @@ defmodule Exopticon.CapturePort do
   end
 
   # Handle messages from port
-  def handle_port_message({%{"jpegFrame" => _dec, "pts" => _pts}, _id, _}) do
-    #    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
-    #      cameraId: id,
-    #      frameJpeg: Msgpax.Bin.new(dec),
-    #      pts: pts
-    #    })
+  def handle_port_message({%{"jpegFrame" => dec, "pts" => pts}, id, _}) do
+    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
+      cameraId: id,
+      frameJpeg: Msgpax.Bin.new(dec),
+      pts: pts,
+      res: "hd"
+    })
   end
 
   def handle_port_message({%{"jpegFrameScaled" => dec, "pts" => pts, "height" => _height}, id, _}) do
     ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
       cameraId: id,
       frameJpeg: Msgpax.Bin.new(dec),
-      pts: pts
+      pts: pts,
+      res: "sd"
     })
   end
 

@@ -85,6 +85,19 @@ class CameraChannel {
     this.unsubscribe([cameraId]);
     this.watchedCameras.delete(cameraId);
   }
+
+  /**
+   * @param {number} cameraId - id of camera to change
+   * @param {string} resolution - "sd" or "hd" specifying desired resolution
+   *
+   */
+  setResolution(cameraId, resolution) {
+    if (resolution === "hd") {
+      this.channel.push(`hdon${cameraId.toString()}`, '');
+    } else if (resolution === "sd") {
+      this.channel.push(`hdoff${cameraId.toString()}`, '');
+    }
+  }
 }
 
 export default CameraChannel;

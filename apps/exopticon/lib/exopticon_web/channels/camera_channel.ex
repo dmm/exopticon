@@ -41,6 +41,20 @@ defmodule ExopticonWeb.CameraChannel do
     {:noreply, socket}
   end
 
+  def handle_in("hdon" <> camera_id = topic, _payload, socket) do
+    hd_cameras = socket.assigns[:hd_cameras]
+    new_hd_cameras = Map.put_new(hd_cameras, String.to_integer(camera_id), 1)
+    socket = assign(socket, :hd_cameras, new_hd_cameras)
+    {:noreply, socket}
+  end
+
+  def handle_in("hdoff" <> camera_id = topic, _payload, socket) do
+    hd_cameras = socket.assigns[:hd_cameras]
+    new_hd_cameras = Map.delete(hd_cameras, String.to_integer(camera_id))
+    socket = assign(socket, :hd_cameras, new_hd_cameras)
+    {:noreply, socket}
+  end
+
   # Channels can be used in a request/response fashion
   # by sending replies to requests from the client
   def handle_in("ping", payload, socket) do
@@ -110,10 +124,14 @@ defmodule ExopticonWeb.CameraChannel do
     cur_live = socket.assigns[:cur_live]
     max_live = socket.assigns[:max_live]
     camera_id = params[:cameraId]
+    resolution = params[:res]
     watch_camera = socket.assigns[:watch_camera]
+    hd_cameras = socket.assigns[:hd_cameras]
 
     camera_active = Map.has_key?(watch_camera, camera_id)
+    camera_hd = Map.has_key?(hd_cameras, camera_id)
     frame_active = camera_active and cur_live < max_live
+    resolution_active = (resolution == "hd" && camera_hd) or (resolution == "sd" and not camera_hd)
 
     #    Logger.info(
     #      "liveness: "
@@ -123,7 +141,7 @@ defmodule ExopticonWeb.CameraChannel do
     #      <> " " <> to_string(socket.assigns[:rtt])
     #    )
     new_cur_live =
-      if frame_active do
+      if frame_active and resolution_active do
         cur_time = System.monotonic_time(:milliseconds)
         params = Map.put(params, :ts, to_string(cur_time))
         push(socket, "jpg" <> Integer.to_string(camera_id), params)

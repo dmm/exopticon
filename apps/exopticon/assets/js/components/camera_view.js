@@ -49,6 +49,7 @@ class CameraView extends React.Component {
     this.visibilityCheck = this.visibilityCheck.bind(this);
     this.handleScroll = this.handleScroll.bind(this);
     this.handleResize = this.handleResize.bind(this);
+    this.handleFullscreen = this.handleFullscreen.bind(this);
     this.fullscreenCallback = this.fullscreenCallback.bind(this);
 
     this.isScrolling = true; // junk value to be replaced by timer
@@ -93,6 +94,19 @@ class CameraView extends React.Component {
   handleResize() {
     window.clearTimeout(this.isResizing);
     this.isResizing = window.setTimeout(this.visibilityCheck, 33);
+  }
+
+  /**
+   * handle fullscreen event
+   *
+   */
+  handleFullscreen() {
+    if (this._container === fscreen.fullscreenElement) {
+      console.log('HD!');
+      this.props.cameraPlayer.setResolution('hd');
+    } else {
+      this.props.cameraPlayer.setResolution('sd');
+    }
   }
 
   /*

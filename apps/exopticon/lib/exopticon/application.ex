@@ -32,13 +32,18 @@ defmodule Exopticon.Application do
 
   def start_phase(:start, :normal, [5]) do
     IO.puts("start called!")
-    cameras = Exopticon.Repo.all(
-      from(camera in Exopticon.Video.Camera,
-        where: camera.mode == "enabled",
-        preload: [:camera_group]))
+
+    cameras =
+      Exopticon.Repo.all(
+        from(
+          camera in Exopticon.Video.Camera,
+          where: camera.mode == "enabled",
+          preload: [:camera_group]
+        )
+      )
+
     # Start Cameras
     Exopticon.CameraSupervisor.start_all_cameras(cameras)
-
 
     :ok
   end

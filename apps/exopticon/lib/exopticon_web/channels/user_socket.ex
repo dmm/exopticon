@@ -37,6 +37,7 @@ defmodule ExopticonWeb.UserSocket do
         socket = assign(socket, :cur_live, 0)
         socket = assign(socket, :rtt, 0)
         socket = assign(socket, :watch_camera, %{})
+        socket = assign(socket, :hd_cameras, %{})
         {:ok, socket}
 
       {:error, _reason} ->
