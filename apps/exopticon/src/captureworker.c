@@ -827,7 +827,8 @@ int main(int argc, char *argv[])
 
         // open rtsp
         AVDictionary *opts = 0;
-        av_dict_set(&opts, "rtsp_transport", "tcp", 0);
+        av_dict_set(&opts, "buffer_size", "655360", 0);
+        av_dict_set(&opts, "rtsp_transport", "udp", 0);
         if (avformat_open_input(&(cam.ifcx), input_uri, NULL, &opts) != 0) {
                 // try udp, reset ifcx because the first call trashes it
                 cam.ifcx = avformat_alloc_context();
