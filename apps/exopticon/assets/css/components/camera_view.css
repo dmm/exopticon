@@ -5,12 +5,12 @@
     -webkit-box-sizing: content-box;
     -moz-box-sizing: content-box;
     box-sizing: content-box;
-    margin: 1px;
+    padding: 1px;
 }
 
 .camera:hover {
     border: 1px solid orange;
-    margin: 0;
+    padding: 0;
 }
 
 .camera img {
