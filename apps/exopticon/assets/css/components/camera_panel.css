@@ -20,39 +20,39 @@
 }
 
 .camera-panel .wrapper {
-    width: calc(100% - 2px);
+  width: 100%;
 }
 
 @media screen and (min-width: 767px) {
     .camera-panel .wrapper {
-        width: calc(100% - 2px);
+      width: 100%;
     }
 }
 
 @media screen and (min-width: 980px) {
     .camera-panel .wrapper {
-        width: calc(50% - 2px);
+      width: 50%;
     }
 }
 
 @media screen and (min-width: 1200px) {
     .camera-panel .wrapper {
-        width: calc(25% - 2px);
+      width: 25%;
     }
 }
 
 .camera-panel.panel-col-1 div.wrapper {
-    width: calc(100% - 2px);
+  width: 100%;
 }
 
 .camera-panel.panel-col-2 div.wrapper {
-    width: calc(50% - 2px);
+  width: 50%;
 }
 
 .camera-panel.panel-col-3 div.wrapper {
-    width: calc(33% - 2px);
+  width: 33%;
 }
 
 .camera-panel.panel-col-4 div.wrapper {
-    width: calc(25% - 2px);
+  width: 25%;
 }
