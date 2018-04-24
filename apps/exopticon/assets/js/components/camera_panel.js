@@ -82,7 +82,7 @@ class CameraPanel extends React.Component {
     if (fscreen.fullscreenElement === null) {
       // fullscreen not enabled, request it
       fscreen.requestFullscreen(elem);
-      screen.lockOrientationUniversion('landscape-primary');
+      screen.lockOrientationUniversal('landscape-primary');
     } else {
       fscreen.exitFullscreen();
     }
