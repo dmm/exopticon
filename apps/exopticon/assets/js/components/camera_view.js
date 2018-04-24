@@ -101,9 +101,13 @@ class CameraView extends React.Component {
    *
    */
   handleFullscreen() {
+    screen.lockOrientationUniversal = screen.lockOrientation
+      || screen.mozLockOrientation
+      || screen.msLockOrientation;
+
     if (this._container === fscreen.fullscreenElement) {
-      console.log('HD!');
       this.props.cameraPlayer.setResolution('hd');
+      screen.lockOrientationUniversal('landscape-primary');
     } else {
       this.props.cameraPlayer.setResolution('sd');
     }
