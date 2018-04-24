@@ -99,6 +99,7 @@ class CameraOverlay extends React.Component {
    *
    */
   goToCamera() {
+    this.setState({opacity: 0.0});
     this.props.fullscreenCallback();
   }
 
