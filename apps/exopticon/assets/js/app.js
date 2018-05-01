@@ -20,7 +20,7 @@ import 'phoenix_html';
 import loadView from './views/loader';
 
 import '../css/phoenix.css';
-import '../css/components/orange_theme.css';
+import '../css/components/green_theme.css';
 
 /**
  * called on dom content loaded event, determines the current view and
