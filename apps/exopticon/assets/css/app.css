@@ -50,8 +50,8 @@ html, body, .container-fluid {
 }
 
 .hamburger-menu-button {
-  background-color: orange;
-  color: black;
+  background-color: rgb(0, 68, 0);
+  color: rgb(0, 255, 0);
   border-radius: 3px;
   font-size: 33px;
   height: 36px;
@@ -140,10 +140,20 @@ body[data-js-view-name="PageIndexView"] #side-menu-container div.view-controls.p
 }
 
 #side-menu-container li a {
-  color: orange;
+  color: rgb(0, 255, 0);
 }
 
 #side-menu-container a:visited {
-  color: orange;
+  color: rgb(0, 255, 0);
   text-decoration: none;
+}
+
+#file-browser-mount {
+  height: calc(100vh - 36px);
+}
+
+@media (max-width: 650px) {
+  #file-browser-mount {
+    height: 100%;
+  }
 }
