@@ -26,6 +26,7 @@ defmodule ExopticonWeb.Router do
     resources("/sessions", SessionController, only: [:new, :create, :delete])
     resources("/camera_groups", CameraGroupController)
     resources("/cameras", CameraController)
+    get("/files/browse", FileController, :browse)
     resources("/files", FileController)
 
     get("/cameras/:id/playback", CameraController, :playback)

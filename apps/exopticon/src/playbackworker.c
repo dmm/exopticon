@@ -77,6 +77,10 @@ static struct timespec time_since(struct timespec old_time)
 static int time_cmp(struct timespec a, struct timespec b)
 {
         struct timespec diff = time_diff(a, b);
+
+        if (diff.tv_sec > 2) {
+                return 1;
+        }
         if (diff.tv_sec == 0 && diff.tv_nsec == 0) {
                 return 0;
         } else if (diff.tv_sec < 0 || diff.tv_nsec < 0) {
@@ -251,16 +255,17 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRationa
 
                 struct timespec diff = time_diff(begin_time, cur_time);
 /*
-                fprintf(stderr, "frame->pts: %lld, time_base: %lld,%lld\n",
+                fprintf(stderr, "\nframe->pts: %lld, time_base: %lld,%lld\n",
                         frame->pts,
                         time_base.num,
                         time_base.den);
+
                 fprintf(stderr, "Comparing diff: %lld.%lld, pts_ts: %lld.%lld\n",
                         (long long)diff.tv_sec,
                         (long long)diff.tv_nsec,
                         (long long)pts_ts.tv_sec,
                         (long long)pts_ts.tv_nsec);
-                */
+*/
                 if (time_cmp(diff, pts_ts) == 1) {
                         /*
                         fprintf(stderr, "\nPlaying frame!\n");
@@ -286,6 +291,14 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRationa
 
 int handle_packet(struct PlayerState *state)
 {
+        /*
+                fprintf(stderr, "\npacket->pts: %lld, packet->dts: %lld, time_base: %lld,%lld\n",
+                state->pkt.pts,
+                        state->pkt.dts,
+                        state->st->time_base.num,
+                        state->st->time_base.den
+                        );
+        */
         // Make sure packet is video
         if (state->pkt.stream_index != state->i_index) {
                 return 0;
@@ -301,6 +314,7 @@ int handle_packet(struct PlayerState *state)
                 // pkt is a keyframe
                 state->got_key_frame = 1;
         }
+
 
         const int decode_ret = avcodec_send_packet(state->ccx, &state->pkt);
         if (decode_ret != 0) {
@@ -364,6 +378,9 @@ int checkforquit()
                 }
         } while (ret > 0 && quit == 0);
 
+        if (quit == 1) {
+                fprintf(stderr, "CHECK FOR QUIT TRUE\n\n\n");
+        }
 
         return quit;
 }
@@ -375,6 +392,12 @@ int main(int argc, char *argv[])
         const char *program_name = argv[0];
         if (argc < 3) {
           fprintf(stderr, "USAGE: ./%s <input filename> <offset in ms>\n", program_name);
+        }
+
+        int one_frame = 0;
+
+        if (argc > 3) {
+                one_frame = 1;
         }
 
         // Initialize ffmpeg
@@ -456,6 +479,9 @@ int main(int argc, char *argv[])
                 av_packet_unref(&player.pkt);
                 av_init_packet(&player.pkt);
                 count++;
+                if (one_frame == 1) {
+                        goto cleanup;
+                }
         }
 
 cleanup:

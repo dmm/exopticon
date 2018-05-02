@@ -66,4 +66,8 @@ defmodule ExopticonWeb.FileController do
     |> put_flash(:info, "File deleted successfully.")
     |> redirect(to: file_path(conn, :index))
   end
+
+  def browse(conn, %{"camera_id" => camera_id}) do
+    render(conn, "browse.html", camera_id: camera_id)
+  end
 end
