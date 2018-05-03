@@ -177,7 +177,7 @@ class CameraView extends React.Component {
     window.removeEventListener('scroll', this.handleScroll);
     window.removeEventListener('resize', this.handleResize);
     fscreen.removeEventListener('fullscreenchange', this.handleFullscreen);
-    this.stop();
+    this.pause();
   }
 
   /**

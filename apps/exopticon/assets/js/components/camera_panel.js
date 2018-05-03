@@ -48,8 +48,16 @@ class CameraPanel extends React.Component {
     let channel = props.socket.channel('camera:stream');
     channel.join();
 
+    let enabledCameras = new Array();
+
+    props.initialCameras.forEach((c) => {
+      if (c.mode === 'enabled' && !props.showDisabled) {
+        enabledCameras.push(c);
+      }
+    });
+
     this.state = {
-      cameras: props.initialCameras,
+      cameras: enabledCameras,
       channel: channel,
       cameraChannel: new CameraChannel(channel),
       viewColumns: props.initialColumns,
@@ -106,7 +114,7 @@ class CameraPanel extends React.Component {
         c.play();
       }
     } else {
-      const camera = this.state.cameras[i];
+      const camera = enabledCameras[i];
       let cameraComponent = this.cameraElements.get(camera.id);
 
       for (let c of this.cameraElements.values()) {
@@ -156,9 +164,6 @@ class CameraPanel extends React.Component {
     const cameras = [];
     const cameraChannel = this.state.cameraChannel;
     this.state.cameras.forEach((cam, i) => {
-      if (!this.props.showDisabled && cam.mode === 'disabled') {
-        return;
-      }
       let fsClass = '';
       if (this.state.fullscreenIndex !== -1 && this.state.fullscreenIndex !== i) {
         fsClass += 'background ';
