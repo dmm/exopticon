@@ -41,6 +41,8 @@ class CameraPanel extends React.Component {
     super(props);
 
     this.cameraElements = new Map();
+
+    this.setCameras = this.setCameras.bind(this);
     this.shiftFullscreen = this.shiftFullscreen.bind(this);
     this.setFullscreenIndex = this.setFullscreenIndex.bind(this);
     this.cameraRequestFullscreen = this.cameraRequestFullscreen.bind(this);
@@ -48,13 +50,7 @@ class CameraPanel extends React.Component {
     let channel = props.socket.channel('camera:stream');
     channel.join();
 
-    let enabledCameras = new Array();
-
-    props.initialCameras.forEach((c) => {
-      if (c.mode === 'enabled' && !props.showDisabled) {
-        enabledCameras.push(c);
-      }
-    });
+    let enabledCameras = this.filterCameras(props.initialCameras);
 
     this.state = {
       cameras: enabledCameras,
@@ -63,6 +59,32 @@ class CameraPanel extends React.Component {
       viewColumns: props.initialColumns,
       fullscreenIndex: -1,
     };
+  }
+
+  /**
+   * @param {List} cameras - list of cameras to process
+   * @private
+   */
+  filterCameras(cameras) {
+    let enabledCameras = new Array();
+
+    cameras.forEach((c) => {
+      if (c.mode === 'enabled' && !this.props.showDisabled) {
+        enabledCameras.push(c);
+      } else if (c.mode === 'disabled' && this.props.showDisabled) {
+        enabledCameras.push(c);
+      }
+    });
+
+    return enabledCameras;
+  }
+  /**
+   * @param {List} cameras - set cameras panel's cameras to this list
+   *
+   */
+  setCameras(cameras) {
+
+    this.setState({cameras: this.filterCameras(cameras)});
   }
 
   /**
@@ -114,7 +136,7 @@ class CameraPanel extends React.Component {
         c.play();
       }
     } else {
-      const camera = enabledCameras[i];
+      const camera = this.state.cameras[i];
       let cameraComponent = this.cameraElements.get(camera.id);
 
       for (let c of this.cameraElements.values()) {

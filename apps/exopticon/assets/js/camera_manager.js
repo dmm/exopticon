@@ -38,7 +38,7 @@ class CameraManager {
    * be used by camera manager
    */
   updateCameras(allCameras) {
-    this.component.setState({cameras: allCameras});
+    this.component.setCameras(allCameras);
   }
 
   /**
