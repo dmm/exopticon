@@ -36,8 +36,8 @@ defmodule ExopticonWeb.CameraChannel do
   def handle_in("close" <> camera_id, _payload, socket) do
     Logger.debug("closing socket")
     watch_cameras = socket.assigns[:watch_camera]
-    new_watch = Map.delete(watch_cameras, camera_id)
-    socket = assign(socket, :watch_cameras, new_watch)
+    new_watch = Map.delete(watch_cameras, String.to_integer(camera_id))
+    socket = assign(socket, :watch_camera, new_watch)
     {:noreply, socket}
   end
 
