@@ -9,6 +9,19 @@
     width: 100%;
 }
 
+.camera-panel .wrapper.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  max-height: 100vh !important;
+  background-color: black;
+}
+
+.camera-panel .wrapper.background {
+  display: none;
+}
+
 .camera-panel .camera-width {
     /* Enforce 16:9 aspect ratio */
     padding-top: 56.25%;

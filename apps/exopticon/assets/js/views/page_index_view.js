@@ -62,6 +62,16 @@ export default class View extends MainView {
       }
     });
 
+    document.addEventListener('keyup', (event) => {
+      const keyName = event.key;
+      console.log(keyName);
+      if (keyName === 'ArrowRight') {
+        window.cameraManager.shiftFullscreen(1);
+      } else if (keyName === 'ArrowLeft') {
+        window.cameraManager.shiftFullscreen(-1);
+      }
+    }, false);
+
     let cameraPanelWidth = window.localStorage.getItem('camera-panel-width');
 
     if (!cameraPanelWidth) {

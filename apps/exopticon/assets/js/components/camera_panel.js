@@ -41,6 +41,8 @@ class CameraPanel extends React.Component {
     super(props);
 
     this.cameraElements = new Map();
+    this.shiftFullscreen = this.shiftFullscreen.bind(this);
+    this.setFullscreenIndex = this.setFullscreenIndex.bind(this);
     this.cameraRequestFullscreen = this.cameraRequestFullscreen.bind(this);
 
     let channel = props.socket.channel('camera:stream');
@@ -49,7 +51,9 @@ class CameraPanel extends React.Component {
     this.state = {
       cameras: props.initialCameras,
       channel: channel,
+      cameraChannel: new CameraChannel(channel),
       viewColumns: props.initialColumns,
+      fullscreenIndex: -1,
     };
   }
 
@@ -71,6 +75,45 @@ class CameraPanel extends React.Component {
     this.state.channel.leave();
   }
 
+  shiftFullscreen(amount) {
+    const newIndex = (this.state.fullscreenIndex + amount + this.state.cameras.length)
+          % this.state.cameras.length;
+    this.setFullscreenIndex(newIndex);
+  }
+
+  /**
+   *
+   *
+   */
+  setFullscreenIndex(i) {
+    const newIndex = this.state.fullscreenIndex === i ? -1 : i;
+
+    this.setState({
+      fullscreenIndex: newIndex,
+    });
+
+
+    if (newIndex === -1) {
+      for (let c of this.cameraElements.values()) {
+        c.setResolution('sd');
+        c.play();
+      }
+    } else {
+      const camera = this.state.cameras[i];
+      let cameraComponent = this.cameraElements.get(camera.id);
+
+      for (let c of this.cameraElements.values()) {
+        if (c !== null && c !== cameraComponent) {
+          c.setResolution('sd');
+          c.pause();
+        }
+      }
+      cameraComponent.setResolution('hd');
+      cameraComponent.play();
+    }
+
+  }
+
   /**
    * attempts to make element fullscreen
    * @private
@@ -79,12 +122,12 @@ class CameraPanel extends React.Component {
     screen.lockOrientationUniversal = screen.lockOrientation
       || screen.mozLockOrientation
       || screen.msLockOrientation;
-    if (fscreen.fullscreenElement === null) {
+    if (fscreen.fullscreenElement === elem) {
+      fscreen.exitFullscreen();
+    } else {
       // fullscreen not enabled, request it
       fscreen.requestFullscreen(elem);
       screen.lockOrientationUniversal('landscape-primary');
-    } else {
-      fscreen.exitFullscreen();
     }
 
     this.cameraElements.forEach((c) => {
@@ -104,23 +147,30 @@ class CameraPanel extends React.Component {
     }
     this.cameraElements.clear();
     const cameras = [];
-    const cameraChannel = new CameraChannel(this.state.channel);
-    this.state.cameras.forEach((cam) => {
+    const cameraChannel = this.state.cameraChannel;
+    this.state.cameras.forEach((cam, i) => {
       if (!this.props.showDisabled && cam.mode === 'disabled') {
         return;
       }
+      let fsClass = '';
+      if (this.state.fullscreenIndex !== -1 && this.state.fullscreenIndex !== i) {
+        fsClass += 'background ';
+      }
+      fsClass += this.state.fullscreenIndex === i ? 'wrapper fullscreen' : 'wrapper';
       let player = new CameraPlayer(cam, cameraChannel);
       cameras.push(
-        <div key={cam.id} className="wrapper">
+        <div key={cam.id} className={fsClass}>
           <div className="camera-width"></div>
           <div className="content">
             <CameraView camera={cam}
                         cameraPlayer={player}
-                        fullscreenHandler={this.cameraRequestFullscreen}
-                        ref={
-                          (el) => {
-                            this.cameraElements.set(cam.id, el);
-                          }
+                        fullscreenHandler={() => {
+                          this.setFullscreenIndex(i);
+              }}
+              ref={
+                (el) => {
+                  this.cameraElements.set(cam.id, el);
+                }
               }/>
           </div>
         </div>

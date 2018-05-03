@@ -31,6 +31,7 @@ class CameraManager {
 
     this.component = ReactDOM.render(this.panel,
                                      document.getElementById('allCameras'));
+
   }
   /**
    * @param {Array} allCameras - array of exopticon camera objects to
@@ -45,6 +46,10 @@ class CameraManager {
    */
   setColumnCount(columnCount) {
     this.component.setColumnCount(columnCount);
+  }
+
+  shiftFullscreen(amount) {
+    this.component.shiftFullscreen(amount);
   }
 }
 

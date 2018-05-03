@@ -22,6 +22,7 @@ defmodule ExopticonWeb.Router do
     pipe_through(:browser)
 
     get("/", PageController, :index)
+    get("/device_settings", PageController, :device_settings)
     resources("/users", UserController)
     resources("/sessions", SessionController, only: [:new, :create, :delete])
     resources("/camera_groups", CameraGroupController)

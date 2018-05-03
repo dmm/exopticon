@@ -51,6 +51,8 @@ class CameraView extends React.Component {
     this.handleResize = this.handleResize.bind(this);
     this.handleFullscreen = this.handleFullscreen.bind(this);
     this.fullscreenCallback = this.fullscreenCallback.bind(this);
+    this.play = this.play.bind(this);
+    this.pause = this.pause.bind(this);
 
     this.isScrolling = true; // junk value to be replaced by timer
     this.isResizing = true;
@@ -61,9 +63,7 @@ class CameraView extends React.Component {
    * callback that checks if view within viewport, if not it pauses playback
    */
   visibilityCheck() {
-    const fullscreenNotMe = !(fscreen.fullscreenElement !== null
-                              && fscreen.fullscreenElement !== this._container);
-    const visible = verge.inY(this._container) && fullscreenNotMe;
+    const visible = verge.inY(this._container);
     if (this._img && visible
         && this.state.status === 'paused') {
       this.setState({status: 'loading'});
@@ -72,6 +72,7 @@ class CameraView extends React.Component {
       });
     } else if (this._img && !visible && this.state.status !== 'paused') {
       this.props.cameraPlayer.stop();
+      this.setState({status: 'paused'});
       console.log('stopping ' + this.props.camera.id.toString());
     }
   }
@@ -96,6 +97,16 @@ class CameraView extends React.Component {
     this.isResizing = window.setTimeout(this.visibilityCheck, 33);
   }
 
+
+  /**
+   * setVideoResolution
+   *
+   *
+   */
+  setResolution(resolution) {
+    this.props.cameraPlayer.setResolution(resolution);
+  }
+
   /**
    * handle fullscreen event
    *
@@ -113,7 +124,7 @@ class CameraView extends React.Component {
     }
   }
 
-  /*
+  /**
    * fullscreen callback to pass to camera overlay
    * @private
    **/
@@ -121,6 +132,22 @@ class CameraView extends React.Component {
     if (this.props.fullscreenHandler) {
       this.props.fullscreenHandler(this._container);
     }
+  }
+
+  play() {
+    this.setState({
+      status: 'loading',
+    });
+    this.props.cameraPlayer.playRealtime(this._img, () => {
+      this.setState({status: 'playing'});
+    });
+  }
+
+  pause() {
+    this.props.cameraPlayer.stop();
+    this.setState({
+      status: 'hidden',
+    });
   }
 
   /**
@@ -134,10 +161,7 @@ class CameraView extends React.Component {
     fscreen.addEventListener('fullscreenchange', this.handleFullscreen);
     this.initialTimeout = setTimeout(() => {
       if (verge.inY(this._container)) {
-        this.setState({status: 'loading'});
-        this.props.cameraPlayer.playRealtime(this._img, () => {
-          this.setState({status: 'playing'});
-        });
+        this.play();
       } else {
         this.setState({status: 'paused'});
       }
@@ -153,7 +177,7 @@ class CameraView extends React.Component {
     window.removeEventListener('scroll', this.handleScroll);
     window.removeEventListener('resize', this.handleResize);
     fscreen.removeEventListener('fullscreenchange', this.handleFullscreen);
-    this.props.cameraPlayer.stop();
+    this.stop();
   }
 
   /**
