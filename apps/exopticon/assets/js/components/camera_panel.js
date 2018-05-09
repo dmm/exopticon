@@ -106,15 +106,11 @@ class CameraPanel extends React.Component {
   }
 
   shiftFullscreen(amount) {
-    let activeCameras = 0;
-
-    this.state.cameras.forEach((c) => {
-      if (c.mode === 'enabled') {
-        activeCameras++;
-      }
-    });
-    const newIndex = (this.state.fullscreenIndex + amount + activeCameras)
-          % activeCameras;
+    if (this.state.fullscreenIndex === -1) {
+      return;
+    }
+    const newIndex = (this.state.fullscreenIndex + amount + this.state.cameras.length)
+          % this.state.cameras.length;
     this.setFullscreenIndex(newIndex);
   }
 
