@@ -52,16 +52,6 @@ export default class View extends MainView {
     window.cameraManager = new CameraManager(socket);
     this.updateCameras();
 
-    document.addEventListener('visibilitychange', () => {
-      console.log('visibility change!');
-      if (document['hidden']) {
-        // Clear cameras until visible again
-        window.cameraManager.updateCameras([]);
-      } else {
-        this.updateCameras();
-      }
-    });
-
     document.addEventListener('keyup', (event) => {
       const keyName = event.key;
       console.log(keyName);

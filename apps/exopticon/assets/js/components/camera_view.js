@@ -43,14 +43,13 @@ class CameraView extends React.Component {
     this.state = {
       status: 'loading',
     };
+
+    this.playing = false;
+
     this.props.cameraPlayer.statusCallback = (newStatus) => {
       this.setState({status: newStatus});
     };
-    this.visibilityCheck = this.visibilityCheck.bind(this);
-    this.handleScroll = this.handleScroll.bind(this);
-    this.handleResize = this.handleResize.bind(this);
-    this.handleFullscreen = this.handleFullscreen.bind(this);
-    this.fullscreenCallback = this.fullscreenCallback.bind(this);
+
     this.play = this.play.bind(this);
     this.pause = this.pause.bind(this);
 
@@ -58,45 +57,6 @@ class CameraView extends React.Component {
     this.isResizing = true;
     this.initialTimeout = true; // junk value to be replaced by timer
   }
-
-  /**
-   * callback that checks if view within viewport, if not it pauses playback
-   */
-  visibilityCheck() {
-    const visible = verge.inY(this._container);
-    if (this._img && visible
-        && this.state.status === 'paused') {
-      this.setState({status: 'loading'});
-      this.props.cameraPlayer.playRealtime(this._img, () => {
-        this.setState({status: 'playing'});
-      });
-    } else if (this._img && !visible && this.state.status !== 'paused') {
-      this.props.cameraPlayer.stop();
-      this.setState({status: 'paused'});
-      console.log('stopping ' + this.props.camera.id.toString());
-    }
-  }
-
-  /**
-   * scroll event handler, debounces by setting a timer and then calls
-   * visibilityCheck
-   * @private
-   */
-  handleScroll() {
-    window.clearTimeout(this.isScrolling);
-    this.isScrolling = window.setTimeout(this.visibilityCheck, 33);
-  }
-
-  /**
-   * resize event handler. It debounces by setting a timer and then calls
-   * visibilityCheck
-   * @private
-   */
-  handleResize() {
-    window.clearTimeout(this.isResizing);
-    this.isResizing = window.setTimeout(this.visibilityCheck, 33);
-  }
-
 
   /**
    * setVideoResolution
@@ -107,34 +67,11 @@ class CameraView extends React.Component {
     this.props.cameraPlayer.setResolution(resolution);
   }
 
-  /**
-   * handle fullscreen event
-   *
-   */
-  handleFullscreen() {
-    screen.lockOrientationUniversal = screen.lockOrientation
-      || screen.mozLockOrientation
-      || screen.msLockOrientation;
-
-    if (this._container === fscreen.fullscreenElement) {
-      this.props.cameraPlayer.setResolution('hd');
-      screen.lockOrientationUniversal('landscape-primary');
-    } else {
-      this.props.cameraPlayer.setResolution('sd');
-    }
-  }
-
-  /**
-   * fullscreen callback to pass to camera overlay
-   * @private
-   **/
-  fullscreenCallback() {
-    if (this.props.fullscreenHandler) {
-      this.props.fullscreenHandler(this._container);
-    }
-  }
-
   play() {
+    if (this.playing === true) {
+      return;
+    }
+    this.playing = true;
     this.setState({
       status: 'loading',
     });
@@ -144,6 +81,7 @@ class CameraView extends React.Component {
   }
 
   pause() {
+    this.playing = false;
     this.props.cameraPlayer.stop();
     this.setState({
       status: 'hidden',
@@ -156,9 +94,7 @@ class CameraView extends React.Component {
    * @private
    */
   componentDidMount() {
-    window.addEventListener('scroll', this.handleScroll);
-    window.addEventListener('resize', this.handleResize);
-    fscreen.addEventListener('fullscreenchange', this.handleFullscreen);
+
     this.initialTimeout = setTimeout(() => {
       if (verge.inY(this._container)) {
         this.play();
@@ -174,9 +110,7 @@ class CameraView extends React.Component {
    */
   componentWillUnmount() {
     clearTimeout(this.initialTimeout);
-    window.removeEventListener('scroll', this.handleScroll);
-    window.removeEventListener('resize', this.handleResize);
-    fscreen.removeEventListener('fullscreenchange', this.handleFullscreen);
+
     this.pause();
   }
 
@@ -206,7 +140,7 @@ class CameraView extends React.Component {
              }
         }>
         <CameraOverlay camera={this.props.cameraPlayer}
-                       fullscreenCallback={this.fullscreenCallback}
+                       fullscreenCallback={this.props.fullscreenHandler}
                        />
         { status }
         <img ref={
@@ -223,6 +157,10 @@ CameraView.propTypes = {
   camera: PropTypes.object.isRequired,
   cameraPlayer: PropTypes.object.isRequired,
   fullscreenHandler: PropTypes.func,
+};
+
+CameraView.defaultProps = {
+  fullscreenHandler: () => {},
 };
 
 export default CameraView;

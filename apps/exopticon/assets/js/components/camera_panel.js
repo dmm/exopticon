@@ -19,6 +19,7 @@
 import fscreen from 'fscreen';
 import PropTypes from 'prop-types';
 import React from 'react';
+import verge from 'verge';
 
 import CameraChannel from '../camera_channel';
 import CameraPlayer from '../camera_player';
@@ -47,6 +48,12 @@ class CameraPanel extends React.Component {
     this.setFullscreenIndex = this.setFullscreenIndex.bind(this);
     this.cameraRequestFullscreen = this.cameraRequestFullscreen.bind(this);
 
+    /* Bind event handlers */
+    this.handleScroll = this.handleScroll.bind(this);
+    this.handleResize = this.handleResize.bind(this);
+    this.visibilityChange = this.visibilityChange.bind(this);
+    this.visibilityCheck = this.visibilityCheck.bind(this);
+
     let channel = props.socket.channel('camera:stream');
     channel.join();
 
@@ -59,6 +66,65 @@ class CameraPanel extends React.Component {
       viewColumns: props.initialColumns,
       fullscreenIndex: -1,
     };
+  }
+
+  /***
+   * Event callbacks
+   */
+
+  /**
+   * scroll event handler, debounces by setting a timer and then calls
+   * visibilityCheck
+   * @private
+   */
+  handleScroll() {
+    window.clearTimeout(this.isScrolling);
+    this.isScrolling = window.setTimeout(this.visibilityCheck, 33);
+  }
+
+  /**
+   * resize event handler. It debounces by setting a timer and then calls
+   * visibilityCheck
+   * @private
+   */
+  handleResize() {
+    window.clearTimeout(this.isResizing);
+    this.isResizing = window.setTimeout(this.visibilityCheck, 33);
+  }
+
+  /**
+   * visibilitychange event handler
+   * @private
+   *
+   */
+  visibilityChange() {
+    if (document['hidden']) {
+      this.cameraElements.forEach((c) => {
+        c.pause();
+      });
+    } else {
+      this.cameraElements.forEach((c) => {
+        c.play();
+      });
+    }
+  }
+
+  /**
+   * visibilityCheck
+   * @private
+   */
+  visibilityCheck() {
+    this.cameraElements.forEach((c, i) => {
+      // Ugh, we should probably use our own container instead of
+      // the CameraView's
+      if (verge.inY(c._container)) {
+        console.log('playing: ' + i);
+        c.play();
+      } else {
+        console.log('pausing: ' + i);
+        c.pause();
+      }
+    });
   }
 
   /**
@@ -98,11 +164,24 @@ class CameraPanel extends React.Component {
   }
 
   /**
+   * react mount handler
+   * @private
+   */
+  componentDidMount() {
+    window.addEventListener('scroll', this.handleScroll);
+    window.addEventListener('resize', this.handleResize);
+    window.addEventListener('visibilitychange', this.visibilityChange);
+  }
+
+  /**
    * closes the channel when component unmounts
    * @private
    */
   componentWillUnmount() {
     this.state.channel.leave();
+    window.removeEventListener('scroll', this.handleScroll);
+    window.removeEventListener('resize', this.handleResize);
+    window.removeEventListener('visibilityChange', this.visibilityChange);
   }
 
   shiftFullscreen(amount) {
@@ -177,7 +256,7 @@ class CameraPanel extends React.Component {
 
     if (this.state.viewColumns !== 0) {
       cameraPanelClass += ` panel-col-${this.state.viewColumns.toString()}`;
-    }
+     }
     this.cameraElements.clear();
     const cameras = [];
     const cameraChannel = this.state.cameraChannel;

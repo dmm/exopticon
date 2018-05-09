@@ -143,7 +143,7 @@ class CameraOverlay extends React.Component {
              onTouchEnd={this.touchEnd}
              >
           <OverlayButton
-            label="◎"
+            label="&#x279a;"
             extraClass="camera-link"
             onClick={this.goToCamera}
             />
