@@ -96,13 +96,17 @@ class CameraOverlay extends React.Component {
 
   /**
    * go to camera
-   *
+   * @private
    */
   goToCamera() {
     this.setState({opacity: 0.0});
     this.props.fullscreenCallback();
   }
 
+  /**
+   * go to camera edit page
+   * @private
+   */
   goToCameraEdit() {
     location.href = this.props.camera.link + '/edit';
   }

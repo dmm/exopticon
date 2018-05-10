@@ -69,6 +69,7 @@ class CameraPlayer {
 
   /**
    * allows configuration of video resolution
+   * @param {string} resolution - resolution flag, either 'sd' or 'hd'
    */
   setResolution(resolution) {
     if (resolution === 'hd') {

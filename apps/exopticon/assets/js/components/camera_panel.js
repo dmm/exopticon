@@ -68,7 +68,7 @@ class CameraPanel extends React.Component {
     };
   }
 
-  /***
+  /** *
    * Event callbacks
    */
 
@@ -129,10 +129,11 @@ class CameraPanel extends React.Component {
 
   /**
    * @param {List} cameras - list of cameras to process
+   * @return {List} - list of active cameras
    * @private
    */
   filterCameras(cameras) {
-    let enabledCameras = new Array();
+    let enabledCameras = [];
 
     cameras.forEach((c) => {
       if (c.mode === 'enabled' && !this.props.showDisabled) {
@@ -149,7 +150,6 @@ class CameraPanel extends React.Component {
    *
    */
   setCameras(cameras) {
-
     this.setState({cameras: this.filterCameras(cameras)});
   }
 
@@ -184,18 +184,24 @@ class CameraPanel extends React.Component {
     window.removeEventListener('visibilityChange', this.visibilityChange);
   }
 
+  /**
+   * shift fullscreen by amount
+   * @param {Number} amount - amount to shift
+   */
   shiftFullscreen(amount) {
     if (this.state.fullscreenIndex === -1) {
       return;
     }
-    const newIndex = (this.state.fullscreenIndex + amount + this.state.cameras.length)
+    const newIndex = (this.state.fullscreenIndex
+                      + amount
+                      + this.state.cameras.length)
           % this.state.cameras.length;
     this.setFullscreenIndex(newIndex);
   }
 
   /**
-   *
-   *
+   * sets fullscreen index
+   * @param {Number} i - new fullscreen index
    */
   setFullscreenIndex(i) {
     const newIndex = this.state.fullscreenIndex === i ? -1 : i;
@@ -223,11 +229,11 @@ class CameraPanel extends React.Component {
       cameraComponent.setResolution('hd');
       cameraComponent.play();
     }
-
   }
 
   /**
    * attempts to make element fullscreen
+   * @param {Object} elem - new fullscreen element
    * @private
    */
   cameraRequestFullscreen(elem) {
@@ -262,10 +268,12 @@ class CameraPanel extends React.Component {
     const cameraChannel = this.state.cameraChannel;
     this.state.cameras.forEach((cam, i) => {
       let fsClass = '';
-      if (this.state.fullscreenIndex !== -1 && this.state.fullscreenIndex !== i) {
+      if (this.state.fullscreenIndex !== -1
+          && this.state.fullscreenIndex !== i) {
         fsClass += 'background ';
       }
-      fsClass += this.state.fullscreenIndex === i ? 'wrapper fullscreen' : 'wrapper';
+      fsClass += this.state.fullscreenIndex === i
+        ? 'wrapper fullscreen' : 'wrapper';
       let player = new CameraPlayer(cam, cameraChannel);
       cameras.push(
         <div key={cam.id} className={fsClass}>

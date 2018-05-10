@@ -36,6 +36,7 @@ class SuperImage {
 
   /**
    * Check if ready for draw
+   * @return {Boolean} whether image is ready for drawing
    * @private
    */
   drawReady() {
@@ -59,7 +60,6 @@ class SuperImage {
       if (this.callback) this.callback();
     } else {
       window.requestAnimationFrame(this.checkFrame);
-
     }
   }
 

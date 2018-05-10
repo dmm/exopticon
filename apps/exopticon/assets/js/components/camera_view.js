@@ -16,7 +16,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import fscreen from 'fscreen';
 import PropTypes from 'prop-types';
 import React from 'react';
 import verge from 'verge';
@@ -60,13 +59,16 @@ class CameraView extends React.Component {
 
   /**
    * setVideoResolution
-   *
+   * @param {string} resolution - resolution flag, either 'sd' or 'hd'
    *
    */
   setResolution(resolution) {
     this.props.cameraPlayer.setResolution(resolution);
   }
 
+  /**
+   * start camera playback
+   */
   play() {
     if (this.playing === true) {
       return;
@@ -80,6 +82,10 @@ class CameraView extends React.Component {
     });
   }
 
+  /**
+   * stop camera playback
+   *
+   */
   pause() {
     this.playing = false;
     this.props.cameraPlayer.stop();
@@ -94,7 +100,6 @@ class CameraView extends React.Component {
    * @private
    */
   componentDidMount() {
-
     this.initialTimeout = setTimeout(() => {
       if (verge.inY(this._container)) {
         this.play();

@@ -16,12 +16,13 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {use as jsJodaUse, DateTimeFormatter, Duration, ZonedDateTime, ZoneId, ZoneOffset} from 'js-joda';
+import PropTypes from 'prop-types';
+import {use as jsJodaUse,
+        DateTimeFormatter,
+        Duration, ZonedDateTime, ZoneId} from 'js-joda';
 import jsJodaTimeZone from 'js-joda-timezone';
 import React from 'react';
-import ReactDOM from 'react-dom';
 
-import CameraPlayer from '../camera_player';
 import SuperImage from '../super_image';
 
 import './../../css/components/file_browser.css';
@@ -50,8 +51,10 @@ class FileBrowser extends React.Component {
   }
 
   /**
-   *
-   *
+   * formats a duration as a human readable string
+   * @param {string} beginMonotonic - duration start
+   * @param {string} endMonotonic - duration end
+   * @return {string} formatting duration
    */
   formatDuration(beginMonotonic, endMonotonic) {
     let begin = parseInt(beginMonotonic, 10);
@@ -61,15 +64,25 @@ class FileBrowser extends React.Component {
     return d.toString();
   }
 
+  /**
+   * formats a date as a human readable string
+   * @param {ZonedDateTime} date - input date to be formatted
+   * @return {string} human readable datetime
+   */
   formatDate(date) {
     let d = ZonedDateTime.parse(date);
     let ld = d.withZoneSameInstant(ZoneId.of(window.userTimezone));
     return ld.format(DateTimeFormatter.ofPattern('yyyy-MM-dd HH:mm:ss'));
   }
 
+  /**
+   * select file for playback
+   * @param {Number} id - id of file to play
+   *
+   */
   selectFile(id) {
     this.setState({
-      selectedFile: id
+      selectedFile: id,
     });
     this.playFile(id);
   }
@@ -86,6 +99,10 @@ class FileBrowser extends React.Component {
     return Math.floor(Math.random() * (max - min)) + min;
   }
 
+  /**
+   * play specified file
+   * @param {Number} fileId - id of file to play
+  */
   playFile(fileId) {
     this.stop();
     let nonce = this.getRandomInt(0, 999999);
@@ -109,6 +126,10 @@ class FileBrowser extends React.Component {
     this.channel.push('start_player', {topic: this.topic}, 10000);
   }
 
+  /**
+   * stops file playback
+   *
+   */
   stop() {
     if (this.channel) {
       this.channel.push('kill_player', {topic: this.topic});
@@ -165,6 +186,11 @@ class FileBrowser extends React.Component {
     );
   }
 }
+
+FileBrowser.propTypes = {
+  initialFiles: PropTypes.list,
+  socket: PropTypes.object.isRequired,
+};
 
 FileBrowser.defaultProps = {
   initialFiles: [],

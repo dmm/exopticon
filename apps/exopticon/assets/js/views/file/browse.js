@@ -16,8 +16,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {use as jsJodaUse, ZonedDateTime, ZoneOffset} from 'js-joda';
-import jsJodaTimeZone from 'js-joda-timezone';
 import React from 'react';
 import ReactDOM from 'react-dom';
 
@@ -25,25 +23,25 @@ import FileBrowser from '../../components/file_browser.js';
 import MainView from '../main';
 import socket from '../../socket';
 
-jsJodaUse(jsJodaTimeZone);
-
 /**
  * FileBrowser class
  * Implements page that allows a file-centric view of video
  * recordings.
  */
 export default class view extends MainView {
-  constructor() {
-    super();
-  }
-
+  /**
+   * implements FileBrowser logic
+   *
+   */
   mount() {
     super.mount();
 
     this.browser = React.createElement(FileBrowser, {
       socket: socket,
     });
-    this.browserComponent = ReactDOM.render(this.browser, document.getElementById('file-browser-mount'));
+    this.browserComponent = ReactDOM.render(
+      this.browser,
+      document.getElementById('file-browser-mount'));
 
     let cameraId = parseInt(document.getElementById('singleCamera')
                             .getAttribute('data-id'), 10);
@@ -58,9 +56,5 @@ export default class view extends MainView {
     }).then((files) => {
       this.browserComponent.setState({files: files});
     });
-  }
-
-  umount() {
-    super.unmount();
   }
 }

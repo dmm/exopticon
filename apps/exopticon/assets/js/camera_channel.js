@@ -92,9 +92,9 @@ class CameraChannel {
    *
    */
   setResolution(cameraId, resolution) {
-    if (resolution === "hd") {
+    if (resolution === 'hd') {
       this.channel.push(`hdon${cameraId.toString()}`, '');
-    } else if (resolution === "sd") {
+    } else if (resolution === 'sd') {
       this.channel.push(`hdoff${cameraId.toString()}`, '');
     }
   }

@@ -13,6 +13,7 @@ class CameraManager {
   /**
    * @param {Pheonix.socket} socket - phoenix socket to use as camera transport
    * @param {Number} columns - number of columns in camera panel
+   * @param {Boolean} showDisabled - show disabled camera flag
    */
   constructor(socket, columns = 0, showDisabled = false) {
     this.socket = socket;
@@ -31,7 +32,6 @@ class CameraManager {
 
     this.component = ReactDOM.render(this.panel,
                                      document.getElementById('allCameras'));
-
   }
   /**
    * @param {Array} allCameras - array of exopticon camera objects to
@@ -48,6 +48,11 @@ class CameraManager {
     this.component.setColumnCount(columnCount);
   }
 
+  /**
+   * rotate fullscreen index by argument
+   * @param {Number} amount - number to shift index by
+   * @private
+   */
   shiftFullscreen(amount) {
     this.component.shiftFullscreen(amount);
   }
