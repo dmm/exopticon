@@ -178,9 +178,6 @@ defmodule Exopticon.Video do
     new_mode = Map.get(attrs, "mode")
     {result, _} = ret
 
-    IO.inspect(ret)
-    IO.inspect(new_mode)
-
     if result == :ok and new_mode == "enabled" do
       IO.puts("STARTING CAMERA")
       start_camera(camera.id)
