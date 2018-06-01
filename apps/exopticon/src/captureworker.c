@@ -44,6 +44,7 @@
 
 #include <arpa/inet.h>
 
+#include "exvid.h"
 #include "mpack_frame.h"
 
 const int MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -56,12 +57,7 @@ struct CameraState {
         time_t timenow, timestart;
         int got_key_frame;
 
-        AVFormatContext *ifcx;
-        AVInputFormat *ifmt;
-        AVCodecContext *iccx;
-        AVCodec *icodec;
-        AVStream *ist;
-        int i_index;
+        struct in_context in;
 
         AVFormatContext *ofcx;
         AVOutputFormat *ofmt;
@@ -143,27 +139,11 @@ static void my_av_log_callback(void *avcl, int level, const char *fmt,
         return;
 }
 
-static void report_timings(struct FrameTime time)
-{
-        bs_print("{ \"type\": \"report\", "
-                 "\"decodeTime\": %lld, "
-                 "\"fileWriteTime\": %lld, "
-                 "\"streamWriteTime\": %lld, "
-                 "\"readTime\": %lld, "
-                 "\"wholeLoop\": %lld "
-                 "}",
-                 (long long)time.decode_time, (long long)time.file_write_time,
-                 (long long)time.stream_write_time, (long long)time.read_time,
-                 (long long)time.whole_loop);
-
-        return;
-}
-
 void bs_log(const char *const fmt, ...)
 {
         va_list ap;
         va_start(ap, fmt);
-        //        my_av_log_callback(NULL, 1, fmt, ap);
+        my_av_log_callback(NULL, 1, fmt, ap);
 }
 
 void report_new_file(char *filename, struct timespec begin_time)
@@ -328,13 +308,13 @@ int initialize_output_stream(struct CameraState *cam, const char *out_filename)
 
         // Create output stream
         cam->ost = avformat_new_stream(cam->ofcx, NULL);
-        avcodec_copy_context(cam->ost->codec, cam->iccx);
+        avcodec_copy_context(cam->ost->codec, cam->in.ccx);
 
-        cam->ost->sample_aspect_ratio.num = cam->iccx->sample_aspect_ratio.num;
-        cam->ost->sample_aspect_ratio.den = cam->iccx->sample_aspect_ratio.den;
+        cam->ost->sample_aspect_ratio.num = cam->in.ccx->sample_aspect_ratio.num;
+        cam->ost->sample_aspect_ratio.den = cam->in.ccx->sample_aspect_ratio.den;
 
         // Assume r_frame_rate is accurate
-        bs_log("cam->ist ticks_per_fram: %d", cam->ist->codec->ticks_per_frame);
+        bs_log("cam->ist ticks_per_fram: %d", cam->in.st->codec->ticks_per_frame);
 
         AVRational output_timebase;
         AVRational output_fps;
@@ -346,9 +326,9 @@ int initialize_output_stream(struct CameraState *cam, const char *out_filename)
                 output_timebase.den = 1000;
         } else if (cam->frames_per_second == 0) {  // cam->frames_per_second == 0
 
-                output_fps = cam->ist->r_frame_rate;
-                output_timebase.num = cam->ist->time_base.num;
-                output_timebase.den = cam->ist->time_base.den;
+                output_fps = cam->in.st->r_frame_rate;
+                output_timebase.num = cam->in.st->time_base.num;
+                output_timebase.den = cam->in.st->time_base.den;
         } else { // cam->frames_per_second < 0
                 bs_log("Invalid frames_per_second: %d\n", cam->frames_per_second);
                 exit(1);
@@ -506,18 +486,6 @@ int64_t timespec_to_ms(const struct timespec time)
         return time_ms;
 }
 
-int64_t timespec_to_ms_interval(const struct timespec beg,
-                                const struct timespec end)
-{
-        const int64_t billion = 1E9;
-        const int64_t million = 1E6;
-
-        int64_t begin_time = (beg.tv_sec * billion) + beg.tv_nsec;
-        int64_t end_time = (end.tv_sec * billion) + end.tv_nsec;
-
-        return (end_time - begin_time) / million;
-}
-
 AVFrame* scale_frame(AVFrame *input, int width, int height)
 {
         AVFrame* resizedFrame = av_frame_alloc();
@@ -551,7 +519,7 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
                                                               NULL,
                                                               NULL);
         sws_scale(sws_context,
-                  input->data,
+                  (const unsigned char* const*)input->data,
                   input->linesize,
                   0,
                   input->height,
@@ -589,7 +557,7 @@ cleanup:
 int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
 {
         // Make sure packet is video
-        if (cam->pkt.stream_index != cam->i_index) {
+        if (cam->pkt.stream_index != cam->in.stream_index) {
                 return 0;
         }
         // Make sure we start on a key frame
@@ -639,7 +607,7 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
                 cam->pkt.stream_index = cam->ost->id;
                 cam->pkt.pts -= cam->first_pts;
                 cam->pkt.pts = av_rescale_q(cam->pkt.pts,
-                                            cam->ist->time_base,
+                                            cam->in.st->time_base,
                                             cam->ost->time_base);
                 cam->pkt.dts = cam->pkt.pts;
         }
@@ -654,8 +622,7 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         av_interleaved_write_frame(cam->ofcx, &cam->pkt);
 
         clock_gettime(CLOCK_MONOTONIC, &write_end);
-        frame_time->file_write_time =
-            timespec_to_ms_interval(write_begin, write_end);
+
 
         AVPacket jpegPkt;
         av_init_packet(&jpegPkt);
@@ -666,11 +633,9 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         struct timespec decode_begin;
         struct timespec decode_end;
         clock_gettime(CLOCK_MONOTONIC, &decode_begin);
-        int len = avcodec_decode_video2(cam->iccx, cam->frame, &got_frame,
+        int len = avcodec_decode_video2(cam->in.ccx, cam->frame, &got_frame,
                                         &decode_packet);
         clock_gettime(CLOCK_MONOTONIC, &decode_end);
-        frame_time->decode_time =
-            timespec_to_ms_interval(decode_begin, decode_end);
 
         if (len <= 0 || got_frame == 0) {
                 bs_log("Error decoding frame! len %d, got_frame: %d", len,
@@ -678,8 +643,8 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
                 goto cleanup;
         }
 
-        if (cam->icodec->id == AV_CODEC_ID_MJPEG ||
-            cam->icodec->id == AV_CODEC_ID_MJPEGB) {
+        if (cam->in.codec->id == AV_CODEC_ID_MJPEG ||
+            cam->in.codec->id == AV_CODEC_ID_MJPEGB) {
                 // The video codec is jpeg so we just use the encoded frame
                 // as-is.
                 output_frame_size = decode_packet.buf->size;
@@ -709,8 +674,6 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         send_frame_message(&message);
         send_scaled_frame(cam->frame, cam->frame->pts, 640, 360);
         clock_gettime(CLOCK_MONOTONIC, &write_end);
-        frame_time->stream_write_time =
-            timespec_to_ms_interval(write_begin, write_end);
 
 cleanup:
         av_packet_unref(&jpegPkt);
@@ -761,25 +724,10 @@ int checkforquit()
         return quit;
 }
 
-static int interrupt_cb(void *ctx)
-{
-        struct CameraState *cam = (struct CameraState *)ctx;
-        const int64_t timeout = 5000;
-        struct timespec cur;
-        const struct timespec beg = cam->frame_begin_time;
-        clock_gettime(CLOCK_MONOTONIC, &cur);
-
-        // If tv_sec is zero, capture hasn't started so don't kill anything.
-        const int64_t interval = timespec_to_ms_interval(beg, cur);
-
-        return (interval > timeout) || checkforquit();
-}
-
 int main(int argc, char *argv[])
 {
         int return_value = EXIT_SUCCESS;
         struct CameraState cam;
-        cam.ifcx = NULL;
         cam.ofcx = NULL;
         cam.frame = NULL;
 
@@ -801,139 +749,34 @@ int main(int argc, char *argv[])
         srand(time(NULL));
 
         // Initialize library
-        av_log_set_level(AV_LOG_INFO);
-        av_log_set_callback(my_av_log_callback);
-        av_register_all();
-        avcodec_register_all();
-        avformat_network_init();
+        ex_init(my_av_log_callback);
 
-        cam.ifcx = NULL;
         cam.ofcx = NULL;
         cam.got_key_frame = 0;
         cam.frame = av_frame_alloc();
         cam.file_size = 0;
 
-        //
-        // Input
-        //
-        // Allocated input AVFormatContext so we can set the i/o
-        // callback prior to calling avformat_open_input
-        cam.ifcx = avformat_alloc_context();
 
-        /*
-         * Initialize i/o callback to implement av_read_frame timeout.
-         */
-        cam.ifcx->interrupt_callback.callback = interrupt_cb;
-        cam.ifcx->interrupt_callback.opaque = &cam;
-        clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
-
-        // open rtsp
-        AVDictionary *opts = 0;
-        av_dict_set(&opts, "buffer_size", "655360", 0);
-        av_dict_set(&opts, "rtsp_transport", "udp", 0);
-        if (avformat_open_input(&(cam.ifcx), input_uri, NULL, &opts) != 0) {
-                // try udp, reset ifcx because the first call trashes it
-                cam.ifcx = avformat_alloc_context();
-                cam.ifcx->interrupt_callback.callback = interrupt_cb;
-                cam.ifcx->interrupt_callback.opaque = &cam;
-                cam.frame_begin_time.tv_sec = 0;
-                clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
-
-                av_dict_set(&opts, "rtsp_transport", "udp", 0);
-                if (avformat_open_input(&(cam.ifcx), input_uri, NULL, &opts) !=
-                    0) {
-
-                        bs_print("ERROR: Cannot open input file");
-                        // User allocated AVFormatContext is freed on error by
-                        // avformat_open_input.
-                        cam.ifcx = NULL;
-                        return_value = 1;
-                        goto cleanup;
-                }
-        }
-        cam.ifcx->fps_probe_size = 500;
-
-        if (avformat_find_stream_info(cam.ifcx, NULL) < 0) {
-                bs_log("ERROR: Cannot find stream info");
+        int open_ret = ex_open_input_stream(input_uri, &cam.in);
+        if (open_ret> 0) {
+                bs_log("Error opening stream, %s, error %d!", input_uri, open_ret);
                 goto cleanup;
         }
-
-        snprintf(cam.ifcx->filename, sizeof(cam.ifcx->filename), "%s",
-                 input_uri);
-
-        // search video stream
-        cam.i_index = -1;
-        for (unsigned i = 0; i < cam.ifcx->nb_streams; i++) {
-                cam.iccx = cam.ifcx->streams[i]->codec;
-                if (cam.iccx->codec_type == AVMEDIA_TYPE_VIDEO) {
-                        cam.ist = cam.ifcx->streams[i];
-                        cam.i_index = i;
-                        break;
-                }
-        }
-        if (cam.i_index < 0) {
-                bs_log("ERROR: Cannot find input video stream");
-                goto cleanup;
-        }
-
-        // Initialize code for decoding
-        cam.icodec = avcodec_find_decoder(cam.iccx->codec_id);
-        if (!cam.icodec) {
-                bs_log("Codec not found %d ", cam.iccx->codec_id);
-                return_value = 2;
-                goto cleanup;
-        }
-        if (avcodec_open2(cam.iccx, cam.icodec, NULL) < 0) {
-                bs_log("Could not open codec");
-                return_value = 2;
-                goto cleanup;
-        }
-        // Assume ist framerate is not accurate :(
 
         //
         // Output
         // start reading packets from stream and write them to file
 
-        av_dump_format(cam.ifcx, 0, cam.ifcx->filename, 0);
 
         // av_read_play(context);//play RTSP (Shouldn't need this since it
         // defaults to playing on connect)
         av_init_packet(&cam.pkt);
         cam.switch_file = 1;
         int ret = 0;
-        struct CapturePerformance perf;
-        perf.count = 0;
-        struct FrameTime frame_time;
-        memset(&frame_time, 0, sizeof(frame_time));
-        struct timespec read_begin, read_end;
-        clock_gettime(CLOCK_MONOTONIC, &read_begin);
-        clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
-        while ((ret = av_read_frame(cam.ifcx, &cam.pkt)) >= 0) {
-                // Set frame begin time so we know when to timeout in interrupt_cb
-                clock_gettime(CLOCK_MONOTONIC, &cam.frame_begin_time);
-                struct timespec old_read = read_end;
-                clock_gettime(CLOCK_MONOTONIC, &read_end);
-
-                handle_packet(&cam, &frame_time);
-                frame_time.read_time =
-                    timespec_to_ms_interval(read_begin, read_end);
-
+        while ((ret = ex_read_frame(&cam.in, &cam.pkt)) >= 0) {
+                handle_packet(&cam, NULL);
                 av_packet_unref(&cam.pkt);
                 av_init_packet(&cam.pkt);
-
-                perf.count %= 50;
-                perf.frame_times[perf.count] = frame_time;
-
-                if (perf.count == 0 || perf.count == 25) {
-                        report_timings(frame_time);
-                }
-
-                perf.count++;
-
-                clock_gettime(CLOCK_MONOTONIC, &read_begin);
-                frame_time.whole_loop =
-                    timespec_to_ms_interval(read_end, read_begin);
-                clock_gettime(CLOCK_MONOTONIC, &read_begin);
         }
         char buf[1024];
         av_strerror(ret, buf, sizeof(buf));
@@ -946,13 +789,6 @@ cleanup:
         }
 
         av_frame_free(&cam.frame);
-        if (cam.ifcx != NULL) {
-                avformat_close_input(&cam.ifcx);
-        }
-
-        if (cam.iccx != NULL) {
-                //                avcodec_close(cam.iccx);
-        }
 
         avformat_network_deinit();
 

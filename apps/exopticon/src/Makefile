@@ -15,8 +15,8 @@ development: captureworker.c
 ${EXWORKER_BINDIR}/playbackworker: playbackworker.c mpack_frame.c
 	${CC} -O0 -g $(mycflags) $(CFLAGS) $(LIBRARIES) playbackworker.c mpack.c mpack_frame.c -o ${EXWORKER_BINDIR}/playbackworker
 
-${EXWORKER_BINDIR}/captureworker: captureworker.c mpack_frame.c
-	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c -o ${EXWORKER_BINDIR}/captureworker
+${EXWORKER_BINDIR}/captureworker: captureworker.c mpack_frame.c exvid.c
+	${CC} -O2 -g $(mycflags) $(CFLAGS) $(LIBRARIES) captureworker.c mpack.c mpack_frame.c exvid.c -o ${EXWORKER_BINDIR}/captureworker
 
 .PHONY: clean
 clean:
