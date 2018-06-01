@@ -24,6 +24,7 @@
 #define _XOPEN_SOURCE 500
 #endif /* __STDC_VERSION__ */
 
+#include <poll.h>
 #include <time.h>
 
 #include "exvid.h"
@@ -47,14 +48,19 @@ static int interrupt_cb(void *ctx)
         clock_gettime(CLOCK_MONOTONIC, &cur);
         int64_t interval = timespec_to_ms_interval(c->last_frame_time,
                                                    cur);
+        struct pollfd pfd;
+        pfd.fd = 0;
+        pfd.events = 0;
+        poll(&pfd, 1, 0);
+
+        int eof = pfd.revents & POLLHUP;
+
         /*
            if the interval is greater than the timeout or if EOF is
            set on stdin, return 1. Erlang/Elixir set EOF to indicate
            that the process should close.
         */
-//        fprintf(stderr, "interval: %lld, feof: %d\n", (long long)interval, feof(stdin)); 
-//        return 0;
-        return (interval > EX_TIMEOUT_MS || feof(stdin));
+        return (interval > EX_TIMEOUT_MS || eof);
 }
 
 int ex_init(void(*log_callback)(void *, int, const char *, va_list)) {
