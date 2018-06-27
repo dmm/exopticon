@@ -47,8 +47,7 @@
 #include "exvid.h"
 #include "mpack_frame.h"
 
-const int MAX_FILE_SIZE = 10 * 1024 * 1024;
-const int CAPTURE_PERFORMANCE_SIZE = 50;
+static const int MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 int64_t timespec_to_ms(const struct timespec time);
 char *timespec_to_8601(struct timespec *ts);
@@ -58,6 +57,7 @@ struct CameraState {
         int got_key_frame;
 
         struct in_context in;
+        struct out_context out;
 
         AVFormatContext *ofcx;
         AVOutputFormat *ofmt;
@@ -122,7 +122,7 @@ static void bs_print(const char *fmt, ...)
         pthread_mutex_unlock(&log_mutex);
 }
 
-static void my_av_log_callback(void *avcl, int level, const char *fmt,
+static void my_av_log_callback(__attribute__((unused)) void *avcl, int level, const char *fmt,
                                va_list vl)
 {
         char output_message[2048];
@@ -152,8 +152,7 @@ void report_new_file(char *filename, struct timespec begin_time)
         send_new_file_message(filename, isotime);
         free(isotime);
 }
-void report_finished_file(char *filename, struct timespec begin_time,
-                          struct timespec end_time)
+void report_finished_file(char *filename, struct timespec end_time)
 {
         char *isotime = timespec_to_8601(&end_time);
         send_end_file_message(filename, isotime);
@@ -465,7 +464,7 @@ int close_output_file(struct CameraState *cam)
         }
 
         // Report file as finished
-        report_finished_file(filename, cam->begin_time, cam->end_time);
+        report_finished_file(filename, cam->end_time);
 
 cleanup:
         if (output_file != NULL) {
@@ -478,7 +477,6 @@ cleanup:
 
 int64_t timespec_to_ms(const struct timespec time)
 {
-        const int64_t billion = 1E9;
         const int64_t million = 1E6;
 
         const int64_t time_ms = time.tv_sec * 1000 + (time.tv_nsec / million);
@@ -554,7 +552,72 @@ cleanup:
         av_packet_unref(&jpeg_pkt);
 }
 
-int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
+int send_full_frame(AVFrame *frame, const int pts)
+{
+        struct FrameMessage message;
+        message.pts = pts;
+
+        AVPacket jpegPkt;
+        av_init_packet(&jpegPkt);
+        encode_jpeg(frame, &jpegPkt);
+
+        message.jpeg = jpegPkt.buf->data;
+        message.jpeg_size = jpegPkt.buf->size;
+        message.pts = pts;
+
+        send_frame_message(&message);
+//        send_scaled_frame(frame, pts, 640, 360);
+
+        av_packet_unref(&jpegPkt);
+
+        return 0;
+}
+
+int handle_packet2(struct in_context *in, struct out_context *out, AVPacket *pkt)
+{
+        if (pkt->stream_index != in->stream_index) {
+                // ensure packet is from selected video stream
+                return 0;
+        }
+
+        if (out->size > MAX_FILE_SIZE) {
+//                char *fn = generate_output_name 
+        }
+        return 0;
+}
+
+int handle_output_file(struct in_context *in, struct out_context *out, AVPacket *pkt, const char *output_directory)
+{
+        assert(in != NULL);
+        assert(out != NULL);
+        assert(pkt != NULL);
+
+        if (pkt->stream_index != in->stream_index) {
+                // ensure packet is from selected video stream
+                return 1;
+        }
+
+
+        if (out->st == NULL && !(pkt->flags & AV_PKT_FLAG_KEY)) {
+                // Wait for keyframe
+                return 1;
+        }
+
+        if (out->st == NULL && (pkt->flags & AV_PKT_FLAG_KEY)) {
+                // Open file for first time
+                ex_init_output(out);
+                char *fn = generate_output_name(output_directory, get_time());
+                ex_open_output_stream(out,
+                                      in->codecpar,
+                                      in->st->sample_aspect_ratio,
+                                      fn);
+
+        }
+
+
+}
+
+int handle_packet(struct CameraState *cam)
 {
         // Make sure packet is video
         if (cam->pkt.stream_index != cam->in.stream_index) {
@@ -575,7 +638,7 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
                 }
                 initialize_output_stream(cam, fn);
 
-                av_dump_format(cam->ofcx, 0, cam->ofcx->filename, 1);
+//                av_dump_format(cam->ofcx, 0, cam->ofcx->filename, 1);
                 cam->switch_file = 0;
                 cam->file_size = 0;
                 clock_gettime(CLOCK_REALTIME, &(cam->begin_time));
@@ -590,27 +653,15 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
         }
         cam->got_key_frame = 1;
 
-        if (cam->frames_per_second > 0) {
-                // Don't trust any of the stream timing information. Instead reconstruct
-                // it from the given fps.
-                cam->pkt.stream_index = cam->ost->id;
-//        fprintf(stderr, "PTS: %lld. %d/%d\n", cam->pkt.pts, cam->ist->time_base.num,
-//                cam->ist->time_base.den);
-                cam->pkt.pts = cam->last_pts;
-                cam->pkt.dts = cam->pkt.pts;
-                cam->last_pts += av_rescale_q(1, av_inv_q(cam->ost->avg_frame_rate),
-                                              cam->ost->time_base);
-        } else {
-                if (cam->first_pts < cam->pkt.pts) {
-                        cam->first_pts = cam->pkt.pts;
-                }
-                cam->pkt.stream_index = cam->ost->id;
-                cam->pkt.pts -= cam->first_pts;
-                cam->pkt.pts = av_rescale_q(cam->pkt.pts,
-                                            cam->in.st->time_base,
-                                            cam->ost->time_base);
-                cam->pkt.dts = cam->pkt.pts;
+        if (cam->first_pts < cam->pkt.pts) {
+                cam->first_pts = cam->pkt.pts;
         }
+        cam->pkt.stream_index = cam->ost->id;
+        cam->pkt.pts -= cam->first_pts;
+        cam->pkt.pts = av_rescale_q(cam->pkt.pts,
+                                    cam->in.st->time_base,
+                                    cam->ost->time_base);
+        cam->pkt.dts = cam->pkt.pts;
 
         AVPacket decode_packet;
         struct timespec write_begin;
@@ -623,19 +674,9 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
 
         clock_gettime(CLOCK_MONOTONIC, &write_end);
 
-
-        AVPacket jpegPkt;
-        av_init_packet(&jpegPkt);
-        uint8_t *output_frame_buffer;
-        int output_frame_size;
         int got_frame = 0;
-        struct FrameMessage message;
-        struct timespec decode_begin;
-        struct timespec decode_end;
-        clock_gettime(CLOCK_MONOTONIC, &decode_begin);
         int len = avcodec_decode_video2(cam->in.ccx, cam->frame, &got_frame,
                                         &decode_packet);
-        clock_gettime(CLOCK_MONOTONIC, &decode_end);
 
         if (len <= 0 || got_frame == 0) {
                 bs_log("Error decoding frame! len %d, got_frame: %d", len,
@@ -643,40 +684,11 @@ int handle_packet(struct CameraState *cam, struct FrameTime *frame_time)
                 goto cleanup;
         }
 
-        if (cam->in.codec->id == AV_CODEC_ID_MJPEG ||
-            cam->in.codec->id == AV_CODEC_ID_MJPEGB) {
-                // The video codec is jpeg so we just use the encoded frame
-                // as-is.
-                output_frame_size = decode_packet.buf->size;
-                output_frame_buffer = decode_packet.buf->data;
-
-                message.jpeg = decode_packet.buf->data;
-                message.jpeg_size = decode_packet.buf->size;
-        } else {
-                // The video codec is not jpeg so we need to encode a jpeg
-                // frame.
-                encode_jpeg(cam->frame, &jpegPkt);
-                output_frame_size = jpegPkt.buf->size;
-                output_frame_buffer = jpegPkt.buf->data;
-
-                message.jpeg = jpegPkt.buf->data;
-                message.jpeg_size = jpegPkt.buf->size;
-        }
-        message.pts = cam->frame->pts;
-
-        clock_gettime(CLOCK_MONOTONIC, &write_begin);
-        /*
-        // Write output image to stdout, prefixed with big-endian length
-        uint32_t be_pkt_size = htonl(output_frame_size);
-        fwrite(&be_pkt_size, sizeof(be_pkt_size), 1, stdout);
-        fwrite(output_frame_buffer, output_frame_size, 1, stdout);
-        */
-        send_frame_message(&message);
+        send_full_frame(cam->frame, cam->frame->pts);
         send_scaled_frame(cam->frame, cam->frame->pts, 640, 360);
-        clock_gettime(CLOCK_MONOTONIC, &write_end);
+
 
 cleanup:
-        av_packet_unref(&jpegPkt);
         av_packet_unref(&decode_packet);
 
         return 0;
@@ -733,7 +745,6 @@ int main(int argc, char *argv[])
 
         const char *program_name = argv[0];
         const char *input_uri;
-        const char *output_directory_name;
 
         if (argc < 5) {
                 fprintf(stderr, "Usage: %s url frames_per_second "
@@ -750,6 +761,7 @@ int main(int argc, char *argv[])
 
         // Initialize library
         ex_init(my_av_log_callback);
+        ex_init_input(&cam.in);
 
         cam.ofcx = NULL;
         cam.got_key_frame = 0;
@@ -763,18 +775,14 @@ int main(int argc, char *argv[])
                 goto cleanup;
         }
 
-        //
-        // Output
-        // start reading packets from stream and write them to file
+        // Initialize output stream size
+        cam.out.size = (int64_t)LLONG_MAX;
 
-
-        // av_read_play(context);//play RTSP (Shouldn't need this since it
-        // defaults to playing on connect)
         av_init_packet(&cam.pkt);
         cam.switch_file = 1;
         int ret = 0;
         while ((ret = ex_read_frame(&cam.in, &cam.pkt)) >= 0) {
-                handle_packet(&cam, NULL);
+                handle_packet(&cam);
                 av_packet_unref(&cam.pkt);
                 av_init_packet(&cam.pkt);
         }
@@ -784,6 +792,7 @@ int main(int argc, char *argv[])
 
 cleanup:
         bs_log("Cleaning up!");
+        ex_free_input(&cam.in);
         if (cam.ofcx != NULL) {
                 close_output_file(&cam);
         }

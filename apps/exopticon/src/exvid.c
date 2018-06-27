@@ -29,7 +29,7 @@
 
 #include "exvid.h"
 
-int64_t timespec_to_ms_interval(const struct timespec beg,
+static int64_t timespec_to_ms_interval(const struct timespec beg,
                                 const struct timespec end)
 {
         const int64_t billion = 1E9;
@@ -39,6 +39,46 @@ int64_t timespec_to_ms_interval(const struct timespec beg,
         int64_t end_time = (end.tv_sec * billion) + end.tv_nsec;
 
         return (end_time - begin_time) / million;
+}
+
+static char *timespec_to_8601(struct timespec *ts)
+{
+        const int size = 60;
+        char date[30];
+        char frac_secs[30];
+        char timezone[10];
+        char *ret = calloc(size, 1);
+        int result = 0;
+        struct tm t;
+
+        if (localtime_r(&(ts->tv_sec), &t) == NULL) {
+                return NULL;
+        }
+
+        result = strftime(date, sizeof(date), "%FT%H:%M:%S", &t);
+        if (result == 0) {
+                goto error;
+        }
+
+        result = snprintf(frac_secs, sizeof(frac_secs), ".%03ld", ts->tv_nsec);
+        if (result < 0) {
+                goto error;
+        }
+
+        result = strftime(timezone, sizeof(timezone), "%z", &t);
+        if (result == 0) {
+                goto error;
+        }
+
+        result = snprintf(ret, size, "%s%s%s", date, frac_secs, timezone);
+        if (result < 0) {
+                goto error;
+        }
+
+        return ret;
+error:
+        free(ret);
+        return NULL;
 }
 
 static int interrupt_cb(void *ctx)
@@ -65,7 +105,7 @@ static int interrupt_cb(void *ctx)
 
 int ex_init(void(*log_callback)(void *, int, const char *, va_list)) {
         // Initialize ffmpeg
-        av_log_set_level(AV_LOG_DEBUG);
+        av_log_set_level(AV_LOG_INFO);
         if (log_callback != NULL) {
                 av_log_set_callback(log_callback);
         }
@@ -73,6 +113,11 @@ int ex_init(void(*log_callback)(void *, int, const char *, va_list)) {
         avcodec_register_all();
         avformat_network_init();
 
+        return 0;
+}
+
+int ex_init_input(struct in_context *c) {
+        memset(c, 0, sizeof *c);
         return 0;
 }
 
@@ -86,8 +131,9 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
 
         // Open input format
         AVDictionary *opts = 0;
-        av_dict_set(&opts, "buffer_size", "655360", 0);
+        av_dict_set(&opts, "buffer_size", "12582912", 0);
         av_dict_set(&opts, "rtsp_transport", "udp", 0);
+        c->fcx->max_delay = 500000; // 500ms
         clock_gettime(CLOCK_MONOTONIC, &(c->last_frame_time));
         int err = avformat_open_input(&(c->fcx), url, NULL, &opts);
         if (err != 0) {
@@ -153,11 +199,6 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                 goto cleanup;
         }
 
-        if(avcodec_open2(c->ccx, c->codec, NULL) < 0) {
-                return_value = 8;
-                goto cleanup;
-        }
-
         return return_value;
 cleanup:
         return return_value;
@@ -167,4 +208,174 @@ int ex_read_frame(struct in_context *c, AVPacket *pkt)
 {
         clock_gettime(CLOCK_MONOTONIC, &c->last_frame_time);
         return av_read_frame(c->fcx, pkt);
+}
+
+int ex_send_packet(struct in_context *c, AVPacket *pkt)
+{
+        int return_value = 0;
+
+        const int d_ret = avcodec_send_packet(c->ccx, pkt);
+        if (d_ret != 0) {
+                return_value = 1;
+        }
+
+        return return_value;
+}
+
+int ex_receive_frame(struct in_context *c, AVFrame *frame)
+{
+        const int receive_ret = avcodec_receive_frame(c->ccx, frame);
+        return receive_ret;
+}
+
+int ex_free_input(struct in_context *c)
+{
+        if (c->ccx != NULL) {
+                avcodec_free_context(&c->ccx);
+        }
+
+        if (c->fcx != NULL) {
+                avformat_free_context(c->fcx);
+        }
+        return 0;
+}
+
+int ex_init_output(struct out_context *c)
+{
+        memset(c, 0, sizeof *c);
+        c->first_pts = INT64_MAX;
+        return 0;
+}
+
+int ex_open_output_stream(struct out_context *c,
+                          const AVCodecParameters *codecpar,
+                          const AVRational aspect_ratio,
+                          const char *filename)
+{
+        int return_value = 0;
+
+        c->size = 0;
+        c->fmt = av_guess_format(NULL, filename, NULL);
+        c->fcx = avformat_alloc_context();
+        c->fcx->oformat = c->fmt;
+        int ret = avio_open2(&c->fcx->pb, filename, AVIO_FLAG_WRITE, NULL, NULL);
+        if (ret < 0) {
+                return_value = 1;
+                goto cleanup;
+        }
+
+        c->st = avformat_new_stream(c->fcx, NULL);
+        avcodec_parameters_copy(c->st->codecpar, codecpar);
+        c->st->sample_aspect_ratio = aspect_ratio;
+
+cleanup:
+        return return_value;
+
+}
+
+static int64_t find_string_in_file(FILE *file, char *string)
+{
+        int64_t pos = 0;
+        int64_t cur_string_idx = 0;
+        const int length = strlen(string);
+        int found = 0;
+
+        char temp;
+
+        fseek(file, 0L, SEEK_SET);
+
+        while (fread(&temp, 1, 1, file) == 1) {
+                if (temp == string[cur_string_idx]) {
+                        cur_string_idx++;
+                }
+                if (cur_string_idx >= length) {
+                        found = 1;
+                        break;
+                }
+                pos++;
+        }
+
+        if (found == 0) {
+                pos = -1;
+        }
+
+        return pos;
+}
+
+int ex_close_output_stream(struct out_context *c)
+{
+        int ret = 0;
+        char *end_time = NULL;
+        char filename[1024];
+        FILE *output_file = NULL;
+        struct timespec end_timestamp;
+
+        ret = clock_gettime(CLOCK_REALTIME, &end_timestamp);
+        if (ret == -1) {
+                // error!
+        }
+
+        end_time = timespec_to_8601(&end_timestamp);
+
+        strncpy(filename, c->fcx->filename, sizeof(filename));
+        filename[sizeof(filename) - 1] = '\0';
+
+        av_write_trailer(c->fcx);
+        avio_close(c->fcx->pb);
+        avformat_free_context(c->fcx);
+        c->fcx = NULL;
+
+        /* We need to set the ENDTIME tag in the output file but
+         * ffmpeg only lets us set tags before calling
+         * avformat_write_header and that has to be done before
+         * writing anything. So instead we set a dummy tag ENDTIME tag
+         * and overwrite it manually with fwrite. This only works
+         * because the replacement tag value is exactly the same size
+         * as the dummy value.
+         */
+
+        output_file = fopen(filename, "r+");
+        if (output_file == NULL) {
+                ret = -1;
+                goto cleanup;
+        }
+
+        int64_t pos = find_string_in_file(output_file, "ENDTIMED");
+        if (pos > 0) {
+                fseek(output_file, pos + 3, SEEK_SET);
+                fwrite(end_time, strlen(end_time), 1, output_file);
+        }
+
+        // Report file as finished
+        // report_finished_file(filename, cam->end_time);
+
+cleanup:
+        if (output_file != NULL) {
+                fclose(output_file);
+        }
+        free(end_time);
+
+        return ret;
+}
+
+ int ex_write_output_packet(struct out_context *c,
+                           AVRational time_base,
+                           AVPacket *pkt)
+{
+        int return_value = 0;
+
+        if (c->first_pts < pkt->pts) {
+                c->first_pts = pkt->pts;
+        }
+        pkt->stream_index = c->st->id;
+        pkt->pts -= c->first_pts;
+        pkt->pts = av_rescale_q(pkt->pts,
+                                time_base,
+                                c->st->time_base);
+        pkt->dts = pkt->pts;
+
+        return_value = av_interleaved_write_frame(c->fcx, pkt);
+        c->size += pkt->size;
+
+        return return_value;
 }

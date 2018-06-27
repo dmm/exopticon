@@ -46,14 +46,27 @@ struct out_context {
         AVOutputFormat  *fmt;
         AVCodecContext  *ccx;
         AVCodec         *codec;
+        AVStream        *st;
         char            *output_path;
+
+        int64_t         first_pts;
+        int64_t         size;
 };
 
-int64_t timespec_to_ms_interval(const struct timespec beg,
-                                const struct timespec end);
 int ex_init(void(*)(void *, int, const char *, va_list));
+
 int ex_init_input(struct in_context *context);
 int ex_open_input_stream(const char *url, struct in_context *context);
 int ex_read_frame(struct in_context *c, AVPacket *pkt);
+int ex_free_input(struct in_context *c);
 
+int ex_init_output(struct out_context *context);
+int ex_open_output_stream(struct out_context *context,
+                          const AVCodecParameters *codecpar,
+                          const AVRational aspect_ratio,
+                          const char *filename);
+int ex_close_output_stream(struct out_context *c);
+int ex_write_output_packet(struct out_context *c,
+                           AVRational time_base,
+                           AVPacket *pkt);
 #endif // EXVID_H

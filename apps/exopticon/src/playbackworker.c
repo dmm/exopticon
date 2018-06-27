@@ -1,19 +1,22 @@
 /*
- * This file is part of Exopticon.
+ * This file is a part of Exopticon, a free video surveillance tool. Visit
+ * https://exopticon.org for more information.
  *
- * Exopticon is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * Copyright (C) 2018 David Matthew Mattli
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * Exopticon is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
 #define _DEFAULT_SOURCE
 
 #include <arpa/inet.h>
@@ -34,6 +37,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "exvid.h"
 #include "mpack_frame.h"
 
 #define BILLION 1E9
