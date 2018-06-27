@@ -1,6 +1,6 @@
 mycflags= -W -Wall -Wextra -Wcast-align -Wpointer-arith -Wsign-compare -Wformat=2 \
           -Wno-format-y2k  -Wmissing-braces -Wparentheses -Wtrigraphs -Wstrict-aliasing=2 \
-          -std=c99 -flto
+          -std=c99 -flto -D_FORTIFY_SOURCE=2 -fstack-protector-strong
 devcflags= -fsanitize=undefined -fsanitize=address
 
 LIBRARIES= -lavformat -lavutil -lavcodec -lswscale
