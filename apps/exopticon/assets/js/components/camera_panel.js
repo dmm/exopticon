@@ -158,9 +158,7 @@ class CameraPanel extends React.Component {
    */
   setColumnCount(columnCount) {
     this.setState({viewColumns: columnCount});
-    this.cameraElements.forEach((c) => {
-      c.visibilityCheck();
-    });
+    this.visibilityCheck();
   }
 
   /**
