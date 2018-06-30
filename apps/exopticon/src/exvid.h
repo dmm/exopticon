@@ -46,10 +46,11 @@ struct out_context {
         AVOutputFormat  *fmt;
         AVCodecContext  *ccx;
         AVCodec         *codec;
-        AVStream        *st;
-        char            *output_path;
+        char            output_path[500];
+        int             stream_index;
 
         int64_t         first_pts;
+        int64_t         prev_pts;
         int64_t         size;
 };
 
@@ -61,9 +62,8 @@ int ex_read_frame(struct in_context *c, AVPacket *pkt);
 int ex_free_input(struct in_context *c);
 
 int ex_init_output(struct out_context *context);
-int ex_open_output_stream(struct out_context *context,
-                          const AVCodecParameters *codecpar,
-                          const AVRational aspect_ratio,
+int ex_open_output_stream(struct in_context *in,
+                          struct out_context *out,
                           const char *filename);
 int ex_close_output_stream(struct out_context *c);
 int ex_write_output_packet(struct out_context *c,

@@ -137,9 +137,6 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         clock_gettime(CLOCK_MONOTONIC, &(c->last_frame_time));
         int err = avformat_open_input(&(c->fcx), url, NULL, &opts);
         if (err != 0) {
-                char errbuf[100];
-                av_strerror(err, errbuf, 100);
-                fprintf(stderr, "%s, %d\n", errbuf, err);
                 // User allocated AVFormatContext is freed on error by
                 // avformat_open_input.
                 c->fcx = NULL;
@@ -168,11 +165,13 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         c->stream_index = av_find_best_stream(c->fcx, AVMEDIA_TYPE_VIDEO, -1,
                                               -1, &(c->codec), 0);
 
+
         if (c->stream_index < 0) {
                 // unable to find video stream
                 return_value = 3;
                 goto cleanup;
         }
+        c->st = c->fcx->streams[c->stream_index];
 
         // Initialize codec
         c->codec = avcodec_find_decoder(c->codecpar->codec_id);
@@ -243,30 +242,72 @@ int ex_free_input(struct in_context *c)
 int ex_init_output(struct out_context *c)
 {
         memset(c, 0, sizeof *c);
-        c->first_pts = INT64_MAX;
+        c->first_pts = -1;
+        c->prev_pts = -1;
+        c->size = 0;
         return 0;
 }
 
-int ex_open_output_stream(struct out_context *c,
-                          const AVCodecParameters *codecpar,
-                          const AVRational aspect_ratio,
+int ex_open_output_stream(struct in_context *in,
+                          struct out_context *out,
                           const char *filename)
 {
         int return_value = 0;
 
-        c->size = 0;
-        c->fmt = av_guess_format(NULL, filename, NULL);
-        c->fcx = avformat_alloc_context();
-        c->fcx->oformat = c->fmt;
-        int ret = avio_open2(&c->fcx->pb, filename, AVIO_FLAG_WRITE, NULL, NULL);
-        if (ret < 0) {
+        out->size = 0;
+
+        out->fmt = av_guess_format(NULL, filename, NULL);
+        avformat_alloc_output_context2(&out->fcx, NULL, NULL, filename);
+        if (out->fcx == NULL) {
                 return_value = 1;
                 goto cleanup;
         }
+        for (unsigned int i = 0; i < in->fcx->nb_streams; i++) {
+                if (i == (uint64_t)in->stream_index) {
+                        AVStream *out_stream;
+                        AVStream *in_stream = in->fcx->streams[i];
+                        AVCodecParameters *in_codecpar = in_stream->codecpar;
+                        out_stream = avformat_new_stream(out->fcx, NULL);
+                        if (!out_stream) {
+                                fprintf(stderr, "Failed allocating output stream\n");
+                                return_value = 2;
+                                goto cleanup;
+                        }
+                        int copy_ret = avcodec_parameters_copy(out_stream->codecpar, in_codecpar);
+                        if (copy_ret < 0) {
+                                return_value = 3;
+                                goto cleanup;
+                        }
+                        out_stream->codecpar->codec_tag = 0;
 
-        c->st = avformat_new_stream(c->fcx, NULL);
-        avcodec_parameters_copy(c->st->codecpar, codecpar);
-        c->st->sample_aspect_ratio = aspect_ratio;
+//                        out_stream->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+                        out_stream->time_base = in_stream->time_base;
+                }
+        }
+
+        int ret = avio_open(&out->fcx->pb, filename, AVIO_FLAG_WRITE);
+        if (ret < 0) {
+                return_value = 4;
+                goto cleanup;
+        }
+
+        // Set file begin time
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        char *timestring = timespec_to_8601(&ts);
+
+        av_dict_set(&(out->fcx->metadata), "ENDTIME", timestring, 0);
+        av_dict_set(&(out->fcx->metadata), "BEGINTIME", timestring, 0);
+
+        free(timestring);
+
+        int header_ret = avformat_write_header(out->fcx, NULL);
+        if (header_ret < 0) {
+                return_value = 5;
+        }
+
+        out->stream_index = in->stream_index;
+        strncpy(out->output_path, filename, sizeof out->output_path);
 
 cleanup:
         return return_value;
@@ -321,7 +362,7 @@ int ex_close_output_stream(struct out_context *c)
         filename[sizeof(filename) - 1] = '\0';
 
         av_write_trailer(c->fcx);
-        avio_close(c->fcx->pb);
+        avio_closep(&c->fcx->pb);
         avformat_free_context(c->fcx);
         c->fcx = NULL;
 
@@ -363,19 +404,41 @@ cleanup:
                            AVPacket *pkt)
 {
         int return_value = 0;
+        AVStream *out_stream = c->fcx->streams[pkt->stream_index];
 
-        if (c->first_pts < pkt->pts) {
+        if (pkt->stream_index != c->stream_index) {
+                return 0;
+        }
+
+        if (pkt->pts < 0 || (c->prev_pts > 0 && pkt->pts < c->prev_pts)) {
+                return 0;
+        }
+        c->prev_pts = pkt->pts;
+
+        if (c->first_pts == -1) {
                 c->first_pts = pkt->pts;
         }
-        pkt->stream_index = c->st->id;
-        pkt->pts -= c->first_pts;
-        pkt->pts = av_rescale_q(pkt->pts,
-                                time_base,
-                                c->st->time_base);
-        pkt->dts = pkt->pts;
 
-        return_value = av_interleaved_write_frame(c->fcx, pkt);
+        pkt->pts -= c->first_pts;
+        pkt->pts = av_rescale_q_rnd(pkt->pts,
+                                    time_base,
+                                    out_stream->time_base,
+                                    AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX);
+        pkt->dts = pkt->pts;
+        pkt->duration = av_rescale_q(pkt->duration,
+                                     time_base,
+                                     out_stream->time_base);
+
+
         c->size += pkt->size;
+        return_value = av_interleaved_write_frame(c->fcx, pkt);
+        if (return_value < 0) {
+                char errbuf[100];
+                av_strerror(return_value, errbuf, 100);
+                fprintf(stderr, "%s, %d\n", errbuf, return_value);
+
+        }
+
 
         return return_value;
 }
