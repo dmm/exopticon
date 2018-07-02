@@ -36,8 +36,8 @@ defmodule Exopticon.Video.FileDeletionServer do
 
   defp run([camera_group_id, max_size] = state) do
     video_size = Video.get_total_video_size(camera_group_id)
-    max_size_kb = max_size * 1024 * 1024
-    delete_amount = video_size - max_size_kb
+    max_size_bytes = max_size * 1024 * 1024
+    delete_amount = video_size - max_size_bytes
 
     if delete_amount > 0 do
       files = Video.get_oldest_files_in_group(camera_group_id, 1000)
@@ -70,7 +70,7 @@ defmodule Exopticon.Video.FileDeletionServer do
 
     if elem(stat, 0) == :ok do
       File.rm(file.filename)
-      elem(stat, 1).size / 1024
+      elem(stat, 1).size
     else
       0
     end
