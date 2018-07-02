@@ -124,7 +124,7 @@ void bs_log(const char *const fmt, ...)
 {
         va_list ap;
         va_start(ap, fmt);
-        my_av_log_callback(NULL, 1, fmt, ap);
+        my_av_log_callback(NULL, AV_LOG_INFO, fmt, ap);
 }
 
 void report_new_file(char *filename, struct timespec begin_time)
