@@ -81,6 +81,7 @@ export default class View extends MainView {
     let useFs = window.localStorage.getItem('use-fs-api');
     if (!useFs) {
       useFs = '1';
+      window.localStorage.setItem('use-fs-api', '1');
     }
     let fsCheck = document.querySelector('#use-fs-checkbox');
     if (useFs == '1') {
