@@ -11,7 +11,7 @@
 /* Implement background stripes */
 @media (min-width: 320px) {
   .breadcrumb {
-    background-image: repeating-linear-gradient(130deg, black, black 15px, rgb(0, 255, 0) 15px, rgb(0, 255, 0) 30px);
+    background-image: repeating-linear-gradient(130deg, black, black 15px, #ffb000 15px, #ffb000 30px);
   }
 }
 
@@ -28,7 +28,7 @@
 }
 
 .breadcrumb > li {
-  color: rgb(0, 255, 0);
+  color: #ffb000;
   background-color: black;
   border-radius: 4px;
   padding: 3px;
@@ -36,14 +36,14 @@
 }
 
 .breadcrumb a {
-  color: rgb(0, 255, 0);
+  color: #ffb000;
   text-decoration: none;
 }
 
 body, form, ul, table {
   margin: 0px;
   background-color: black;
-  color: rgb(0, 255, 0);
+  color: #ffb000;
 }
 
 /* Phoenix flash messages */
@@ -55,7 +55,7 @@ body, form, ul, table {
 
 /* Custom page header */
 .header {
-  border-bottom: 1px solid rgb(0, 136, 0);
+  border-bottom: 1px solid #ffb000;
   padding: 0;
   display: flex;
   flex-direction: row;
@@ -67,7 +67,7 @@ body, form, ul, table {
 
 .header span.logo {
   height: 37px;
-  background-color: rgb(0, 255, 0);
+  background-color: #ffb000;
 }
 
 .header span.logo img {

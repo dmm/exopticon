@@ -10,9 +10,9 @@
 }
 
 .status-overlay .status-message {
-  color: rgb(0, 255, 0);
+  color: #ffb000;
     background: black;
     padding: 25px;
-    border: 1px solid rgb(0, 136, 0);
+    border: 1px solid #ffb000;
     border-radius: 10px;
 }
