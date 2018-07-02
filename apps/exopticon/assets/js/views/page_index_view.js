@@ -77,5 +77,23 @@ export default class View extends MainView {
       window.cameraManager.setColumnCount(parseInt(this.value, 10));
       window.localStorage.setItem('camera-panel-width', this.value);
     };
+
+    let useFs = window.localStorage.getItem('use-fs-api');
+    if (!useFs) {
+      useFs = '1';
+    }
+    let fsCheck = document.querySelector('#use-fs-checkbox');
+    if (useFs == '1') {
+      fsCheck.checked = true;
+    } else {
+      fsCheck.checked = false;
+    }
+    fsCheck.addEventListener('click', function(e) {
+      if (e.target.checked === true) {
+        window.localStorage.setItem('use-fs-api', '1');
+      } else {
+        window.localStorage.setItem('use-fs-api', '0');
+      }
+    });
   }
 }
