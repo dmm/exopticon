@@ -211,11 +211,11 @@ class CameraPanel extends React.Component {
     let useFs = window.localStorage.getItem('use-fs-api');
 
     if (newIndex === -1) {
-      fscreen.exitFullscreen();
       for (let c of this.cameraElements.values()) {
         c.setResolution('sd');
         c.play();
       }
+      fscreen.exitFullscreen();
     } else {
       const camera = this.state.cameras[i];
       let cameraComponent = this.cameraElements.get(camera.id);
