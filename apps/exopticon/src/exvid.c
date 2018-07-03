@@ -137,6 +137,10 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         clock_gettime(CLOCK_MONOTONIC, &(c->last_frame_time));
         int err = avformat_open_input(&(c->fcx), url, NULL, &opts);
         if (err != 0) {
+                char errbuf[100];
+                av_strerror(err, errbuf, 100);
+                av_log(NULL, AV_LOG_FATAL, "Error opening input file: %s", errbuf);
+
                 // User allocated AVFormatContext is freed on error by
                 // avformat_open_input.
                 c->fcx = NULL;
