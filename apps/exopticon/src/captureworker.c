@@ -545,7 +545,9 @@ int push_frame(struct in_context *in, AVPacket *pkt)
 
         int receive_ret = avcodec_receive_frame(in->ccx, frame);
         if (receive_ret != 0) {
-                bs_log("Error receiving frame!");
+                char errbuf[100];
+                av_strerror(receive_ret, errbuf, 100);
+                av_log(NULL, AV_LOG_FATAL, "Error receiving frame: %s", errbuf);
                 goto cleanup;
         }
 
@@ -647,6 +649,9 @@ int main(int argc, char *argv[])
                         if (handle_ret != 0) {
                                 bs_log("Handle error!");
                                 goto cleanup;
+                        }
+                        if (cam.out.fcx == NULL) {
+                                continue;
                         }
                         push_frame(&cam.in, &cam.pkt);
                         int write_ret = ex_write_output_packet(&cam.out, cam.in.st->time_base, &cam.pkt);
