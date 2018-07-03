@@ -208,7 +208,6 @@ class CameraPanel extends React.Component {
       fullscreenIndex: newIndex,
     });
 
-    let useFs = window.localStorage.getItem('use-fs-api');
 
     if (newIndex === -1) {
       for (let c of this.cameraElements.values()) {
@@ -229,12 +228,6 @@ class CameraPanel extends React.Component {
       cameraComponent.setResolution('hd');
       cameraComponent.play();
     }
-
-    if (useFs == '1') {
-      const camera = this.state.cameras[i];
-      let cameraComponent = this.cameraElements.get(camera.id);
-      this.cameraRequestFullscreen(cameraComponent._container);
-    }
   }
 
   /**
@@ -253,6 +246,10 @@ class CameraPanel extends React.Component {
       fscreen.requestFullscreen(elem);
       screen.lockOrientationUniversal('landscape-primary');
     }
+
+    this.cameraElements.forEach((c) => {
+      c.visibilityCheck();
+    });
   }
 
   /**

@@ -28,5 +28,3 @@
   </select>
 </div>
 
-<label for="use-fs-checkbox">Use FS Api:</label>
-<input type="checkbox" name="use-fs-checkbox" id="use-fs-checkbox"></input>
