@@ -10,6 +10,7 @@ defmodule Exopticon.Video do
   alias Exopticon.Repo
   alias Exopticon.Video.CameraGroup
   alias Exvif.Cam
+  alias Exopticon.Video.VideoUnit
 
   @doc """
   Returns the list of camera_groups.
@@ -377,21 +378,14 @@ defmodule Exopticon.Video do
     Repo.all(query) || []
   end
 
-  @doc """
-  Returns video coverage for given camera and begin and end times
-  """
-  def get_video_coverage(camera_id, begin_time, end_time) do
-    camera_id
-    |> get_files_between(begin_time, end_time)
-    |> FileLibrary.calculate_availability(begin_time, end_time)
-  end
-
   def get_total_video_size(camera_group_id) do
     query =
       from(
         f in File,
+        join: vu in VideoUnit,
+        on: f.video_unit_id == vu.id,
         join: c in Camera,
-        on: f.camera_id == c.id,
+        on: c.id == vu.camera_id,
         select: sum(f.size),
         where: c.camera_group_id == ^camera_group_id
       )
@@ -437,5 +431,101 @@ defmodule Exopticon.Video do
 
   def stop_camera(camera_id) do
     Exopticon.CameraSupervisor.stop_camera(camera_id)
+  end
+
+  alias Exopticon.Video.VideoUnit
+
+  @doc """
+  Returns the list of video_units.
+
+  ## Examples
+
+      iex> list_video_units()
+      [%VideoUnit{}, ...]
+
+  """
+  def list_video_units do
+    Repo.all(VideoUnit)
+  end
+
+  @doc """
+  Gets a single video_unit.
+
+  Raises `Ecto.NoResultsError` if the Video unit does not exist.
+
+  ## Examples
+
+      iex> get_video_unit!(123)
+      %VideoUnit{}
+
+      iex> get_video_unit!(456)
+      ** (Ecto.NoResultsError)
+
+  """
+  def get_video_unit!(id), do: Repo.get!(VideoUnit, id)
+
+  @doc """
+  Creates a video_unit.
+
+  ## Examples
+
+      iex> create_video_unit(%{field: value})
+      {:ok, %VideoUnit{}}
+
+      iex> create_video_unit(%{field: bad_value})
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def create_video_unit(attrs \\ %{}) do
+    %VideoUnit{}
+    |> VideoUnit.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a video_unit.
+
+  ## Examples
+
+      iex> update_video_unit(video_unit, %{field: new_value})
+      {:ok, %VideoUnit{}}
+
+      iex> update_video_unit(video_unit, %{field: bad_value})
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def update_video_unit(%VideoUnit{} = video_unit, attrs) do
+    video_unit
+    |> VideoUnit.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a VideoUnit.
+
+  ## Examples
+
+      iex> delete_video_unit(video_unit)
+      {:ok, %VideoUnit{}}
+
+      iex> delete_video_unit(video_unit)
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def delete_video_unit(%VideoUnit{} = video_unit) do
+    Repo.delete(video_unit)
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking video_unit changes.
+
+  ## Examples
+
+      iex> change_video_unit(video_unit)
+      %Ecto.Changeset{source: %VideoUnit{}}
+
+  """
+  def change_video_unit(%VideoUnit{} = video_unit) do
+    VideoUnit.changeset(video_unit, %{})
   end
 end

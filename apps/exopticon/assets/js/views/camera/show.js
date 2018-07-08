@@ -67,53 +67,6 @@ export default class view extends MainView {
   }
 
   /**
-   * fetches files for camera between two datetimes
-   * @param {number} cameraId
-   * @param {object} progress - progresbar component
-   * @param {string} beginTime - iso8601 datetime
-   * @param {string} endTime - iso8601 datetime
-   */
-  fetchCoverage(cameraId, progress, beginTime, endTime) {
-    let url = `/v1/cameras/${cameraId}/availability`;
-
-    if (beginTime !== undefined) {
-      url += `?begin_time=${beginTime}`;
-    }
-    if (endTime !== undefined) {
-      url += `&end_time=${endTime}`;
-    }
-    fetch(url, {
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }).then((response) => {
-      return response.json();
-    }).then((availability) => {
-      const beginTime = ZonedDateTime.parse(availability.begin_time);
-      const endTime = ZonedDateTime.parse(availability.end_time);
-      let chunks = [];
-      availability.availability.forEach((ch) => {
-        chunks.push({
-          type: ch.type,
-          begin_time: ZonedDateTime.parse(ch.begin_time),
-          end_time: ZonedDateTime.parse(ch.end_time),
-        });
-      });
-      progress.setState({
-        availability: {
-          begin_time: beginTime,
-          end_time: endTime,
-          availability: chunks,
-        },
-      });
-      this.fileLibrary = new FileLibrary(availability.files);
-    }).catch((error) => {
-      console.log('There was an error fetching availability: ' + error);
-    });
-  }
-
-  /**
    * page entry point
    */
   mount() {

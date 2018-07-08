@@ -7,14 +7,9 @@ defmodule Exopticon.Video.File do
   alias Exopticon.Video.File
 
   schema "files" do
-    field(:begin_time, :utc_datetime)
-    field(:end_time, :utc_datetime)
-    field(:begin_monotonic, :integer)
-    field(:end_monotonic, :integer)
     field(:filename, :string)
-    field(:monotonic_index, :integer)
     field(:size, :integer)
-    field(:camera_id, :id)
+    field(:video_unit_id, :id)
 
     timestamps()
   end
@@ -25,20 +20,12 @@ defmodule Exopticon.Video.File do
     |> cast(attrs, [
       :filename,
       :size,
-      :begin_time,
-      :end_time,
-      :begin_monotonic,
-      :end_monotonic,
-      :monotonic_index
+      :video_unit_id
     ])
     |> validate_required([
       :filename,
       :size,
-      :begin_time,
-      :end_time,
-      :begin_monotonic,
-      :end_monotonic,
-      :monotonic_index
+      :video_unit_id
     ])
   end
 end

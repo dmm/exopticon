@@ -29,7 +29,7 @@ defmodule ExopticonWeb.Router do
     resources("/cameras", CameraController)
     get("/files/browse", FileController, :browse)
     resources("/files", FileController)
-
+    resources "/video_units", VideoUnitController, except: [:new, :edit]
     get("/cameras/:id/playback", CameraController, :playback)
   end
 

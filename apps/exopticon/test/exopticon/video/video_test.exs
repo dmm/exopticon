@@ -274,4 +274,72 @@ defmodule Exopticon.VideoTest do
       assert %Ecto.Changeset{} = Video.change_file(file)
     end
   end
+
+  describe "video_units" do
+    alias Exopticon.Video.VideoUnit
+
+    @valid_attrs %{begin_monotonic: 42, begin_time: "2010-04-17 14:00:00.000000Z", end_monotonic: 42, end_time: "2010-04-17 14:00:00.000000Z", monotonic_index: 42}
+    @update_attrs %{begin_monotonic: 43, begin_time: "2011-05-18 15:01:01.000000Z", end_monotonic: 43, end_time: "2011-05-18 15:01:01.000000Z", monotonic_index: 43}
+    @invalid_attrs %{begin_monotonic: nil, begin_time: nil, end_monotonic: nil, end_time: nil, monotonic_index: nil}
+
+    def video_unit_fixture(attrs \\ %{}) do
+      {:ok, video_unit} =
+        attrs
+        |> Enum.into(@valid_attrs)
+        |> Video.create_video_unit()
+
+      video_unit
+    end
+
+    test "list_video_units/0 returns all video_units" do
+      video_unit = video_unit_fixture()
+      assert Video.list_video_units() == [video_unit]
+    end
+
+    test "get_video_unit!/1 returns the video_unit with given id" do
+      video_unit = video_unit_fixture()
+      assert Video.get_video_unit!(video_unit.id) == video_unit
+    end
+
+    test "create_video_unit/1 with valid data creates a video_unit" do
+      assert {:ok, %VideoUnit{} = video_unit} = Video.create_video_unit(@valid_attrs)
+      assert video_unit.begin_monotonic == 42
+      assert video_unit.begin_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
+      assert video_unit.end_monotonic == 42
+      assert video_unit.end_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
+      assert video_unit.monotonic_index == 42
+    end
+
+    test "create_video_unit/1 with invalid data returns error changeset" do
+      assert {:error, %Ecto.Changeset{}} = Video.create_video_unit(@invalid_attrs)
+    end
+
+    test "update_video_unit/2 with valid data updates the video_unit" do
+      video_unit = video_unit_fixture()
+      assert {:ok, video_unit} = Video.update_video_unit(video_unit, @update_attrs)
+      assert %VideoUnit{} = video_unit
+      assert video_unit.begin_monotonic == 43
+      assert video_unit.begin_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
+      assert video_unit.end_monotonic == 43
+      assert video_unit.end_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
+      assert video_unit.monotonic_index == 43
+    end
+
+    test "update_video_unit/2 with invalid data returns error changeset" do
+      video_unit = video_unit_fixture()
+      assert {:error, %Ecto.Changeset{}} = Video.update_video_unit(video_unit, @invalid_attrs)
+      assert video_unit == Video.get_video_unit!(video_unit.id)
+    end
+
+    test "delete_video_unit/1 deletes the video_unit" do
+      video_unit = video_unit_fixture()
+      assert {:ok, %VideoUnit{}} = Video.delete_video_unit(video_unit)
+      assert_raise Ecto.NoResultsError, fn -> Video.get_video_unit!(video_unit.id) end
+    end
+
+    test "change_video_unit/1 returns a video_unit changeset" do
+      video_unit = video_unit_fixture()
+      assert %Ecto.Changeset{} = Video.change_video_unit(video_unit)
+    end
+  end
 end
