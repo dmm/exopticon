@@ -183,30 +183,18 @@ defmodule Exopticon.VideoTest do
     alias Exopticon.Video.File
 
     @valid_attrs %{
-      begin_monotonic: 42,
-      begin_time: "2010-04-17 14:00:00.000000Z",
-      end_monotonic: 42,
-      end_time: "2010-04-17 14:00:00.000000Z",
       filename: "some filename",
-      monotonic_index: 42,
+      video_unit_id: 42,
       size: 42
     }
     @update_attrs %{
-      begin_monotonic: 43,
-      begin_time: "2011-05-18 15:01:01.000000Z",
-      end_monotonic: 43,
-      end_time: "2011-05-18 15:01:01.000000Z",
       filename: "some updated filename",
-      monotonic_index: 43,
+      video_unit_id: 43,
       size: 43
     }
     @invalid_attrs %{
-      begin_monotonic: nil,
-      begin_time: nil,
-      end_monotonic: nil,
-      end_time: nil,
       filename: nil,
-      monotonic_index: nil,
+      video_unit_id: nil,
       size: nil
     }
 

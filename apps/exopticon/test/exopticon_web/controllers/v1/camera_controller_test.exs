@@ -1,6 +1,7 @@
 defmodule Exopticon.V1.CameraControllerTest do
   use ExopticonWeb.ConnCase
 
+  @tag :integration
   test "require user authentication on all actions", %{conn: conn} do
     Enum.each(
       [

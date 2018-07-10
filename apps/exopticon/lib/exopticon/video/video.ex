@@ -363,16 +363,17 @@ defmodule Exopticon.Video do
   end
 
   @doc """
-  Returns video for single camera
+  Returns video units for single camera
   """
-  def get_files_between(camera_id, begin_time, end_time) do
+  def get_video_between(camera_id, begin_time, end_time) do
     query =
       from(
-        f in File,
+        v in VideoUnit,
         where:
-          f.camera_id == ^camera_id and ^end_time >= f.begin_time and ^begin_time <= f.end_time and
-            not is_nil(f.end_monotonic),
-        order_by: [asc: f.monotonic_index, asc: f.begin_monotonic]
+          v.camera_id == ^camera_id and ^end_time >= v.begin_time and ^begin_time <= v.end_time and
+            not is_nil(v.end_monotonic),
+          order_by: [asc: v.monotonic_index, asc: v.begin_monotonic],
+          preload: [:files]
       )
 
     Repo.all(query) || []

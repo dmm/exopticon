@@ -1,5 +1,7 @@
-defmodule ExopticonWeb.VideoUnitController do
+defmodule ExopticonWeb.V1.VideoUnitController do
   use ExopticonWeb, :controller
+
+  plug(:authenticate_user)
 
   alias Exopticon.Video
   alias Exopticon.Video.VideoUnit
@@ -15,7 +17,7 @@ defmodule ExopticonWeb.VideoUnitController do
     with {:ok, %VideoUnit{} = video_unit} <- Video.create_video_unit(video_unit_params) do
       conn
       |> put_status(:created)
-      |> put_resp_header("location", video_unit_path(conn, :show, video_unit))
+      |> put_resp_header("location", video_unit_v1_path(conn, :show, video_unit))
       |> render("show.json", video_unit: video_unit)
     end
   end

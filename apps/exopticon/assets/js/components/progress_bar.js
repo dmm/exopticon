@@ -44,8 +44,9 @@ class ProgressBar extends React.Component {
         availability: [],
         begin_time: ZonedDateTime.parse('9999-12-31T23:59:59.999Z'),
         end_time: ZonedDateTime.parse('1970-01-01T00:00:00.000Z'),
+        current_time: ZonedDateTime.parse('1970-01-01T00:00:00.000Z'),
       },
-        timeLabel: '',
+      timeLabel: '',
     };
     this.gaps = [];
 
