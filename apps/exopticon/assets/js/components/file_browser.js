@@ -41,11 +41,11 @@ class FileBrowser extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      files: props.initialFiles,
-      selectedFile: undefined,
+      videos: props.initialVideos,
+      selectedUnit: undefined
     };
 
-    this.selectFile = this.selectFile.bind(this);
+    this.selectUnit = this.selectUnit.bind(this);
     this.playFile = this.playFile.bind(this);
     this.stop = this.stop.bind(this);
   }
@@ -76,15 +76,15 @@ class FileBrowser extends React.Component {
   }
 
   /**
-   * select file for playback
-   * @param {Number} id - id of file to play
+   * select video unit for playback
+   * @param {Number} id - id of video unit to play
    *
    */
-  selectFile(id) {
+  selectUnit(videoUnit) {
     this.setState({
-      selectedFile: id,
+      selectedUnit: videoUnit.id
     });
-    this.playFile(id);
+    this.playFile(videoUnit.files[0].id);
   }
 
   /**
@@ -147,24 +147,24 @@ class FileBrowser extends React.Component {
    * @return {Object} react object
    */
   render() {
-    const files = this.state.files.map((f) => {
+    const videos = this.state.videos.map((v) => {
       let classes = 'file-listing';
-      if (this.state.selectedFile === f.id) {
+      if (this.state.selectedUnit === v.id) {
         classes += ' selected';
       }
       return (
         <div className={classes}
-             key={f.id}
-             onClick={() => this.selectFile(f.id)}
-             >
+             key={v.id}
+             onClick={() => this.selectUnit(v)}
+          >
           <div>
-            { this.formatDate(f.begin_time) }
+            { this.formatDate(v.begin_time) }
           </div>
           <div>
-            { this.formatDate(f.end_time) }
+            { this.formatDate(v.end_time) }
           </div>
           <div>
-            { this.formatDuration(f.begin_monotonic, f.end_monotonic) }
+            { this.formatDuration(v.begin_monotonic, v.end_monotonic) }
           </div>
         </div>
       );
@@ -173,7 +173,7 @@ class FileBrowser extends React.Component {
     return (
       <div className='file-browser-wrapper'>
         <div className='file-list'>
-          { files }
+          { videos }
         </div>
         <div className='file-view'>
           <img ref={
@@ -188,12 +188,12 @@ class FileBrowser extends React.Component {
 }
 
 FileBrowser.propTypes = {
-  initialFiles: PropTypes.list,
+  initialVideos: PropTypes.array,
   socket: PropTypes.object.isRequired,
 };
 
 FileBrowser.defaultProps = {
-  initialFiles: [],
+  initialVideos: [],
 };
 
 export default FileBrowser;

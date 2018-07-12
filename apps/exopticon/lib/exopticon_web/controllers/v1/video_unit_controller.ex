@@ -8,8 +8,8 @@ defmodule ExopticonWeb.V1.VideoUnitController do
 
   action_fallback ExopticonWeb.FallbackController
 
-  def index(conn, _params) do
-    video_units = Video.list_video_units()
+  def index(conn, %{"camera_id" => camera_id}) do
+    video_units = Video.list_video_units_by_camera(camera_id)
     render(conn, "index.json", video_units: video_units)
   end
 

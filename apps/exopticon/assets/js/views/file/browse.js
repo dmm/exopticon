@@ -46,15 +46,15 @@ export default class view extends MainView {
     let cameraId = parseInt(document.getElementById('singleCamera')
                             .getAttribute('data-id'), 10);
 
-    fetch(`/v1/files?camera_id=${cameraId}`, {
+    fetch(`/v1/video_units/?camera_id=${cameraId}`, {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
       },
     }).then((response) => {
       return response.json();
-    }).then((files) => {
-      this.browserComponent.setState({files: files});
+    }).then((videoUnits) => {
+      this.browserComponent.setState({videos: videoUnits});
     });
   }
 }

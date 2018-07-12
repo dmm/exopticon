@@ -450,6 +450,21 @@ defmodule Exopticon.Video do
   end
 
   @doc """
+  Returns video_units belonging to given camera
+  """
+  def list_video_units_by_camera(camera_id) do
+    query =
+      from(
+        v in VideoUnit,
+        where: v.camera_id == ^camera_id and not is_nil(v.end_monotonic),
+        preload: [:files],
+        order_by: [asc: v.monotonic_index, asc: v.begin_monotonic],
+      )
+    Repo.all(query) || []
+
+  end
+
+  @doc """
   Gets a single video_unit.
 
   Raises `Ecto.NoResultsError` if the Video unit does not exist.

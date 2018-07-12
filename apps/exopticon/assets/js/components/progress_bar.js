@@ -41,7 +41,7 @@ class ProgressBar extends React.Component {
     super();
     this.state = {
       availability: {
-        availability: [],
+        video_units: [],
         begin_time: ZonedDateTime.parse('9999-12-31T23:59:59.999Z'),
         end_time: ZonedDateTime.parse('1970-01-01T00:00:00.000Z'),
         current_time: ZonedDateTime.parse('1970-01-01T00:00:00.000Z'),
@@ -102,6 +102,31 @@ class ProgressBar extends React.Component {
     const newTime = this.state.availability.begin_time
           .plusSeconds(timeOffset / 1000);
     console.log(newTime.toString());
+  }
+
+  /**
+   * calculateAvailability
+   * @param {Array} units - array of video units
+   * @param {ZonedDateTime} begin_time
+   * @param {ZonedDateTime} end_time
+   */
+  calculateAvailability(units, begin_time, end_time) {
+    let availability = [];
+
+    units.forEach((u) => {
+      let video_begin = ZonedDateTime.parse(u.begin_time);
+      if (video_begin.isBefore(begin_time)) {
+        video_begin = begin_time;
+      }
+      let video_end = ZonedDateTime.parse(u.end_time);
+      if (video_end.isAfter(end_time)) {
+        video_end = end_time;
+      }
+      availability.push({
+        start_offset_ms: Duration.between(begin_time, video_begin),
+        end_offset_ms: Duration.between(begin_time, video_end)
+      });
+    });
   }
 
   /**
