@@ -10,12 +10,13 @@
 }
 
 .camera-panel .wrapper.fullscreen {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   width: 100vw !important;
   max-height: 100vh !important;
   background-color: black;
+  overflow-y: hidden;
 }
 
 .camera-panel .wrapper.background {
