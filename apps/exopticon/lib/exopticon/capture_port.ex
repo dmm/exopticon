@@ -1,19 +1,19 @@
- # This file is a part of Exopticon, a free video surveillance tool. Visit
- # https://exopticon.org for more information.
- #
- # Copyright (C) 2018 David Matthew Mattli
- #
- # This program is free software: you can redistribute it and/or modify
- # it under the terms of the GNU Affero General Public License as published by
- # the Free Software Foundation, either version 3 of the License, or
- # (at your option) any later version.
- #
- # This program is distributed in the hope that it will be useful,
- # but WITHOUT ANY WARRANTY; without even the implied warranty of
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU Affero General Public License for more details.
- # You should have received a copy of the GNU Affero General Public License
- # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# This file is a part of Exopticon, a free video surveillance tool. Visit
+# https://exopticon.org for more information.
+#
+# Copyright (C) 2018 David Matthew Mattli
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 defmodule Exopticon.CapturePort do
   @moduledoc """
@@ -106,23 +106,24 @@ defmodule Exopticon.CapturePort do
   end
 
   # Handle messages from port
-  def handle_port_message({%{"jpegFrame" => dec, "pts" => pts}, %{
-                              port: port,
-                              id: id,
-                              monotonic_index: monotonic_index,
-                              video_unit_id: video_unit_id,
-                              frame_index: frame_index,
-                              port_args: port_args
-                           }}) do
-    ExopticonWeb.Endpoint.broadcast!(
-      "camera:stream",
-      "jpg",
-      %{
-        cameraId: id,
-        frameJpeg: Msgpax.Bin.new(dec),
-        pts: pts,
-        res: "hd"
-      })
+  def handle_port_message(
+        {%{"jpegFrame" => dec, "pts" => pts},
+         %{
+           port: port,
+           id: id,
+           monotonic_index: monotonic_index,
+           video_unit_id: video_unit_id,
+           frame_index: frame_index,
+           port_args: port_args
+         }}
+      ) do
+    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
+      cameraId: id,
+      frameJpeg: Msgpax.Bin.new(dec),
+      pts: pts,
+      res: "hd"
+    })
+
     %{
       port: port,
       id: id,
@@ -133,38 +134,42 @@ defmodule Exopticon.CapturePort do
     }
   end
 
-  def handle_port_message({%{"jpegFrameScaled" => dec, "pts" => pts, "height" => _height}, %{
-                              port: port,
-                              id: id,
-                              monotonic_index: monotonic_index,
-                              video_unit_id: video_unit_id,
-                              frame_index: frame_index,
-                              port_args: port_args
-                           } = state}) do
-    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg",
-      %{
-        cameraId: id,
-        frameJpeg: Msgpax.Bin.new(dec),
-        pts: pts,
-        res: "sd"
-      })
+  def handle_port_message(
+        {%{"jpegFrameScaled" => dec, "pts" => pts, "height" => _height},
+         %{
+           port: port,
+           id: id,
+           monotonic_index: monotonic_index,
+           video_unit_id: video_unit_id,
+           frame_index: frame_index,
+           port_args: port_args
+         } = state}
+      ) do
+    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
+      cameraId: id,
+      frameJpeg: Msgpax.Bin.new(dec),
+      pts: pts,
+      res: "sd"
+    })
+
     state
   end
 
-  def handle_port_message({
-    %{"filename" => filename, "beginTime" => beginTime},
-    %{
-      port: port,
-      id: id,
-      monotonic_index: monotonic_index,
-      video_unit_id: video_unit_id,
-      frame_index: frame_index,
-      port_args: port_args
-    }}) do
+  def handle_port_message(
+        {%{"filename" => filename, "beginTime" => beginTime},
+         %{
+           port: port,
+           id: id,
+           monotonic_index: monotonic_index,
+           video_unit_id: video_unit_id,
+           frame_index: frame_index,
+           port_args: port_args
+         }}
+      ) do
     {:ok, start_time, _} = DateTime.from_iso8601(beginTime)
     monotonic_start = System.monotonic_time(:microsecond)
 
-    {:ok , video_unit} =
+    {:ok, video_unit} =
       %Exopticon.Video.VideoUnit{
         camera_id: id,
         begin_time: start_time,
@@ -177,21 +182,31 @@ defmodule Exopticon.CapturePort do
       }
       |> Repo.insert()
 
-    %{port: port, id: id, monotonic_index: monotonic_index, video_unit_id: video_unit.id, frame_index: 0, port_args: port_args}
+    %{
+      port: port,
+      id: id,
+      monotonic_index: monotonic_index,
+      video_unit_id: video_unit.id,
+      frame_index: 0,
+      port_args: port_args
+    }
   end
 
-  def handle_port_message({%{"filename" => filename, "endTime" => endTime}, %{
-                              port: port,
-                              id: id,
-                              monotonic_index: monotonic_index,
-                              video_unit_id: video_unit_id,
-                              frame_index: frame_index,
-                              port_args: port_args
-                           }}) do
+  def handle_port_message(
+        {%{"filename" => filename, "endTime" => endTime},
+         %{
+           port: port,
+           id: id,
+           monotonic_index: monotonic_index,
+           video_unit_id: video_unit_id,
+           frame_index: frame_index,
+           port_args: port_args
+         }}
+      ) do
     monotonic_stop = System.monotonic_time(:microsecond)
     {:ok, end_time, _} = DateTime.from_iso8601(endTime)
     video_unit = VideoUnit |> Repo.get(video_unit_id, preload: [:files]) |> Repo.preload(:files)
-    file = video_unit.files |> List.first
+    file = video_unit.files |> List.first()
 
     %{size: size} = File.stat!(filename)
 
@@ -204,7 +219,14 @@ defmodule Exopticon.CapturePort do
     |> Changeset.change(end_monotonic: monotonic_stop)
     |> Repo.update()
 
-    %{port: port, id: id, monotonic_index: monotonic_index, video_unit_id: 0, frame_index: -1, port_args: port_args}
+    %{
+      port: port,
+      id: id,
+      monotonic_index: monotonic_index,
+      video_unit_id: 0,
+      frame_index: -1,
+      port_args: port_args
+    }
   end
 
   def handle_port_message({%{"type" => "log", "level" => level, "message" => message}, state}) do
@@ -212,15 +234,17 @@ defmodule Exopticon.CapturePort do
     state
   end
 
-  def handle_info({port, {:data, msg}}, %{
-        port: port,
-        id: id,
-        monotonic_index: monotonic_index,
-        video_unit_id: video_unit_id,
-        frame_index: frame_index,
-        port_args: port_args
-      } = state) do
-
+  def handle_info(
+        {port, {:data, msg}},
+        %{
+          port: port,
+          id: id,
+          monotonic_index: monotonic_index,
+          video_unit_id: video_unit_id,
+          frame_index: frame_index,
+          port_args: port_args
+        } = state
+      ) do
     ret = {Msgpax.unpack!(msg), state} |> handle_port_message
 
     {:noreply, ret}
@@ -242,11 +266,21 @@ defmodule Exopticon.CapturePort do
     # sleep for five seconds and then restart the port
     :timer.sleep(5000)
     new_port = start_port(port_args)
-    {:noreply, %{port: new_port, id: id, monotonic_index: monotonic_index, video_unit_id: 0, frame_index: -1, port_args: port_args}}
+
+    {:noreply,
+     %{
+       port: new_port,
+       id: id,
+       monotonic_index: monotonic_index,
+       video_unit_id: 0,
+       frame_index: -1,
+       port_args: port_args
+     }}
   end
 
   def terminate(_reason, %{id: _, port: port}) do
     Logger.info("Capture port terminated!")
+
     if Port.info(port) != nil do
     end
 

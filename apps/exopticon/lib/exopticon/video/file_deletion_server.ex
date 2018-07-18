@@ -1,19 +1,19 @@
- # This file is a part of Exopticon, a free video surveillance tool. Visit
- # https://exopticon.org for more information.
- #
- # Copyright (C) 2018 David Matthew Mattli
- #
- # This program is free software: you can redistribute it and/or modify
- # it under the terms of the GNU Affero General Public License as published by
- # the Free Software Foundation, either version 3 of the License, or
- # (at your option) any later version.
- #
- # This program is distributed in the hope that it will be useful,
- # but WITHOUT ANY WARRANTY; without even the implied warranty of
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU Affero General Public License for more details.
- # You should have received a copy of the GNU Affero General Public License
- # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# This file is a part of Exopticon, a free video surveillance tool. Visit
+# https://exopticon.org for more information.
+#
+# Copyright (C) 2018 David Matthew Mattli
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 require Logger
 
@@ -35,7 +35,8 @@ defmodule Exopticon.Video.FileDeletionServer do
   end
 
   def handle_info(:work, []) do
-    Logger.debug("starting work")
+    Logger.debug(fn -> "starting work" end)
+
     Video.list_camera_groups()
     |> handle_groups()
 
@@ -57,7 +58,11 @@ defmodule Exopticon.Video.FileDeletionServer do
     max_size_bytes = max_size * 1024 * 1024
     delete_amount = video_size - max_size_bytes
 
-    Logger.debug("Max size bytes: #{Integer.to_string(max_size_bytes)} Delete amount: #{Integer.to_string(delete_amount)}")
+    Logger.debug(fn ->
+      "Max size bytes: #{Integer.to_string(max_size_bytes)} Delete amount: #{
+        Integer.to_string(delete_amount)
+      }"
+    end)
 
     if delete_amount > 0 do
       files = Video.get_oldest_files_in_group(camera_group_id, 1000)

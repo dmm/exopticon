@@ -46,7 +46,6 @@ defmodule Exopticon.AccountsTest do
       assert user.username == user2.username
       assert user.name == user2.name
       assert user.timezone == user2.timezone
-
     end
 
     test "create_user/1 with valid data creates a user" do
@@ -54,7 +53,7 @@ defmodule Exopticon.AccountsTest do
       assert user.name == "some name"
       assert user.password == "some password"
       # Don't test password hashing. Assume it's correct.
-      #assert user.password_hash == "some password_hash"
+      # assert user.password_hash == "some password_hash"
       assert user.username == "some username"
     end
 
@@ -69,7 +68,7 @@ defmodule Exopticon.AccountsTest do
       assert user.name == "some updated name"
       assert user.password == "some updated password"
       # Don't test password hashing. Assume it's correct.
-      #assert user.password_hash == "some updated password_hash"
+      # assert user.password_hash == "some updated password_hash"
       assert user.username == "some updated username"
     end
 

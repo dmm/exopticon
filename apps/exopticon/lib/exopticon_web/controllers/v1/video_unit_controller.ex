@@ -6,7 +6,7 @@ defmodule ExopticonWeb.V1.VideoUnitController do
   alias Exopticon.Video
   alias Exopticon.Video.VideoUnit
 
-  action_fallback ExopticonWeb.FallbackController
+  action_fallback(ExopticonWeb.FallbackController)
 
   def index(conn, %{"camera_id" => camera_id}) do
     video_units = Video.list_video_units_by_camera(camera_id)
@@ -37,6 +37,7 @@ defmodule ExopticonWeb.V1.VideoUnitController do
 
   def delete(conn, %{"id" => id}) do
     video_unit = Video.get_video_unit!(id)
+
     with {:ok, %VideoUnit{}} <- Video.delete_video_unit(video_unit) do
       send_resp(conn, :no_content, "")
     end
@@ -47,5 +48,4 @@ defmodule ExopticonWeb.V1.VideoUnitController do
 
     render(conn, "index.json", video_units: videos)
   end
-
 end

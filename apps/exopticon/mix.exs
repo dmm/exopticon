@@ -71,9 +71,10 @@ defmodule Exopticon.Mixfile do
       {:cowboy, "~> 1.0"},
       {:msgpax, "~> 2.0"},
       {:comeonin, "~> 4.0"},
-      {:bcrypt_elixir, "~> 0.12.0"},
+      {:bcrypt_elixir, "~> 1.0"},
       {:credo, github: "rrrene/credo", only: [:dev, :test], runtime: false},
-      {:timex, "~> 3.2.2"},
+      {:timex, "~> 3.3"},
+      {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
       {:exvif, in_umbrella: true}
     ]
   end

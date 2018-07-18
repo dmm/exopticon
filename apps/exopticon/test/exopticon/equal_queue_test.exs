@@ -40,4 +40,3 @@ defmodule Exopticon.EqualQueueTest do
     assert val3 == val1
   end
 end
-

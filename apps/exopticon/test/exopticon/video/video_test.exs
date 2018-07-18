@@ -266,9 +266,27 @@ defmodule Exopticon.VideoTest do
   describe "video_units" do
     alias Exopticon.Video.VideoUnit
 
-    @valid_attrs %{begin_monotonic: 42, begin_time: "2010-04-17 14:00:00.000000Z", end_monotonic: 42, end_time: "2010-04-17 14:00:00.000000Z", monotonic_index: 42}
-    @update_attrs %{begin_monotonic: 43, begin_time: "2011-05-18 15:01:01.000000Z", end_monotonic: 43, end_time: "2011-05-18 15:01:01.000000Z", monotonic_index: 43}
-    @invalid_attrs %{begin_monotonic: nil, begin_time: nil, end_monotonic: nil, end_time: nil, monotonic_index: nil}
+    @valid_attrs %{
+      begin_monotonic: 42,
+      begin_time: "2010-04-17 14:00:00.000000Z",
+      end_monotonic: 42,
+      end_time: "2010-04-17 14:00:00.000000Z",
+      monotonic_index: 42
+    }
+    @update_attrs %{
+      begin_monotonic: 43,
+      begin_time: "2011-05-18 15:01:01.000000Z",
+      end_monotonic: 43,
+      end_time: "2011-05-18 15:01:01.000000Z",
+      monotonic_index: 43
+    }
+    @invalid_attrs %{
+      begin_monotonic: nil,
+      begin_time: nil,
+      end_monotonic: nil,
+      end_time: nil,
+      monotonic_index: nil
+    }
 
     def video_unit_fixture(attrs \\ %{}) do
       {:ok, video_unit} =
@@ -292,7 +310,10 @@ defmodule Exopticon.VideoTest do
     test "create_video_unit/1 with valid data creates a video_unit" do
       assert {:ok, %VideoUnit{} = video_unit} = Video.create_video_unit(@valid_attrs)
       assert video_unit.begin_monotonic == 42
-      assert video_unit.begin_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
+
+      assert video_unit.begin_time ==
+               DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
+
       assert video_unit.end_monotonic == 42
       assert video_unit.end_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
       assert video_unit.monotonic_index == 42
@@ -307,7 +328,10 @@ defmodule Exopticon.VideoTest do
       assert {:ok, video_unit} = Video.update_video_unit(video_unit, @update_attrs)
       assert %VideoUnit{} = video_unit
       assert video_unit.begin_monotonic == 43
-      assert video_unit.begin_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
+
+      assert video_unit.begin_time ==
+               DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
+
       assert video_unit.end_monotonic == 43
       assert video_unit.end_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
       assert video_unit.monotonic_index == 43

@@ -317,15 +317,12 @@ defmodule Exvif.Cam do
     profiles = fetch_profiles(url, username, password)
 
     uris =
-      Enum.into(
-        Enum.map(profiles, fn p ->
-          {
-            String.to_atom(p[:profile_token]),
-            fetch_stream_uri(url, username, password, p[:profile_token])
-          }
-        end),
-        %{}
-      )
+      Enum.into(profiles, %{}, fn p ->
+        {
+          String.to_atom(p[:profile_token]),
+          fetch_stream_uri(url, username, password, p[:profile_token])
+        }
+      end)
 
     device_information = fetch_device_information(url, username, password)
     network_interfaces = fetch_network_interfaces(url, username, password)

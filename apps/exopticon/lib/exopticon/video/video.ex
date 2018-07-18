@@ -1,22 +1,21 @@
- # This file is a part of Exopticon, a free video surveillance tool. Visit
- # https://exopticon.org for more information.
- #
- # Copyright (C) 2018 David Matthew Mattli
- #
- # This program is free software: you can redistribute it and/or modify
- # it under the terms of the GNU Affero General Public License as published by
- # the Free Software Foundation, either version 3 of the License, or
- # (at your option) any later version.
- #
- # This program is distributed in the hope that it will be useful,
- # but WITHOUT ANY WARRANTY; without even the implied warranty of
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU Affero General Public License for more details.
- # You should have received a copy of the GNU Affero General Public License
- # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# This file is a part of Exopticon, a free video surveillance tool. Visit
+# https://exopticon.org for more information.
+#
+# Copyright (C) 2018 David Matthew Mattli
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
- defmodule Exopticon.Video do
+defmodule Exopticon.Video do
   @moduledoc """
   The Video context.
   """
@@ -27,8 +26,8 @@
   alias Exopticon.FileLibrary
   alias Exopticon.Repo
   alias Exopticon.Video.CameraGroup
-  alias Exvif.Cam
   alias Exopticon.Video.VideoUnit
+  alias Exvif.Cam
 
   @doc """
   Returns the list of camera_groups.
@@ -390,8 +389,8 @@
         where:
           v.camera_id == ^camera_id and ^end_time >= v.begin_time and ^begin_time <= v.end_time and
             not is_nil(v.end_monotonic),
-          order_by: [asc: v.monotonic_index, asc: v.begin_monotonic],
-          preload: [:files]
+        order_by: [asc: v.monotonic_index, asc: v.begin_monotonic],
+        preload: [:files]
       )
 
     Repo.all(query) || []
@@ -478,6 +477,7 @@
         preload: [:files],
         order_by: [asc: v.monotonic_index, asc: v.begin_monotonic]
       )
+
     Repo.all(query) || []
   end
 
@@ -486,15 +486,15 @@
   """
   def list_video_units_between(camera_id, begin_time, end_time) do
     query =
-    from(
-      v in VideoUnit,
-      where: 1==1
-      and v.camera_id == ^camera_id
-      and not is_nil(v.end_monotonic)
-      and ^begin_time <= v.end_time and ^end_time >= v.begin_time,
-      preload: [:files],
-      order_by: [asc: v.monotonic_index, asc: v.begin_monotonic]
-    )
+      from(
+        v in VideoUnit,
+        where:
+          v.camera_id == ^camera_id and not is_nil(v.end_monotonic) and ^begin_time <= v.end_time and
+            ^end_time >= v.begin_time,
+        preload: [:files],
+        order_by: [asc: v.monotonic_index, asc: v.begin_monotonic]
+      )
+
     Repo.all(query) || []
   end
 

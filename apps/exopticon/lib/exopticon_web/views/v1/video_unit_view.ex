@@ -11,7 +11,8 @@ defmodule ExopticonWeb.V1.VideoUnitView do
   end
 
   def render("video_unit.json", %{video_unit: video_unit}) do
-    %{id: video_unit.id,
+    %{
+      id: video_unit.id,
       begin_time: video_unit.begin_time,
       end_time: video_unit.end_time,
       begin_monotonic: video_unit.begin_monotonic,
