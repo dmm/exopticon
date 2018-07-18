@@ -34,31 +34,9 @@ defmodule ExopticonWeb.V1.CameraController do
     json(conn, %{id: id})
   end
 
-  def availability(conn, %{"id" => id} = params) do
-    end_time_string = Map.get(params, "end_time", Timex.now() |> Timex.format("{ISO:Extended}"))
+  def video(conn, %{"id" => id, "begin_time" => begin_time, "end_time" => end_time}) do
+    videos = Video.list_video_units_between(id, begin_time, end_time)
 
-    {:ok, end_time} = Timex.parse(end_time_string, "{ISO:Extended}")
-
-    begin_time_string =
-      Map.get(
-        params,
-        "begin_time",
-        end_time |> Timex.shift(hours: -6) |> Timex.format("{ISO:Extended}")
-      )
-
-    {:ok, begin_time} = Timex.parse(begin_time_string, "{ISO:Extended}")
-
-    chunks = Video.get_video_coverage(id, begin_time, end_time)
-    files = Video.get_files_between(id, begin_time, end_time)
-
-    files2 = Enum.map(files, fn f -> f |> Map.from_struct() |> Map.delete(:__meta__) end)
-
-    json(conn, %{
-      camera_id: id,
-      begin_time: chunks.begin_time,
-      end_time: chunks.end_time,
-      availability: chunks.availability,
-      files: files2
-    })
+    render(conn, "index.json", video_units: videos)
   end
 end

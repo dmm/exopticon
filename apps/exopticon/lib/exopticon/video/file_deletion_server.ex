@@ -18,6 +18,7 @@ defmodule Exopticon.Video.FileDeletionServer do
   end
 
   def handle_info(:work, []) do
+    Logger.debug("starting work")
     Video.list_camera_groups()
     |> handle_groups()
 
@@ -38,6 +39,8 @@ defmodule Exopticon.Video.FileDeletionServer do
     video_size = Video.get_total_video_size(camera_group_id)
     max_size_bytes = max_size * 1024 * 1024
     delete_amount = video_size - max_size_bytes
+
+    Logger.debug("Max size bytes: #{Integer.to_string(max_size_bytes)} Delete amount: #{Integer.to_string(delete_amount)}")
 
     if delete_amount > 0 do
       files = Video.get_oldest_files_in_group(camera_group_id, 1000)

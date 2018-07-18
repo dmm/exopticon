@@ -18,10 +18,12 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
+import {ZonedDateTime, ZoneOffset} from 'js-joda';
 
 import FileBrowser from '../../components/file_browser.js';
 import MainView from '../main';
 import socket from '../../socket';
+
 
 /**
  * FileBrowser class
@@ -46,7 +48,11 @@ export default class view extends MainView {
     let cameraId = parseInt(document.getElementById('singleCamera')
                             .getAttribute('data-id'), 10);
 
-    fetch(`/v1/video_units/?camera_id=${cameraId}`, {
+    const now = ZonedDateTime.now(ZoneOffset.UTC);
+    const endTime = now.minusMinutes(now.minute()).plusHours(1);
+      const beginTime = now.minusDays(30);
+
+    fetch(`/v1/video_units/between?camera_id=${cameraId}&begin_time=${beginTime.toString()}&end_time=${endTime.toString()}`, {
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',

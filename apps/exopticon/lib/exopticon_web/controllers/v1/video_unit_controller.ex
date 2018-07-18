@@ -41,4 +41,11 @@ defmodule ExopticonWeb.V1.VideoUnitController do
       send_resp(conn, :no_content, "")
     end
   end
+
+  def between(conn, %{"camera_id" => id, "begin_time" => begin_time, "end_time" => end_time}) do
+    videos = Video.list_video_units_between(id, begin_time, end_time)
+
+    render(conn, "index.json", video_units: videos)
+  end
+
 end

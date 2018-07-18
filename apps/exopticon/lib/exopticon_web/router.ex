@@ -41,6 +41,8 @@ defmodule ExopticonWeb.Router do
     post("/cameras/:id/relativeMove", V1.CameraController, :relativeMove, as: :cameras_v1)
     get("/cameras/:id/availability", V1.CameraController, :availability, as: :cameras_v1)
     get("/files/", V1.FileController, :index)
-    resources "/video_units", V1.VideoUnitController, except: [:new, :edit], as: :video_unit_v1
+    get("/video_units/between", V1.VideoUnitController, :between, as: :video_unit_v1)
+    resources("/video_units", V1.VideoUnitController, except: [:new, :edit], as: :video_unit_v1)
+
   end
 end
