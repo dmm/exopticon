@@ -89,8 +89,8 @@ defmodule ExopticonWeb.UserControllerTest do
       conn = put(conn, Routes.user_path(conn, :update, user), user: @update_attrs)
       assert redirected_to(conn) == Routes.user_path(conn, :show, user)
 
-#      conn = get(conn, Routes.user_path(conn, :show, user))
-#      assert html_response(conn, 200) =~ "some updated name"
+      #      conn = get(conn, Routes.user_path(conn, :show, user))
+      #      assert html_response(conn, 200) =~ "some updated name"
     end
 
     test "renders errors when data is invalid", %{conn: conn, user: user} do

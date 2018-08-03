@@ -29,7 +29,6 @@ defmodule ExopticonWeb.CameraGroupControllerTest do
     end
   end
 
-
   describe "index" do
     @describetag login_as: "some user"
     test "lists all camera_groups", %{conn: conn} do
@@ -79,7 +78,12 @@ defmodule ExopticonWeb.CameraGroupControllerTest do
     setup [:create_camera_group]
 
     test "redirects when data is valid", %{conn: conn, camera_group: camera_group} do
-      conn = put(conn, Routes.camera_group_path(conn, :update, camera_group), camera_group: @update_attrs)
+      conn =
+        put(
+          conn,
+          Routes.camera_group_path(conn, :update, camera_group),
+          camera_group: @update_attrs
+        )
 
       assert redirected_to(conn) == Routes.camera_group_path(conn, :show, camera_group)
 
@@ -88,7 +92,12 @@ defmodule ExopticonWeb.CameraGroupControllerTest do
     end
 
     test "renders errors when data is invalid", %{conn: conn, camera_group: camera_group} do
-      conn = put(conn, Routes.camera_group_path(conn, :update, camera_group), camera_group: @invalid_attrs)
+      conn =
+        put(
+          conn,
+          Routes.camera_group_path(conn, :update, camera_group),
+          camera_group: @invalid_attrs
+        )
 
       assert html_response(conn, 200) =~ "Edit Camera group"
     end

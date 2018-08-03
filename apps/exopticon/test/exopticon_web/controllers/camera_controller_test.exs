@@ -48,7 +48,6 @@ defmodule ExopticonWeb.CameraControllerTest do
   end
 
   setup %{conn: conn} = config do
-
     if username = config[:login_as] do
       user = user_fixture(username: username)
       conn = assign(conn, :current_user, user)
@@ -59,16 +58,17 @@ defmodule ExopticonWeb.CameraControllerTest do
     end
   end
 
-
   test "requires user authentication on all actions", %{conn: conn} do
-    Enum.each([
-      get(conn, Routes.camera_path(conn, :new))
-    ], fn conn ->
-      assert html_response(conn, 302)
-      assert conn.halted
-    end)
+    Enum.each(
+      [
+        get(conn, Routes.camera_path(conn, :new))
+      ],
+      fn conn ->
+        assert html_response(conn, 302)
+        assert conn.halted
+      end
+    )
   end
-
 
   describe "index" do
     @describetag login_as: "some user"
@@ -116,7 +116,6 @@ defmodule ExopticonWeb.CameraControllerTest do
       assert html_response(conn, 200) =~ "Edit Camera"
     end
   end
-
 
   describe "update camera" do
     @describetag login_as: "some user"

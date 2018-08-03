@@ -34,7 +34,6 @@ defmodule ExopticonWeb.FileControllerTest do
     end
   end
 
-
   describe "index" do
     @describetag login_as: "some user"
     test "lists all files", %{conn: conn} do

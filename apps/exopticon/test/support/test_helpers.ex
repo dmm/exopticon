@@ -42,12 +42,13 @@ defmodule Exopticon.TestHelpers do
     {:ok, user} =
       attrs
       |> Enum.into(%{
-          name: "Some User",
-          username: "user#{System.unique_integer([:positive])}",
-          password: "supersecret",
-          timezone: "ETC/UTC"
-                   })
-                   |> Accounts.register_user()
-      user
+        name: "Some User",
+        username: "user#{System.unique_integer([:positive])}",
+        password: "supersecret",
+        timezone: "ETC/UTC"
+      })
+      |> Accounts.register_user()
+
+    user
   end
 end

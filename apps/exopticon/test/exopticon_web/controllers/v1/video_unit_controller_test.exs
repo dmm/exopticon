@@ -40,10 +40,10 @@ defmodule ExopticonWeb.V1.VideoUnitControllerTest do
 
   describe "index" do
     @describetag login_as: "some user"
-#    test "lists all video_units", %{conn: conn} do
-#$      conn = get(conn, Routes.video_unit_v1_path(conn, :index))
-#      assert json_response(conn, 200)["data"] == []
-#    end
+    #    test "lists all video_units", %{conn: conn} do
+    # $      conn = get(conn, Routes.video_unit_v1_path(conn, :index))
+    #      assert json_response(conn, 200)["data"] == []
+    #    end
   end
 
   defp create_video_unit(_) do

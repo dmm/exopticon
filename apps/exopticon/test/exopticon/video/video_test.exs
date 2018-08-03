@@ -103,7 +103,6 @@ defmodule Exopticon.VideoTest do
       ptz_type: "onvif_continuous",
       ptz_profile_token: "token2",
       mode: "disabled"
-
     }
     @invalid_attrs %{
       fps: nil,
@@ -119,6 +118,7 @@ defmodule Exopticon.VideoTest do
 
     def camera_fixture(attrs \\ %{}) do
       camera_group = camera_group_fixture()
+
       {:ok, camera} =
         attrs
         |> Enum.into(@valid_attrs)
@@ -208,6 +208,7 @@ defmodule Exopticon.VideoTest do
 
     def file_fixture(attrs \\ %{}) do
       video_unit = video_unit_fixture()
+
       {:ok, file} =
         attrs
         |> Enum.into(@valid_attrs)

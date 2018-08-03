@@ -35,11 +35,11 @@ defmodule Exopticon.Video.File do
     file
     |> cast(attrs, [
       :filename,
-      :size,
+      :size
     ])
     |> validate_required([
       :filename,
-      :size,
+      :size
     ])
   end
 end
