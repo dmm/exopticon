@@ -19,7 +19,8 @@ defmodule ExopticonWeb.ConnCase do
     quote do
       # Import conveniences for testing with connections
       use Phoenix.ConnTest
-      import ExopticonWeb.Router.Helpers
+      import Exopticon.TestHelpers
+      alias ExopticonWeb.Router.Helpers, as: Routes
 
       # The default endpoint for testing
       @endpoint ExopticonWeb.Endpoint

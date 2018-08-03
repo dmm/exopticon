@@ -27,7 +27,7 @@ defmodule Exopticon.Video.CameraGroup do
     field(:max_storage_size, :integer)
     field(:name, :string)
     field(:storage_path, :string)
-
+    has_many(:cameras, Exopticon.Video.Camera)
     timestamps()
   end
 

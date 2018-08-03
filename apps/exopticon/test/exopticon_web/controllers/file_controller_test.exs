@@ -6,110 +6,113 @@ defmodule ExopticonWeb.FileControllerTest do
   alias Exopticon.Video
 
   @create_attrs %{
-    begin_monotonic: 42,
-    begin_time: "2010-04-17 14:00:00.000000Z",
-    end_monotonic: 42,
-    end_time: "2010-04-17 14:00:00.000000Z",
     filename: "some filename",
-    monotonic_index: 42,
     size: 42
   }
   @update_attrs %{
-    begin_monotonic: 43,
-    begin_time: "2011-05-18 15:01:01.000000Z",
-    end_monotonic: 43,
-    end_time: "2011-05-18 15:01:01.000000Z",
     filename: "some updated filename",
-    monotonic_index: 43,
     size: 43
   }
   @invalid_attrs %{
-    begin_monotonic: nil,
-    begin_time: nil,
-    end_monotonic: nil,
-    end_time: nil,
     filename: nil,
-    monotonic_index: nil,
     size: nil
   }
 
   def fixture(:file) do
-    {:ok, file} = Video.create_file(@create_attrs)
-    file
+    {:ok, test_file} = Video.create_file(@create_attrs)
+    test_file
   end
 
+  setup %{conn: conn} = config do
+    if username = config[:login_as] do
+      user = user_fixture(username: username)
+      conn = assign(conn, :current_user, user)
+
+      {:ok, conn: conn, user: user, login_as: username}
+    else
+      :ok
+    end
+  end
+
+
   describe "index" do
+    @describetag login_as: "some user"
     test "lists all files", %{conn: conn} do
-      conn = get(conn, file_path(conn, :index))
+      conn = get(conn, Routes.file_path(conn, :index))
       assert html_response(conn, 200) =~ "Listing Files"
     end
   end
 
   describe "new file" do
+    @describetag login_as: "some user"
     test "renders form", %{conn: conn} do
-      conn = get(conn, file_path(conn, :new))
+      conn = get(conn, Routes.file_path(conn, :new))
       assert html_response(conn, 200) =~ "New File"
     end
   end
 
   describe "create file" do
+    @describetag login_as: "some user"
     test "redirects to show when data is valid", %{conn: conn} do
-      conn = post(conn, file_path(conn, :create), file: @create_attrs)
+      conn = post(conn, Routes.file_path(conn, :create), file: @create_attrs)
 
       assert %{id: id} = redirected_params(conn)
-      assert redirected_to(conn) == file_path(conn, :show, id)
+      assert redirected_to(conn) == Routes.file_path(conn, :show, id)
 
-      conn = get(conn, file_path(conn, :show, id))
+      conn = get(conn, Routes.file_path(conn, :show, id))
       assert html_response(conn, 200) =~ "Show File"
     end
 
     test "renders errors when data is invalid", %{conn: conn} do
-      conn = post(conn, file_path(conn, :create), file: @invalid_attrs)
+      conn = post(conn, Routes.file_path(conn, :create), file: @invalid_attrs)
       assert html_response(conn, 200) =~ "New File"
     end
   end
 
   describe "edit file" do
+    @describetag login_as: "some user"
     setup [:create_file]
 
-    test "renders form for editing chosen file", %{conn: conn, file: file} do
-      conn = get(conn, file_path(conn, :edit, file))
+    test "renders form for editing chosen file", %{conn: conn, test_file: test_file} do
+      conn = get(conn, Routes.file_path(conn, :edit, test_file))
       assert html_response(conn, 200) =~ "Edit File"
     end
   end
 
   describe "update file" do
+    @describetag login_as: "some user"
     setup [:create_file]
 
-    test "redirects when data is valid", %{conn: conn, file: file} do
-      conn = put(conn, file_path(conn, :update, file), file: @update_attrs)
-      assert redirected_to(conn) == file_path(conn, :show, file)
+    test "redirects when data is valid", %{conn: conn, test_file: test_file} do
+      conn = put(conn, Routes.file_path(conn, :update, test_file), file: @update_attrs)
+      assert redirected_to(conn) == Routes.file_path(conn, :show, test_file)
 
-      conn = get(conn, file_path(conn, :show, file))
+      conn = get(conn, Routes.file_path(conn, :show, test_file))
       assert html_response(conn, 200) =~ "some updated filename"
     end
 
-    test "renders errors when data is invalid", %{conn: conn, file: file} do
-      conn = put(conn, file_path(conn, :update, file), file: @invalid_attrs)
+    test "renders errors when data is invalid", %{conn: conn, test_file: test_file} do
+      conn = put(conn, Routes.file_path(conn, :update, test_file), file: @invalid_attrs)
       assert html_response(conn, 200) =~ "Edit File"
     end
   end
 
   describe "delete file" do
+    @describetag login_as: "some user"
     setup [:create_file]
 
-    test "deletes chosen file", %{conn: conn, file: file} do
-      conn = delete(conn, file_path(conn, :delete, file))
-      assert redirected_to(conn) == file_path(conn, :index)
+    test "deletes chosen file", %{conn: conn, test_file: test_file} do
+      conn = delete(conn, Routes.file_path(conn, :delete, test_file))
+      assert redirected_to(conn) == Routes.file_path(conn, :index)
 
       assert_error_sent(404, fn ->
-        get(conn, file_path(conn, :show, file))
+        get(conn, Routes.file_path(conn, :show, test_file))
       end)
     end
   end
 
   defp create_file(_) do
     file = fixture(:file)
-    {:ok, file: file}
+    {:ok, test_file: file}
   end
 end

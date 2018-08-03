@@ -26,8 +26,7 @@ defmodule Exopticon.Video.File do
   schema "files" do
     field(:filename, :string)
     field(:size, :integer)
-    field(:video_unit_id, :id)
-
+    belongs_to(:video_unit, Exopticon.Video.VideoUnit)
     timestamps()
   end
 
@@ -37,12 +36,10 @@ defmodule Exopticon.Video.File do
     |> cast(attrs, [
       :filename,
       :size,
-      :video_unit_id
     ])
     |> validate_required([
       :filename,
       :size,
-      :video_unit_id
     ])
   end
 end

@@ -18,74 +18,92 @@ defmodule ExopticonWeb.CameraGroupControllerTest do
     camera_group
   end
 
+  setup %{conn: conn} = config do
+    if username = config[:login_as] do
+      user = user_fixture(username: username)
+      conn = assign(conn, :current_user, user)
+
+      {:ok, conn: conn, user: user}
+    else
+      :ok
+    end
+  end
+
+
   describe "index" do
+    @describetag login_as: "some user"
     test "lists all camera_groups", %{conn: conn} do
-      conn = get(conn, camera_group_path(conn, :index))
+      conn = get(conn, Routes.camera_group_path(conn, :index))
       assert html_response(conn, 200) =~ "Listing Camera groups"
     end
   end
 
   describe "new camera_group" do
+    @describetag login_as: "some user"
     test "renders form", %{conn: conn} do
-      conn = get(conn, camera_group_path(conn, :new))
+      conn = get(conn, Routes.camera_group_path(conn, :new))
       assert html_response(conn, 200) =~ "New Camera group"
     end
   end
 
   describe "create camera_group" do
+    @describetag login_as: "some user"
     test "redirects to show when data is valid", %{conn: conn} do
-      conn = post(conn, camera_group_path(conn, :create), camera_group: @create_attrs)
+      conn = post(conn, Routes.camera_group_path(conn, :create), camera_group: @create_attrs)
 
       assert %{id: id} = redirected_params(conn)
-      assert redirected_to(conn) == camera_group_path(conn, :show, id)
+      assert redirected_to(conn) == Routes.camera_group_path(conn, :show, id)
 
-      conn = get(conn, camera_group_path(conn, :show, id))
+      conn = get(conn, Routes.camera_group_path(conn, :show, id))
       assert html_response(conn, 200) =~ "Show Camera group"
     end
 
     test "renders errors when data is invalid", %{conn: conn} do
-      conn = post(conn, camera_group_path(conn, :create), camera_group: @invalid_attrs)
+      conn = post(conn, Routes.camera_group_path(conn, :create), camera_group: @invalid_attrs)
       assert html_response(conn, 200) =~ "New Camera group"
     end
   end
 
   describe "edit camera_group" do
+    @describetag login_as: "some user"
     setup [:create_camera_group]
 
     test "renders form for editing chosen camera_group", %{conn: conn, camera_group: camera_group} do
-      conn = get(conn, camera_group_path(conn, :edit, camera_group))
+      conn = get(conn, Routes.camera_group_path(conn, :edit, camera_group))
       assert html_response(conn, 200) =~ "Edit Camera group"
     end
   end
 
   describe "update camera_group" do
+    @describetag login_as: "some user"
     setup [:create_camera_group]
 
     test "redirects when data is valid", %{conn: conn, camera_group: camera_group} do
-      conn = put(conn, camera_group_path(conn, :update, camera_group), camera_group: @update_attrs)
+      conn = put(conn, Routes.camera_group_path(conn, :update, camera_group), camera_group: @update_attrs)
 
-      assert redirected_to(conn) == camera_group_path(conn, :show, camera_group)
+      assert redirected_to(conn) == Routes.camera_group_path(conn, :show, camera_group)
 
-      conn = get(conn, camera_group_path(conn, :show, camera_group))
+      conn = get(conn, Routes.camera_group_path(conn, :show, camera_group))
       assert html_response(conn, 200) =~ "some updated name"
     end
 
     test "renders errors when data is invalid", %{conn: conn, camera_group: camera_group} do
-      conn = put(conn, camera_group_path(conn, :update, camera_group), camera_group: @invalid_attrs)
+      conn = put(conn, Routes.camera_group_path(conn, :update, camera_group), camera_group: @invalid_attrs)
 
       assert html_response(conn, 200) =~ "Edit Camera group"
     end
   end
 
   describe "delete camera_group" do
+    @describetag login_as: "some user"
     setup [:create_camera_group]
 
     test "deletes chosen camera_group", %{conn: conn, camera_group: camera_group} do
-      conn = delete(conn, camera_group_path(conn, :delete, camera_group))
-      assert redirected_to(conn) == camera_group_path(conn, :index)
+      conn = delete(conn, Routes.camera_group_path(conn, :delete, camera_group))
+      assert redirected_to(conn) == Routes.camera_group_path(conn, :index)
 
       assert_error_sent(404, fn ->
-        get(conn, camera_group_path(conn, :show, camera_group))
+        get(conn, Routes.camera_group_path(conn, :show, camera_group))
       end)
     end
   end

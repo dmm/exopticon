@@ -54,6 +54,7 @@
 -->
 
 <div id="singleCamera" data-id=<%= @camera.id %>>
+  <h1>Show Camera</h1>
   <div id="allCameras">
   </div>
   <div id="progress"></div>

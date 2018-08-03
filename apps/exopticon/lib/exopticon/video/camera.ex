@@ -59,6 +59,5 @@ defmodule Exopticon.Video.Camera do
       :mode
     ])
     |> validate_required([:name, :ip, :fps, :mac, :username, :type, :mode])
-    |> put_change(:camera_group_id, 1)
   end
 end

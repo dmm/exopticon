@@ -85,7 +85,10 @@ defmodule Exopticon.VideoTest do
       password: "some password",
       rtsp_url: "some rtsp_url",
       type: "some type",
-      username: "some username"
+      username: "some username",
+      ptz_type: "onvif",
+      ptz_profile_token: "token1",
+      mode: "enabled"
     }
     @update_attrs %{
       fps: 43,
@@ -96,7 +99,11 @@ defmodule Exopticon.VideoTest do
       password: "some updated password",
       rtsp_url: "some updated rtsp_url",
       type: "some updated type",
-      username: "some updated username"
+      username: "some updated username",
+      ptz_type: "onvif_continuous",
+      ptz_profile_token: "token2",
+      mode: "disabled"
+
     }
     @invalid_attrs %{
       fps: nil,
@@ -111,9 +118,11 @@ defmodule Exopticon.VideoTest do
     }
 
     def camera_fixture(attrs \\ %{}) do
+      camera_group = camera_group_fixture()
       {:ok, camera} =
         attrs
         |> Enum.into(@valid_attrs)
+        |> Map.put(:camera_group_id, camera_group.id)
         |> Video.create_camera()
 
       camera
@@ -147,6 +156,7 @@ defmodule Exopticon.VideoTest do
     end
 
     test "update_camera/2 with valid data updates the camera" do
+      camera_group = camera_group_fixture()
       camera = camera_fixture()
       assert {:ok, camera} = Video.update_camera(camera, @update_attrs)
       assert %Camera{} = camera
@@ -189,19 +199,19 @@ defmodule Exopticon.VideoTest do
     }
     @update_attrs %{
       filename: "some updated filename",
-      video_unit_id: 43,
       size: 43
     }
     @invalid_attrs %{
       filename: nil,
-      video_unit_id: nil,
       size: nil
     }
 
     def file_fixture(attrs \\ %{}) do
+      video_unit = video_unit_fixture()
       {:ok, file} =
         attrs
         |> Enum.into(@valid_attrs)
+        |> Map.put(:video_unit_id, video_unit.id)
         |> Video.create_file()
 
       file
@@ -219,12 +229,7 @@ defmodule Exopticon.VideoTest do
 
     test "create_file/1 with valid data creates a file" do
       assert {:ok, %File{} = file} = Video.create_file(@valid_attrs)
-      assert file.begin_monotonic == 42
-      assert file.begin_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
-      assert file.end_monotonic == 42
-      assert file.end_time == DateTime.from_naive!(~N[2010-04-17 14:00:00.000000Z], "Etc/UTC")
       assert file.filename == "some filename"
-      assert file.monotonic_index == 42
       assert file.size == 42
     end
 
@@ -236,12 +241,7 @@ defmodule Exopticon.VideoTest do
       file = file_fixture()
       assert {:ok, file} = Video.update_file(file, @update_attrs)
       assert %File{} = file
-      assert file.begin_monotonic == 43
-      assert file.begin_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
-      assert file.end_monotonic == 43
-      assert file.end_time == DateTime.from_naive!(~N[2011-05-18 15:01:01.000000Z], "Etc/UTC")
       assert file.filename == "some updated filename"
-      assert file.monotonic_index == 43
       assert file.size == 43
     end
 

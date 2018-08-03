@@ -47,6 +47,7 @@ defmodule ExopticonWeb.CameraController do
 
   def show(conn, %{"id" => id}) do
     camera = Video.get_camera!(id)
+
     render(conn, "show.html", camera: camera)
   end
 

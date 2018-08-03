@@ -16,31 +16,6 @@
     <%= @file.size %> (<%= @file.size / 1024 / 1024 %> MiB)
   </li>
 
-  <li>
-    <strong>Begin time:</strong>
-    <%= @file.begin_time %>
-  </li>
-
-  <li>
-    <strong>End time:</strong>
-    <%= @file.end_time %>
-  </li>
-
-  <li>
-    <strong>Begin monotonic:</strong>
-    <%= @file.begin_monotonic %>
-  </li>
-
-  <li>
-    <strong>End monotonic:</strong>
-    <%= @file.end_monotonic %>
-  </li>
-
-  <li>
-    <strong>Monotonic index:</strong>
-    <%= @file.monotonic_index %>
-  </li>
-
 </ul>
 
 <span><%= link "Edit", to: file_path(@conn, :edit, @file) %></span>

@@ -18,6 +18,7 @@ defmodule Exopticon.TestHelpers do
   @moduledoc """
   Provides helpers for Exopticon unit tests
   """
+  alias Exopticon.Accounts
   alias Exopticon.Repo
 
   def insert_user(attrs \\ %{}) do
@@ -26,13 +27,27 @@ defmodule Exopticon.TestHelpers do
         %{
           name: "Some User",
           username: "user#{Base.encode16(:crypto.strong_rand_bytes(8))}",
-          password: "supersecret"
+          password: "supersecret",
+          timezone: "ETC/UTC"
         },
         attrs
       )
 
     %Exopticon.Accounts.User{}
     |> Exopticon.Accounts.User.registration_changeset(changes)
-    |> Repo.insert!()
+    |> Exopticon.Accounts.create_user()
+  end
+
+  def user_fixture(attrs \\ %{}) do
+    {:ok, user} =
+      attrs
+      |> Enum.into(%{
+          name: "Some User",
+          username: "user#{System.unique_integer([:positive])}",
+          password: "supersecret",
+          timezone: "ETC/UTC"
+                   })
+                   |> Accounts.register_user()
+      user
   end
 end

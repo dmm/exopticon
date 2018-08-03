@@ -32,10 +32,11 @@ defmodule ExopticonWeb.Auth do
 
   def call(conn, {:ok, repo}) do
     user_id = get_session(conn, :user_id)
+    env = Application.get_env(:exopticon, :env)
 
     cond do
-      user = conn.assigns[:current_user] ->
-        put_current_user(conn, user)
+      user = env == :test && conn.assigns[:current_user] ->
+        login(conn, user)
 
       user = user_id && repo.get(Exopticon.Accounts.User, user_id) ->
         put_current_user(conn, user)

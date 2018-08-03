@@ -101,4 +101,10 @@ defmodule Exopticon.Accounts do
   def change_user(%User{} = user) do
     User.changeset(user, %{})
   end
+
+  def register_user(attrs \\ %{}) do
+    %User{}
+    |> User.registration_changeset(attrs)
+    |> Repo.insert()
+  end
 end
