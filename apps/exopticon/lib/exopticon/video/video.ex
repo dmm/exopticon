@@ -23,7 +23,6 @@ defmodule Exopticon.Video do
   import Ecto.Query, warn: false
   #  import Logger
 
-  alias Exopticon.FileLibrary
   alias Exopticon.Repo
   alias Exopticon.Video.CameraGroup
   alias Exopticon.Video.VideoUnit

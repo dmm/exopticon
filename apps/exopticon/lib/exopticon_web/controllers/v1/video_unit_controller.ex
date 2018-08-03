@@ -4,7 +4,6 @@ defmodule ExopticonWeb.V1.VideoUnitController do
   plug(:authenticate_user)
 
   alias Exopticon.Video
-  alias Exopticon.Video.VideoUnit
 
   action_fallback(ExopticonWeb.FallbackController)
 

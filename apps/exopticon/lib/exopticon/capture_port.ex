@@ -30,7 +30,7 @@ defmodule Exopticon.CapturePort do
   require Logger
 
   ### Client API
-  def start_link({id, _, _, _} = state, opts \\ []) do
+  def start_link({id, _, _, _} = state, _) do
     GenServer.start_link(__MODULE__, state, name: via_tuple(id))
   end
 
@@ -137,12 +137,12 @@ defmodule Exopticon.CapturePort do
   def handle_port_message(
         {%{"jpegFrameScaled" => dec, "pts" => pts, "height" => _height},
          %{
-           port: port,
+           port: _,
            id: id,
-           monotonic_index: monotonic_index,
-           video_unit_id: video_unit_id,
-           frame_index: frame_index,
-           port_args: port_args
+           monotonic_index: _,
+           video_unit_id: _,
+           frame_index: _,
+           port_args: _
          } = state}
       ) do
     ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
@@ -161,8 +161,8 @@ defmodule Exopticon.CapturePort do
            port: port,
            id: id,
            monotonic_index: monotonic_index,
-           video_unit_id: video_unit_id,
-           frame_index: frame_index,
+           video_unit_id: _,
+           frame_index: _,
            port_args: port_args
          }}
       ) do
@@ -199,7 +199,7 @@ defmodule Exopticon.CapturePort do
            id: id,
            monotonic_index: monotonic_index,
            video_unit_id: video_unit_id,
-           frame_index: frame_index,
+           frame_index: _,
            port_args: port_args
          }}
       ) do
@@ -229,7 +229,7 @@ defmodule Exopticon.CapturePort do
     }
   end
 
-  def handle_port_message({%{"type" => "log", "level" => level, "message" => message}, state}) do
+  def handle_port_message({%{"type" => "log", "level" => _, "message" => message}, state}) do
     Logger.debug(message)
     state
   end
@@ -238,11 +238,11 @@ defmodule Exopticon.CapturePort do
         {port, {:data, msg}},
         %{
           port: port,
-          id: id,
-          monotonic_index: monotonic_index,
-          video_unit_id: video_unit_id,
-          frame_index: frame_index,
-          port_args: port_args
+          id: _,
+          monotonic_index: _,
+          video_unit_id: _,
+          frame_index: _,
+          port_args: _
         } = state
       ) do
     ret = {Msgpax.unpack!(msg), state} |> handle_port_message
@@ -255,12 +255,12 @@ defmodule Exopticon.CapturePort do
     {:stop, reason, state}
   end
 
-  def handle_info({_port, {:exit_status, status}}, %{
-        port: port,
+  def handle_info({_port, {:exit_status, _}}, %{
+        port: _,
         id: id,
         monotonic_index: monotonic_index,
-        video_unit_id: video_unit_id,
-        frame_index: frame_index,
+        video_unit_id: _,
+        frame_index: _,
         port_args: port_args
       }) do
     # sleep for five seconds and then restart the port
