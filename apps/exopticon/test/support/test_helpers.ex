@@ -19,7 +19,6 @@ defmodule Exopticon.TestHelpers do
   Provides helpers for Exopticon unit tests
   """
   alias Exopticon.Accounts
-  alias Exopticon.Repo
 
   def insert_user(attrs \\ %{}) do
     changes =

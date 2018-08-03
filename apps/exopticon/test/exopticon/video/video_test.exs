@@ -156,7 +156,6 @@ defmodule Exopticon.VideoTest do
     end
 
     test "update_camera/2 with valid data updates the camera" do
-      camera_group = camera_group_fixture()
       camera = camera_fixture()
       assert {:ok, camera} = Video.update_camera(camera, @update_attrs)
       assert %Camera{} = camera
