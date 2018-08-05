@@ -30,8 +30,8 @@ defmodule Exopticon.CapturePort do
   require Logger
 
   ### Client API
-  def start_link({id, _, _, _} = state, _) do
-    GenServer.start_link(__MODULE__, state, name: via_tuple(id))
+  def start_link({id, _, _, _} = state, opts \\ []) do
+    GenServer.start_link(__MODULE__, state, [name: via_tuple(id)] ++ opts)
   end
 
   def child_spec(camera) do
