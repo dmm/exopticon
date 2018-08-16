@@ -11,6 +11,10 @@ html, body, .container-fluid {
     width: 100%;
 }
 
+a {
+  color: #ffb000;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
