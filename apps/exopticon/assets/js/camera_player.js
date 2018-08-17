@@ -15,10 +15,14 @@ class CameraPlayer {
     this.camera = camera;
     Object.assign(this, camera);
     this.relativeMoveUrl = `/v1/cameras/${camera.id}/relativeMove`;
+    this.annotationUrl = '/v1/annotations';
     this.status = 'paused';
     this.channel = channel;
     this.img = null;
     this.statusCallback = () => {};
+    this.frameIndex = 0;
+    this.offset = 0;
+    this.videoUnitId = 0;
 
     // Bind functions so they can be used as callbacks
     // and use 'this'.
@@ -26,6 +30,7 @@ class CameraPlayer {
     this.right = this.right.bind(this);
     this.up = this.up.bind(this);
     this.down = this.down.bind(this);
+    this.takeSnapshot = this.takeSnapshot.bind(this);
   }
   /**
    * Change player status, firing callbacks if different
@@ -51,6 +56,9 @@ class CameraPlayer {
 
     this.channel.join(this.camera.id, (data) => {
       if (this.status !== 'paused' && this.img !== null) {
+        this.frameIndex = data.frameIndex;
+        this.offset = data.offset;
+        this.videoUnitId = data.videoUnitId;
         this.setStatus('playing');
         this.img.renderArrayIfReady(data.frameJpeg);
         cb();
@@ -138,6 +146,35 @@ class CameraPlayer {
    */
   down() {
     this.relativeMove('0.0', '-0.1');
+  }
+
+  /**
+   * take snapshot of frame
+   *
+   */
+  takeSnapshot() {
+    const id = this.videoUnitId;
+    const index = this.frameIndex;
+    const offset = this.offset;
+    console.log(`Taking snapshot of ${id} ${index}`);
+    if (id !== 0 && index !== 0) {
+      fetch(this.annotationUrl,
+          {
+            method: 'post',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              video_unit_id: id,
+              frame_index: index,
+              offset: offset,
+              key: 'snapshot', value: 'snapshot', source: 'user', ul_x: -1, ul_y: -1, width: -1, height: -1}),
+    }).then(function(response) {
+      if (callback) callback(response);
+    });
+
+    }
   }
 }
 

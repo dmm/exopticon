@@ -15,38 +15,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-defmodule Exopticon.Video.VideoUnit do
+defmodule Exopticon.Video.FrameCaptureSupervisor do
   @moduledoc """
-  Provides schema for Video.VideoUnit
+  Provides supervisor for FrameCaptureServer.
   """
-  use Ecto.Schema
-  import Ecto.Changeset
-  alias Exopticon.Video.VideoUnit
+  use Supervisor
 
-  schema "video_units" do
-    field(:begin_monotonic, :integer)
-    field(:begin_time, :utc_datetime)
-    field(:end_monotonic, :integer)
-    field(:end_time, :utc_datetime)
-    field(:monotonic_index, :integer)
-
-    belongs_to(:camera, Exopticon.Video.Camera)
-    has_many(:files, Exopticon.Video.File)
-    has_many(:annotations, Exopticon.Video.Annotation)
-
-    timestamps()
+  def start_link do
+    Supervisor.start_link(__MODULE__, [], name: __MODULE__)
   end
 
-  @doc false
-  def changeset(%VideoUnit{} = video_unit, attrs) do
-    video_unit
-    |> cast(attrs, [:begin_time, :end_time, :begin_monotonic, :end_monotonic, :monotonic_index])
-    |> validate_required([
-      :begin_time,
-      :end_time,
-      :begin_monotonic,
-      :end_monotonic,
-      :monotonic_index
-    ])
+  def init(_) do
+    children = [
+      worker(Exopticon.Video.FrameCaptureServer, [], restart: :permanent)
+    ]
+
+    supervise(children, strategy: :one_for_one)
   end
 end

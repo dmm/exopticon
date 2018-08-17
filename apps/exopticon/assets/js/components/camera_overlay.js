@@ -28,6 +28,7 @@ class CameraOverlay extends React.Component {
     this.touchEnd = this.touchEnd.bind(this);
     this.goToCamera = this.goToCamera.bind(this);
     this.goToCameraEdit = this.goToCameraEdit.bind(this);
+    this.goToSnapshots = this.goToSnapshots.bind(this);
   }
 
   /**
@@ -112,6 +113,14 @@ class CameraOverlay extends React.Component {
   }
 
   /**
+   * got to camera snapshot page
+   * @private
+   */
+  goToSnapshots() {
+    location.href = this.props.camera.link + '/snapshots';
+  }
+
+  /**
    * render CameraOverlay
    * @return {Object} returns react instance for camera overlay
    */
@@ -133,6 +142,16 @@ class CameraOverlay extends React.Component {
           label="&#9881;"
           extraClass="camera-edit-link"
           onClick={this.goToCameraEdit}
+          />
+        <OverlayButton
+          label="&#x1f5bc;"
+          extraClass="snapshot-view-button"
+          onClick={this.goToSnapshots}
+          />
+        <OverlayButton
+          label="&#x1f4f7;"
+          extraClass="snapshot-button"
+          onClick={this.props.camera.takeSnapshot}
           />
       </div>
     );
@@ -173,6 +192,16 @@ class CameraOverlay extends React.Component {
             label="▼"
             extraClass="down-arrow"
             onClick={this.props.camera.down} />
+          <OverlayButton
+            label="&#x1f5bc;"
+            extraClass="snapshot-view-button"
+            onClick={this.goToSnapshots}
+            />
+          <OverlayButton
+            label="&#x1f4f7;"
+            extraClass="snapshot-button"
+            onClick={this.props.camera.takeSnapshot}
+            />
         </div>
       );
     }

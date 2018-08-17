@@ -20,9 +20,9 @@ defmodule ExopticonWeb.Transports.MessagePackSerializer do
 
   @behaviour Phoenix.Transports.Serializer
 
-  alias Phoenix.Socket.Reply
-  alias Phoenix.Socket.Message
   alias Phoenix.Socket.Broadcast
+  alias Phoenix.Socket.Message
+  alias Phoenix.Socket.Reply
 
   def fastlane!(%Broadcast{} = msg) do
     {

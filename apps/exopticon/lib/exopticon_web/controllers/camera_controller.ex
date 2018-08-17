@@ -17,6 +17,7 @@
 
 defmodule ExopticonWeb.CameraController do
   use ExopticonWeb, :controller
+  use Timex
 
   plug(:authenticate_user)
 
@@ -83,5 +84,113 @@ defmodule ExopticonWeb.CameraController do
   def playback(conn, %{"id" => id}) do
     camera = Video.get_camera!(id)
     render(conn, "playback.html", camera: camera)
+  end
+
+  defp date_to_timespan(date) do
+    day_start = date |> Timex.set(hour: 00, minute: 00, second: 00)
+    day_end = day_start |> Timex.set(hour: 23, minute: 59, second: 59)
+
+    {day_start, day_end}
+  end
+
+  defp get_snapshot_counts(id, date) do
+    {day_start, day_end} = date_to_timespan(date)
+    start_utc = day_start |> Timezone.convert("Z")
+    end_utc = day_end |> Timezone.convert("Z")
+
+    today_count = Video.get_snapshot_count(id, start_utc, end_utc)
+
+    yesterday_count =
+      Video.get_snapshot_count(
+        id,
+        start_utc |> Timex.shift(days: -1),
+        end_utc |> Timex.shift(days: -1)
+      )
+
+    {today_count, yesterday_count}
+  end
+
+  def snapshots(conn, %{"id" => id} = parameters) do
+    {offset, _} = Integer.parse(parameters["offset"] || "0")
+    date = Timex.now(conn.assigns.current_user.timezone)
+    {day_start, day_end} = date_to_timespan(date)
+    {today_count, yesterday_count} = get_snapshot_counts(id, date)
+
+    camera = Video.get_camera!(id)
+    snapshots = Video.list_recent_snapshots(id, 24, offset)
+    user = conn.assigns.current_user
+
+    snapshot_count =
+      Video.get_snapshot_count(
+        id,
+        Timex.now() |> Timex.shift(years: -1000),
+        Timex.now() |> Timex.shift(years: 1000)
+      )
+
+    render(
+      conn,
+      "snapshots.html",
+      title: "Latest Snapshots",
+      camera: camera,
+      snapshots: snapshots,
+      user: user,
+      today_count: today_count,
+      yesterday_count: yesterday_count,
+      prev_count: offset,
+      next_count: snapshot_count - (offset + 24)
+    )
+  end
+
+  def snapshots_today(conn, %{"id" => id}) do
+    date = Timex.now(conn.assigns.current_user.timezone)
+    {day_start, day_end} = date_to_timespan(date)
+    {today_count, yesterday_count} = get_snapshot_counts(id, date)
+
+    camera = Video.get_camera!(id)
+    snapshots = Video.list_snapshots_between(id, day_start, day_end)
+    user = conn.assigns.current_user
+
+    render(
+      conn,
+      "snapshots.html",
+      title: "Today's Snapshots",
+      camera: camera,
+      snapshots: snapshots,
+      user: user,
+      today_count: today_count,
+      yesterday_count: yesterday_count,
+      prev_count: 0,
+      next_count: 0
+    )
+  end
+
+  def snapshots_yesterday(conn, %{"id" => id}) do
+    date = Timex.now(conn.assigns.current_user.timezone)
+    {day_start, day_end} = date_to_timespan(date)
+    {today_count, yesterday_count} = get_snapshot_counts(id, date)
+
+    camera = Video.get_camera!(id)
+
+    snapshots =
+      Video.list_snapshots_between(
+        id,
+        day_start |> Timex.shift(days: -1),
+        day_end |> Timex.shift(days: -1)
+      )
+
+    user = conn.assigns.current_user
+
+    render(
+      conn,
+      "snapshots.html",
+      title: "Yesterday's Snapshots",
+      camera: camera,
+      snapshots: snapshots,
+      user: user,
+      today_count: today_count,
+      yesterday_count: yesterday_count,
+      prev_count: 0,
+      next_count: 0
+    )
   end
 end

@@ -436,10 +436,10 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
         return resizedFrame;
 }
 
-int send_scaled_frame(AVFrame *frame, const int pts, const int width, const int height)
+int send_scaled_frame(AVFrame *frame, const int offset, const int width, const int height)
 {
         struct FrameMessage message;
-        message.pts = pts;
+        message.offset = offset;
 
         AVPacket jpeg_pkt;
         av_init_packet(&jpeg_pkt);
@@ -460,10 +460,10 @@ int send_scaled_frame(AVFrame *frame, const int pts, const int width, const int 
         return 0;
 }
 
-int send_full_frame(AVFrame *frame, const int pts)
+int send_full_frame(AVFrame *frame, const int offset)
 {
         struct FrameMessage message;
-        message.pts = pts;
+        message.offset = offset;
 
         AVPacket jpegPkt;
         av_init_packet(&jpegPkt);
@@ -471,7 +471,7 @@ int send_full_frame(AVFrame *frame, const int pts)
 
         message.jpeg = jpegPkt.buf->data;
         message.jpeg_size = jpegPkt.buf->size;
-        message.pts = pts;
+        message.offset = offset;
 
         send_frame_message(&message);
 
@@ -550,9 +550,19 @@ int push_frame(struct in_context *in, AVPacket *pkt)
                 av_log(NULL, AV_LOG_FATAL, "Error receiving frame: %s", errbuf);
                 goto cleanup;
         }
+        AVRational nsec = av_make_q(1, 1E9); // one billion
+        struct timespec pts_ts;
+        pts_ts.tv_sec = (frame->pts * in->st->time_base.num) / in->st->time_base.den;
+        int64_t frac_sec =
+          frame->pts - ((pts_ts.tv_sec * in->st->time_base.den) / in->st->time_base.num);
+        pts_ts.tv_nsec =
+          av_rescale_q(frac_sec, in->st->time_base, nsec);
 
-        send_full_frame(frame, frame->pts);
-        send_scaled_frame(frame, frame->pts, 640, 360);
+        // calculate offset in milliseconds
+        const int offset_ms = (pts_ts.tv_sec * 1000) + (pts_ts.tv_nsec / 1000000);
+
+        send_full_frame(frame, offset_ms);
+        send_scaled_frame(frame, offset_ms, 640, 360);
 
 cleanup:
         av_frame_free(&frame);

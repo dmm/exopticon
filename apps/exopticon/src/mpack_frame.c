@@ -39,8 +39,8 @@ void send_frame_message(struct FrameMessage *msg)
         mpack_start_map(&writer, 2);
         mpack_write_cstr(&writer, "jpegFrame");
         mpack_write_bin(&writer, (char*)msg->jpeg, (uint32_t)msg->jpeg_size);
-        mpack_write_cstr(&writer, "pts");
-        mpack_write_i64(&writer, msg->pts);
+        mpack_write_cstr(&writer, "offset");
+        mpack_write_i64(&writer, msg->offset);
         mpack_finish_map(&writer);
 
         if (mpack_writer_destroy(&writer) != mpack_ok) {
@@ -69,8 +69,8 @@ void send_scaled_frame_message(struct FrameMessage *msg, const int32_t height)
         mpack_write_bin(&writer, (char*)msg->jpeg, (uint32_t)msg->jpeg_size);
         mpack_write_cstr(&writer, "height");
         mpack_write_i32(&writer, height);
-        mpack_write_cstr(&writer, "pts");
-        mpack_write_i64(&writer, msg->pts);
+        mpack_write_cstr(&writer, "offset");
+        mpack_write_i64(&writer, msg->offset);
         mpack_finish_map(&writer);
 
         if (mpack_writer_destroy(&writer) != mpack_ok) {

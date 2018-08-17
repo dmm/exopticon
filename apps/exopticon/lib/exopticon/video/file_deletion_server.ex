@@ -23,6 +23,9 @@ defmodule Exopticon.Video.FileDeletionServer do
   """
   use GenServer
 
+  import Ecto.Query
+  alias Exopticon.Repo
+
   alias Exopticon.Video
 
   def start_link do
@@ -92,6 +95,7 @@ defmodule Exopticon.Video.FileDeletionServer do
     stat = File.stat(file.filename)
 
     Video.delete_file(file)
+    delete_video_unit(file.video_unit_id)
 
     if elem(stat, 0) == :ok do
       File.rm(file.filename)
@@ -99,6 +103,26 @@ defmodule Exopticon.Video.FileDeletionServer do
     else
       0
     end
+  end
+
+  def delete_video_unit(id) do
+    query =
+      from(
+        v in Video.VideoUnit,
+        where: v.id == ^id,
+        preload: [:annotations]
+      )
+
+    vu = Repo.one(query)
+
+    Enum.each(vu.annotations, fn a ->
+      Logger.info("Deleting annotation: #{Integer.to_string(a.id)}")
+      Video.delete_annotation(a)
+    end)
+
+    Logger.info("Deleting video unit: " <> Integer.to_string(vu.id))
+    {:ok, _} = Video.delete_video_unit(vu)
+    :ok
   end
 
   defp schedule_work do

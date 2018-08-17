@@ -48,6 +48,13 @@ defmodule ExopticonWeb.Router do
     resources("/files", FileController)
 
     get("/cameras/:id/playback", CameraController, :playback)
+    get("/cameras/:id/snapshots", CameraController, :snapshots)
+    get("/cameras/:id/snapshots/today", CameraController, :snapshots_today)
+    get("/cameras/:id/snapshots/yesterday", CameraController, :snapshots_yesterday)
+
+    # Annotations
+    get("/annotations/:id/sd_snapshot", AnnotationController, :sd_snapshot)
+    get("/annotations/:id/hd_snapshot", AnnotationController, :hd_snapshot)
   end
 
   # Other scopes may use custom stacks.
@@ -60,5 +67,6 @@ defmodule ExopticonWeb.Router do
     get("/files/", V1.FileController, :index)
     get("/video_units/between", V1.VideoUnitController, :between, as: :video_unit_v1)
     resources("/video_units", V1.VideoUnitController, except: [:new, :edit], as: :video_unit_v1)
+    resources("/annotations", V1.AnnotationController, except: [:new, :edit], as: :annotation_v1)
   end
 end

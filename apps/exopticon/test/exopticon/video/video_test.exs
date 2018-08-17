@@ -8,7 +8,12 @@ defmodule Exopticon.VideoTest do
   describe "camera_groups" do
     alias Exopticon.Video.CameraGroup
 
-    @valid_attrs %{max_storage_size: 42, name: "some name", storage_path: "some storage_path"}
+    @valid_attrs %{
+      id: 42,
+      max_storage_size: 42,
+      name: "some name",
+      storage_path: "some storage_path"
+    }
     @update_attrs %{
       max_storage_size: 43,
       name: "some updated name",
@@ -352,6 +357,116 @@ defmodule Exopticon.VideoTest do
     test "change_video_unit/1 returns a video_unit changeset" do
       video_unit = video_unit_fixture()
       assert %Ecto.Changeset{} = Video.change_video_unit(video_unit)
+    end
+  end
+
+  describe "annotations" do
+    alias Exopticon.Video.Annotation
+
+    @valid_attrs %{
+      frame_index: 42,
+      offset: 0,
+      height: 42,
+      key: "some key",
+      source: "some source",
+      ul_x: 42,
+      ul_y: 42,
+      value: "some value",
+      width: 42,
+      hd_filename: "some value",
+      sd_filename: "some value"
+    }
+    @update_attrs %{
+      frame_index: 43,
+      offset: 1,
+      height: 43,
+      key: "some updated key",
+      source: "some updated source",
+      ul_x: 43,
+      ul_y: 43,
+      value: "some updated value",
+      width: 43,
+      hd_filename: "some updated value",
+      sd_filename: "some updated value"
+    }
+    @invalid_attrs %{
+      frame_index: nil,
+      offset: nil,
+      height: nil,
+      key: nil,
+      source: nil,
+      ul_x: nil,
+      ul_y: nil,
+      value: nil,
+      width: nil,
+      hd_filename: nil,
+      sd_filename: nil
+    }
+
+    def annotation_fixture(attrs \\ %{}) do
+      {:ok, annotation} =
+        attrs
+        |> Enum.into(@valid_attrs)
+        |> Video.create_annotation()
+
+      annotation
+    end
+
+    test "list_annotations/0 returns all annotations" do
+      annotation = annotation_fixture()
+      assert Video.list_annotations() == [annotation]
+    end
+
+    test "get_annotation!/1 returns the annotation with given id" do
+      annotation = annotation_fixture()
+      assert Video.get_annotation!(annotation.id) == annotation
+    end
+
+    test "create_annotation/1 with valid data creates a annotation" do
+      assert {:ok, %Annotation{} = annotation} = Video.create_annotation(@valid_attrs)
+      assert annotation.frame_index == 42
+      assert annotation.height == 42
+      assert annotation.key == "some key"
+      assert annotation.source == "some source"
+      assert annotation.ul_x == 42
+      assert annotation.ul_y == 42
+      assert annotation.value == "some value"
+      assert annotation.width == 42
+    end
+
+    test "create_annotation/1 with invalid data returns error changeset" do
+      assert {:error, %Ecto.Changeset{}} = Video.create_annotation(@invalid_attrs)
+    end
+
+    test "update_annotation/2 with valid data updates the annotation" do
+      annotation = annotation_fixture()
+      assert {:ok, annotation} = Video.update_annotation(annotation, @update_attrs)
+      assert %Annotation{} = annotation
+      assert annotation.frame_index == 43
+      assert annotation.height == 43
+      assert annotation.key == "some updated key"
+      assert annotation.source == "some updated source"
+      assert annotation.ul_x == 43
+      assert annotation.ul_y == 43
+      assert annotation.value == "some updated value"
+      assert annotation.width == 43
+    end
+
+    test "update_annotation/2 with invalid data returns error changeset" do
+      annotation = annotation_fixture()
+      assert {:error, %Ecto.Changeset{}} = Video.update_annotation(annotation, @invalid_attrs)
+      assert annotation == Video.get_annotation!(annotation.id)
+    end
+
+    test "delete_annotation/1 deletes the annotation" do
+      annotation = annotation_fixture()
+      assert {:ok, %Annotation{}} = Video.delete_annotation(annotation)
+      assert_raise Ecto.NoResultsError, fn -> Video.get_annotation!(annotation.id) end
+    end
+
+    test "change_annotation/1 returns a annotation changeset" do
+      annotation = annotation_fixture()
+      assert %Ecto.Changeset{} = Video.change_annotation(annotation)
     end
   end
 end

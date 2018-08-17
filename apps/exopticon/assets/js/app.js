@@ -21,6 +21,7 @@ import loadView from './views/loader';
 
 import '../css/phoenix.css';
 import '../css/components/green_theme.css';
+import '../css/snapshots.css';
 
 /**
  * called on dom content loaded event, determines the current view and

@@ -20,8 +20,9 @@ defmodule Exopticon.Video do
   The Video context.
   """
 
+  import File
   import Ecto.Query, warn: false
-  #  import Logger
+  require Logger
 
   alias Exopticon.Repo
   alias Exopticon.Video.CameraGroup
@@ -424,10 +425,12 @@ defmodule Exopticon.Video do
     query =
       from(
         f in File,
+        join: vu in VideoUnit,
+        on: f.video_unit_id == vu.id,
         join: c in Camera,
-        on: f.camera_id == c.id,
+        on: vu.camera_id == c.id,
         where: c.camera_group_id == ^camera_group_id,
-        order_by: [asc: f.monotonic_index, asc: f.begin_monotonic],
+        order_by: [asc: vu.monotonic_index, asc: vu.begin_monotonic],
         limit: ^count
       )
 
@@ -576,5 +579,181 @@ defmodule Exopticon.Video do
   """
   def change_video_unit(%VideoUnit{} = video_unit) do
     VideoUnit.changeset(video_unit, %{})
+  end
+
+  alias Exopticon.Video.Annotation
+
+  @doc """
+  Returns the list of annotations.
+
+  ## Examples
+
+      iex> list_annotations()
+      [%Annotation{}, ...]
+
+  """
+  def list_annotations do
+    Repo.all(Annotation)
+  end
+
+  def list_unframed_snapshots do
+    query =
+      from(
+        a in Exopticon.Video.Annotation,
+        join: vu in assoc(a, :video_unit),
+        join: f in assoc(vu, :files),
+        join: c in assoc(vu, :camera),
+        join: cg in assoc(c, :camera_group),
+        where: is_nil(a.hd_filename) and a.key == "snapshot",
+        preload: [video_unit: {vu, camera: {c, camera_group: cg}, files: f}]
+      )
+
+    Repo.all(query)
+  end
+
+  @doc """
+  Gets a single annotation.
+
+  Raises `Ecto.NoResultsError` if the Annotation does not exist.
+
+  ## Examples
+
+      iex> get_annotation!(123)
+      %Annotation{}
+
+      iex> get_annotation!(456)
+      ** (Ecto.NoResultsError)
+
+  """
+  def get_annotation!(id), do: Repo.get!(Annotation, id)
+
+  @doc """
+  Creates a annotation.
+
+  ## Examples
+
+      iex> create_annotation(%{field: value})
+      {:ok, %Annotation{}}
+
+      iex> create_annotation(%{field: bad_value})
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def create_annotation(attrs \\ %{}) do
+    ret =
+      %Annotation{}
+      |> Annotation.changeset(attrs)
+      |> Repo.insert()
+
+    ret
+  end
+
+  @doc """
+  Updates a annotation.
+
+  ## Examples
+
+      iex> update_annotation(annotation, %{field: new_value})
+      {:ok, %Annotation{}}
+
+      iex> update_annotation(annotation, %{field: bad_value})
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def update_annotation(%Annotation{} = annotation, attrs) do
+    annotation
+    |> Annotation.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a Annotation.
+
+  ## Examples
+
+      iex> delete_annotation(annotation)
+      {:ok, %Annotation{}}
+
+      iex> delete_annotation(annotation)
+      {:error, %Ecto.Changeset{}}
+
+  """
+  def delete_annotation(%Annotation{} = annotation) do
+    sd = annotation.sd_filename
+    hd = annotation.sd_filename
+    {:ok, ret} = Repo.delete(annotation)
+    rm(sd)
+    rm(hd)
+    {:ok, ret}
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking annotation changes.
+
+  ## Examples
+
+      iex> change_annotation(annotation)
+      %Ecto.Changeset{source: %Annotation{}}
+
+  """
+  def change_annotation(%Annotation{} = annotation) do
+    Annotation.changeset(annotation, %{})
+  end
+
+  @doc """
+  Returns a given number of snapshot annotations from the specified camera.
+  """
+  def list_recent_snapshots(camera_id, snapshot_count, offset \\ 0) do
+    query =
+      from(
+        a in Exopticon.Video.Annotation,
+        join: vu in assoc(a, :video_unit),
+        where: vu.camera_id == ^camera_id and a.key == "snapshot",
+        order_by: [desc: vu.monotonic_index, desc: vu.begin_monotonic],
+        limit: ^snapshot_count,
+        offset: ^offset,
+        preload: [video_unit: vu]
+      )
+
+    Repo.all(query) || []
+  end
+
+  @doc """
+  Returns snapshot between given dates
+  """
+  def list_snapshots_between(camera_id, begin_date, end_date) do
+    # THIS IS REALLY BROKEN. WE WILL FIX ONCE WE STORE ACTUAL annotation TIMESTAMPS
+    query =
+      from(
+        a in Exopticon.Video.Annotation,
+        join: vu in assoc(a, :video_unit),
+        where:
+          vu.camera_id == ^camera_id and a.key == "snapshot" and vu.begin_time >= ^begin_date and
+            vu.begin_time <= ^end_date,
+        order_by: [desc: vu.monotonic_index, desc: vu.begin_monotonic],
+        preload: [video_unit: vu]
+      )
+
+    Repo.all(query) || []
+  end
+
+  @doc """
+  Returns snapshot counts for date and camera_id.
+  """
+  def get_snapshot_count(camera_id, begin_time, end_time) do
+    Logger.info("Counting snapshots for #{camera_id} between #{begin_time} and #{end_time}")
+    # THIS IS REALLY BROKEN. WE WILL FIX ONCE WE STORE ACTUAL annotation TIMESTAMPS
+    query =
+      from(
+        a in Exopticon.Video.Annotation,
+        join: vu in assoc(a, :video_unit),
+        where:
+          vu.camera_id == ^camera_id and a.key == "snapshot" and vu.begin_time <= ^end_time and
+            vu.begin_time >= ^begin_time,
+        order_by: [desc: vu.monotonic_index, desc: vu.begin_monotonic],
+        preload: [video_unit: vu]
+      )
+
+    Repo.aggregate(query, :count, :id)
   end
 end

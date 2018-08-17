@@ -243,7 +243,7 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRationa
         struct FrameMessage message;
         message.jpeg = jpeg_packet.buf->data;
         message.jpeg_size = jpeg_packet.buf->size;
-        message.pts = frame->pts;
+        //        message.pts = frame->pts;
 
         do {
                 AVRational nsec = av_make_q(1, BILLION);

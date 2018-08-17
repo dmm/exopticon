@@ -15,38 +15,60 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-defmodule Exopticon.Video.VideoUnit do
+defmodule Exopticon.Video.Annotation do
   @moduledoc """
-  Provides schema for Video.VideoUnit
+  Provides schema for Video.Annotation
   """
   use Ecto.Schema
   import Ecto.Changeset
-  alias Exopticon.Video.VideoUnit
+  alias Exopticon.Video.Annotation
 
-  schema "video_units" do
-    field(:begin_monotonic, :integer)
-    field(:begin_time, :utc_datetime)
-    field(:end_monotonic, :integer)
-    field(:end_time, :utc_datetime)
-    field(:monotonic_index, :integer)
+  schema "annotations" do
+    field(:frame_index, :integer)
+    field(:offset, :integer)
+    field(:height, :integer)
+    field(:key, :string)
+    field(:source, :string)
+    field(:ul_x, :integer)
+    field(:ul_y, :integer)
+    field(:value, :string)
+    field(:width, :integer)
+    field(:hd_filename, :string)
+    field(:sd_filename, :string)
 
-    belongs_to(:camera, Exopticon.Video.Camera)
-    has_many(:files, Exopticon.Video.File)
-    has_many(:annotations, Exopticon.Video.Annotation)
+    belongs_to(:video_unit, Exopticon.Video.VideoUnit)
 
     timestamps()
   end
 
   @doc false
-  def changeset(%VideoUnit{} = video_unit, attrs) do
-    video_unit
-    |> cast(attrs, [:begin_time, :end_time, :begin_monotonic, :end_monotonic, :monotonic_index])
+  def changeset(%Annotation{} = annotation, attrs) do
+    annotation
+    |> cast(attrs, [
+      :key,
+      :value,
+      :source,
+      :frame_index,
+      :offset,
+      :video_unit_id,
+      :ul_x,
+      :ul_y,
+      :width,
+      :height,
+      :sd_filename,
+      :hd_filename
+    ])
     |> validate_required([
-      :begin_time,
-      :end_time,
-      :begin_monotonic,
-      :end_monotonic,
-      :monotonic_index
+      :key,
+      :value,
+      :source,
+      :frame_index,
+      :offset,
+      #      :video_unit_id,
+      :ul_x,
+      :ul_y,
+      :width,
+      :height
     ])
   end
 end
