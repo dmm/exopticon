@@ -57,7 +57,16 @@ struct PlayerState {
 
         AVFrame *frame;
         struct timespec begin_time;
+        int64_t first_pts;
 };
+
+static AVRational millisecond()
+{
+        AVRational millisecond;
+        millisecond.num = 1;
+        millisecond.den = 1000;
+        return millisecond;
+}
 
 static struct timespec time_diff(struct timespec old_time, struct timespec time)
 {
@@ -220,12 +229,8 @@ cleanup:
 
 int seek_to_offset(struct PlayerState *state, int64_t ms_offset)
 {
-        AVRational millisecond;
-        millisecond.num = 1;
-        millisecond.den = 1000;
-
         int64_t offset = av_rescale_q(ms_offset,
-                                      millisecond,
+                                      millisecond(),
                                       state->fcx->streams[state->i_index]->time_base);
 
         int flags = AVSEEK_FLAG_FRAME | AVSEEK_FLAG_BACKWARD;
@@ -235,7 +240,7 @@ int seek_to_offset(struct PlayerState *state, int64_t ms_offset)
         return 0;
 }
 
-int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRational time_base)
+int send_frame(const AVFrame *frame, struct timespec begin_time, int64_t first_pts, const AVRational time_base)
 {
         AVPacket jpeg_packet;
         av_init_packet(&jpeg_packet);
@@ -244,13 +249,14 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRationa
         message.jpeg = jpeg_packet.buf->data;
         message.jpeg_size = jpeg_packet.buf->size;
         //        message.pts = frame->pts;
+        int64_t pts = frame->pts - first_pts;
 
         do {
                 AVRational nsec = av_make_q(1, BILLION);
                 struct timespec pts_ts;
-                pts_ts.tv_sec = (frame->pts * time_base.num) / time_base.den;
+                pts_ts.tv_sec = (pts * time_base.num) / time_base.den;
                 int64_t frac_sec =
-                    frame->pts - ((pts_ts.tv_sec * time_base.den) / time_base.num);
+                    pts - ((pts_ts.tv_sec * time_base.den) / time_base.num);
                 pts_ts.tv_nsec =
                     av_rescale_q(frac_sec, time_base, nsec);
 
@@ -293,7 +299,7 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, const AVRationa
         return 0;
 }
 
-int handle_packet(struct PlayerState *state)
+int handle_packet(struct PlayerState *state, int64_t ms_offset)
 {
         /*
                 fprintf(stderr, "\npacket->pts: %lld, packet->dts: %lld, time_base: %lld,%lld\n",
@@ -334,7 +340,21 @@ int handle_packet(struct PlayerState *state)
                         goto cleanup;
                 }
 
-                send_frame(state->frame, state->begin_time, state->st->time_base);
+                // Check if we are beyond offset argument, if not,
+                // ignore frame.  The earlier call to seek_to_offset
+                // should have done most of the work, putting us on
+                // the proceeding I frame.
+                int64_t offset = av_rescale_q(ms_offset,
+                                              millisecond(),
+                                              state->fcx->streams[state->i_index]->time_base);
+                if (state->frame->pts < offset) {
+                        continue;
+                }
+                if (state->first_pts == -1) {
+                        state->first_pts = state->frame->pts;
+                }
+
+                send_frame(state->frame, state->begin_time, state->first_pts, state->st->time_base);
 
         } while (receive_ret != AVERROR(EOF));
 
@@ -416,6 +436,7 @@ int main(int argc, char *argv[])
         player.frame = av_frame_alloc();
         player.begin_time.tv_sec = 0;
         player.begin_time.tv_nsec = 0;
+        player.first_pts = -1;
 
         // Determine offset
         long long ms_offset = 0;
@@ -479,7 +500,7 @@ int main(int argc, char *argv[])
         seek_to_offset(&player, ms_offset);
         while (checkforquit() != 1 && (ret = av_read_frame(player.fcx, &player.pkt)) >= 0) {
                 // handle packet
-                handle_packet(&player);
+                handle_packet(&player, ms_offset);
                 av_packet_unref(&player.pkt);
                 av_init_packet(&player.pkt);
                 count++;
