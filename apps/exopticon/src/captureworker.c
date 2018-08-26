@@ -526,7 +526,7 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
         return 0;
 }
 
-int push_frame(struct in_context *in, AVPacket *pkt)
+int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
 {
         // Make sure packet is video
         if (pkt->stream_index != in->stream_index) {
@@ -552,9 +552,9 @@ int push_frame(struct in_context *in, AVPacket *pkt)
         }
         AVRational nsec = av_make_q(1, 1E9); // one billion
         struct timespec pts_ts;
-        pts_ts.tv_sec = (frame->pts * in->st->time_base.num) / in->st->time_base.den;
+        pts_ts.tv_sec = ((frame->pts - out->first_pts) * in->st->time_base.num) / in->st->time_base.den;
         int64_t frac_sec =
-          frame->pts - ((pts_ts.tv_sec * in->st->time_base.den) / in->st->time_base.num);
+          (frame->pts - out->first_pts) - ((pts_ts.tv_sec * in->st->time_base.den) / in->st->time_base.num);
         pts_ts.tv_nsec =
           av_rescale_q(frac_sec, in->st->time_base, nsec);
 
@@ -663,7 +663,7 @@ int main(int argc, char *argv[])
                         if (cam.out.fcx == NULL) {
                                 continue;
                         }
-                        push_frame(&cam.in, &cam.pkt);
+                        push_frame(&cam.in, &cam.out, &cam.pkt);
                         int write_ret = ex_write_output_packet(&cam.out, cam.in.st->time_base, &cam.pkt);
                         if (write_ret != 0) {
                                 bs_log("Write Error!");
