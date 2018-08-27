@@ -16,7 +16,7 @@
   width: 100vw !important;
   max-height: 100vh !important;
   background-color: black;
-  overflow-y: hidden;
+  overflow: hidden;
 }
 
 .camera-panel .wrapper.background {
