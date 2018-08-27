@@ -19,26 +19,26 @@
 import {Duration, ZonedDateTime} from 'js-joda';
 
 /**
- * FileLibrary stores and returns information about a sequence of
- * video files
+ * VideoLibrary stores and returns information about a sequence of
+ * video units
  * @class
  *
  */
 class FileLibrary {
   /**
-   * @param {List} files - list of video files to put in new library
+   * @param {List} files - list of video units to put in new library
    */
   constructor(files) {
     this.files = this.parseFiles(files);
   }
 
   /**
-   * @param {List} files - list of files to parse
-   * @return {List} list of parsed files
+   * @param {List} video_units - list of video_units to parse
+   * @return {List} list of parsed video units
    * @private
    */
-  parseFiles(files) {
-    return files.map((f) => {
+  parseFiles(video_units) {
+    return video_units.map((f) => {
       {
         let f2 = Object.assign({}, f);
         f2.begin_time = ZonedDateTime.parse(f.begin_time);
@@ -56,23 +56,28 @@ class FileLibrary {
     let time = datetime;
 
     if (typeof datetime === 'string') {
-      ZonedDateTime.parse(datetime);
+      time = ZonedDateTime.parse(datetime);
     }
 
     let ret = null;
 
-    this.files.forEach((f) => {
+    let file = this.files.find((f) => {
       if (f.begin_time.compareTo(time) <= 0) {
         if (f.end_time.compareTo(time) > 0) {
-          ret = {
-            file: f,
-            offset: Duration.between(f.begin_time, time).toMillis(),
-          };
-          return;
-        }
+          return true;
+        };
       }
+      return false;
     });
-    return ret;
+
+    if (file !== undefined) {
+      return {
+        file: file,
+        offset: Duration.between(file.begin_time, time).toMillis()
+      };
+    }
+
+    return undefined;
   }
 
   /**

@@ -1,5 +1,6 @@
 'use strict';
 
+import socket from './socket';
 import SuperImage from './super_image';
 
 /**
@@ -20,9 +21,7 @@ class CameraPlayer {
     this.channel = channel;
     this.img = null;
     this.statusCallback = () => {};
-    this.frameIndex = 0;
-    this.offset = 0;
-    this.videoUnitId = 0;
+    this.lastFrame = undefined;
 
     // Bind functions so they can be used as callbacks
     // and use 'this'.
@@ -32,6 +31,7 @@ class CameraPlayer {
     this.down = this.down.bind(this);
     this.takeSnapshot = this.takeSnapshot.bind(this);
   }
+
   /**
    * Change player status, firing callbacks if different
    * @param {string} newStatus - status to change to
@@ -56,9 +56,7 @@ class CameraPlayer {
 
     this.channel.join(this.camera.id, (data) => {
       if (this.status !== 'paused' && this.img !== null) {
-        this.frameIndex = data.frameIndex;
-        this.offset = data.offset;
-        this.videoUnitId = data.videoUnitId;
+        this.lastFrame = data;
         this.setStatus('playing');
         this.img.renderArrayIfReady(data.frameJpeg);
         cb();
@@ -152,10 +150,10 @@ class CameraPlayer {
    * take snapshot of frame
    *
    */
-  takeSnapshot() {
-    const id = this.videoUnitId;
-    const index = this.frameIndex;
-    const offset = this.offset;
+  takeSnapshot(callback) {
+    const id = this.lastFrame.videoUnitId;
+    const index = this.lastFrame.frameIndex;
+    const offset = this.lastFrame.offset;
     console.log(`Taking snapshot of ${id} ${index}`);
     if (id !== 0 && index !== 0) {
       fetch(this.annotationUrl,
@@ -170,10 +168,7 @@ class CameraPlayer {
               frame_index: index,
               offset: offset,
               key: 'snapshot', value: 'snapshot', source: 'user', ul_x: -1, ul_y: -1, width: -1, height: -1}),
-    }).then(function(response) {
-      if (callback) callback(response);
-    });
-
+          });
     }
   }
 }
