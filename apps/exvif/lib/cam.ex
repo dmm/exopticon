@@ -4,6 +4,7 @@ defmodule Exvif.Cam do
   """
 
   import Exvif.Util
+  import Timex
 
   def request_date_and_time(url) do
     body = """
@@ -32,6 +33,35 @@ defmodule Exvif.Cam do
     url
     |> request_date_and_time
     |> handle_date_and_time
+  end
+
+  def set_date_and_time(url, username, password, local_datetime) do
+    ts = fn x -> Integer.to_string(x) end
+    t = local_datetime
+
+    body =
+      envelope_header(username, password) <>
+        """
+        <SetSystemDateAndTime xmlns="http://www.onvif.org/ver10/device/wsdl">
+          <DateTimeType>Manual</DateTimeType>
+          <DaylightSavings>false</DaylightSavings>
+          <UTCDateTime>
+            <Time xmlns="http://www.onvif.org/ver10/schema">
+              <Hour>#{ts.(t.hour)}</Hour>
+              <Minute>#{ts.(t.minute)}</Minute>
+              <Second>#{ts.(t.second)}</Second>
+            </Time>
+            <Date xmlns="http://www.onvif.org/ver10/schema">
+              <Year>#{ts.(t.year)}</Year>
+              <Month>#{ts.(t.month)}</Month>
+              <Day>#{ts.(t.day)}</Day>
+            </Date>
+          </UTCDateTime>
+        </SetSystemDateAndTime>
+        """ <> envelope_footer()
+
+    IO.puts(body)
+    request(url, body)
   end
 
   def request_capabilities(url, username, password) do
