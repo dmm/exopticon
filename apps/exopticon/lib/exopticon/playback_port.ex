@@ -91,10 +91,12 @@ defmodule Exopticon.PlaybackPort do
   end
 
   ### Handle messages from port
-  def handle_message({%{"jpegFrame" => dec, "pts" => pts}, %{id: id, port: _, offset: _} = state}) do
+  def handle_message(
+        {%{"jpegFrame" => dec, "offset" => offset}, %{id: id, port: _, offset: _} = state}
+      ) do
     Endpoint.broadcast!(id, "jpg", %{
       frameJpeg: Bin.new(dec),
-      pts: pts
+      offset: offset
     })
 
     {:noreply, state}

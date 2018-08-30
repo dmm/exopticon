@@ -14,13 +14,13 @@
     <%= if @prev_count > 0 do %>
         <a style="margin-left: 10px;" class="button" href=<%= camera_path(@conn, :snapshots, @camera.id, offset: [0, @prev_count - 24] |> Enum.max) %>><-- Prev</a>
     <% else %>
-        <a style="margin-left: 10px; cursor: not-allowed;" class="button"><-- Prev</a>
+        <a style="visibility: hidden; margin-left: 10px; cursor: not-allowed;" class="button"><-- Prev</a>
     <% end %>
 
     <%= if @next_count > 0 do %>
         <a style="float: right; margin-right: 10px;" class="button" href=<%= camera_path(@conn, :snapshots, @camera.id, offset: @prev_count + 24) %>>Next --></a>
     <% else %>
-        <a style="float: right; margin-right: 10px; cursor: not-allowed;" class="button">Next --></a>
+        <a style="visibility: hidden; float: right; margin-right: 10px; cursor: not-allowed;" class="button">Next --></a>
     <% end %>
 </div>
 <div style="clear: both;">

@@ -38,10 +38,8 @@ defmodule Exopticon.Video.FrameCaptureServer do
 
   def handle_info(:work, []) do
     # Not working, let's go!
-    Logger.debug("Starting work!")
     annotations = Video.list_unframed_snapshots()
     work(annotations)
-    Logger.debug("All done!")
     schedule_work()
     {:noreply, []}
   end
@@ -110,7 +108,7 @@ defmodule Exopticon.Video.FrameCaptureServer do
       )
 
     Logger.debug(fn -> "Generating frames for #{input_file}" end)
-    Logger.info(output)
+    Logger.debug(output)
 
     if ret == 0 do
       {:ok, 0}

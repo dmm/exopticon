@@ -16,15 +16,22 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {use as jsJodaUse, ZonedDateTime, ZoneOffset} from 'js-joda';
+import {
+  use as jsJodaUse,
+  DateTimeFormatter,
+  LocalDateTime,
+  Duration,
+  ZonedDateTime,
+  ZoneOffset,
+} from 'js-joda';
 import jsJodaTimeZone from 'js-joda-timezone';
+
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import CameraManager from '../../camera_manager';
 import FileLibrary from '../../file_library';
 import MainView from '../main';
-import ProgressBar from '../../components/progress_bar';
+import CameraPlayerView from '../../components/camera_player_view';
 import socket from '../../socket';
 
 jsJodaUse(jsJodaTimeZone);
@@ -39,7 +46,6 @@ export default class view extends MainView {
    */
   constructor() {
     super();
-    this.fileLibrary = new FileLibrary([]);
   }
 
   /**
@@ -67,6 +73,31 @@ export default class view extends MainView {
   }
 
   /**
+   * fetches video_units for interval
+   * @param {Number} cameraId
+   * @param {ZonedDateTime} beginTime
+   * @param {ZonedDateTime} endTime
+   *
+   */
+  fetchAvailability(cameraId, beginTime, endTime) {
+    let request = new XMLHttpRequest();
+    request.open('GET', `/v1/video_units/between?camera_id=${cameraId}&begin_time=${beginTime.toString()}&end_time=${endTime.toString()}`, true);
+    request.onload = function() {
+      if (this.status >= 200 && this.status < 400) {
+        // Success!
+      } else {
+        console.log('reached server but something went wrong');
+      }
+    };
+
+    request.onerror = function() {
+      console.log('There was a connection error of some sort...');
+    };
+
+    request.send();
+  }
+
+  /**
    * page entry point
    */
   mount() {
@@ -75,23 +106,35 @@ export default class view extends MainView {
 
     let cameraId = parseInt(document.getElementById('singleCamera')
                             .getAttribute('data-id'), 10);
-    window.cameraManager = new CameraManager(socket, 1, true);
-    this.fetchCamera(cameraId);
-    const now = ZonedDateTime.now(ZoneOffset.UTC);
-    const then = now.minusHours(6);
 
-    const barCallback = (t) => {
-      console.log(this.fileLibrary
-                  .getFileForTime(t));
-    };
-    let progressBar = React.createElement(ProgressBar,
-                                          {
-                                            onMouseUp: barCallback,
+    const now = ZonedDateTime.now(ZoneOffset.UTC);
+    const begin = now.minus(Duration.ofHours(1))
+          .minus(Duration.ofMinutes(now.minute())
+                 .plusSeconds(now.second())
+                 .plusNanos(now.nano()))
+          .plus(Duration.ofNanos(1));
+
+    const end = begin.plus(Duration.ofHours(1));
+        console.log('Now: ' + now.toString());
+    console.log('Begin: ' + begin.toString());
+    console.log('End: ' + end.toString());
+    fetch(`/v1/video_units/between?camera_id=${cameraId}&begin_time=${begin.toString()}&end_time=${end.toString()}`, {
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }).then((response) => {
+      return response.json();
+    }).then((videoUnits) => {
+      let playerView = React.createElement(CameraPlayerView,
+                                           {
+                                             beginTime: begin,
+                                             endTime: end,
+                                             videoUnits: videoUnits
                                           });
-    this.progressComponent =
-      ReactDOM.render(progressBar, document.getElementById('progress'));
-    this.fetchCoverage(cameraId, this.progressComponent,
-                       then.toString(),
-                       now.toString());
+      this.playerComponent =
+        ReactDOM.render(playerView, document.getElementById('player'));
+
+    });
   }
 }

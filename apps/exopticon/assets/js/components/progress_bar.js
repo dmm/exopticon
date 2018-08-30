@@ -37,18 +37,14 @@ class ProgressBar extends React.Component {
   /**
    * ProgressBar constructor
    */
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {
-      availability: {
-        video_units: [],
-        begin_time: ZonedDateTime.parse('9999-12-31T23:59:59.999Z'),
-        end_time: ZonedDateTime.parse('1970-01-01T00:00:00.000Z'),
-        current_time: ZonedDateTime.parse('1970-01-01T00:00:00.000Z'),
-      },
       timeLabel: '',
+      chunks: this.calculateAvailability(props.videoUnits,
+                                         props.beginTime,
+                                         props.endTime)
     };
-    this.gaps = [];
 
     this.onMouseMove = this.onMouseMove.bind(this);
     this.onMouseLeave = this.onMouseLeave.bind(this);
@@ -65,11 +61,11 @@ class ProgressBar extends React.Component {
           / e.currentTarget.clientWidth;
 
     const timeOffset =
-          Duration.between(this.state.availability.begin_time,
-                           this.state.availability.end_time).toMillis()
+          Duration.between(this.props.beginTime,
+                           this.props.endTime).toMillis()
           * ratio;
 
-    const newTime = this.state.availability.begin_time
+    const newTime = this.props.beginTime
           .plusSeconds(timeOffset / 1000);
     const formattedDate =
           newTime.format(DateTimeFormatter.ofPattern('yyyy-MM-dd HH:mm:ss'));
@@ -96,12 +92,14 @@ class ProgressBar extends React.Component {
           / e.currentTarget.clientWidth;
 
     const timeOffset =
-          Duration.between(this.state.availability.begin_time,
-                           this.state.availability.end_time).toMillis()
+          Duration.between(this.props.beginTime,
+                           this.props.endTime).toMillis()
           * ratio;
-    const newTime = this.state.availability.begin_time
+    const newTime = this.props.beginTime
           .plusSeconds(timeOffset / 1000);
-    console.log(newTime.toString());
+    if (this.props.onClick) {
+      this.props.onClick(newTime);
+    }
   }
 
   /**
@@ -112,8 +110,9 @@ class ProgressBar extends React.Component {
    */
   calculateAvailability(units, begin_time, end_time) {
     let availability = [];
+    let last = undefined;
 
-    units.forEach((u) => {
+    units.forEach((u, i) => {
       let video_begin = ZonedDateTime.parse(u.begin_time);
       if (video_begin.isBefore(begin_time)) {
         video_begin = begin_time;
@@ -122,11 +121,30 @@ class ProgressBar extends React.Component {
       if (video_end.isAfter(end_time)) {
         video_end = end_time;
       }
+
       availability.push({
-        start_offset_ms: Duration.between(begin_time, video_begin),
-        end_offset_ms: Duration.between(begin_time, video_end)
+        startOffsetMs: Duration.between(begin_time, video_begin).toMillis(),
+        endOffsetMs: Duration.between(begin_time, video_end).toMillis(),
+        type: 'video',
       });
+
+      const next = units[i+1];
+      if (next && Duration.between(video_end,
+                                   ZonedDateTime.parse(next.begin_time)).toMillis() > 1000) {
+        console.log('GAP');
+        availability.push({
+          startOffsetMs: Duration.between(begin_time, video_end
+                                          .plus(Duration.ofMillis(1))).toMillis(),
+          endOffsetMs: Duration.between(begin_time,
+                                        ZonedDateTime
+                                        .parse(next.begin_time)
+                                        .minus(Duration.ofMillis(1))).toMillis(),
+          type: 'no-video',
+        });
+      }
     });
+
+    return availability;
   }
 
   /**
@@ -134,13 +152,11 @@ class ProgressBar extends React.Component {
    * @return {object} react
    */
   render() {
-    const chunks = this.state.availability.availability;
-    const duration =
-          Duration.between(this.state.availability.begin_time,
-                           this.state.availability.end_time).toMillis();
+    const duration = Duration.between(this.props.beginTime,
+                                      this.props.endTime).toMillis();
     let elm = [];
-    chunks.forEach((c, i) => {
-      const chunkLength = Duration.between(c.begin_time, c.end_time).toMillis();
+    this.state.chunks.forEach((c, i) => {
+      const chunkLength = c.endOffsetMs - c.startOffsetMs;
       const percentage = ((chunkLength / duration) * 100);
       elm.push((
         <div className={`progress-element ${c.type}`}

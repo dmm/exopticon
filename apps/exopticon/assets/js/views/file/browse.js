@@ -50,7 +50,7 @@ export default class view extends MainView {
 
     const now = ZonedDateTime.now(ZoneOffset.UTC);
     const endTime = now.minusMinutes(now.minute()).plusHours(1);
-      const beginTime = now.minusDays(30);
+    const beginTime = now.minusDays(1);
 
     fetch(`/v1/video_units/between?camera_id=${cameraId}&begin_time=${beginTime.toString()}&end_time=${endTime.toString()}`, {
       credentials: 'same-origin',
