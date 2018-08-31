@@ -23,6 +23,8 @@ defmodule ExopticonWeb.CameraChannel do
 
   require Logger
 
+  @maximum_live_bytes 100 * 1024 * 1024
+
   intercept(["jpg"])
 
   def join("camera:lobby", payload, socket) do
@@ -78,26 +80,58 @@ defmodule ExopticonWeb.CameraChannel do
     {:reply, {:ok, payload}, socket}
   end
 
+  def update_window({cur_live, max_live, old_rtt}, size, rtt) when max_live == 0 do
+    update_window({cur_live, size, rtt}, size, rtt)
+  end
+
+  def update_window({cur_live, max_live, old_rtt}, size, rtt) when max_live != 0 do
+    adj_rtt = old_rtt / rtt
+    new_max_live =
+    if rtt > old_rtt do
+      Enum.max([max_live * adj_rtt |> Kernel.trunc, 0])
+    else
+      Enum.min([max_live * adj_rtt, @maximum_live_bytes])
+    end
+    {cur_live - size, new_max_live, (old_rtt + rtt)/2}
+  end
+
+  def check_window({cur_live, max_live, old_rate}, size) when max_live == 0 do
+    if cur_live == 0 do
+      { true, {cur_live + size, max_live, old_rate}}
+    else
+      {false, {cur_live, max_live, old_rate}}
+    end
+  end
+
+  def check_window({cur_live, max_live, old_rate} = win, size) when max_live != 0 do
+    if cur_live == 0 or (cur_live + size) < max_live do
+      {true, {cur_live + size, max_live, old_rate}}
+    else
+      {false, win}
+    end
+  end
+
   def handle_in("ack", payload, socket) do
     cur_live = socket.assigns[:cur_live]
     max_live = socket.assigns[:max_live]
     cur_time = System.monotonic_time(:milliseconds)
-    %{"ts" => ts} = payload
+    window = socket.assigns[:window]
+    %{"ts" => ts, "size" => size} = payload
     {ts_int, _} = Integer.parse(ts)
+
     old_rtt = socket.assigns[:rtt]
-    new_rtt = cur_time - ts_int
+
+    new_rtt = Enum.max([cur_time - ts_int, 1])
     rtt = (new_rtt + old_rtt) / 2
 
-    max_live =
-      if new_rtt > 2 * old_rtt do
-        Enum.max([div(max_live, 2), 1])
-      else
-        Enum.min([max_live + 1, 10])
-      end
+    new_window = update_window(window, size, rtt)
+
+    max_live = max_live * (old_rtt / new_rtt)
 
     socket = assign(socket, :max_live, max_live)
     socket = assign(socket, :cur_live, cur_live - 1)
     socket = assign(socket, :rtt, rtt)
+    socket = assign(socket, :window, new_window)
     #    Logger.info("Ack: " <> to_string(cur_live))
     {:noreply, socket}
   end
@@ -140,10 +174,14 @@ defmodule ExopticonWeb.CameraChannel do
   def handle_out("jpg", params, socket) do
     cur_live = socket.assigns[:cur_live]
     max_live = socket.assigns[:max_live]
+    window = socket.assigns[:window]
     camera_id = params[:cameraId]
     resolution = params[:res]
     watch_camera = socket.assigns[:watch_camera]
     hd_cameras = socket.assigns[:hd_cameras]
+
+    sd_queue = socket.assigns[:sd_queue]
+    hd_queue = socket.assigns[:hd_queue]
 
     camera_active = Map.has_key?(watch_camera, camera_id)
     camera_hd = Map.has_key?(hd_cameras, camera_id)
@@ -157,8 +195,14 @@ defmodule ExopticonWeb.CameraChannel do
     #      <> to_string(camera_active)
     #      <> " " <> to_string(socket.assigns[:rtt])
     #    )
+    size = byte_size(params[:frameJpeg].data)
+    {window_check, new_window} = check_window(window, size)
+
+    if resolution_active do
+      IO.inspect({resolution_active, window_check, new_window})
+    end
     new_cur_live =
-      if frame_active and resolution_active do
+      if window_check and resolution_active do
         cur_time = System.monotonic_time(:milliseconds)
         params = Map.put(params, :ts, to_string(cur_time))
         push(socket, "jpg" <> Integer.to_string(camera_id), params)
@@ -167,6 +211,13 @@ defmodule ExopticonWeb.CameraChannel do
         cur_live
       end
 
+    update_window =
+    if window_check and resolution_active do
+      new_window
+    else
+      window
+    end
+    socket = assign(socket, :window, update_window)
     socket = assign(socket, :cur_live, new_cur_live)
     {:noreply, socket}
   end

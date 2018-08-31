@@ -20,7 +20,10 @@ class CameraChannel {
     });
     this.channel.onMessage = (event, payload, ref) => {
       if (event.match(/jpg([0-9]+)/)) {
-        this.channel.push('ack', {ts: payload.ts});
+        this.channel.push('ack', {
+          ts: payload.ts,
+          size: payload.frameJpeg.length
+        });
       }
       return payload;
     };

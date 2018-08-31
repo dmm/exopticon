@@ -18,6 +18,8 @@
 defmodule ExopticonWeb.UserSocket do
   use Phoenix.Socket
 
+  import Exopticon.EqualQueue
+
   @max_age 2 * 7 * 24 * 60 * 60
 
   ## Channels
@@ -55,6 +57,7 @@ defmodule ExopticonWeb.UserSocket do
         socket = assign(socket, :rtt, 0)
         socket = assign(socket, :watch_camera, %{})
         socket = assign(socket, :hd_cameras, %{})
+        socket = assign(socket, :window, {0, 0, 0})
         {:ok, socket}
 
       {:error, _reason} ->
