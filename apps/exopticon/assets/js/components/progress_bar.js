@@ -119,7 +119,7 @@ class ProgressBar extends React.Component {
 
     units.forEach((u, i) => {
       let videoBegin = u.begin_time;
-      if (videoBegin.isBefore(begin_time)) {
+      if (videoBegin.isBefore(videoBegin)) {
         videoBegin = beginTime;
       }
       let videoEnd = u.end_time;
