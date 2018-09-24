@@ -207,12 +207,12 @@ class ProgressBar extends React.Component {
 ProgressBar.propTypes = {
   beginTime: PropTypes.object.isRequired,
   endTime: PropTypes.object.isRequired,
-  formatLocal: PropTypes.function.isRequired,
-  onClick: PropTypes.function,
-  onTimeHover: PropTypes.function,
-  onTimeLeave: PropTypes.function,
+  formatLocal: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+  onTimeHover: PropTypes.func,
+  onTimeLeave: PropTypes.func,
   progress: PropTypes.number,
-  videoUnits: PropTypes.list.isRequired,
+  videoUnits: PropTypes.array.isRequired,
 };
 
 ProgressBar.defaultProps = {
