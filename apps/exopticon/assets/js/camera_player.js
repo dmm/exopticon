@@ -1,6 +1,5 @@
 'use strict';
 
-import socket from './socket';
 import SuperImage from './super_image';
 
 /**
@@ -29,6 +28,7 @@ class CameraPlayer {
     this.right = this.right.bind(this);
     this.up = this.up.bind(this);
     this.down = this.down.bind(this);
+    this.playRealtime = this.playRealtime.bind(this);
     this.takeSnapshot = this.takeSnapshot.bind(this);
   }
 
@@ -148,7 +148,7 @@ class CameraPlayer {
 
   /**
    * take snapshot of frame
-   *
+   * @param {Function} callback - function to call when snapshot complete.
    */
   takeSnapshot(callback) {
     const id = this.lastFrame.videoUnitId;
@@ -167,7 +167,10 @@ class CameraPlayer {
               video_unit_id: id,
               frame_index: index,
               offset: offset,
-              key: 'snapshot', value: 'snapshot', source: 'user', ul_x: -1, ul_y: -1, width: -1, height: -1}),
+              key: 'snapshot',
+              value: 'snapshot',
+              source: 'user',
+              ul_x: -1, ul_y: -1, width: -1, height: -1}),
           });
     }
   }

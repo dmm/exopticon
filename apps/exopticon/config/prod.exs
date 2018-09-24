@@ -17,7 +17,8 @@ config :exopticon, ExopticonWeb.Endpoint,
   load_from_system_env: true,
   url: [
     host: System.get_env("EXOPTICON_HOST") || "example.com",
-    port: String.to_integer(System.get_env("PORT") || "4000")
+    port: String.to_integer(System.get_env("PORT") || "4000"),
+    path: System.get_env("EXOPTICON_PATH") || "/"
   ],
   secret_key_base: System.get_env("SECRET_KEY_BASE") || "",
   cache_static_manifest: "priv/static/cache_manifest.json"

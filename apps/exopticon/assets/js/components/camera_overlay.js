@@ -27,7 +27,7 @@ class CameraOverlay extends React.Component {
     this.touchMove = this.touchMove.bind(this);
     this.touchEnd = this.touchEnd.bind(this);
     this.goToCamera = this.goToCamera.bind(this);
-    this.goToCameraEdit = this.goToCameraEdit.bind(this);
+    this.goToCameraPlayback = this.goToCameraPlayback.bind(this);
     this.goToSnapshots = this.goToSnapshots.bind(this);
   }
 
@@ -100,16 +100,15 @@ class CameraOverlay extends React.Component {
    * @private
    */
   goToCamera() {
-    this.setState({opacity: 0.0});
     this.props.fullscreenCallback();
   }
 
   /**
-   * go to camera edit page
+   * go to camera playback page
    * @private
    */
-  goToCameraEdit() {
-    location.href = this.props.camera.link + '/edit';
+  goToCameraPlayback() {
+    location.href = this.props.camera.link + '/playback';
   }
 
   /**
@@ -139,9 +138,9 @@ class CameraOverlay extends React.Component {
           onClick={this.goToCamera}
           />
         <OverlayButton
-          label="&#9881;"
+          label="▶"
           extraClass="camera-edit-link"
-          onClick={this.goToCameraEdit}
+          onClick={this.goToCameraPlayback}
           />
         <OverlayButton
           label="&#x1f5bc;"
@@ -171,9 +170,9 @@ class CameraOverlay extends React.Component {
             onClick={this.goToCamera}
             />
           <OverlayButton
-            label="&#9881;"
+            label="▶"
             extraClass="camera-edit-link"
-            onClick={this.goToCameraEdit}
+            onClick={this.goToCameraPlayback}
             />
 
           <OverlayButton

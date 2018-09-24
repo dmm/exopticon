@@ -22,7 +22,6 @@ import React from 'react';
 import verge from 'verge';
 
 import CameraChannel from '../camera_channel';
-import CameraPlayer from '../camera_player';
 
 import CameraView from './camera_view';
 
@@ -261,7 +260,8 @@ class CameraPanel extends React.Component {
 
     if (this.state.viewColumns !== 0) {
       cameraPanelClass += ` panel-col-${this.state.viewColumns.toString()}`;
-     }
+    }
+
     this.cameraElements.clear();
     const cameras = [];
     const cameraChannel = this.state.cameraChannel;
@@ -273,15 +273,14 @@ class CameraPanel extends React.Component {
       }
       fsClass += this.state.fullscreenIndex === i
         ? 'wrapper fullscreen' : 'wrapper';
-      let player = new CameraPlayer(cam, cameraChannel);
       cameras.push(
         <div key={cam.id} className={fsClass}>
           <div className="camera-width"></div>
           <div className="content">
-            <CameraView camera={cam}
-                        cameraPlayer={player}
-                        fullscreenHandler={() => {
-                          this.setFullscreenIndex(i);
+          <CameraView camera={cam}
+                      cameraChannel={cameraChannel}
+                      fullscreenHandler={() => {
+                        this.setFullscreenIndex(i);
               }}
               ref={
                 (el) => {

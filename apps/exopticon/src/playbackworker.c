@@ -58,6 +58,7 @@ struct PlayerState {
         AVFrame *frame;
         struct timespec begin_time;
         int64_t first_pts;
+        int64_t frame_count;
 };
 
 static AVRational millisecond()
@@ -251,6 +252,10 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, int64_t first_p
         //        message.pts = frame->pts;
         int64_t pts = frame->pts - first_pts;
 
+        // Calculate offset
+        AVRational msec = av_make_q(1, 1000);
+        message.offset = av_rescale_q(frame->pts, time_base, msec);
+
         do {
                 AVRational nsec = av_make_q(1, BILLION);
                 struct timespec pts_ts;
@@ -299,7 +304,7 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, int64_t first_p
         return 0;
 }
 
-int handle_packet(struct PlayerState *state, int64_t ms_offset)
+int handle_packet(struct PlayerState *state, int64_t ms_offset, int playback_rate)
 {
         /*
                 fprintf(stderr, "\npacket->pts: %lld, packet->dts: %lld, time_base: %lld,%lld\n",
@@ -353,8 +358,14 @@ int handle_packet(struct PlayerState *state, int64_t ms_offset)
                 if (state->first_pts == -1) {
                         state->first_pts = state->frame->pts;
                 }
+                state->frame_count++;
 
-                send_frame(state->frame, state->begin_time, state->first_pts, state->st->time_base);
+                // Adjust frame pts by playback_rate
+                state->frame->pts = state->frame->pts / playback_rate;
+
+                if (state->frame_count % playback_rate == 0) {
+                        send_frame(state->frame, state->begin_time, state->first_pts, state->st->time_base);
+                }
 
         } while (receive_ret != AVERROR(EOF));
 
@@ -415,15 +426,15 @@ int main(int argc, char *argv[])
 
         const char *program_name = argv[0];
         if (argc < 3) {
-          fprintf(stderr, "USAGE: ./%s <input filename> <offset in ms>\n", program_name);
+          fprintf(stderr, "USAGE: ./%s <input filename> <offset in ms> (<playback rate>)\n", program_name);
         }
 
-        int one_frame = 0;
+        int playback_rate = 1;
 
         if (argc > 3) {
-                one_frame = 1;
+                playback_rate = atoi(argv[3]);
         }
-
+        fprintf(stderr, "playback rate: %d\n", playback_rate);
         // Initialize ffmpeg
         av_log_set_level(AV_LOG_FATAL);
         av_register_all();
@@ -437,6 +448,7 @@ int main(int argc, char *argv[])
         player.begin_time.tv_sec = 0;
         player.begin_time.tv_nsec = 0;
         player.first_pts = -1;
+        player.frame_count = 0;
 
         // Determine offset
         long long ms_offset = 0;
@@ -500,13 +512,10 @@ int main(int argc, char *argv[])
         seek_to_offset(&player, ms_offset);
         while (checkforquit() != 1 && (ret = av_read_frame(player.fcx, &player.pkt)) >= 0) {
                 // handle packet
-                handle_packet(&player, ms_offset);
+                handle_packet(&player, ms_offset, playback_rate);
                 av_packet_unref(&player.pkt);
                 av_init_packet(&player.pkt);
                 count++;
-                if (one_frame == 1) {
-                        goto cleanup;
-                }
         }
 
 cleanup:

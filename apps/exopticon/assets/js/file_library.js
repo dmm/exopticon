@@ -1,21 +1,21 @@
 /*
- * This file is part of Exopticon (https://github.com/dmm/exopticon).
- * Copyright (c) 2018 David Matthew Mattli
+ * This file is a part of Exopticon, a free video surveillance tool. Visit
+ * https://exopticon.org for more information.
  *
- * Exopticon is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * Copyright (C) 2018 David Matthew Mattli
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * Exopticon is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import {Duration, ZonedDateTime} from 'js-joda';
 
 /**
@@ -33,12 +33,12 @@ class FileLibrary {
   }
 
   /**
-   * @param {List} video_units - list of video_units to parse
+   * @param {List} videoUnits - list of video units to parse
    * @return {List} list of parsed video units
    * @private
    */
-  parseFiles(video_units) {
-    return video_units.map((f) => {
+  parseFiles(videoUnits) {
+    return videoUnits.map((f) => {
       {
         let f2 = Object.assign({}, f);
         f2.begin_time = ZonedDateTime.parse(f.begin_time);
@@ -59,8 +59,6 @@ class FileLibrary {
       time = ZonedDateTime.parse(datetime);
     }
 
-    let ret = null;
-
     let file = this.files.find((f) => {
       if (f.begin_time.compareTo(time) <= 0) {
         if (f.end_time.compareTo(time) > 0) {
@@ -73,7 +71,7 @@ class FileLibrary {
     if (file !== undefined) {
       return {
         file: file,
-        offset: Duration.between(file.begin_time, time).toMillis()
+        offset: Duration.between(file.begin_time, time).toMillis(),
       };
     }
 
@@ -87,15 +85,16 @@ class FileLibrary {
    */
   getNextFile(fileId) {
     let ret = null;
+    let i = 0;
     for (let f of this.files) {
-      if (f.id === fileId) {
-        ret = f;
+      if (f.files[0].id === fileId) {
+        ret = this.files[i+1];
       }
 
       if (ret !== null) {
-        ret = f;
         break;
       }
+      i++;
     }
     return ret;
   }

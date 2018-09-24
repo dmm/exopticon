@@ -51,21 +51,16 @@ defmodule Exopticon.CapturePort do
   end
 
   ### Server callbacks
-  defp get_monotonic_index_for_id(id) do
+  defp get_monotonic_index() do
     index =
       Repo.one(
         from(
           vu in "video_units",
-          select: max(vu.monotonic_index),
-          where: vu.camera_id == ^id
+          select: max(vu.monotonic_index)
         )
-      )
+      ) || 0
 
-    if index == nil do
-      1
-    else
-      index + 1
-    end
+    index + 1
   end
 
   def start_port({id, url, fps, video_dir}) do
@@ -88,7 +83,7 @@ defmodule Exopticon.CapturePort do
   end
 
   def init({id, url, fps, video_dir} = port_args) do
-    monotonic_index = get_monotonic_index_for_id(id)
+    monotonic_index = get_monotonic_index()
     Logger.info("starting port #{id} #{url}")
     port = start_port({id, url, fps, video_dir})
 
@@ -173,6 +168,8 @@ defmodule Exopticon.CapturePort do
     {:ok, start_time, _} = DateTime.from_iso8601(beginTime)
     monotonic_start = System.monotonic_time(:microsecond)
 
+    Logger.info("Camera #{id}: creating new video unit and file: #{filename}")
+
     {:ok, video_unit} =
       %Exopticon.Video.VideoUnit{
         camera_id: id,
@@ -207,6 +204,7 @@ defmodule Exopticon.CapturePort do
            port_args: port_args
          }}
       ) do
+    Logger.info("Camera #{id}: closing video unit and file: #{filename}")
     monotonic_stop = System.monotonic_time(:microsecond)
     {:ok, end_time, _} = DateTime.from_iso8601(endTime)
     video_unit = VideoUnit |> Repo.get(video_unit_id, preload: [:files]) |> Repo.preload(:files)

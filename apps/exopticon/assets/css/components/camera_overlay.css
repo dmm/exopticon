@@ -66,9 +66,9 @@
 
 .ptz-controls > .snapshot-view-button {
   position: absolute;
-  bottom: 80px;
-  right: 0;
-  padding: 3px;
+  bottom: 0;
+  left: 72%;
+  margin-left: -25px;
   border-radius: 5px;
 }
 

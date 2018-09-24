@@ -44,6 +44,7 @@
     </div>
     <script>window.userToken = "<%= assigns[:user_token] %>"</script>
     <script>window.userTimezone = "<%= assigns[:timezone] %>"</script>
+    <script>window.apiRoot = "<%= ExopticonWeb.Endpoint.struct_url.path || "/" %>"</script>
     <script src="<%= static_path(@conn, "/js/app.js") %>"></script>
   </body>
 </html>

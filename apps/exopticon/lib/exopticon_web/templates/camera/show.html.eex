@@ -1,4 +1,4 @@
-<!---
+<h1>Show Camera</h1>
 <ul>
 
   <li>
@@ -51,9 +51,4 @@
 <span><%= link "Edit", to: camera_path(@conn, :edit, @camera) %></span>
 <span><%= link "Back", to: camera_path(@conn, :index) %></span>
 
--->
 
-<div id="singleCamera" data-id=<%= @camera.id %>>
-  <h1>Show Camera</h1>
-  <div id="player" style="width: 50%;"></div>
-</div>

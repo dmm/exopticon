@@ -1,14 +1,6 @@
 
+
+
 <div id="singleCamera" data-id=<%= @camera.id %>>
-  <div id="camera">
-    <img id="playback-img"></img>
-  </div>
-  <div id="video-controls" class="controls" data-state="visible">
-    <button id="playpause" type="button" data-state="play">Play/Pause</button>
-    <div class="progress">
-      <progress id="progress" value="0" min="0">
-        <span id="progress-bar"></span>
-      </progress>
-    </div>
-  </div>
+  <div id="player" style="width: 100%; height: calc(100vh - 40px);"></div>
 </div>

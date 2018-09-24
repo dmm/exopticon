@@ -24,6 +24,8 @@ defmodule ExopticonWeb.PlaybackChannel do
   alias Exopticon.PlaybackSupervisor
   alias Exopticon.Repo
 
+  intercept(["jpg"])
+
   def join("playback:lobby", payload, socket) do
     if authorized?(payload) do
       {:ok, socket}
@@ -50,14 +52,35 @@ defmodule ExopticonWeb.PlaybackChannel do
     {:noreply, socket}
   end
 
-  def handle_in("ack", _payload, socket) do
+  def handle_in("ack", payload, socket) do
     topic = socket.assigns[:topic]
     regs = Registry.lookup(Registry.PlayerRegistry, topic)
     pids = Enum.map(regs, fn {pid, _} -> pid end)
+    cur_time = System.monotonic_time(:milliseconds)
+    cur_live = socket.assigns[:cur_live]
+    max_live = socket.assigns[:max_live]
+    old_rtt = socket.assigns[:rtt]
 
     Enum.each(pids, fn p ->
       GenServer.cast(p, :ack)
     end)
+
+    %{"ts" => ts} = payload
+    {ts_int, _} = Integer.parse(ts)
+
+    new_rtt = cur_time - ts_int
+    rtt = (new_rtt + old_rtt) / 2
+
+    max_live =
+      if new_rtt > 2 * old_rtt do
+        Enum.max([div(max_live, 2), 1])
+      else
+        Enum.min([max_live + 1, 10])
+      end
+
+    socket = assign(socket, :max_live, max_live)
+    socket = assign(socket, :cur_live, cur_live - 1)
+    socket = assign(socket, :rtt, rtt)
 
     {:noreply, socket}
   end
@@ -72,6 +95,24 @@ defmodule ExopticonWeb.PlaybackChannel do
   # broadcast to everyone in the current topic (playback:lobby).
   def handle_in("shout", payload, socket) do
     broadcast(socket, "shout", payload)
+    {:noreply, socket}
+  end
+
+  def handle_out("jpg", params, socket) do
+    cur_live = socket.assigns[:cur_live]
+    max_live = socket.assigns[:max_live]
+
+    new_cur_live =
+      if cur_live < max_live do
+        cur_time = System.monotonic_time(:milliseconds)
+        params = Map.put(params, :ts, to_string(cur_time))
+        push(socket, "jpg", params)
+        cur_live + 1
+      else
+        cur_live
+      end
+
+    socket = assign(socket, :cur_live, new_cur_live)
     {:noreply, socket}
   end
 

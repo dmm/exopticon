@@ -120,7 +120,7 @@ defmodule Exopticon.Video.FileDeletionServer do
       Video.delete_annotation(a)
     end)
 
-    Logger.info("Deleting video unit: " <> Integer.to_string(vu.id))
+    Logger.info("Deleting video unit: #{inspect(vu)}")
     {:ok, _} = Video.delete_video_unit(vu)
     :ok
   end

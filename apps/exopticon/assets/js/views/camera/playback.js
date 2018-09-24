@@ -1,38 +1,35 @@
 /*
- * This file is part of Exopticon (https://github.com/dmm/exopticon).
- * Copyright (c) 2018 David Matthew Mattli
+ * This file is a part of Exopticon, a free video surveillance tool. Visit
+ * https://exopticon.org for more information.
  *
- * Exopticon is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * Copyright (C) 2018 David Matthew Mattli
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * Exopticon is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 import {
   use as jsJodaUse,
-  DateTimeFormatter,
-  LocalDateTime,
   Duration,
   ZonedDateTime,
   ZoneOffset,
 } from 'js-joda';
 import jsJodaTimeZone from 'js-joda-timezone';
-
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import FileLibrary from '../../file_library';
 import MainView from '../main';
 import CameraPlayerView from '../../components/camera_player_view';
-import socket from '../../socket';
+import VideoUnitRepository from '../../repositories/video_unit_repository';
 
 jsJodaUse(jsJodaTimeZone);
 
@@ -42,59 +39,10 @@ jsJodaUse(jsJodaTimeZone);
  */
 export default class view extends MainView {
   /**
-   * CameraShow constructor
+   * CameraPlayback constructor
    */
   constructor() {
     super();
-  }
-
-  /**
-   * fetches camera details
-   * @param {number} cameraId
-   */
-  fetchCamera(cameraId) {
-    let request = new XMLHttpRequest();
-    request.open('GET', '/v1/cameras/' + cameraId, true);
-    request.onload = function() {
-      if (this.status >= 200 && this.status < 400) {
-        // Success!
-        let camera = JSON.parse(this.response);
-        window.cameraManager.updateCameras([camera]);
-      } else {
-        console.log('reached server but something went wrong');
-      }
-    };
-
-    request.onerror = function() {
-      console.log('There was a connection error of some sort...');
-    };
-
-    request.send();
-  }
-
-  /**
-   * fetches video_units for interval
-   * @param {Number} cameraId
-   * @param {ZonedDateTime} beginTime
-   * @param {ZonedDateTime} endTime
-   *
-   */
-  fetchAvailability(cameraId, beginTime, endTime) {
-    let request = new XMLHttpRequest();
-    request.open('GET', `/v1/video_units/between?camera_id=${cameraId}&begin_time=${beginTime.toString()}&end_time=${endTime.toString()}`, true);
-    request.onload = function() {
-      if (this.status >= 200 && this.status < 400) {
-        // Success!
-      } else {
-        console.log('reached server but something went wrong');
-      }
-    };
-
-    request.onerror = function() {
-      console.log('There was a connection error of some sort...');
-    };
-
-    request.send();
   }
 
   /**
@@ -118,23 +66,19 @@ export default class view extends MainView {
         console.log('Now: ' + now.toString());
     console.log('Begin: ' + begin.toString());
     console.log('End: ' + end.toString());
-    fetch(`/v1/video_units/between?camera_id=${cameraId}&begin_time=${begin.toString()}&end_time=${end.toString()}`, {
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }).then((response) => {
-      return response.json();
-    }).then((videoUnits) => {
-      let playerView = React.createElement(CameraPlayerView,
-                                           {
-                                             beginTime: begin,
-                                             endTime: end,
-                                             videoUnits: videoUnits
-                                          });
+
+    let videoUnitRepository = new VideoUnitRepository(window.apiRoot);
+
+    let playerView =
+        React.createElement(CameraPlayerView,
+                            {
+                              cameraId: cameraId,
+                              initialBeginTime: begin,
+                              initialEndTime: end,
+                              videoUnitRepository: videoUnitRepository,
+                              timezone: window.userTimezone,
+                            });
       this.playerComponent =
         ReactDOM.render(playerView, document.getElementById('player'));
-
-    });
   }
 }

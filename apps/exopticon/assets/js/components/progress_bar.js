@@ -18,11 +18,11 @@
 
 import {
   use as jsJodaUse,
-  DateTimeFormatter,
   Duration,
-  ZonedDateTime,
 } from 'js-joda';
 import jsJodaTimeZone from 'js-joda-timezone';
+import memoizeOne from 'memoize-one';
+import PropTypes from 'prop-types';
 import React from 'react';
 
 import './../../css/components/progress_bar.css';
@@ -36,15 +36,17 @@ jsJodaUse(jsJodaTimeZone);
 class ProgressBar extends React.Component {
   /**
    * ProgressBar constructor
+   * @param {object} props
    */
   constructor(props) {
     super(props);
+
     this.state = {
       timeLabel: '',
-      chunks: this.calculateAvailability(props.videoUnits,
-                                         props.beginTime,
-                                         props.endTime)
+      hoverPosition: {x: 0, y: 0},
     };
+
+    this.calculateAvailability = memoizeOne(this.calculateAvailability);
 
     this.onMouseMove = this.onMouseMove.bind(this);
     this.onMouseLeave = this.onMouseLeave.bind(this);
@@ -56,7 +58,6 @@ class ProgressBar extends React.Component {
    * @param {object} e
    */
   onMouseMove(e) {
-    this._label.style.display = 'block';
     const ratio = (e.clientX - e.currentTarget.offsetLeft)
           / e.currentTarget.clientWidth;
 
@@ -67,10 +68,11 @@ class ProgressBar extends React.Component {
 
     const newTime = this.props.beginTime
           .plusSeconds(timeOffset / 1000);
-    const formattedDate =
-          newTime.format(DateTimeFormatter.ofPattern('yyyy-MM-dd HH:mm:ss'));
+    this.props.onTimeHover(newTime);
+    console.log(newTime.toString());
     this.setState({
-      timeLabel: formattedDate,
+      hoverTime: newTime,
+      hoverPosition: {x: e.clientX, y: e.clientY - 35},
     });
   }
 
@@ -78,7 +80,10 @@ class ProgressBar extends React.Component {
    * onMouseLeave
    */
   onMouseLeave() {
-    this._label.style.display = 'none';
+    this.props.onTimeLeave();
+    this.setState({
+      hoverTime: undefined,
+    });
   }
 
 
@@ -105,40 +110,40 @@ class ProgressBar extends React.Component {
   /**
    * calculateAvailability
    * @param {Array} units - array of video units
-   * @param {ZonedDateTime} begin_time
-   * @param {ZonedDateTime} end_time
+   * @param {ZonedDateTime} beginTime
+   * @param {ZonedDateTime} endTime
+   * @return {object} availability
    */
-  calculateAvailability(units, begin_time, end_time) {
+  calculateAvailability(units, beginTime, endTime) {
     let availability = [];
-    let last = undefined;
 
     units.forEach((u, i) => {
-      let video_begin = ZonedDateTime.parse(u.begin_time);
-      if (video_begin.isBefore(begin_time)) {
-        video_begin = begin_time;
+      let videoBegin = u.begin_time;
+      if (videoBegin.isBefore(begin_time)) {
+        videoBegin = beginTime;
       }
-      let video_end = ZonedDateTime.parse(u.end_time);
-      if (video_end.isAfter(end_time)) {
-        video_end = end_time;
+      let videoEnd = u.end_time;
+      if (videoEnd.isAfter(endTime)) {
+        videoEnd = endTime;
       }
 
       availability.push({
-        startOffsetMs: Duration.between(begin_time, video_begin).toMillis(),
-        endOffsetMs: Duration.between(begin_time, video_end).toMillis(),
+        startOffsetMs: Duration.between(beginTime, videoBegin).toMillis(),
+        endOffsetMs: Duration.between(beginTime, videoEnd).toMillis(),
         type: 'video',
       });
 
       const next = units[i+1];
-      if (next && Duration.between(video_end,
-                                   ZonedDateTime.parse(next.begin_time)).toMillis() > 1000) {
-        console.log('GAP');
+      if (next && Duration.between(videoEnd,
+                                   next.begin_time).toMillis() > 1000) {
         availability.push({
-          startOffsetMs: Duration.between(begin_time, video_end
-                                          .plus(Duration.ofMillis(1))).toMillis(),
-          endOffsetMs: Duration.between(begin_time,
-                                        ZonedDateTime
-                                        .parse(next.begin_time)
-                                        .minus(Duration.ofMillis(1))).toMillis(),
+          startOffsetMs: Duration.between(beginTime, videoEnd
+                                          .plus(Duration.ofMillis(1)))
+            .toMillis(),
+          endOffsetMs: Duration.between(beginTime,
+                                        next.begin_time
+                                        .minus(Duration.ofMillis(1)))
+            .toMillis(),
           type: 'no-video',
         });
       }
@@ -154,34 +159,68 @@ class ProgressBar extends React.Component {
   render() {
     const duration = Duration.between(this.props.beginTime,
                                       this.props.endTime).toMillis();
+    const chunks = this.calculateAvailability(this.props.videoUnits,
+                                              this.props.beginTime,
+                                              this.props.endTime);
+
     let elm = [];
-    this.state.chunks.forEach((c, i) => {
+    chunks.forEach((c, i) => {
       const chunkLength = c.endOffsetMs - c.startOffsetMs;
       const percentage = ((chunkLength / duration) * 100);
       elm.push((
         <div className={`progress-element ${c.type}`}
-        key={i} style={{width: percentage+'%'}} />
+             key={i} style={{width: percentage+'%'}} />
       ));
     });
 
+    let progressElm = (<div className='progress-marker'
+                       style={{left: this.props.progress+'%'}}
+                       ></div>);
+
+    let hoverTime = this.state.hoverTime ? (
+      <div className="hover-time"
+           style={{
+             top: this.state.hoverPosition.y,
+             left: this.state.hoverPosition.x,
+           }}>
+        {this.props.formatLocal(this.state.hoverTime)}
+      </div>
+    ) : null;
+
     return (
-      <div className='progress-bar'
-           onMouseMove={this.onMouseMove}
-           onMouseLeave={this.onMouseLeave}
-           onMouseUp={this.onMouseUp}
-           >
-        { elm }
-        <div className='time-label'
-             ref={
-               (el) => {
-                 this._label = el;
-               }
-          }>
-          <span>{this.state.timeLabel}</span>
+      <div className='progress-wrapper'>
+        <div className='progress-bar'
+             onMouseMove={this.onMouseMove}
+             onMouseLeave={this.onMouseLeave}
+             onMouseUp={this.onMouseUp}
+             onTouchEnd={this.onMouseUp}
+             >
+          { progressElm }
+          { elm }
         </div>
+        { hoverTime }
       </div>
     );
   }
 }
+
+ProgressBar.propTypes = {
+  beginTime: PropTypes.object.isRequired,
+  endTime: PropTypes.object.isRequired,
+  formatLocal: PropTypes.function.isRequired,
+  onClick: PropTypes.function,
+  onTimeHover: PropTypes.function,
+  onTimeLeave: PropTypes.function,
+  progress: PropTypes.number,
+  videoUnits: PropTypes.list.isRequired,
+};
+
+ProgressBar.defaultProps = {
+  extraClasses: '',
+  onTimeHover: ()=>{},
+  onTimeLeave: ()=>{},
+  onClick: ()=>{},
+  progress: -1,
+};
 
 export default ProgressBar;

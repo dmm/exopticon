@@ -20,6 +20,8 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import verge from 'verge';
 
+import CameraPlayer from '../camera_player';
+
 import CameraOverlay from './camera_overlay';
 import StatusOverlay from './status_overlay';
 
@@ -39,13 +41,16 @@ class CameraView extends React.Component {
   constructor(props) {
     super(props);
 
+    let player = new CameraPlayer(this.props.camera,
+                                  this.props.cameraChannel);
     this.state = {
       status: 'loading',
+      player: player,
     };
 
     this.playing = false;
 
-    this.props.cameraPlayer.statusCallback = (newStatus) => {
+    player.statusCallback = (newStatus) => {
       this.setState({status: newStatus});
     };
 
@@ -63,7 +68,7 @@ class CameraView extends React.Component {
    *
    */
   setResolution(resolution) {
-    this.props.cameraPlayer.setResolution(resolution);
+    this.state.player.setResolution(resolution);
   }
 
   /**
@@ -77,8 +82,10 @@ class CameraView extends React.Component {
     this.setState({
       status: 'loading',
     });
-    this.props.cameraPlayer.playRealtime(this._img, () => {
-      this.setState({status: 'playing'});
+    this.state.player.playRealtime(this._img, () => {
+      if (this.state.status !== 'playing') {
+        this.setState({status: 'playing'});
+      }
     });
   }
 
@@ -88,7 +95,7 @@ class CameraView extends React.Component {
    */
   pause() {
     this.playing = false;
-    this.props.cameraPlayer.stop();
+    this.state.player.stop();
     this.setState({
       status: 'hidden',
     });
@@ -144,7 +151,7 @@ class CameraView extends React.Component {
                this._container = el;
              }
         }>
-        <CameraOverlay camera={this.props.cameraPlayer}
+        <CameraOverlay camera={this.state.player}
                        fullscreenCallback={this.props.fullscreenHandler}
                        />
         { status }
@@ -160,7 +167,7 @@ class CameraView extends React.Component {
 
 CameraView.propTypes = {
   camera: PropTypes.object.isRequired,
-  cameraPlayer: PropTypes.object.isRequired,
+  cameraChannel: PropTypes.object.isRequired,
   fullscreenHandler: PropTypes.func,
 };
 

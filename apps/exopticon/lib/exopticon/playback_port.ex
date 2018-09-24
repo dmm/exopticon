@@ -46,7 +46,7 @@ defmodule Exopticon.PlaybackPort do
       Port.open(
         {
           :spawn,
-          "apps/exopticon/lib/exopticon/playbackworker #{filename} #{offset}"
+          "apps/exopticon/lib/exopticon/playbackworker #{filename} #{offset} 1"
         },
         [:binary, {:packet, 4}, :exit_status]
       )

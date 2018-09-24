@@ -42,7 +42,7 @@ class FileBrowser extends React.Component {
     super(props);
     this.state = {
       videos: props.initialVideos,
-      selectedUnit: undefined
+      selectedUnit: undefined,
     };
 
     this.selectUnit = this.selectUnit.bind(this);
@@ -77,12 +77,12 @@ class FileBrowser extends React.Component {
 
   /**
    * select video unit for playback
-   * @param {Number} id - id of video unit to play
+   * @param {Number} videoUnit - video unit to play
    *
    */
   selectUnit(videoUnit) {
     this.setState({
-      selectedUnit: videoUnit.id
+      selectedUnit: videoUnit.id,
     });
     this.playFile(videoUnit.files[0].id);
   }
