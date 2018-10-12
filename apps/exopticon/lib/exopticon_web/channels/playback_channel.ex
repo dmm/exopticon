@@ -23,6 +23,7 @@ defmodule ExopticonWeb.PlaybackChannel do
 
   alias Exopticon.PlaybackSupervisor
   alias Exopticon.Repo
+  alias ExopticonWeb.FlowAgent
 
   intercept(["jpg"])
 
@@ -49,38 +50,27 @@ defmodule ExopticonWeb.PlaybackChannel do
   def handle_in("kill_player", %{"topic" => topic}, socket) do
     IO.puts("Stopping player: " <> topic)
     PlaybackSupervisor.stop_playback(topic)
+    FlowAgent.reset(socket.id)
     {:noreply, socket}
   end
 
   def handle_in("ack", payload, socket) do
+    cur_time = System.monotonic_time(:milliseconds)
+    %{"ts" => ts} = payload
+    {ts_int, _} = Integer.parse(ts)
+    new_rtt = cur_time - ts_int
+
+    # Send :ack message to port process
     topic = socket.assigns[:topic]
     regs = Registry.lookup(Registry.PlayerRegistry, topic)
     pids = Enum.map(regs, fn {pid, _} -> pid end)
-    cur_time = System.monotonic_time(:milliseconds)
-    cur_live = socket.assigns[:cur_live]
-    max_live = socket.assigns[:max_live]
-    old_rtt = socket.assigns[:rtt]
 
     Enum.each(pids, fn p ->
       GenServer.cast(p, :ack)
     end)
 
-    %{"ts" => ts} = payload
-    {ts_int, _} = Integer.parse(ts)
-
-    new_rtt = cur_time - ts_int
-    rtt = (new_rtt + old_rtt) / 2
-
-    max_live =
-      if new_rtt > 2 * old_rtt do
-        Enum.max([div(max_live, 2), 1])
-      else
-        Enum.min([max_live + 1, 10])
-      end
-
-    socket = assign(socket, :max_live, max_live)
-    socket = assign(socket, :cur_live, cur_live - 1)
-    socket = assign(socket, :rtt, rtt)
+    # Send ack to flow agent
+    FlowAgent.ack(socket.id, new_rtt)
 
     {:noreply, socket}
   end
@@ -99,20 +89,12 @@ defmodule ExopticonWeb.PlaybackChannel do
   end
 
   def handle_out("jpg", params, socket) do
-    cur_live = socket.assigns[:cur_live]
-    max_live = socket.assigns[:max_live]
+    if FlowAgent.try_send(socket.id) do
+      cur_time = System.monotonic_time(:milliseconds)
+      params = Map.put(params, :ts, to_string(cur_time))
+      push(socket, "jpg", params)
+    end
 
-    new_cur_live =
-      if cur_live < max_live do
-        cur_time = System.monotonic_time(:milliseconds)
-        params = Map.put(params, :ts, to_string(cur_time))
-        push(socket, "jpg", params)
-        cur_live + 1
-      else
-        cur_live
-      end
-
-    socket = assign(socket, :cur_live, new_cur_live)
     {:noreply, socket}
   end
 

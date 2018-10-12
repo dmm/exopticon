@@ -21,6 +21,8 @@ defmodule ExopticonWeb.CameraChannel do
   """
   use ExopticonWeb, :channel
 
+  alias ExopticonWeb.FlowAgent
+
   require Logger
 
   intercept(["jpg"])
@@ -39,6 +41,7 @@ defmodule ExopticonWeb.CameraChannel do
   end
 
   def handle_info(:after_join, socket) do
+    FlowAgent.reset(socket.id)
     push(socket, "subscribe", %{})
     {:noreply, socket}
   end
@@ -79,26 +82,13 @@ defmodule ExopticonWeb.CameraChannel do
   end
 
   def handle_in("ack", payload, socket) do
-    cur_live = socket.assigns[:cur_live]
-    max_live = socket.assigns[:max_live]
     cur_time = System.monotonic_time(:milliseconds)
     %{"ts" => ts} = payload
     {ts_int, _} = Integer.parse(ts)
-    old_rtt = socket.assigns[:rtt]
     new_rtt = cur_time - ts_int
-    rtt = (new_rtt + old_rtt) / 2
 
-    max_live =
-      if new_rtt > 2 * old_rtt do
-        Enum.max([div(max_live, 2), 1])
-      else
-        Enum.min([max_live + 1, 10])
-      end
+    FlowAgent.ack(socket.id, new_rtt)
 
-    socket = assign(socket, :max_live, max_live)
-    socket = assign(socket, :cur_live, cur_live - 1)
-    socket = assign(socket, :rtt, rtt)
-    #    Logger.info("Ack: " <> to_string(cur_live))
     {:noreply, socket}
   end
 
@@ -109,37 +99,7 @@ defmodule ExopticonWeb.CameraChannel do
     {:noreply, socket}
   end
 
-  def adjust_max_live(true, cur_live, max_live) when cur_live < max_live do
-    max_live
-  end
-
-  def adjust_max_live(_active, cur_live, max_live) when cur_live >= max_live do
-    Enum.max([max_live - 1, 1])
-  end
-
-  def adjust_max_live(_active, cur_live, max_live) when cur_live == 0 do
-    Enum.min([max_live + 2, 50])
-  end
-
-  def adjust_max_live(_active, _cur_live, max_live) do
-    max_live
-  end
-
-  def adjust_cur_live(true, cur_live, max_live) when cur_live < max_live do
-    cur_live + 1
-  end
-
-  def adjust_cur_live(true, cur_live, max_live) when cur_live >= max_live do
-    cur_live
-  end
-
-  def adjust_cur_live(false, cur_live, _) do
-    cur_live
-  end
-
   def handle_out("jpg", params, socket) do
-    cur_live = socket.assigns[:cur_live]
-    max_live = socket.assigns[:max_live]
     camera_id = params[:cameraId]
     resolution = params[:res]
     watch_camera = socket.assigns[:watch_camera]
@@ -147,7 +107,8 @@ defmodule ExopticonWeb.CameraChannel do
 
     camera_active = Map.has_key?(watch_camera, camera_id)
     camera_hd = Map.has_key?(hd_cameras, camera_id)
-    frame_active = camera_active and cur_live < max_live
+    # cur_live < max_live
+    frame_active = camera_active
     resolution_active = (resolution == "hd" && camera_hd) or (resolution == "sd" and not camera_hd)
 
     #    Logger.info(
@@ -157,17 +118,12 @@ defmodule ExopticonWeb.CameraChannel do
     #      <> to_string(camera_active)
     #      <> " " <> to_string(socket.assigns[:rtt])
     #    )
-    new_cur_live =
-      if frame_active and resolution_active do
-        cur_time = System.monotonic_time(:milliseconds)
-        params = Map.put(params, :ts, to_string(cur_time))
-        push(socket, "jpg" <> Integer.to_string(camera_id), params)
-        cur_live + 1
-      else
-        cur_live
-      end
+    if frame_active and resolution_active and FlowAgent.try_send(socket.id) do
+      cur_time = System.monotonic_time(:milliseconds)
+      params = Map.put(params, :ts, to_string(cur_time))
+      push(socket, "jpg" <> Integer.to_string(camera_id), params)
+    end
 
-    socket = assign(socket, :cur_live, new_cur_live)
     {:noreply, socket}
   end
 

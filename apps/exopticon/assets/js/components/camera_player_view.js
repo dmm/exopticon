@@ -152,16 +152,14 @@ class CameraPlayerView extends React.Component {
           fileOffset: state.offset,
           currentPlaybackTime: playbackTime,
         });
-      }
-
-      if (state.status === 'stopped') {
+      } else if (state.status === 'stopped') {
         const nextUnit = this.state.library.getNextFile(fileId);
         console.log(nextUnit);
         if (nextUnit !== null) {
           this.setState({
             currentVideoUnit: nextUnit,
           });
-          if (this.fiePlayer) {
+          if (this.filePlayer) {
             this.filePlayer.stop();
             this.filePlayer = undefined;
           }

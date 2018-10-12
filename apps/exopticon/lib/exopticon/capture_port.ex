@@ -51,7 +51,7 @@ defmodule Exopticon.CapturePort do
   end
 
   ### Server callbacks
-  defp get_monotonic_index() do
+  defp get_monotonic_index do
     index =
       Repo.one(
         from(

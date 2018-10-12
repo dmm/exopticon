@@ -39,7 +39,8 @@ defmodule Exopticon.Application do
       supervisor(Exopticon.CameraSupervisor, []),
       supervisor(Exopticon.PlaybackSupervisor, []),
       supervisor(Exopticon.Video.FileDeletionSupervisor, []),
-      supervisor(Exopticon.Video.FrameCaptureSupervisor, [])
+      supervisor(Exopticon.Video.FrameCaptureSupervisor, []),
+      supervisor(ExopticonWeb.FlowAgent, [])
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
