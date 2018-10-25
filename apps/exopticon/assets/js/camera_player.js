@@ -9,18 +9,21 @@ import SuperImage from './super_image';
 class CameraPlayer {
   /**
    * @param {Exopticon.Camera} camera - Camera object to play
-   * @param {Exopticon.CameraChannel} channel - channel to play over
+   * @param {Phoenix.Socket} socket - socket to connect over
    */
-  constructor(camera, channel) {
+  constructor(camera, socket) {
     this.camera = camera;
     Object.assign(this, camera);
     this.relativeMoveUrl = `/v1/cameras/${camera.id}/relativeMove`;
     this.annotationUrl = '/v1/annotations';
     this.status = 'paused';
-    this.channel = channel;
+    this.socket = socket;
+    this.channel = undefined;
     this.img = null;
     this.statusCallback = () => {};
     this.lastFrame = undefined;
+    this.resolutionSuffix = 'sd';
+    this.cb = () => {};
 
     // Bind functions so they can be used as callbacks
     // and use 'this'.
@@ -52,23 +55,30 @@ class CameraPlayer {
    */
   playRealtime(img, cb = ()=>{}) {
     this.setStatus('loading');
+    this.domImg = img;
+    this.cb = cb;
     this.img = new SuperImage(img);
 
-    this.channel.join(this.camera.id, (data) => {
+    this.channel = this.socket.channel(`camera:${this.camera.id}${this.resolutionSuffix}`);
+    this.channel.on("frame", frame => {
+      this.channel.push('ack', {ts: frame.ts});
       if (this.status !== 'paused' && this.img !== null) {
-        this.lastFrame = data;
+        this.lastFrame = frame;
         this.setStatus('playing');
-        this.img.renderArrayIfReady(data.frameJpeg);
-        cb();
+        this.img.renderArrayIfReady(frame.frameJpeg);
+        this.cb();
       }
     });
+    this.channel.join();
   }
 
   /**
    * stop all playback of given camera
    */
   stop() {
-    this.channel.leave(this.camera.id);
+    if (this.channel) {
+      this.channel.leave();
+    }
     this.setStatus('paused');
     this.img = null;
   }
@@ -78,10 +88,16 @@ class CameraPlayer {
    * @param {string} resolution - resolution flag, either 'sd' or 'hd'
    */
   setResolution(resolution) {
+    const oldResolution = this.resolutionSuffix;
     if (resolution === 'hd') {
-      this.channel.setResolution(this.camera.id, 'hd');
+      this.resolutionSuffix = '';
     } else if (resolution === 'sd') {
-      this.channel.setResolution(this.camera.id, 'sd');
+      this.resolutionSuffix = 'sd';
+    }
+
+    if (oldResolution !== this.resolutionSuffix) {
+    this.stop();
+      this.playRealtime(this.domImg, this.cb);
     }
   }
 

@@ -25,7 +25,7 @@ defmodule ExopticonWeb.CameraChannel do
 
   require Logger
 
-  intercept(["jpg"])
+  intercept(["jpg", "frame"])
 
   def join("camera:lobby", payload, socket) do
     if authorized?(payload) do
@@ -40,39 +40,8 @@ defmodule ExopticonWeb.CameraChannel do
     {:ok, socket}
   end
 
-  def handle_info(:after_join, socket) do
-    FlowAgent.reset(socket.id)
-    push(socket, "subscribe", %{})
-    {:noreply, socket}
-  end
-
-  def handle_in("watch" <> camera_id, _payload, socket) do
-    watch_cameras = socket.assigns[:watch_camera]
-    new_watch = Map.put_new(watch_cameras, String.to_integer(camera_id), 1)
-    socket = assign(socket, :watch_camera, new_watch)
-    {:noreply, socket}
-  end
-
-  def handle_in("close" <> camera_id, _payload, socket) do
-    Logger.debug("closing socket")
-    watch_cameras = socket.assigns[:watch_camera]
-    new_watch = Map.delete(watch_cameras, String.to_integer(camera_id))
-    socket = assign(socket, :watch_camera, new_watch)
-    {:noreply, socket}
-  end
-
-  def handle_in("hdon" <> camera_id, _payload, socket) do
-    hd_cameras = socket.assigns[:hd_cameras]
-    new_hd_cameras = Map.put_new(hd_cameras, String.to_integer(camera_id), 1)
-    socket = assign(socket, :hd_cameras, new_hd_cameras)
-    {:noreply, socket}
-  end
-
-  def handle_in("hdoff" <> camera_id, _payload, socket) do
-    hd_cameras = socket.assigns[:hd_cameras]
-    new_hd_cameras = Map.delete(hd_cameras, String.to_integer(camera_id))
-    socket = assign(socket, :hd_cameras, new_hd_cameras)
-    {:noreply, socket}
+  def join("camera:" <> room_id, _params, socket) do
+    {:ok, socket}
   end
 
   # Channels can be used in a request/response fashion
@@ -125,6 +94,20 @@ defmodule ExopticonWeb.CameraChannel do
     end
 
     {:noreply, socket}
+  end
+
+  def handle_out("frame", params, socket) do
+    if true do #FlowAgent.try_send(socket.id) do
+      cur_time = System.monotonic_time(:milliseconds)
+      params = Map.put(params, :ts, to_string(cur_time))
+      push(socket, "frame", params)
+    end
+    {:noreply, socket}
+  end
+
+  def terminate(_reason, socket) do
+    IO.puts("RESETTING: " <> socket.id)
+    FlowAgent.reset(socket.id)
   end
 
   # Add authorization logic here as required.

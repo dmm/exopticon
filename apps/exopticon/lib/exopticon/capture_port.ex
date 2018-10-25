@@ -112,7 +112,8 @@ defmodule Exopticon.CapturePort do
            port_args: port_args
          }}
       ) do
-    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
+
+    ExopticonWeb.Endpoint.broadcast!("camera:"<>to_string(id), "frame", %{
       cameraId: id,
       frameJpeg: Msgpax.Bin.new(dec),
       videoUnitId: video_unit_id,
@@ -142,7 +143,8 @@ defmodule Exopticon.CapturePort do
            port_args: _
          } = state}
       ) do
-    ExopticonWeb.Endpoint.broadcast!("camera:stream", "jpg", %{
+
+    ExopticonWeb.Endpoint.broadcast!("camera:"<>to_string(id)<>"sd", "frame", %{
       cameraId: id,
       frameJpeg: Msgpax.Bin.new(dec),
       videoUnitId: video_unit_id,

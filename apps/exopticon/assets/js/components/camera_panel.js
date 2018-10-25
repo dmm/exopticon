@@ -46,22 +46,20 @@ class CameraPanel extends React.Component {
     this.shiftFullscreen = this.shiftFullscreen.bind(this);
     this.setFullscreenIndex = this.setFullscreenIndex.bind(this);
     this.cameraRequestFullscreen = this.cameraRequestFullscreen.bind(this);
+    this.panelActive = true;
+    this.fullscreenId = -1;
 
     /* Bind event handlers */
     this.handleScroll = this.handleScroll.bind(this);
     this.handleResize = this.handleResize.bind(this);
     this.visibilityChange = this.visibilityChange.bind(this);
     this.visibilityCheck = this.visibilityCheck.bind(this);
-
-    let channel = props.socket.channel('camera:stream');
-    channel.join();
+    this.updateActive = this.updateActive.bind(this);
 
     let enabledCameras = this.filterCameras(props.initialCameras);
 
     this.state = {
       cameras: enabledCameras,
-      channel: channel,
-      cameraChannel: new CameraChannel(channel),
       viewColumns: props.initialColumns,
       fullscreenIndex: -1,
     };
@@ -78,7 +76,7 @@ class CameraPanel extends React.Component {
    */
   handleScroll() {
     window.clearTimeout(this.isScrolling);
-    this.isScrolling = window.setTimeout(this.visibilityCheck, 33);
+    this.isScrolling = window.setTimeout(this.visibilityCheck, 300);
   }
 
   /**
@@ -88,7 +86,7 @@ class CameraPanel extends React.Component {
    */
   handleResize() {
     window.clearTimeout(this.isResizing);
-    this.isResizing = window.setTimeout(this.visibilityCheck, 33);
+    this.isResizing = window.setTimeout(this.visibilityCheck, 300);
   }
 
   /**
@@ -98,14 +96,11 @@ class CameraPanel extends React.Component {
    */
   visibilityChange() {
     if (document['hidden']) {
-      this.cameraElements.forEach((c) => {
-        c.pause();
-      });
+      this.panelActive = false;
     } else {
-      this.cameraElements.forEach((c) => {
-        c.play();
-      });
+      this.panelActive = true;
     }
+    this.updateActive();
   }
 
   /**
@@ -113,17 +108,29 @@ class CameraPanel extends React.Component {
    * @private
    */
   visibilityCheck() {
-    this.cameraElements.forEach((c, i) => {
-      // Ugh, we should probably use our own container instead of
-      // the CameraView's
-      if (verge.inY(c._container)) {
-        console.log('playing: ' + i);
+    this.updateActive();
+  }
+
+  /**
+   * updateActive
+   * @private
+   */
+  updateActive() {
+    const active = this.panelActive;
+    const fsi = this.fullscreenId;
+
+    for (let c of this.cameraElements.values()) {
+      const visible = verge.inY(c._container);
+      if (visible && active && fsi === -1) {
+        c.setResolution('sd');
+        c.play();
+      } else if (visible && active && fsi === c.props.camera.id) {
+        c.setResolution('hd');
         c.play();
       } else {
-        console.log('pausing: ' + i);
         c.pause();
       }
-    });
+    };
   }
 
   /**
@@ -165,6 +172,7 @@ class CameraPanel extends React.Component {
    * @private
    */
   componentDidMount() {
+    this.visibilityChange();
     window.addEventListener('scroll', this.handleScroll);
     window.addEventListener('resize', this.handleResize);
     window.addEventListener('visibilitychange', this.visibilityChange);
@@ -175,7 +183,6 @@ class CameraPanel extends React.Component {
    * @private
    */
   componentWillUnmount() {
-    this.state.channel.leave();
     window.removeEventListener('scroll', this.handleScroll);
     window.removeEventListener('resize', this.handleResize);
     window.removeEventListener('visibilityChange', this.visibilityChange);
@@ -207,11 +214,15 @@ class CameraPanel extends React.Component {
       fullscreenIndex: newIndex,
     });
 
+    this.fullscreenId = newIndex == -1 ? -1 :this.state.cameras[newIndex].id;
+
+    this.updateActive();
+    this.handleResize();
+    return;
 
     if (newIndex === -1) {
       for (let c of this.cameraElements.values()) {
         c.setResolution('sd');
-        c.play();
       }
       fscreen.exitFullscreen();
     } else {
@@ -264,7 +275,7 @@ class CameraPanel extends React.Component {
 
     this.cameraElements.clear();
     const cameras = [];
-    const cameraChannel = this.state.cameraChannel;
+
     this.state.cameras.forEach((cam, i) => {
       let fsClass = '';
       if (this.state.fullscreenIndex !== -1
@@ -278,7 +289,7 @@ class CameraPanel extends React.Component {
           <div className="camera-width"></div>
           <div className="content">
           <CameraView camera={cam}
-                      cameraChannel={cameraChannel}
+                      socket={this.props.socket}
                       fullscreenHandler={() => {
                         this.setFullscreenIndex(i);
               }}

@@ -56,7 +56,7 @@ defmodule ExopticonWeb.FlowAgent do
   def ack(socket_id, rtt) do
     flow_state =
       Agent.get(__MODULE__, fn map ->
-        Map.get(map, socket_id)
+        Map.get(map, socket_id, %{cur_live: 0, max_live: 1})
       end)
 
     cur_live = Map.get(flow_state, :cur_live) - 1
