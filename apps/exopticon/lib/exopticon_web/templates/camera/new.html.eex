@@ -1,5 +1,0 @@
-<h2>New Camera</h2>
-
-<%= render "form.html", Map.put(assigns, :action, camera_path(@conn, :create)) %>
-
-<span><%= link "Back", to: camera_path(@conn, :index) %></span>

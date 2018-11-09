@@ -1,3 +1,0 @@
-<div style="display: none;" id="singleCamera" data-id=<%= @camera_id %>>
-</div>
-<div id="file-browser-mount"></div>

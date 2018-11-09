@@ -1,5 +1,0 @@
-<h2>New File</h2>
-
-<%= render "form.html", Map.put(assigns, :action, file_path(@conn, :create)) %>
-
-<span><%= link "Back", to: file_path(@conn, :index) %></span>

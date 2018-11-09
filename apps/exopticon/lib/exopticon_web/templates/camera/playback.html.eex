@@ -1,6 +1,0 @@
-
-
-
-<div id="singleCamera" data-id=<%= @camera.id %>>
-  <div id="player" style="width: 100%; height: calc(100vh - 40px);"></div>
-</div>
