@@ -60,7 +60,6 @@ use root_supervisor::{ExopticonMode, RootSupervisor};
 
 fn main() {
     env_logger::init();
-    std::env::set_var("RUST_LOG", "actix_web=info");
 
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
