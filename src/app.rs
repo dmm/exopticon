@@ -7,6 +7,7 @@ use camera_group_routes::{
 };
 use camera_routes::{create_camera, fetch_all_cameras, fetch_camera, update_camera};
 use models::DbExecutor;
+use static_routes::fetch_static_file;
 use video_unit_routes::{fetch_video_unit, fetch_video_units_between};
 use ws_session::WsSession;
 
@@ -23,6 +24,8 @@ pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
     App::with_state(AppState { db })
         // setup builtin logger to get nice logging for each request
         .middleware(Logger::default())
+        // routes for static files
+        .handler("/static/", fetch_static_file)
         .resource("/ws", |r| r.route().f(ws_route))
         // routes for authentication
         .resource("/auth", |_r| {})

@@ -7,3 +7,5 @@ web/node_modules
 src/cworkers/captureworker
 src/cworkers/playbackworker
 **/.#*
+web/static/css
+web/static/js

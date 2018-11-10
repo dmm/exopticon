@@ -4,6 +4,7 @@
 
 extern crate actix;
 extern crate actix_web;
+extern crate askama;
 extern crate bytes;
 extern crate chrono;
 extern crate dotenv;
@@ -20,8 +21,11 @@ extern crate serde_derive;
 extern crate failure;
 #[macro_use]
 extern crate log;
+extern crate mime_guess;
 extern crate rmp;
 extern crate rmp_serde;
+#[macro_use]
+extern crate rust_embed;
 extern crate serde_bytes;
 extern crate tokio;
 extern crate tokio_codec;
@@ -29,23 +33,19 @@ extern crate tokio_io;
 extern crate tokio_process;
 
 mod app;
-mod errors;
-mod models;
-mod schema;
-
 mod camera_group_handler;
 mod camera_group_routes;
-
 mod camera_handler;
 mod camera_routes;
-
-mod video_unit_handler;
-mod video_unit_routes;
-
 mod capture_actor;
 mod capture_supervisor;
-
+mod errors;
+mod models;
 mod root_supervisor;
+mod schema;
+mod static_routes;
+mod video_unit_handler;
+mod video_unit_routes;
 mod ws_camera_server;
 mod ws_session;
 
