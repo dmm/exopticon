@@ -6,3 +6,4 @@ web/node_modules
 *.dat
 src/cworkers/captureworker
 src/cworkers/playbackworker
+**/.#*
