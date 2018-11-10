@@ -3,7 +3,7 @@ use actix::prelude::*;
 //use std::collections::HashMap;
 //use std::mem;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize)]
 pub enum FrameResolution {
     SD,
     HD,
@@ -12,7 +12,7 @@ pub enum FrameResolution {
 type Client = Recipient<CameraFrame>;
 
 // MESSAGES
-#[derive(Clone, Message)]
+#[derive(Clone, Message, Serialize)]
 pub struct CameraFrame {
     pub camera_id: i32,
     pub jpeg: Vec<u8>,

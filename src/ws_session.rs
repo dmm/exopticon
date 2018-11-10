@@ -1,5 +1,7 @@
 use actix::prelude::*;
 use actix_web::{fs, ws, App, Error, HttpRequest, HttpResponse};
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 use app::AppState;
 use ws_camera_server::{CameraFrame, Subscribe, Unsubscribe};
@@ -16,6 +18,15 @@ impl Actor for WsSession {
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         debug!("Stopping websocket!");
+    }
+}
+
+impl Handler<CameraFrame> for WsSession {
+    type Result = ();
+    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
+        let mut buf = Vec::new();
+        msg.serialize(&mut Serializer::new(&mut buf)).unwrap();
+        ctx.binary(buf);
     }
 }
 
