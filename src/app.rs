@@ -7,7 +7,7 @@ use camera_group_routes::{
 };
 use camera_routes::{create_camera, fetch_all_cameras, fetch_camera, update_camera};
 use models::DbExecutor;
-use static_routes::fetch_static_file;
+use static_routes::{fetch_static_file, index};
 use video_unit_routes::{fetch_video_unit, fetch_video_units_between};
 use ws_session::WsSession;
 
@@ -16,6 +16,7 @@ pub struct AppState {
 }
 
 pub fn ws_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
+    debug!("Starting websocket session...");
     ws::start(req, WsSession::default())
 }
 
@@ -25,30 +26,31 @@ pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
         // setup builtin logger to get nice logging for each request
         .middleware(Logger::default())
         // routes for static files
+        .route("/", Method::GET, index)
         .handler("/static/", fetch_static_file)
         .resource("/ws", |r| r.route().f(ws_route))
         // routes for authentication
         .resource("/auth", |_r| {})
         // routes to camera_group
-        .resource("/v1/camera_group", |r| {
+        .resource("/v1/camera_groups", |r| {
             r.method(Method::POST).with(create_camera_group);
             r.method(Method::GET).with(fetch_all_camera_groups);
-        }).resource("/v1/camera_group/{id}", |r| {
+        }).resource("/v1/camera_groups/{id}", |r| {
             r.method(Method::POST).with(update_camera_group);
             r.method(Method::GET).with(fetch_camera_group);
         })
         // routes to camera
-        .resource("/v1/camera", |r| {
+        .resource("/v1/cameras", |r| {
             r.method(Method::POST).with(create_camera);
             r.method(Method::GET).with(fetch_all_cameras);
-        }).resource("/v1/camera/{id}", |r| {
+        }).resource("/v1/cameras/{id}", |r| {
             r.method(Method::POST).with(update_camera);
             r.method(Method::GET).with(fetch_camera);
         })
         // routes to video_unit
-        .resource("/v1/video_unit/{id}", |r| {
+        .resource("/v1/video_units/{id}", |r| {
             r.method(Method::GET).with(fetch_video_unit);
-        }).resource("/v1/video_unit/between/{begin}/{end}", |r| {
+        }).resource("/v1/video_units/between/{begin}/{end}", |r| {
             r.method(Method::GET).with(fetch_video_units_between);
         })
 }
