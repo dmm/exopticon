@@ -1,20 +1,39 @@
 'use strict';
+
+import msgpack from './msgpack';
+
 /**
  * @class
  */
 class CameraChannel {
   /**
-   * @param {Pheonix.Channel} channel
+   * @param {WebSocketClient} client
    */
-  constructor(channel) {
-    this.channel = channel;
+  constructor(client) {
+    this.client = client;
     this.prefix = 'camera';
 
     this.watchedCameras = new Map();
 
     this.subscribe = this.subscribe.bind(this);
     this.unsubscribe = this.unsubscribe.bind(this);
+    this.join = this.join.bind(this);
+    this.leave = this.leave.bind(this);
 
+    this.client.onopen = () => {
+      this.subscribe(this.watchedCameraIds());
+    };
+
+    this.client.onmessage = (event) => {
+      let msg = this.decodeMessage(event.data);
+
+      if (msg === undefined) return;
+
+      if (this.watchedCameras.has(msg.camera_id)) {
+        this.watchedCameras.get(msg.camera_id).callback(msg);
+      }
+    };
+    /*
     this.channel.on('subscribe', () => {
       this.subscribe(this.watchedCameraIds());
     });
@@ -24,7 +43,26 @@ class CameraChannel {
       }
       return payload;
     };
+    */
   }
+
+  /**
+   * @param {ArrayBuffer} rawdata
+   * @return {Object} decoded object
+   */
+  decodeMessage(rawdata) {
+    if (!rawdata) {
+      return undefined;
+    }
+    let binary = new Uint8Array(rawdata);
+    let data;
+    data = binary;
+
+    let msg = msgpack.decode(data);
+    return msg;
+  }
+
+
   /**
    * @return {Array} returns ids of cameras being watched as array
    */
@@ -43,19 +81,24 @@ class CameraChannel {
    * @param {Array} cameras - Array of camera ids to watch
    * @private
    */
-  subscribe(cameras) {
-   cameras.forEach((cameraId) => {
-      this.channel.push(`watch${cameraId.toString()}`, '');
-    });
+  subscribe(cameras, resolution) {
+    if (cameras.length == 0) return;
+    this.client.send(JSON.stringify({
+      command: 'subscribe',
+      resolution: {type: resolution},
+      cameraIds: cameras,
+    }));
   }
   /**
    * @param {Array} cameras - Array of cameras to stop watching
    * @private
    */
   unsubscribe(cameras) {
-    cameras.forEach((cameraId) => {
-      this.channel.push(`close${cameraId.toString()}`, '');
-    });
+    this.client.send(JSON.stringify({
+      command: 'unsubscribe',
+      resolution: {type: 'SD'},
+      cameraIds: cameras,
+    }));
   }
 
   /**
@@ -63,25 +106,21 @@ class CameraChannel {
    * @param {Function} callback - function to be called when frame is
    *                   received for given camera
    */
-  join(cameraId, callback) {
+  join(cameraId, resolution, callback) {
     this.leave(cameraId);
 
-    this.channel.off(`jpg${cameraId}`, ref);
+    this.watchedCameras.set(cameraId, {
+      callback: callback,
+      resolution: resolution,
+    });
 
-    const ref = this.channel.on(`jpg${cameraId}`, callback);
-    this.watchedCameras.set(cameraId, ref);
-
-    this.subscribe([cameraId]);
+    this.subscribe([cameraId], resolution);
   }
 
   /**
    * @param {number} cameraId - stop watching given camera id
    */
   leave(cameraId) {
-    const ref = this.watchedCameras.get(cameraId);
-    if (false && ref !== undefined) { // ref doesn't work yet :(
-      this.channel.off(`jpg${cameraId}`, ref);
-    }
     this.unsubscribe([cameraId]);
     this.watchedCameras.delete(cameraId);
   }
@@ -92,6 +131,7 @@ class CameraChannel {
    *
    */
   setResolution(cameraId, resolution) {
+    return;
     if (resolution === 'hd') {
       this.channel.push(`hdon${cameraId.toString()}`, '');
     } else if (resolution === 'sd') {

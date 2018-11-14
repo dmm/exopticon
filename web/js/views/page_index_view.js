@@ -69,13 +69,5 @@ export default class View extends MainView {
     }
 
     window.cameraManager.setColumnCount(parseInt(cameraPanelWidth, 10));
-
-    let columnSelector = document.querySelector('#panel-width-select');
-    columnSelector.value = cameraPanelWidth;
-
-    columnSelector.onchange = function() {
-      window.cameraManager.setColumnCount(parseInt(this.value, 10));
-      window.localStorage.setItem('camera-panel-width', this.value);
-    };
   }
 }

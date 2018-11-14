@@ -42,7 +42,7 @@ class CameraView extends React.Component {
     super(props);
 
     let player = new CameraPlayer(this.props.camera,
-                                  this.props.socket);
+                                  this.props.channel);
     this.state = {
       status: 'loading',
       player: player,
@@ -167,7 +167,7 @@ class CameraView extends React.Component {
 
 CameraView.propTypes = {
   camera: PropTypes.object.isRequired,
-  socket: PropTypes.object.isRequired,
+  channel: PropTypes.object.isRequired,
   fullscreenHandler: PropTypes.func,
 };
 

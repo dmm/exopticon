@@ -16,19 +16,91 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {Socket} from 'phoenix';
+var loc = window.location, new_uri;
+if (loc.protocol === "https:") {
+    new_uri = "wss:";
+} else {
+    new_uri = "ws:";
+}
+new_uri += "//" + loc.host;
+new_uri += loc.pathname + "ws";
+console.log(new_uri);
 
-import binarySocket from './binarySocket';
+function WebSocketClient() {
+	this.number = 0;	// Message number
+	this.autoReconnectInterval = 5*1000;	// ms
+  this.status = 'enabled';
+}
 
-/*
-the type=msgpack param is only added to distinguish this connection
-from the phoenix live reload connection in the browser's network tab
-*/
-let socket = new Socket('/socket',
-                        {params: {type: 'msgpack', token: window.userToken}});
+WebSocketClient.prototype.open = function(url) {
+	this.url = url;
+	this.instance = new WebSocket(this.url);
+  this.instance.binaryType = "arraybuffer";
+	this.instance.onopen = ()=>{
+		this.onopen();
+	};
+	this.instance.onmessage = (data,flags)=>{
+		this.number++;
+		this.onmessage(data,flags,this.number);
+	};
+	this.instance.onclose = (e)=>{
+		switch (e.code){
+		case 1000:	// CLOSE_NORMAL
+			console.log("WebSocket: closed");
+			break;
+		default:	// Abnormal closure
+			this.reconnect(e);
+			break;
+		}
+		this.onclose(e);
+	};
 
-socket = binarySocket.convertToBinary(socket);
+	this.instance.onerror = (e)=> {
+		switch (e.code){
+		case 'ECONNREFUSED':
+			this.reconnect(e);
+			break;
+		default:
+			this.onerror(e);
+			break;
+		}
+	};
+};
 
-socket.connect();
+WebSocketClient.prototype.send = function(data){
+	try {
+		this.instance.send(data);
+	} catch (e) {
+		this.instance.emit('error',e);
+	}
+};
+
+WebSocketClient.prototype.reconnect = function(e) {
+	console.log(`WebSocketClient: retry in ${this.autoReconnectInterval}ms`,e);
+
+	var that = this;
+	setTimeout(function(){
+		console.log("WebSocketClient: reconnecting...");
+    if (that.status === 'enabled') {
+		  that.open(that.url);
+    }
+	},this.autoReconnectInterval);
+};
+
+WebSocketClient.prototype.onopen = function(e){	console.log("WebSocketClient: open",arguments);	};
+WebSocketClient.prototype.onmessage = function(data,flags,number){	console.log("WebSocketClient: message",arguments);	};
+WebSocketClient.prototype.onerror = function(e){	console.log("WebSocketClient: error",arguments);	};
+WebSocketClient.prototype.onclose = function(e){	console.log("WebSocketClient: closed",arguments);	};
+WebSocketClient.prototype.setStatus = function(status) {
+  if (status !== 'enabled' && status !== 'disabled') {
+    return;
+  }
+
+  this.status = status;
+};
+
+let socket = new WebSocketClient();
+
+socket.open(new_uri);
 
 export default socket;

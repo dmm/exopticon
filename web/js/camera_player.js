@@ -9,20 +9,19 @@ import SuperImage from './super_image';
 class CameraPlayer {
   /**
    * @param {Exopticon.Camera} camera - Camera object to play
-   * @param {Phoenix.Socket} socket - socket to connect over
+   * @param {Channel} channel - channel to get camera frames
    */
-  constructor(camera, socket) {
+  constructor(camera, channel) {
     this.camera = camera;
     Object.assign(this, camera);
     this.relativeMoveUrl = `/v1/cameras/${camera.id}/relativeMove`;
     this.annotationUrl = '/v1/annotations';
     this.status = 'paused';
-    this.socket = socket;
-    this.channel = undefined;
+    this.channel = channel;
     this.img = null;
     this.statusCallback = () => {};
     this.lastFrame = undefined;
-    this.resolutionSuffix = 'sd';
+    this.resolutionSuffix = 'SD';
     this.cb = () => {};
 
     // Bind functions so they can be used as callbacks
@@ -59,17 +58,15 @@ class CameraPlayer {
     this.cb = cb;
     this.img = new SuperImage(img);
 
-    this.channel = this.socket.channel(`camera:${this.camera.id}${this.resolutionSuffix}`);
-    this.channel.on("frame", frame => {
-      this.channel.push('ack', {ts: frame.ts});
-      if (this.status !== 'paused' && this.img !== null) {
-        this.lastFrame = frame;
-        this.setStatus('playing');
-        this.img.renderArrayIfReady(frame.frameJpeg);
-        this.cb();
-      }
-    });
-    this.channel.join();
+    this.channel = this.channel.join(this.camera.id, this.resolutionSuffix,
+                                     frame => {
+                                       if (this.status !== 'paused' && this.img !== null) {
+                                         this.lastFrame = frame;
+                                         this.setStatus('playing');
+                                         this.img.renderArrayIfReady(frame.jpeg);
+                                         this.cb();
+                                       }
+                                     });
   }
 
   /**
@@ -77,7 +74,7 @@ class CameraPlayer {
    */
   stop() {
     if (this.channel) {
-      this.channel.leave();
+      this.channel.leave(this.camera.id);
     }
     this.setStatus('paused');
     this.img = null;
@@ -89,10 +86,10 @@ class CameraPlayer {
    */
   setResolution(resolution) {
     const oldResolution = this.resolutionSuffix;
-    if (resolution === 'hd') {
+    if (resolution === 'HD') {
       this.resolutionSuffix = '';
-    } else if (resolution === 'sd') {
-      this.resolutionSuffix = 'sd';
+    } else if (resolution === 'SD') {
+      this.resolutionSuffix = 'SD';
     }
 
     if (oldResolution !== this.resolutionSuffix) {

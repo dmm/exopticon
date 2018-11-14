@@ -142,9 +142,9 @@ class CameraPanel extends React.Component {
     let enabledCameras = [];
 
     cameras.forEach((c) => {
-      if (c.mode === 'enabled' && !this.props.showDisabled) {
+      if (c.enabled && !this.props.showDisabled) {
         enabledCameras.push(c);
-      } else if (c.mode === 'disabled' && this.props.showDisabled) {
+      } else if (!c.enabled && this.props.showDisabled) {
         enabledCameras.push(c);
       }
     });
@@ -289,7 +289,7 @@ class CameraPanel extends React.Component {
           <div className="camera-width"></div>
           <div className="content">
           <CameraView camera={cam}
-                      socket={this.props.socket}
+                      channel={this.props.channel}
                       fullscreenHandler={() => {
                         this.setFullscreenIndex(i);
               }}
@@ -311,7 +311,7 @@ class CameraPanel extends React.Component {
 }
 
 CameraPanel.propTypes = {
-  socket: PropTypes.object.isRequired,
+  channel: PropTypes.object.isRequired,
   initialCameras: PropTypes.object,
   initialColumns: PropTypes.number,
   showDisabled: PropTypes.bool,

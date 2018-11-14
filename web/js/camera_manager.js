@@ -3,6 +3,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
+import CameraChannel from './camera_channel';
 import CameraPanel from './components/camera_panel';
 
 /**
@@ -17,6 +18,7 @@ class CameraManager {
    */
   constructor(socket, columns = 0, showDisabled = false) {
     this.socket = socket;
+    this.channel = new CameraChannel(this.socket);
     this.visibleCameras = new Map();
     this.checkingVisibility = false;
     this.lastScrollPosition = 0;
@@ -24,7 +26,7 @@ class CameraManager {
     this.panel =
       React.createElement(CameraPanel,
                           {
-                            socket: this.socket,
+                            channel: this.channel,
                             initialCameras: new Map(),
                             initialColumns: columns,
                             showDisabled: showDisabled,
