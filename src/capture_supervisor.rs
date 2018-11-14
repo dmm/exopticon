@@ -33,8 +33,12 @@ impl Handler<StartCaptureWorker> for CaptureSupervisor {
 
     fn handle(&mut self, msg: StartCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
         println!("Supervisor: Starting camera id: {}", msg.id);
-        let address = CaptureActor::new(msg.id, msg.stream_url, msg.storage_path).start();
-        self.workers.push((msg.id, address));
+        let id = msg.id.to_owned();
+        // Launch each CaptureActor in a new thread. This is really
+        // only necessary for debug builds because they are otherwise too slow on one thread.
+        let address =
+            Arbiter::start(|_| CaptureActor::new(msg.id, msg.stream_url, msg.storage_path));
+        self.workers.push((id, address));
     }
 }
 
