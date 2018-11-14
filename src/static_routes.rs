@@ -1,13 +1,25 @@
 use std::path::{Path, PathBuf};
 
+use actix::Handler;
 use actix_web::dev::FromParam;
 use actix_web::{
     AsyncResponder, Body, FutureResponse, HttpRequest, HttpResponse, Json, Responder,
-    ResponseError, State,
+    ResponseError, Result, State,
 };
+use askama::Template;
 use mime_guess::guess_mime_type;
 
 use app::AppState;
+
+#[derive(Template)]
+#[template(path = "index.html")]
+struct Index;
+
+pub fn index(req: HttpRequest<AppState>) -> HttpResponse {
+    let s = Index.render().unwrap();
+
+    HttpResponse::Ok().content_type("text/html").body(s)
+}
 
 #[derive(RustEmbed)]
 #[folder = "web/static"]

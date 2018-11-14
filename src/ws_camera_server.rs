@@ -3,7 +3,8 @@ use actix::prelude::*;
 //use std::collections::HashMap;
 //use std::mem;
 
-#[derive(Clone, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "type")]
 pub enum FrameResolution {
     SD,
     HD,
@@ -92,6 +93,7 @@ impl WsCameraServer {
                 .iter()
                 .position(|(c, _r)| *c == client)
             {
+                debug!("Removing subscriber...");
                 self.subscriptions[pos].subscribers.remove(client_pos);
             }
         }
@@ -113,6 +115,7 @@ impl WsCameraServer {
             }
 
             for i in failed.iter() {
+                debug!("Send failed. Removing subscriber...");
                 self.subscriptions[pos].subscribers.remove(*i);
             }
         }
