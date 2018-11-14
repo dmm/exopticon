@@ -4,6 +4,7 @@
 
 extern crate actix;
 extern crate actix_web;
+#[macro_use]
 extern crate askama;
 extern crate bytes;
 extern crate chrono;
@@ -17,6 +18,7 @@ extern crate uuid;
 extern crate diesel;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -76,8 +78,8 @@ fn main() {
     let db_address = address.clone();
 
     server::new(move || app::create_app(address.clone()))
-        .bind("127.0.0.1:3000")
-        .expect("Can not bind to '127.0.0.1:3000'")
+        .bind("0.0.0.0:3000")
+        .expect("Can not bind to '0.0.0.0:3000'")
         .start();
 
     let root_supervisor = RootSupervisor::new(ExopticonMode::Run, db_address);
