@@ -1,4 +1,5 @@
 use actix::prelude::*;
+use actix_web::actix::fut::wrap_future;
 use actix_web::{fs, ws, App, Error, HttpRequest, HttpResponse};
 use rmp::encode::{write_map_len, write_str, ValueWriteError};
 use rmp::Marker;
@@ -28,13 +29,16 @@ struct RawCameraFrame {
 }
 
 #[derive(Default)]
-pub struct WsSession {}
+pub struct WsSession {
+    pub ready: bool,
+}
 
 impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self, AppState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Starting websocket!");
+        self.ready = true;
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
@@ -57,6 +61,16 @@ impl VariantWriter for StructMapWriter {
 impl Handler<CameraFrame> for WsSession {
     type Result = ();
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
+        if !self.ready {
+            debug!("Dropping frame!");
+            return;
+        }
+        // wait for buffer to drain before sending another
+        self.ready = false;
+        let fut = ctx.drain().map(|_status, actor, _ctx| {
+            actor.ready = true;
+        });
+
         let frame = RawCameraFrame {
             camera_id: msg.camera_id,
             jpeg: ByteBuf::from(msg.jpeg),
@@ -65,6 +79,9 @@ impl Handler<CameraFrame> for WsSession {
         let mut se = Serializer::with(Vec::new(), StructMapWriter);
         frame.serialize(&mut se).unwrap();
         ctx.binary(se.into_inner());
+
+        // spawn drain future
+        ctx.spawn(fut);
     }
 }
 
@@ -85,7 +102,15 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                                 });
                             }
                         }
-                        "unsubscribe" => {}
+                        "unsubscribe" => {
+                            for id in c.camera_ids {
+                                WsCameraServer::from_registry().do_send(Unsubscribe {
+                                    camera_id: id,
+                                    client: ctx.address().recipient(),
+                                    resolution: c.resolution.clone(),
+                                });
+                            }
+                        }
                         _ => {}
                     },
                     Err(e) => {
@@ -94,6 +119,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 }
             }
             ws::Message::Close(_) => {
+                debug!("Stopping WsSession.");
                 ctx.stop();
             }
             _ => {}

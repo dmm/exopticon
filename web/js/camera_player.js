@@ -58,24 +58,22 @@ class CameraPlayer {
     this.cb = cb;
     this.img = new SuperImage(img);
 
-    this.channel = this.channel.join(this.camera.id, this.resolutionSuffix,
-                                     frame => {
-                                       if (this.status !== 'paused' && this.img !== null) {
-                                         this.lastFrame = frame;
-                                         this.setStatus('playing');
-                                         this.img.renderArrayIfReady(frame.jpeg);
-                                         this.cb();
-                                       }
-                                     });
+    this.channel.join(this.camera.id, this.resolutionSuffix,
+                      frame => {
+                        if (this.status !== 'paused' && this.img !== null) {
+                          this.lastFrame = frame;
+                          this.setStatus('playing');
+                          this.img.renderArrayIfReady(frame.jpeg);
+                          this.cb();
+                        }
+                      });
   }
 
   /**
    * stop all playback of given camera
    */
   stop() {
-    if (this.channel) {
-      this.channel.leave(this.camera.id);
-    }
+    this.channel.leave(this.camera.id, this.resolutionSuffix);
     this.setStatus('paused');
     this.img = null;
   }
@@ -85,15 +83,17 @@ class CameraPlayer {
    * @param {string} resolution - resolution flag, either 'sd' or 'hd'
    */
   setResolution(resolution) {
+    resolution = resolution.toUpperCase();
     const oldResolution = this.resolutionSuffix;
-    if (resolution === 'HD') {
-      this.resolutionSuffix = '';
-    } else if (resolution === 'SD') {
-      this.resolutionSuffix = 'SD';
-    }
+    if (oldResolution !== resolution) {
+      this.stop();
 
-    if (oldResolution !== this.resolutionSuffix) {
-    this.stop();
+      if (resolution === 'HD') {
+        this.resolutionSuffix = 'HD';
+      } else if (resolution === 'SD') {
+        this.resolutionSuffix = 'SD';
+      }
+
       this.playRealtime(this.domImg, this.cb);
     }
   }

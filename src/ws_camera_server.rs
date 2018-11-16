@@ -3,7 +3,7 @@ use actix::prelude::*;
 //use std::collections::HashMap;
 //use std::mem;
 
-#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum FrameResolution {
     SD,
@@ -31,6 +31,7 @@ pub struct Subscribe {
 pub struct Unsubscribe {
     pub camera_id: i32,
     pub client: Client,
+    pub resolution: FrameResolution,
 }
 
 // Server definitions
@@ -67,12 +68,11 @@ impl WsCameraServer {
         let client_pos = self.subscriptions[pos]
             .subscribers
             .iter()
-            .position(|(c, _r)| *c == client);
+            .position(|(c, r)| *c == client && *r == resolution);
 
         match client_pos {
             Some(c) => {
-                // client is already subscribed, make sure resolution is consistent
-                self.subscriptions[pos].subscribers[c] = (client, resolution);
+                // client is already subscribed, do nothing
             }
             None => {
                 self.subscriptions[pos]
@@ -82,18 +82,19 @@ impl WsCameraServer {
         };
     }
 
-    fn remove_subscriber(&mut self, camera_id: i32, client: Client) {
+    fn remove_subscriber(&mut self, camera_id: i32, client: Client, resolution: FrameResolution) {
         if let Some(pos) = self
             .subscriptions
             .iter()
             .position(|ref s| s.camera_id == camera_id)
         {
+            debug!("Couldn't find the subscription camera...");
             if let Some(client_pos) = self.subscriptions[pos]
                 .subscribers
                 .iter()
-                .position(|(c, _r)| *c == client)
+                .position(|(c, r)| *c == client && *r == resolution)
             {
-                debug!("Removing subscriber...");
+                debug!("Removing subscriber... {} {:?}", camera_id, resolution);
                 self.subscriptions[pos].subscribers.remove(client_pos);
             }
         }
@@ -142,7 +143,8 @@ impl Handler<Unsubscribe> for WsCameraServer {
     type Result = ();
 
     fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) -> Self::Result {
-        self.remove_subscriber(msg.camera_id, msg.client);
+        debug!("Message: Unsubscribe");
+        self.remove_subscriber(msg.camera_id, msg.client, msg.resolution);
     }
 }
 

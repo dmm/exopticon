@@ -1,6 +1,6 @@
-'use strict';
+"use strict";
 
-import msgpack from './msgpack';
+import msgpack from "./msgpack";
 
 /**
  * @class
@@ -11,9 +11,9 @@ class CameraChannel {
    */
   constructor(client) {
     this.client = client;
-    this.prefix = 'camera';
+    this.prefix = "camera";
 
-    this.watchedCameras = new Map();
+    this.subscriptions = new Map();
 
     this.subscribe = this.subscribe.bind(this);
     this.unsubscribe = this.unsubscribe.bind(this);
@@ -21,16 +21,19 @@ class CameraChannel {
     this.leave = this.leave.bind(this);
 
     this.client.onopen = () => {
-      this.subscribe(this.watchedCameraIds());
+      this.subscriptions.forEach((s, cameraId) => {
+        this.join(cameraId, s.resolution, s.callback);
+      });
     };
 
-    this.client.onmessage = (event) => {
+    this.client.onmessage = event => {
       let msg = this.decodeMessage(event.data);
 
       if (msg === undefined) return;
 
-      if (this.watchedCameras.has(msg.camera_id)) {
-        this.watchedCameras.get(msg.camera_id).callback(msg);
+      const key = msg.camera_id.toString() + msg.resolution.type;
+      if (this.subscriptions.has(key)) {
+        this.subscriptions.get(key).callback(msg);
       }
     };
     /*
@@ -62,56 +65,57 @@ class CameraChannel {
     return msg;
   }
 
-
-  /**
-   * @return {Array} returns ids of cameras being watched as array
-   */
-  watchedCameraIds() {
-    return Array.from(this.watchedCameras.keys());
-  }
-
   /**
    * closes all watched cameras
    */
   close() {
-    this.unsubscribe(this.watchedCameraIds());
+    this.subscriptions.forEach(s => {
+      this.leave(s.cameraId, s.resolution);
+    });
   }
 
   /**
    * @param {Array} cameras - Array of camera ids to watch
    * @private
    */
-  subscribe(cameras, resolution) {
+  subscribe(cameras, resolution = "SD") {
     if (cameras.length == 0) return;
-    this.client.send(JSON.stringify({
-      command: 'subscribe',
-      resolution: {type: resolution},
-      cameraIds: cameras,
-    }));
+    this.client.send(
+      JSON.stringify({
+        command: "subscribe",
+        resolution: { type: resolution },
+        cameraIds: cameras
+      })
+    );
   }
   /**
    * @param {Array} cameras - Array of cameras to stop watching
    * @private
    */
-  unsubscribe(cameras) {
-    this.client.send(JSON.stringify({
-      command: 'unsubscribe',
-      resolution: {type: 'SD'},
-      cameraIds: cameras,
-    }));
+  unsubscribe(cameras, resolution) {
+    this.client.send(
+      JSON.stringify({
+        command: "unsubscribe",
+        resolution: { type: resolution },
+        cameraIds: cameras
+      })
+    );
   }
 
   /**
    * @param {number} cameraId
+   * @param {string} resolution
    * @param {Function} callback - function to be called when frame is
    *                   received for given camera
    */
   join(cameraId, resolution, callback) {
-    this.leave(cameraId);
+    if (this.subscriptions.has(cameraId.toString() + resolution)) {
+      this.leave(cameraId, resolution);
+    }
 
-    this.watchedCameras.set(cameraId, {
+    this.subscriptions.set(cameraId.toString() + resolution, {
       callback: callback,
-      resolution: resolution,
+      resolution: resolution
     });
 
     this.subscribe([cameraId], resolution);
@@ -120,9 +124,11 @@ class CameraChannel {
   /**
    * @param {number} cameraId - stop watching given camera id
    */
-  leave(cameraId) {
-    this.unsubscribe([cameraId]);
-    this.watchedCameras.delete(cameraId);
+  leave(cameraId, resolution) {
+    if (this.subscriptions.has(cameraId.toString() + resolution)) {
+      this.unsubscribe([cameraId], resolution);
+      this.subscriptions.delete(cameraId.toString() + resolution);
+    }
   }
 
   /**
@@ -132,10 +138,10 @@ class CameraChannel {
    */
   setResolution(cameraId, resolution) {
     return;
-    if (resolution === 'hd') {
-      this.channel.push(`hdon${cameraId.toString()}`, '');
-    } else if (resolution === 'sd') {
-      this.channel.push(`hdoff${cameraId.toString()}`, '');
+    if (resolution === "hd") {
+      this.channel.push(`hdon${cameraId.toString()}`, "");
+    } else if (resolution === "sd") {
+      this.channel.push(`hdoff${cameraId.toString()}`, "");
     }
   }
 }
