@@ -199,6 +199,16 @@ pub struct UpdateVideoFile {
     pub size: Option<i32>,
 }
 
-//pub struct FetchVideoFile {
-//    pub id: i32,
-//}
+pub struct CreateVideoUnitFile {
+    pub camera_id: i32,
+    pub monotonic_index: i32,
+    pub begin_time: NaiveDateTime,
+    pub filename: String,
+}
+
+pub struct UpdateVideoUnitFile {
+    pub video_unit_id: i32,
+    pub end_time: NaiveDateTime,
+    pub video_file_id: i32,
+    pub size: i32,
+}

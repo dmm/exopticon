@@ -46,6 +46,7 @@ mod models;
 mod root_supervisor;
 mod schema;
 mod static_routes;
+mod video_file_handler;
 mod video_unit_handler;
 mod video_unit_routes;
 mod ws_camera_server;

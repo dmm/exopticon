@@ -1,11 +1,13 @@
 use actix::*;
 
 use capture_actor::CaptureActor;
+use models::DbExecutor;
 
 pub struct StartCaptureWorker {
     pub id: i32,
     pub stream_url: String,
     pub storage_path: String,
+    pub db_addr: Addr<DbExecutor>,
 }
 
 impl Message for StartCaptureWorker {
@@ -36,8 +38,9 @@ impl Handler<StartCaptureWorker> for CaptureSupervisor {
         let id = msg.id.to_owned();
         // Launch each CaptureActor in a new thread. This is really
         // only necessary for debug builds because they are otherwise too slow on one thread.
-        let address =
-            Arbiter::start(|_| CaptureActor::new(msg.id, msg.stream_url, msg.storage_path));
+        let address = Arbiter::start(|_| {
+            CaptureActor::new(msg.db_addr, msg.id, msg.stream_url, msg.storage_path)
+        });
         self.workers.push((id, address));
     }
 }

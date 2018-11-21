@@ -30,6 +30,7 @@ impl Actor for RootSupervisor {
                         for g in groups {
                             for c in g.1 {
                                 actor.capture_supervisor.do_send(StartCaptureWorker {
+                                    db_addr: actor.db_worker.clone(),
                                     id: c.id,
                                     stream_url: c.rtsp_url,
                                     storage_path: g.0.storage_path.clone(),

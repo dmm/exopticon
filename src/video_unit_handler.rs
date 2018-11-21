@@ -2,8 +2,9 @@ use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 use errors::ServiceError;
 use models::{
-    CreateVideoUnit, DbExecutor, FetchBetweenVideoUnit, FetchVideoUnit, OutputVideoUnit,
-    UpdateVideoUnit, VideoFile, VideoUnit,
+    CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor, FetchBetweenVideoUnit,
+    FetchVideoUnit, OutputVideoUnit, UpdateVideoFile, UpdateVideoUnit, UpdateVideoUnitFile,
+    VideoFile, VideoUnit,
 };
 
 impl Message for CreateVideoUnit {
@@ -24,6 +25,38 @@ impl Handler<CreateVideoUnit> for DbExecutor {
     }
 }
 
+impl Message for CreateVideoUnitFile {
+    type Result = Result<(VideoUnit, VideoFile), ServiceError>;
+}
+
+impl Handler<CreateVideoUnitFile> for DbExecutor {
+    type Result = Result<(VideoUnit, VideoFile), ServiceError>;
+    fn handle(&mut self, msg: CreateVideoUnitFile, _: &mut Self::Context) -> Self::Result {
+        use schema::video_files::dsl::*;
+        use schema::video_units::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+        // TODO: Wrap this in a transaction
+        let video_unit: VideoUnit = diesel::insert_into(video_units)
+            .values(CreateVideoUnit {
+                camera_id: msg.camera_id,
+                monotonic_index: msg.monotonic_index,
+                begin_time: msg.begin_time,
+                end_time: msg.begin_time,
+            }).get_result(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        let video_file = diesel::insert_into(video_files)
+            .values(CreateVideoFile {
+                video_unit_id: video_unit.id,
+                filename: msg.filename,
+                size: 0,
+            }).get_result(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        Ok((video_unit, video_file))
+    }
+}
+
 impl Message for UpdateVideoUnit {
     type Result = Result<VideoUnit, ServiceError>;
 }
@@ -39,6 +72,40 @@ impl Handler<UpdateVideoUnit> for DbExecutor {
             .set(&msg)
             .get_result(conn)
             .map_err(|_error| ServiceError::InternalServerError)
+    }
+}
+
+impl Message for UpdateVideoUnitFile {
+    type Result = Result<(VideoUnit, VideoFile), ServiceError>;
+}
+
+impl Handler<UpdateVideoUnitFile> for DbExecutor {
+    type Result = Result<(VideoUnit, VideoFile), ServiceError>;
+    fn handle(&mut self, msg: UpdateVideoUnitFile, _: &mut Self::Context) -> Self::Result {
+        use schema::video_files::dsl::*;
+        use schema::video_units::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        let video_unit = diesel::update(video_units)
+            .set(UpdateVideoUnit {
+                id: msg.video_unit_id,
+                camera_id: None,
+                monotonic_index: None,
+                begin_time: None,
+                end_time: Some(msg.end_time),
+            }).get_result(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        let video_file = diesel::update(video_files)
+            .set(UpdateVideoFile {
+                id: msg.video_file_id,
+                video_unit_id: None,
+                filename: None,
+                size: Some(msg.size),
+            }).get_result(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        Ok((video_unit, video_file))
     }
 }
 
