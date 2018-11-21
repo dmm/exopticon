@@ -22,7 +22,7 @@ class CameraChannel {
 
     this.client.onopen = () => {
       this.subscriptions.forEach((s, cameraId) => {
-        this.join(cameraId, s.resolution, s.callback);
+        this.subscribe([parseInt(cameraId)], s.resolution);
       });
     };
 
