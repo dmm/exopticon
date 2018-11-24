@@ -2,9 +2,9 @@ use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 use errors::ServiceError;
 use models::{
-    CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor, FetchBetweenVideoUnit,
-    FetchVideoUnit, OutputVideoUnit, UpdateVideoFile, UpdateVideoUnit, UpdateVideoUnitFile,
-    VideoFile, VideoUnit,
+    Camera, CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor,
+    FetchBetweenVideoUnit, FetchOldVideoUnitFile, FetchVideoUnit, OutputVideoUnit, UpdateVideoFile,
+    UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
 };
 
 impl Message for CreateVideoUnit {
@@ -158,6 +158,30 @@ impl Handler<FetchBetweenVideoUnit> for DbExecutor {
             .filter(begin_time.le(msg.end_time))
             .filter(end_time.ge(msg.begin_time))
             .load::<VideoUnit>(conn)
+            .map_err(|_error| ServiceError::InternalServerError)
+    }
+}
+
+impl Message for FetchOldVideoUnitFile {
+    type Result = Result<Vec<(Camera, (VideoUnit, VideoFile))>, ServiceError>;
+}
+
+impl Handler<FetchOldVideoUnitFile> for DbExecutor {
+    type Result = Result<Vec<(Camera, (VideoUnit, VideoFile))>, ServiceError>;
+
+    fn handle(&mut self, msg: FetchOldVideoUnitFile, _: &mut Self::Context) -> Self::Result {
+        use schema::cameras::dsl::*;
+        use schema::video_files::dsl::*;
+        use schema::video_units::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        cameras
+            .inner_join(video_units.inner_join(video_files))
+            .filter(size.gt(0))
+            .filter(begin_time.ne(end_time))
+            .order(begin_time.asc())
+            .limit(msg.count)
+            .load(conn)
             .map_err(|_error| ServiceError::InternalServerError)
     }
 }

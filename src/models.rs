@@ -212,3 +212,8 @@ pub struct UpdateVideoUnitFile {
     pub video_file_id: i32,
     pub size: i32,
 }
+
+pub struct FetchOldVideoUnitFile {
+    pub camera_group_id: i32,
+    pub count: i64,
+}

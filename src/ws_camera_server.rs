@@ -71,7 +71,7 @@ impl WsCameraServer {
             .position(|(c, r)| *c == client && *r == resolution);
 
         match client_pos {
-            Some(c) => {
+            Some(_c) => {
                 // client is already subscribed, do nothing
             }
             None => {

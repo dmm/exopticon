@@ -1,11 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use actix::Handler;
 use actix_web::dev::FromParam;
-use actix_web::{
-    AsyncResponder, Body, FutureResponse, HttpRequest, HttpResponse, Json, Responder,
-    ResponseError, Result, State,
-};
+use actix_web::{Body, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use mime_guess::guess_mime_type;
 
@@ -15,7 +11,7 @@ use app::AppState;
 #[template(path = "index.html")]
 struct Index;
 
-pub fn index(req: HttpRequest<AppState>) -> HttpResponse {
+pub fn index(_req: HttpRequest<AppState>) -> HttpResponse {
     let s = Index.render().unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(s)

@@ -1,11 +1,10 @@
 use actix::prelude::*;
-use actix_web::actix::fut::wrap_future;
-use actix_web::{fs, ws, App, Error, HttpRequest, HttpResponse};
+use actix_web::ws;
 use rmp::encode::{write_map_len, write_str, ValueWriteError};
 use rmp::Marker;
 use rmp_serde::encode::VariantWriter;
-use rmp_serde::{Deserializer, Raw, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Serializer;
+use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json;
 use std::io::Write;
@@ -36,7 +35,7 @@ pub struct WsSession {
 impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self, AppState>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         debug!("Starting websocket!");
         self.ready = true;
     }

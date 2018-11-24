@@ -1,3 +1,4 @@
+#[allow(deprecated)]
 use std::fs;
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -6,7 +7,6 @@ use actix::prelude::*;
 use actix_web::actix::fut::wrap_future;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
-use futures::Future;
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use tokio_io::codec::length_delimited;
@@ -91,7 +91,6 @@ impl CaptureActor {
             // worker has created a new file. Write video_unit and
             // file to database.
             if let Ok(date) = msg.begin_time.parse::<DateTime<Utc>>() {
-                let addr = self.db_addr.clone();
                 let fut = self.db_addr.send(CreateVideoUnitFile {
                     camera_id: self.camera_id,
                     monotonic_index: 0,
@@ -118,17 +117,16 @@ impl CaptureActor {
                 fs::metadata(msg.filename),
                 msg.end_time.parse::<DateTime<Utc>>(),
             ) {
-                let now = Utc::now().naive_utc();
                 let fut = self.db_addr.send(UpdateVideoUnitFile {
                     video_unit_id: video_unit_id,
-                    end_time: now,
+                    end_time: end_time.naive_utc(),
                     video_file_id: video_file_id,
                     size: metadata.len() as i32,
                 });
                 ctx.spawn(
                     wrap_future::<_, Self>(fut)
-                        .map(|result, actor, _ctx| match result {
-                            Ok((video_unit, video_file)) => {}
+                        .map(|result, _actor, _ctx| match result {
+                            Ok((_video_unit, _video_file)) => {}
                             _ => println!("Error!"),
                         }).map_err(|_e, _actor, _ctx| {}),
                 );

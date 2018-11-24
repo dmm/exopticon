@@ -1,39 +1,9 @@
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, Path, ResponseError, State};
+use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, ResponseError, State};
 use chrono::NaiveDateTime;
 use futures::future::Future;
 
 use app::AppState;
-use models::{CreateVideoUnit, FetchBetweenVideoUnit, FetchVideoUnit, UpdateVideoUnit};
-
-pub fn create_video_unit(
-    (video_unit_request, state): (Json<CreateVideoUnit>, State<AppState>),
-) -> FutureResponse<HttpResponse> {
-    state
-        .db
-        .send(video_unit_request.into_inner())
-        .from_err()
-        .and_then(|db_response| match db_response {
-            Ok(video_unit) => Ok(HttpResponse::Ok().json(video_unit)),
-            Err(err) => Ok(err.error_response()),
-        }).responder()
-}
-
-pub fn update_video_unit(
-    (path, video_unit_request, state): (Path<i32>, Json<UpdateVideoUnit>, State<AppState>),
-) -> FutureResponse<HttpResponse> {
-    let video_unit_update = UpdateVideoUnit {
-        id: path.into_inner(),
-        ..video_unit_request.into_inner()
-    };
-    state
-        .db
-        .send(video_unit_update)
-        .from_err()
-        .and_then(|db_response| match db_response {
-            Ok(video_unit) => Ok(HttpResponse::Ok().json(video_unit)),
-            Err(err) => Ok(err.error_response()),
-        }).responder()
-}
+use models::{FetchBetweenVideoUnit, FetchVideoUnit};
 
 pub fn fetch_video_unit(
     (path, state): (Path<i32>, State<AppState>),
