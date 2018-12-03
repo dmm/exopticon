@@ -36,7 +36,9 @@ void send_frame_message(struct FrameMessage *msg)
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
-        mpack_start_map(&writer, 2);
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_cstr(&writer, "frame");
         mpack_write_cstr(&writer, "jpegFrame");
         mpack_write_bin(&writer, (char*)msg->jpeg, (uint32_t)msg->jpeg_size);
         mpack_write_cstr(&writer, "offset");
@@ -64,7 +66,9 @@ void send_scaled_frame_message(struct FrameMessage *msg, const int32_t height)
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
-        mpack_start_map(&writer, 3);
+        mpack_start_map(&writer, 4);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_cstr(&writer, "frameScaled");
         mpack_write_cstr(&writer, "jpegFrameScaled");
         mpack_write_bin(&writer, (char*)msg->jpeg, (uint32_t)msg->jpeg_size);
         mpack_write_cstr(&writer, "height");
@@ -94,7 +98,9 @@ void send_new_file_message(char *filename, char *iso_begin_time)
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
-        mpack_start_map(&writer, 2);
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_cstr(&writer, "newFile");
         mpack_write_cstr(&writer, "filename");
         mpack_write_cstr(&writer, filename);
         mpack_write_cstr(&writer, "beginTime");
@@ -123,7 +129,9 @@ void send_end_file_message(char *filename, char *iso_end_time)
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
-        mpack_start_map(&writer, 2);
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_cstr(&writer, "endFile");
         mpack_write_cstr(&writer, "filename");
         mpack_write_cstr(&writer, filename);
         mpack_write_cstr(&writer, "endTime");

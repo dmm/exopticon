@@ -100,58 +100,60 @@ impl CaptureActor {
 
     fn message_to_action(&self, msg: CaptureMessage, ctx: &mut Context<CaptureActor>) {
         // Check if log
-        if msg.message_type == "log" {
-            debug!("Worker log message: {}", msg.message);
-        }
-        // Check if full frame
-        else if msg.jpeg.len() > 0 {
-            WsCameraServer::from_registry().do_send(CameraFrame {
-                camera_id: self.camera_id,
-                jpeg: msg.jpeg,
-                resolution: FrameResolution::HD,
-            });
-        }
-        // Check if scaled frame
-        else if msg.scaled_jpeg.len() > 0 {
-            WsCameraServer::from_registry().do_send(CameraFrame {
-                camera_id: self.camera_id,
-                jpeg: msg.scaled_jpeg,
-                resolution: FrameResolution::SD,
-            });
-        }
-        // Check if new file
-        else if msg.begin_time != "" {
-            // worker has created a new file. Write video_unit and
-            // file to database.
-            if let Ok(date) = msg.begin_time.parse::<DateTime<Utc>>() {
-                let filename = msg.filename.clone();
-                let fut = self.db_addr.send(CreateVideoUnitFile {
+        match msg.message_type.as_str() {
+            "log" => debug!("Worker log message: {}", msg.message),
+            "frame" => {
+                WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
-                    monotonic_index: 0,
-                    begin_time: date.naive_utc(),
-                    filename: msg.filename,
+                    jpeg: msg.jpeg,
+                    resolution: FrameResolution::HD,
                 });
+            }
+            "frameScaled" => {
+                WsCameraServer::from_registry().do_send(CameraFrame {
+                    camera_id: self.camera_id,
+                    jpeg: msg.scaled_jpeg,
+                    resolution: FrameResolution::SD,
+                });
+            }
+            "newFile" => {
+                // worker has created a new file. Write video_unit and
+                // file to database.
+                if let Ok(date) = msg.begin_time.parse::<DateTime<Utc>>() {
+                    let filename = msg.filename.clone();
+                    let fut = self.db_addr.send(CreateVideoUnitFile {
+                        camera_id: self.camera_id,
+                        monotonic_index: 0,
+                        begin_time: date.naive_utc(),
+                        filename: msg.filename,
+                    });
 
-                ctx.spawn(
-                    wrap_future::<_, Self>(fut)
-                        .map(|result, actor, _ctx| match result {
-                            Ok((video_unit, video_file)) => {
-                                actor.video_unit_id = Some(video_unit.id);
-                                actor.video_file_id = Some(video_file.id);
-                                actor.filename = Some(filename)
-                            }
-                            Err(e) => error!("Error! {}", e),
-                        }).map_err(|_e, _actor, _ctx| {}),
-                );
+                    ctx.spawn(
+                        wrap_future::<_, Self>(fut)
+                            .map(|result, actor, _ctx| match result {
+                                Ok((video_unit, video_file)) => {
+                                    actor.video_unit_id = Some(video_unit.id);
+                                    actor.video_file_id = Some(video_file.id);
+                                    actor.filename = Some(filename)
+                                }
+                                Err(e) => error!("Error! {}", e),
+                            }).map_err(|e, _actor, _ctx| {
+                                error!("Captureworker: Error sending new file message: {}", e);
+                            }),
+                    );
+                }
             }
-        }
-        // Check if end file
-        else if msg.end_time != "" {
-            if let Ok(end_time) = msg.end_time.parse::<DateTime<Utc>>() {
-                self.close_file(ctx, msg.filename, end_time)
-            } else {
-                error!("CaptureActor: Error handling close file message.");
+            "endFile" => {
+                if let Ok(end_time) = msg.end_time.parse::<DateTime<Utc>>() {
+                    self.close_file(ctx, msg.filename, end_time)
+                } else {
+                    error!("CaptureActor: Error handling close file message.");
+                }
             }
+            _ => error!(
+                "CaptureActor {}: Invalid capture message type: {}",
+                self.camera_id, msg.message_type
+            ),
         }
     }
 }
