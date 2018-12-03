@@ -4,7 +4,7 @@ CREATE TABLE camera_groups (
     id SERIAL PRIMARY KEY,
     name VARCHAR NOT NULL,
     storage_path VARCHAR NOT NULL,
-    max_storage_size integer NOT NULL,
+    max_storage_size BIGINT NOT NULL,
     inserted_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT timezone('UTC', NOW())::timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT timezone('UTC', NOW())::timestamp
 );

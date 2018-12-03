@@ -3,8 +3,8 @@ use diesel::{self, prelude::*};
 use errors::ServiceError;
 use models::{
     Camera, CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor,
-    FetchBetweenVideoUnit, FetchOldVideoUnitFile, FetchVideoUnit, OutputVideoUnit, UpdateVideoFile,
-    UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
+    DeleteVideoUnitFiles, FetchBetweenVideoUnit, FetchOldVideoUnitFile, FetchVideoUnit,
+    OutputVideoUnit, UpdateVideoFile, UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
 };
 
 impl Message for CreateVideoUnit {
@@ -82,28 +82,31 @@ impl Message for UpdateVideoUnitFile {
 impl Handler<UpdateVideoUnitFile> for DbExecutor {
     type Result = Result<(VideoUnit, VideoFile), ServiceError>;
     fn handle(&mut self, msg: UpdateVideoUnitFile, _: &mut Self::Context) -> Self::Result {
+        use schema;
         use schema::video_files::dsl::*;
         use schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
-        let video_unit = diesel::update(video_units)
-            .set(UpdateVideoUnit {
-                id: msg.video_unit_id,
-                camera_id: None,
-                monotonic_index: None,
-                begin_time: None,
-                end_time: Some(msg.end_time),
-            }).get_result(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+        let video_unit = diesel::update(
+            video_units.filter(schema::video_units::columns::id.eq(msg.video_unit_id)),
+        ).set(UpdateVideoUnit {
+            id: msg.video_unit_id,
+            camera_id: None,
+            monotonic_index: None,
+            begin_time: None,
+            end_time: Some(msg.end_time),
+        }).get_result(conn)
+        .map_err(|_error| ServiceError::InternalServerError)?;
 
-        let video_file = diesel::update(video_files)
-            .set(UpdateVideoFile {
-                id: msg.video_file_id,
-                video_unit_id: None,
-                filename: None,
-                size: Some(msg.size),
-            }).get_result(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+        let video_file = diesel::update(
+            video_files.filter(schema::video_files::columns::id.eq(msg.video_file_id)),
+        ).set(UpdateVideoFile {
+            id: msg.video_file_id,
+            video_unit_id: None,
+            filename: None,
+            size: Some(msg.size),
+        }).get_result(conn)
+        .map_err(|_error| ServiceError::InternalServerError)?;
 
         Ok((video_unit, video_file))
     }
@@ -177,11 +180,39 @@ impl Handler<FetchOldVideoUnitFile> for DbExecutor {
 
         cameras
             .inner_join(video_units.inner_join(video_files))
+            .filter(camera_group_id.eq(msg.camera_group_id))
             .filter(size.gt(0))
             .filter(begin_time.ne(end_time))
             .order(begin_time.asc())
             .limit(msg.count)
             .load(conn)
             .map_err(|_error| ServiceError::InternalServerError)
+    }
+}
+
+impl Message for DeleteVideoUnitFiles {
+    type Result = Result<(), ServiceError>;
+}
+
+impl Handler<DeleteVideoUnitFiles> for DbExecutor {
+    type Result = Result<(), ServiceError>;
+
+    fn handle(&mut self, msg: DeleteVideoUnitFiles, _: &mut Self::Context) -> Self::Result {
+        use diesel::dsl::any;
+        use schema;
+        use schema::video_files::dsl::*;
+        use schema::video_units::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        diesel::delete(
+            video_files.filter(schema::video_files::columns::id.eq(any(msg.video_file_ids))),
+        ).execute(conn)
+        .map_err(|_error| ServiceError::InternalServerError)?;
+        diesel::delete(
+            video_units.filter(schema::video_units::columns::id.eq(any(msg.video_unit_ids))),
+        ).execute(conn)
+        .map_err(|_error| ServiceError::InternalServerError)?;
+
+        Ok(())
     }
 }

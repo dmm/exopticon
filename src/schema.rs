@@ -3,7 +3,7 @@ table! {
         id -> Int4,
         name -> Varchar,
         storage_path -> Varchar,
-        max_storage_size -> Int4,
+        max_storage_size -> Int8,
         inserted_at -> Timestamp,
         updated_at -> Timestamp,
     }
@@ -55,9 +55,4 @@ joinable!(cameras -> camera_groups (camera_group_id));
 joinable!(video_files -> video_units (video_unit_id));
 joinable!(video_units -> cameras (camera_id));
 
-allow_tables_to_appear_in_same_query!(
-    camera_groups,
-    cameras,
-    video_files,
-    video_units,
-);
+allow_tables_to_appear_in_same_query!(camera_groups, cameras, video_files, video_units,);

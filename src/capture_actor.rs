@@ -1,5 +1,6 @@
 #[allow(deprecated)]
 use std::fs;
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -62,9 +63,41 @@ pub struct CaptureActor {
     pub db_addr: Addr<DbExecutor>,
     pub video_unit_id: Option<i32>,
     pub video_file_id: Option<i32>,
+    pub filename: Option<String>,
 }
 
 impl CaptureActor {
+    fn close_file(
+        &self,
+        ctx: &mut Context<CaptureActor>,
+        filename: String,
+        end_time: DateTime<Utc>,
+    ) {
+        if let (Some(video_unit_id), Some(video_file_id), Ok(metadata)) = (
+            self.video_unit_id,
+            self.video_file_id,
+            fs::metadata(filename),
+        ) {
+            let fut = self.db_addr.send(UpdateVideoUnitFile {
+                video_unit_id: video_unit_id,
+                end_time: end_time.naive_utc(),
+                video_file_id: video_file_id,
+                size: metadata.len() as i32,
+            });
+            ctx.spawn(
+                wrap_future::<_, Self>(fut)
+                    .map(|result, _actor, _ctx| match result {
+                        Ok((_video_unit, _video_file)) => {}
+                        Err(e) => error!("CaptureWorker: Error updating video unit: {}", e),
+                    }).map_err(|_e, _actor, _ctx| {
+                        error!("CaptureWorker: Error calling UpdateVideoUnitFile");
+                    }),
+            );
+        } else {
+            error!("Error closing file!");
+        }
+    }
+
     fn message_to_action(&self, msg: CaptureMessage, ctx: &mut Context<CaptureActor>) {
         // Check if log
         if msg.message_type == "log" {
@@ -91,45 +124,33 @@ impl CaptureActor {
             // worker has created a new file. Write video_unit and
             // file to database.
             if let Ok(date) = msg.begin_time.parse::<DateTime<Utc>>() {
+                let filename = msg.filename.clone();
                 let fut = self.db_addr.send(CreateVideoUnitFile {
                     camera_id: self.camera_id,
                     monotonic_index: 0,
                     begin_time: date.naive_utc(),
                     filename: msg.filename,
                 });
+
                 ctx.spawn(
                     wrap_future::<_, Self>(fut)
                         .map(|result, actor, _ctx| match result {
                             Ok((video_unit, video_file)) => {
                                 actor.video_unit_id = Some(video_unit.id);
                                 actor.video_file_id = Some(video_file.id);
+                                actor.filename = Some(filename)
                             }
-                            _ => println!("Error!"),
+                            Err(e) => error!("Error! {}", e),
                         }).map_err(|_e, _actor, _ctx| {}),
                 );
             }
         }
         // Check if end file
         else if msg.end_time != "" {
-            if let (Some(video_unit_id), Some(video_file_id), Ok(metadata), Ok(end_time)) = (
-                self.video_unit_id,
-                self.video_file_id,
-                fs::metadata(msg.filename),
-                msg.end_time.parse::<DateTime<Utc>>(),
-            ) {
-                let fut = self.db_addr.send(UpdateVideoUnitFile {
-                    video_unit_id: video_unit_id,
-                    end_time: end_time.naive_utc(),
-                    video_file_id: video_file_id,
-                    size: metadata.len() as i32,
-                });
-                ctx.spawn(
-                    wrap_future::<_, Self>(fut)
-                        .map(|result, _actor, _ctx| match result {
-                            Ok((_video_unit, _video_file)) => {}
-                            _ => println!("Error!"),
-                        }).map_err(|_e, _actor, _ctx| {}),
-                );
+            if let Ok(end_time) = msg.end_time.parse::<DateTime<Utc>>() {
+                self.close_file(ctx, msg.filename, end_time)
+            } else {
+                error!("CaptureActor: Error handling close file message.");
             }
         }
     }
@@ -162,10 +183,12 @@ impl Handler<StartWorker> for CaptureActor {
 
     fn handle(&mut self, _msg: StartWorker, ctx: &mut Context<Self>) -> Self::Result {
         info!("Launching worker for stream: {}", self.stream_url);
+        let storage_path = Path::new(&self.storage_path).join(self.camera_id.to_string());
+        std::fs::create_dir(&storage_path);
         let mut cmd = Command::new("src/cworkers/captureworker");
-        cmd.arg(self.stream_url.clone());
+        cmd.arg(&self.stream_url);
         cmd.arg("0");
-        cmd.arg(self.storage_path.clone());
+        cmd.arg(&storage_path);
         cmd.arg("/dev/null");
         cmd.stdout(Stdio::piped());
 
@@ -174,7 +197,8 @@ impl Handler<StartWorker> for CaptureActor {
         let framed_stream = length_delimited::FramedRead::new(stdout);
         Self::add_stream(framed_stream, ctx);
         let fut = wrap_future::<_, Self>(child)
-            .map(|_status, _actor, ctx| {
+            .map(|_status, actor, ctx| {
+                error!("CaptureWorker {}: capture process died...", actor.camera_id);
                 ctx.notify_later(StartWorker {}, Duration::new(5, 0));
             }).map_err(|_e, _actor, _ctx| {}); // Do something on error?
         ctx.spawn(fut);
@@ -203,6 +227,7 @@ impl CaptureActor {
             db_addr,
             video_unit_id: None,
             video_file_id: None,
+            filename: None,
         }
     }
 }

@@ -23,7 +23,7 @@ pub struct CameraGroup {
     pub id: i32,
     pub name: String,
     pub storage_path: String,
-    pub max_storage_size: i32,
+    pub max_storage_size: i64,
     pub inserted_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -33,7 +33,7 @@ pub struct CameraGroup {
 pub struct CreateCameraGroup {
     pub name: String,
     pub storage_path: String,
-    pub max_storage_size: i32,
+    pub max_storage_size: i64,
 }
 
 #[derive(AsChangeset, Debug, Deserialize, Identifiable, Insertable)]
@@ -42,7 +42,7 @@ pub struct UpdateCameraGroup {
     pub id: i32,
     pub name: Option<String>,
     pub storage_path: Option<String>,
-    pub max_storage_size: Option<i32>,
+    pub max_storage_size: Option<i64>,
 }
 
 pub struct FetchCameraGroup {
@@ -52,6 +52,11 @@ pub struct FetchCameraGroup {
 pub struct FetchAllCameraGroup {}
 
 pub struct FetchAllCameraGroupAndCameras {}
+
+pub struct FetchCameraGroupFiles {
+    pub camera_group_id: i32,
+    pub count: i64,
+}
 
 #[derive(
     Identifiable, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
@@ -216,4 +221,9 @@ pub struct UpdateVideoUnitFile {
 pub struct FetchOldVideoUnitFile {
     pub camera_group_id: i32,
     pub count: i64,
+}
+
+pub struct DeleteVideoUnitFiles {
+    pub video_unit_ids: Vec<i32>,
+    pub video_file_ids: Vec<i32>,
 }

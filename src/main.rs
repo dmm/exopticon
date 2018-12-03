@@ -42,6 +42,8 @@ mod camera_routes;
 mod capture_actor;
 mod capture_supervisor;
 mod errors;
+mod file_deletion_actor;
+mod file_deletion_supervisor;
 mod models;
 mod root_supervisor;
 mod schema;
