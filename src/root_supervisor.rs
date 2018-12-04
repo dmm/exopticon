@@ -1,9 +1,9 @@
 use actix::*;
 
 use actix_web::actix::fut;
-use capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
-use file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
-use models::{
+use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
+use crate::file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
+use crate::models::{
     CameraGroup, CameraGroupAndCameras, DbExecutor, FetchAllCameraGroup,
     FetchAllCameraGroupAndCameras, FetchEmptyVideoFile, UpdateVideoFile, VideoFile,
 };

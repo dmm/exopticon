@@ -1,12 +1,12 @@
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
-use errors::ServiceError;
-use models::{
+use crate::errors::ServiceError;
+use crate::models::{
     Camera, CameraGroup, CameraGroupAndCameras, CreateCameraGroup, DbExecutor, FetchAllCameraGroup,
     FetchAllCameraGroupAndCameras, FetchCameraGroup, FetchCameraGroupFiles, UpdateCameraGroup,
     VideoFile, VideoUnit,
 };
-use schema::camera_groups::dsl::*;
+use crate::schema::camera_groups::dsl::*;
 
 impl Message for CreateCameraGroup {
     type Result = Result<CameraGroup, ServiceError>;
@@ -16,7 +16,7 @@ impl Handler<CreateCameraGroup> for DbExecutor {
     type Result = Result<CameraGroup, ServiceError>;
 
     fn handle(&mut self, msg: CreateCameraGroup, _: &mut Self::Context) -> Self::Result {
-        use schema::camera_groups::dsl::*;
+        use crate::schema::camera_groups::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         diesel::insert_into(camera_groups)
@@ -38,7 +38,7 @@ impl Handler<UpdateCameraGroup> for DbExecutor {
     type Result = Result<CameraGroup, ServiceError>;
 
     fn handle(&mut self, msg: UpdateCameraGroup, _: &mut Self::Context) -> Self::Result {
-        use schema::camera_groups::dsl::*;
+        use crate::schema::camera_groups::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
         println!("{:?}", msg);
         diesel::update(camera_groups.filter(id.eq(msg.id)))
@@ -60,7 +60,7 @@ impl Handler<FetchCameraGroup> for DbExecutor {
     type Result = Result<CameraGroup, ServiceError>;
 
     fn handle(&mut self, msg: FetchCameraGroup, _: &mut Self::Context) -> Self::Result {
-        use schema::camera_groups::dsl::*;
+        use crate::schema::camera_groups::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         let group = camera_groups
@@ -104,7 +104,7 @@ impl Handler<FetchAllCameraGroupAndCameras> for DbExecutor {
         _: &mut Self::Context,
     ) -> Self::Result {
         use diesel::prelude::*;
-        use schema::cameras::dsl::*;
+        use crate::schema::cameras::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         let mut groups_and_cameras: Vec<CameraGroupAndCameras> = Vec::new();
@@ -135,10 +135,10 @@ impl Handler<FetchCameraGroupFiles> for DbExecutor {
 
     fn handle(&mut self, msg: FetchCameraGroupFiles, _: &mut Self::Context) -> Self::Result {
         use diesel::dsl::sum;
-        use schema::camera_groups;
-        use schema::cameras::dsl::*;
-        use schema::video_files::dsl::*;
-        use schema::video_units::dsl::*;
+        use crate::schema::camera_groups;
+        use crate::schema::cameras::dsl::*;
+        use crate::schema::video_files::dsl::*;
+        use crate::schema::video_units::dsl::*;
 
         let conn: &PgConnection = &self.0.get().unwrap();
 

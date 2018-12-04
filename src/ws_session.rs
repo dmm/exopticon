@@ -9,8 +9,8 @@ use serde_bytes::ByteBuf;
 use serde_json;
 use std::io::Write;
 
-use app::AppState;
-use ws_camera_server::{CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer};
+use crate::app::AppState;
+use crate::ws_camera_server::{CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer};
 
 #[derive(Serialize, Deserialize)]
 struct WsCommand {

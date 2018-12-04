@@ -5,7 +5,7 @@ use actix_web::{Body, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use mime_guess::guess_mime_type;
 
-use app::AppState;
+use crate::app::AppState;
 
 #[derive(Template)]
 #[template(path = "index.html")]

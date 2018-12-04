@@ -1,7 +1,7 @@
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
-use errors::ServiceError;
-use models::{
+use crate::errors::ServiceError;
+use crate::models::{
     Camera, CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor,
     DeleteVideoUnitFiles, FetchBetweenVideoUnit, FetchOldVideoUnitFile, FetchVideoUnit,
     OutputVideoUnit, UpdateVideoFile, UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
@@ -15,7 +15,7 @@ impl Handler<CreateVideoUnit> for DbExecutor {
     type Result = Result<VideoUnit, ServiceError>;
 
     fn handle(&mut self, msg: CreateVideoUnit, _: &mut Self::Context) -> Self::Result {
-        use schema::video_units::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         diesel::insert_into(video_units)
@@ -32,8 +32,8 @@ impl Message for CreateVideoUnitFile {
 impl Handler<CreateVideoUnitFile> for DbExecutor {
     type Result = Result<(VideoUnit, VideoFile), ServiceError>;
     fn handle(&mut self, msg: CreateVideoUnitFile, _: &mut Self::Context) -> Self::Result {
-        use schema::video_files::dsl::*;
-        use schema::video_units::dsl::*;
+        use crate::schema::video_files::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
         // TODO: Wrap this in a transaction
         let video_unit: VideoUnit = diesel::insert_into(video_units)
@@ -65,7 +65,7 @@ impl Handler<UpdateVideoUnit> for DbExecutor {
     type Result = Result<VideoUnit, ServiceError>;
 
     fn handle(&mut self, msg: UpdateVideoUnit, _: &mut Self::Context) -> Self::Result {
-        use schema::video_units::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         diesel::update(video_units.filter(id.eq(msg.id)))
@@ -82,9 +82,9 @@ impl Message for UpdateVideoUnitFile {
 impl Handler<UpdateVideoUnitFile> for DbExecutor {
     type Result = Result<(VideoUnit, VideoFile), ServiceError>;
     fn handle(&mut self, msg: UpdateVideoUnitFile, _: &mut Self::Context) -> Self::Result {
-        use schema;
-        use schema::video_files::dsl::*;
-        use schema::video_units::dsl::*;
+        use crate::schema;
+        use crate::schema::video_files::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         let video_unit = diesel::update(
@@ -121,7 +121,7 @@ impl Handler<FetchVideoUnit> for DbExecutor {
 
     fn handle(&mut self, msg: FetchVideoUnit, _: &mut Self::Context) -> Self::Result {
         //        use schema::{video_files, video_units};
-        use schema::video_units::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         let vu = video_units
@@ -129,7 +129,7 @@ impl Handler<FetchVideoUnit> for DbExecutor {
             .get_result::<VideoUnit>(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
-        let files = ::models::VideoFile::belonging_to(&vu)
+        let files = crate::models::VideoFile::belonging_to(&vu)
             .load::<VideoFile>(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
@@ -154,7 +154,7 @@ impl Handler<FetchBetweenVideoUnit> for DbExecutor {
     type Result = Result<Vec<VideoUnit>, ServiceError>;
 
     fn handle(&mut self, msg: FetchBetweenVideoUnit, _: &mut Self::Context) -> Self::Result {
-        use schema::video_units::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         video_units
@@ -173,9 +173,9 @@ impl Handler<FetchOldVideoUnitFile> for DbExecutor {
     type Result = Result<Vec<(Camera, (VideoUnit, VideoFile))>, ServiceError>;
 
     fn handle(&mut self, msg: FetchOldVideoUnitFile, _: &mut Self::Context) -> Self::Result {
-        use schema::cameras::dsl::*;
-        use schema::video_files::dsl::*;
-        use schema::video_units::dsl::*;
+        use crate::schema::cameras::dsl::*;
+        use crate::schema::video_files::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         cameras
@@ -199,9 +199,9 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
 
     fn handle(&mut self, msg: DeleteVideoUnitFiles, _: &mut Self::Context) -> Self::Result {
         use diesel::dsl::any;
-        use schema;
-        use schema::video_files::dsl::*;
-        use schema::video_units::dsl::*;
+        use crate::schema;
+        use crate::schema::video_files::dsl::*;
+        use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         diesel::delete(

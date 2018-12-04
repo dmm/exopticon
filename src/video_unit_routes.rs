@@ -2,8 +2,8 @@ use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, ResponseErro
 use chrono::NaiveDateTime;
 use futures::future::Future;
 
-use app::AppState;
-use models::{FetchBetweenVideoUnit, FetchVideoUnit};
+use crate::app::AppState;
+use crate::models::{FetchBetweenVideoUnit, FetchVideoUnit};
 
 pub fn fetch_video_unit(
     (path, state): (Path<i32>, State<AppState>),

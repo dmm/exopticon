@@ -1,7 +1,7 @@
 use actix::{Handler, Message};
 use diesel::*;
-use errors::ServiceError;
-use models::{Camera, CreateCamera, DbExecutor, FetchAllCamera, FetchCamera, UpdateCamera};
+use crate::errors::ServiceError;
+use crate::models::{Camera, CreateCamera, DbExecutor, FetchAllCamera, FetchCamera, UpdateCamera};
 
 impl Message for CreateCamera {
     type Result = Result<Camera, ServiceError>;
@@ -11,7 +11,7 @@ impl Handler<CreateCamera> for DbExecutor {
     type Result = Result<Camera, ServiceError>;
 
     fn handle(&mut self, msg: CreateCamera, _: &mut Self::Context) -> Self::Result {
-        use schema::cameras::dsl::*;
+        use crate::schema::cameras::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         diesel::insert_into(cameras)
@@ -29,7 +29,7 @@ impl Handler<UpdateCamera> for DbExecutor {
     type Result = Result<Camera, ServiceError>;
 
     fn handle(&mut self, msg: UpdateCamera, _: &mut Self::Context) -> Self::Result {
-        use schema::cameras::dsl::*;
+        use crate::schema::cameras::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         diesel::update(cameras.filter(id.eq(msg.id)))
@@ -47,7 +47,7 @@ impl Handler<FetchCamera> for DbExecutor {
     type Result = Result<Camera, ServiceError>;
 
     fn handle(&mut self, msg: FetchCamera, _: &mut Self::Context) -> Self::Result {
-        use schema::cameras::dsl::*;
+        use crate::schema::cameras::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         let c = cameras
@@ -67,7 +67,7 @@ impl Handler<FetchAllCamera> for DbExecutor {
     type Result = Result<Vec<Camera>, ServiceError>;
 
     fn handle(&mut self, _msg: FetchAllCamera, _: &mut Self::Context) -> Self::Result {
-        use schema::cameras::dsl::*;
+        use crate::schema::cameras::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         cameras

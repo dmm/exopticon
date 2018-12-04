@@ -2,14 +2,14 @@
 use actix::prelude::*;
 use actix_web::{http::Method, middleware::Logger, ws, App, Error, HttpRequest, HttpResponse};
 
-use camera_group_routes::{
+use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
 };
-use camera_routes::{create_camera, fetch_all_cameras, fetch_camera, update_camera};
-use models::DbExecutor;
-use static_routes::{fetch_static_file, index};
-use video_unit_routes::{fetch_video_unit, fetch_video_units_between};
-use ws_session::WsSession;
+use crate::camera_routes::{create_camera, fetch_all_cameras, fetch_camera, update_camera};
+use crate::models::DbExecutor;
+use crate::static_routes::{fetch_static_file, index};
+use crate::video_unit_routes::{fetch_video_unit, fetch_video_units_between};
+use crate::ws_session::WsSession;
 
 pub struct AppState {
     pub db: Addr<DbExecutor>,

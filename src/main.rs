@@ -54,14 +54,14 @@ mod video_unit_routes;
 mod ws_camera_server;
 mod ws_session;
 
+use crate::models::DbExecutor;
 use actix::prelude::*;
 use actix_web::server;
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
-use models::DbExecutor;
 use std::env;
 
-use root_supervisor::{ExopticonMode, RootSupervisor};
+use crate::root_supervisor::{ExopticonMode, RootSupervisor};
 
 fn main() {
     env_logger::init();

@@ -15,7 +15,7 @@ impl Actor for DbExecutor {
 }
 
 use chrono::NaiveDateTime;
-use schema::{camera_groups, cameras, video_files, video_units};
+use crate::schema::{camera_groups, cameras, video_files, video_units};
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
 #[table_name = "camera_groups"]

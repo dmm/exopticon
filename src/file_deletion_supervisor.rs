@@ -1,7 +1,7 @@
 use actix::*;
 
-use file_deletion_actor::FileDeletionActor;
-use models::DbExecutor;
+use crate::file_deletion_actor::FileDeletionActor;
+use crate::models::DbExecutor;
 
 pub struct StartDeletionWorker {
     pub db_addr: Addr<DbExecutor>,

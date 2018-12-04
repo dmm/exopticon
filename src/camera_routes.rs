@@ -1,8 +1,8 @@
 use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, Path, ResponseError, State};
 use futures::future::Future;
 
-use app::AppState;
-use models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
+use crate::app::AppState;
+use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
 
 pub fn create_camera(
     (camera_request, state): (Json<CreateCamera>, State<AppState>),

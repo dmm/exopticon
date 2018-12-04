@@ -13,8 +13,8 @@ use serde::Deserialize;
 use tokio_io::codec::length_delimited;
 use tokio_process::CommandExt;
 
-use models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
-use ws_camera_server::{CameraFrame, FrameResolution, WsCameraServer};
+use crate::models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
+use crate::ws_camera_server::{CameraFrame, FrameResolution, WsCameraServer};
 
 #[derive(Default, Debug, PartialEq, Deserialize, Serialize)]
 struct CaptureMessage {

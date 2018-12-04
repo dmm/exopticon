@@ -1,7 +1,7 @@
 use actix::*;
 
-use capture_actor::CaptureActor;
-use models::DbExecutor;
+use crate::capture_actor::CaptureActor;
+use crate::models::DbExecutor;
 
 pub struct StartCaptureWorker {
     pub id: i32,
