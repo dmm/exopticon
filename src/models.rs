@@ -227,3 +227,5 @@ pub struct DeleteVideoUnitFiles {
     pub video_unit_ids: Vec<i32>,
     pub video_file_ids: Vec<i32>,
 }
+
+pub struct FetchEmptyVideoFile;

@@ -5,7 +5,7 @@ use capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
 use file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
 use models::{
     CameraGroup, CameraGroupAndCameras, DbExecutor, FetchAllCameraGroup,
-    FetchAllCameraGroupAndCameras,
+    FetchAllCameraGroupAndCameras, FetchEmptyVideoFile, UpdateVideoFile, VideoFile,
 };
 
 pub enum ExopticonMode {

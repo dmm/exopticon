@@ -49,7 +49,7 @@ impl Handler<CreateVideoUnitFile> for DbExecutor {
             .values(CreateVideoFile {
                 video_unit_id: video_unit.id,
                 filename: msg.filename,
-                size: 0,
+                size: -1,
             }).get_result(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
@@ -181,7 +181,7 @@ impl Handler<FetchOldVideoUnitFile> for DbExecutor {
         cameras
             .inner_join(video_units.inner_join(video_files))
             .filter(camera_group_id.eq(msg.camera_group_id))
-            .filter(size.gt(0))
+            .filter(size.gt(-1))
             .filter(begin_time.ne(end_time))
             .order(begin_time.asc())
             .limit(msg.count)

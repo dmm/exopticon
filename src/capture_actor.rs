@@ -141,6 +141,11 @@ impl CaptureActor {
                                 error!("Captureworker: Error sending new file message: {}", e);
                             }),
                     );
+                } else {
+                    error!(
+                        "CaptureWorker: unable to parse begin time: {}",
+                        msg.begin_time
+                    );
                 }
             }
             "endFile" => {

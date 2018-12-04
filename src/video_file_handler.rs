@@ -1,7 +1,7 @@
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 use errors::ServiceError;
-use models::{CreateVideoFile, DbExecutor, UpdateVideoFile, VideoFile};
+use models::{CreateVideoFile, DbExecutor, FetchEmptyVideoFile, UpdateVideoFile, VideoFile};
 
 impl Message for CreateVideoFile {
     type Result = Result<VideoFile, ServiceError>;
@@ -34,6 +34,24 @@ impl Handler<UpdateVideoFile> for DbExecutor {
         diesel::update(video_files.filter(id.eq(msg.id)))
             .set(&msg)
             .get_result(conn)
+            .map_err(|_error| ServiceError::InternalServerError)
+    }
+}
+
+impl Message for FetchEmptyVideoFile {
+    type Result = Result<Vec<VideoFile>, ServiceError>;
+}
+
+impl Handler<FetchEmptyVideoFile> for DbExecutor {
+    type Result = Result<Vec<VideoFile>, ServiceError>;
+
+    fn handle(&mut self, msg: FetchEmptyVideoFile, _: &mut Self::Context) -> Self::Result {
+        use schema::video_files::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        video_files
+            .filter(size.eq(-1))
+            .load::<VideoFile>(conn)
             .map_err(|_error| ServiceError::InternalServerError)
     }
 }
