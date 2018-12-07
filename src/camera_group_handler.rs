@@ -1,5 +1,3 @@
-use actix::{Handler, Message};
-use diesel::{self, prelude::*};
 use crate::errors::ServiceError;
 use crate::models::{
     Camera, CameraGroup, CameraGroupAndCameras, CreateCameraGroup, DbExecutor, FetchAllCameraGroup,
@@ -7,6 +5,8 @@ use crate::models::{
     VideoFile, VideoUnit,
 };
 use crate::schema::camera_groups::dsl::*;
+use actix::{Handler, Message};
+use diesel::{self, prelude::*};
 
 impl Message for CreateCameraGroup {
     type Result = Result<CameraGroup, ServiceError>;
@@ -103,8 +103,8 @@ impl Handler<FetchAllCameraGroupAndCameras> for DbExecutor {
         _msg: FetchAllCameraGroupAndCameras,
         _: &mut Self::Context,
     ) -> Self::Result {
-        use diesel::prelude::*;
         use crate::schema::cameras::dsl::*;
+        use diesel::prelude::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         let mut groups_and_cameras: Vec<CameraGroupAndCameras> = Vec::new();
@@ -134,11 +134,11 @@ impl Handler<FetchCameraGroupFiles> for DbExecutor {
     type Result = Result<(i64, i64, Vec<(Camera, (VideoUnit, VideoFile))>), ServiceError>;
 
     fn handle(&mut self, msg: FetchCameraGroupFiles, _: &mut Self::Context) -> Self::Result {
-        use diesel::dsl::sum;
         use crate::schema::camera_groups;
         use crate::schema::cameras::dsl::*;
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
+        use diesel::dsl::sum;
 
         let conn: &PgConnection = &self.0.get().unwrap();
 
@@ -152,11 +152,13 @@ impl Handler<FetchCameraGroupFiles> for DbExecutor {
             .select(sum(size))
             .inner_join(video_units.inner_join(cameras))
             .filter(camera_group_id.eq(msg.camera_group_id))
+            .filter(size.ne(-1))
             .first(conn)
             .map(|result| match result {
                 Some(val) => val,
                 None => 0,
-            }).map_err(|_error| ServiceError::InternalServerError)?;
+            })
+            .map_err(|_error| ServiceError::InternalServerError)?;
 
         let files = cameras
             .inner_join(video_units.inner_join(video_files))

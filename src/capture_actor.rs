@@ -70,7 +70,7 @@ impl CaptureActor {
     fn close_file(
         &self,
         ctx: &mut Context<CaptureActor>,
-        filename: String,
+        filename: &String,
         end_time: DateTime<Utc>,
     ) {
         if let (Some(video_unit_id), Some(video_file_id), Ok(metadata)) = (
@@ -99,7 +99,7 @@ impl CaptureActor {
         }
     }
 
-    fn message_to_action(&self, msg: CaptureMessage, ctx: &mut Context<CaptureActor>) {
+    fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<CaptureActor>) {
         // Check if log
         match msg.message_type.as_str() {
             "log" => debug!("Worker log message: {}", msg.message),
@@ -152,7 +152,10 @@ impl CaptureActor {
             }
             "endFile" => {
                 if let Ok(end_time) = msg.end_time.parse::<DateTime<Utc>>() {
-                    self.close_file(ctx, msg.filename, end_time)
+                    self.close_file(ctx, &msg.filename, end_time);
+                    self.video_unit_id = None;
+                    self.video_file_id = None;
+                    self.filename = None;
                 } else {
                     error!("CaptureActor: Error handling close file message.");
                 }
@@ -207,10 +210,28 @@ impl Handler<StartWorker> for CaptureActor {
         Self::add_stream(framed_stream, ctx);
         let fut = wrap_future::<_, Self>(child)
             .map(|_status, actor, ctx| {
-                error!("CaptureWorker {}: capture process died...", actor.camera_id);
+                // Change this to an error when we can't distinguish
+                // between intentional and unintentional exits.
+                info!("CaptureWorker {}: capture process died...", actor.camera_id);
+
+                // Close file if open
+                if let Some(filename) = &actor.filename {
+                    info!(
+                        "CaptureActor {}: capture process died, closing file: {}",
+                        actor.camera_id, &filename
+                    );
+                    actor.close_file(ctx, filename, Utc::now());
+                    actor.filename = None;
+                }
+
                 ctx.notify_later(StartWorker {}, Duration::new(5, 0));
             })
-            .map_err(|_e, _actor, _ctx| {}); // Do something on error?
+            .map_err(|err, act, _ctx| {
+                error!(
+                    "CaptureActor {}: Error launching child process: {}",
+                    act.camera_id, err
+                )
+            }); // Do something on error?
         ctx.spawn(fut);
     }
 }
