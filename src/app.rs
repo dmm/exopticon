@@ -1,6 +1,8 @@
 // app.rs
-use actix::prelude::*;
-use actix_web::{http::Method, middleware::Logger, ws, App, Error, HttpRequest, HttpResponse};
+use crate::actix::prelude::*;
+use crate::actix_web::{
+    http::Method, middleware::Logger, ws, App, Error, HttpRequest, HttpResponse,
+};
 
 use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
@@ -35,7 +37,8 @@ pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
         .resource("/v1/camera_groups", |r| {
             r.method(Method::POST).with(create_camera_group);
             r.method(Method::GET).with(fetch_all_camera_groups);
-        }).resource("/v1/camera_groups/{id}", |r| {
+        })
+        .resource("/v1/camera_groups/{id}", |r| {
             r.method(Method::POST).with(update_camera_group);
             r.method(Method::GET).with(fetch_camera_group);
         })
@@ -43,14 +46,16 @@ pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
         .resource("/v1/cameras", |r| {
             r.method(Method::POST).with(create_camera);
             r.method(Method::GET).with(fetch_all_cameras);
-        }).resource("/v1/cameras/{id}", |r| {
+        })
+        .resource("/v1/cameras/{id}", |r| {
             r.method(Method::POST).with(update_camera);
             r.method(Method::GET).with(fetch_camera);
         })
         // routes to video_unit
         .resource("/v1/video_units/{id}", |r| {
             r.method(Method::GET).with(fetch_video_unit);
-        }).resource("/v1/video_units/between/{begin}/{end}", |r| {
+        })
+        .resource("/v1/video_units/between/{begin}/{end}", |r| {
             r.method(Method::GET).with(fetch_video_units_between);
         })
 }

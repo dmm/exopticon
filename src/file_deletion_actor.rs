@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use actix::prelude::*;
+use crate::actix::prelude::*;
 use actix_web::actix::fut::wrap_future;
 
 use crate::models::{
@@ -98,14 +98,16 @@ impl Handler<StartWork> for FileDeletionActor {
             .send(FetchCameraGroupFiles {
                 camera_group_id: self.camera_group_id,
                 count: 100,
-            }).into_actor(self)
+            })
+            .into_actor(self)
             .map(|result, actor: &mut FileDeletionActor, ctx| {
                 match result {
                     Ok(result) => actor.handle_files(result, ctx),
                     _ => error!("Error fetching camera group files."),
                 }
                 ctx.notify_later(StartWork {}, Duration::from_millis(5000));
-            }).map_err(|_e, actor, ctx| {
+            })
+            .map_err(|_e, actor, ctx| {
                 error!(
                     "Error fetching camera group files for id: {}",
                     actor.camera_group_id

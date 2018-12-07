@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use actix::prelude::*;
+use crate::actix::prelude::*;
 use actix_web::actix::fut::wrap_future;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
@@ -89,7 +89,8 @@ impl CaptureActor {
                     .map(|result, _actor, _ctx| match result {
                         Ok((_video_unit, _video_file)) => {}
                         Err(e) => error!("CaptureWorker: Error updating video unit: {}", e),
-                    }).map_err(|_e, _actor, _ctx| {
+                    })
+                    .map_err(|_e, _actor, _ctx| {
                         error!("CaptureWorker: Error calling UpdateVideoUnitFile");
                     }),
             );
@@ -137,7 +138,8 @@ impl CaptureActor {
                                     actor.filename = Some(filename)
                                 }
                                 Err(e) => error!("Error! {}", e),
-                            }).map_err(|e, _actor, _ctx| {
+                            })
+                            .map_err(|e, _actor, _ctx| {
                                 error!("Captureworker: Error sending new file message: {}", e);
                             }),
                     );
@@ -207,7 +209,8 @@ impl Handler<StartWorker> for CaptureActor {
             .map(|_status, actor, ctx| {
                 error!("CaptureWorker {}: capture process died...", actor.camera_id);
                 ctx.notify_later(StartWorker {}, Duration::new(5, 0));
-            }).map_err(|_e, _actor, _ctx| {}); // Do something on error?
+            })
+            .map_err(|_e, _actor, _ctx| {}); // Do something on error?
         ctx.spawn(fut);
     }
 }

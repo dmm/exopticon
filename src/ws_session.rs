@@ -1,4 +1,4 @@
-use actix::prelude::*;
+use crate::actix::prelude::*;
 use actix_web::ws;
 use rmp::encode::{write_map_len, write_str, ValueWriteError};
 use rmp::Marker;
@@ -10,7 +10,9 @@ use serde_json;
 use std::io::Write;
 
 use crate::app::AppState;
-use crate::ws_camera_server::{CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer};
+use crate::ws_camera_server::{
+    CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer,
+};
 
 #[derive(Serialize, Deserialize)]
 struct WsCommand {

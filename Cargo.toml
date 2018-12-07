@@ -2,7 +2,7 @@
 name = "exopticon"
 version = "0.1.0"
 authors = ["David Matthew Mattli <dmm@mattli.us>"]
-#edition = "2018"
+edition = "2018"
 
 [profile.dev]
 opt-level = 2
