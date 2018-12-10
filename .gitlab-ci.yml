@@ -1,0 +1,8 @@
+image: dmattli/exopticon
+stages:
+  - build
+
+app-build:
+  stage: build
+  script:
+    - cargo build --release
