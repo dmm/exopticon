@@ -14,10 +14,15 @@ use crate::ws_camera_server::{
     CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer,
 };
 
+/// A command from the client, transported over the websocket
+/// connection
 #[derive(Serialize, Deserialize)]
 struct WsCommand {
+    /// command type
     command: String,
+    /// selected frame resolution
     resolution: FrameResolution,
+    /// affected camera ids
     #[serde(rename = "cameraIds")]
     camera_ids: Vec<i32>,
 }
@@ -29,8 +34,10 @@ struct RawCameraFrame {
     pub jpeg: ByteBuf,
 }
 
+/// An actor representing a websocket connection
 #[derive(Default)]
 pub struct WsSession {
+    /// True when the websocket is ready to send
     pub ready: bool,
 }
 
@@ -47,6 +54,7 @@ impl Actor for WsSession {
     }
 }
 
+/// An empty struct to implement VariantWriter so we can serialize frames as structs/maps.
 struct StructMapWriter;
 
 impl VariantWriter for StructMapWriter {
@@ -78,7 +86,9 @@ impl Handler<CameraFrame> for WsSession {
             resolution: msg.resolution,
         };
         let mut se = Serializer::with(Vec::new(), StructMapWriter);
-        frame.serialize(&mut se).unwrap();
+        frame
+            .serialize(&mut se)
+            .expect("Camera frame serialization failed");
         ctx.binary(se.into_inner());
 
         // spawn drain future
