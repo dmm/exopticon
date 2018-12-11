@@ -67,6 +67,22 @@ pub struct CaptureActor {
 }
 
 impl CaptureActor {
+    pub fn new(
+        db_addr: Addr<DbExecutor>,
+        camera_id: i32,
+        stream_url: String,
+        storage_path: String,
+    ) -> CaptureActor {
+        CaptureActor {
+            camera_id,
+            stream_url,
+            storage_path,
+            db_addr,
+            video_unit_id: None,
+            video_file_id: None,
+            filename: None,
+        }
+    }
     fn close_file(
         &self,
         ctx: &mut Context<CaptureActor>,
@@ -241,24 +257,5 @@ impl Actor for CaptureActor {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.address().do_send(StartWorker {});
-    }
-}
-
-impl CaptureActor {
-    pub fn new(
-        db_addr: Addr<DbExecutor>,
-        camera_id: i32,
-        stream_url: String,
-        storage_path: String,
-    ) -> CaptureActor {
-        CaptureActor {
-            camera_id,
-            stream_url,
-            storage_path,
-            db_addr,
-            video_unit_id: None,
-            video_file_id: None,
-            filename: None,
-        }
     }
 }
