@@ -18,23 +18,26 @@ fn main() {
     println!("cargo:rerun-if-changed=src/cworkers/mpack.h");
     println!("cargo:rerun-if-changed=src/cworkers/timing.h");
 
-    Command::new("make")
+    assert!(Command::new("make")
         .current_dir("src/cworkers")
         .status()
-        .expect("c worker build failed.");
+        .expect("c worker build execute failed.")
+        .success());
 
     if !cfg!(debug_assertions) {
-        Command::new("npm")
+        assert!(Command::new("npm")
             .current_dir("web")
             .arg("install")
             .status()
-            .expect("fetching web assets failed.");
+            .expect("fetching web assets failed.")
+            .success());
 
-        Command::new("npm")
+        assert!(Command::new("npm")
             .current_dir("web")
             .arg("run")
             .arg("deploy")
             .status()
-            .expect("building web assets failed.");
+            .expect("building web assets failed.")
+            .success());
     }
 }
