@@ -14,8 +14,8 @@ impl Actor for DbExecutor {
     type Context = SyncContext<Self>;
 }
 
+use crate::schema::{camera_groups, cameras, users, video_files, video_units};
 use chrono::NaiveDateTime;
-use crate::schema::{camera_groups, cameras, video_files, video_units};
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
 #[table_name = "camera_groups"]
@@ -229,3 +229,39 @@ pub struct DeleteVideoUnitFiles {
 }
 
 pub struct FetchEmptyVideoFile;
+
+#[derive(Queryable, Associations, Identifiable, Serialize)]
+#[table_name = "users"]
+pub struct User {
+    pub id: i32,
+    pub username: String,
+    pub password: String,
+    pub timezone: String,
+    pub inserted_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Serialize)]
+pub struct SlimUser {
+    pub id: i32,
+    pub username: String,
+    pub timezone: String,
+}
+
+impl From<User> for SlimUser {
+    fn from(user: User) -> Self {
+        SlimUser {
+            id: user.id,
+            username: user.username,
+            timezone: user.timezone,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Insertable)]
+#[table_name = "users"]
+pub struct CreateUser {
+    pub username: String,
+    pub password: String,
+    pub timezone: String,
+}

@@ -29,6 +29,17 @@ table! {
 }
 
 table! {
+    users (id) {
+        id -> Int4,
+        username -> Varchar,
+        password -> Varchar,
+        timezone -> Varchar,
+        inserted_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+table! {
     video_files (id) {
         id -> Int4,
         video_unit_id -> Int4,
@@ -55,4 +66,10 @@ joinable!(cameras -> camera_groups (camera_group_id));
 joinable!(video_files -> video_units (video_unit_id));
 joinable!(video_units -> cameras (camera_id));
 
-allow_tables_to_appear_in_same_query!(camera_groups, cameras, video_files, video_units,);
+allow_tables_to_appear_in_same_query!(
+    camera_groups,
+    cameras,
+    users,
+    video_files,
+    video_units,
+);

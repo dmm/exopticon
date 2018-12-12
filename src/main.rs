@@ -1,6 +1,7 @@
 // main.rs
 // to avoid the warning from diesel macros
 #![allow(proc_macro_derive_resolution_fallback)]
+#![warn(clippy::all, clippy::restriction, clippy::pedantic, clippy::cargo)]
 
 extern crate actix;
 extern crate actix_web;
@@ -35,6 +36,8 @@ extern crate tokio_io;
 extern crate tokio_process;
 
 mod app;
+mod auth_handler;
+mod auth_routes;
 mod camera_group_handler;
 mod camera_group_routes;
 mod camera_handler;
@@ -45,9 +48,12 @@ mod errors;
 mod file_deletion_actor;
 mod file_deletion_supervisor;
 mod models;
+mod register_handler;
 mod root_supervisor;
 mod schema;
 mod static_routes;
+mod user_routes;
+mod utils;
 mod video_file_handler;
 mod video_unit_handler;
 mod video_unit_routes;
