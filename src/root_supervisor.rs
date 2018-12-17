@@ -20,12 +20,33 @@ pub struct RootSupervisor {
     pub mode: ExopticonMode,
 }
 
-fn start_cameras(_db_worker: &Addr<DbExecutor>) {}
-
 impl Actor for RootSupervisor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        match self.mode {
+            ExopticonMode::Standby => {}
+            ExopticonMode::Run => {
+                self.start_workers(ctx);
+            }
+        };
+    }
+}
+
+pub struct StartFileDeletionWorkers;
+
+impl Message for StartFileDeletionWorkers {
+    type Result = ();
+}
+
+impl Handler<StartFileDeletionWorkers> for RootSupervisor {
+    type Result = ();
+    fn handle(&mut self, _msg: StartFileDeletionWorkers, _ctx: &mut Context<Self>) -> Self::Result {
+    }
+}
+
+impl RootSupervisor {
+    fn start_workers(&self, ctx: &mut Context<Self>) {
         let capture_future = self
             .db_worker
             .send(FetchAllCameraGroupAndCameras {})
@@ -53,21 +74,6 @@ impl Actor for RootSupervisor {
             });
         ctx.spawn(fut);
     }
-}
-
-pub struct StartFileDeletionWorkers;
-
-impl Message for StartFileDeletionWorkers {
-    type Result = ();
-}
-
-impl Handler<StartFileDeletionWorkers> for RootSupervisor {
-    type Result = ();
-    fn handle(&mut self, _msg: StartFileDeletionWorkers, _ctx: &mut Context<Self>) -> Self::Result {
-    }
-}
-
-impl RootSupervisor {
     fn start_capture_workers(&self, cameras: Vec<CameraGroupAndCameras>) {
         for g in cameras {
             for c in g.1 {
@@ -95,13 +101,6 @@ impl RootSupervisor {
     pub fn new(start_mode: ExopticonMode, db_worker: Addr<DbExecutor>) -> RootSupervisor {
         let capture_supervisor = CaptureSupervisor::new().start();
         let deletion_supervisor = FileDeletionSupervisor::new().start();
-
-        match start_mode {
-            ExopticonMode::Standby => {}
-            ExopticonMode::Run => {
-                start_cameras(&db_worker);
-            }
-        };
 
         RootSupervisor {
             capture_supervisor: capture_supervisor,

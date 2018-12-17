@@ -90,7 +90,19 @@ fn main() {
         .expect("Can not bind to '0.0.0.0:3000'")
         .start();
 
-    let root_supervisor = RootSupervisor::new(ExopticonMode::Run, db_address);
+    let mut mode = ExopticonMode::Run;
+    // Prints each argument on a separate line
+    for argument in env::args() {
+        match argument.as_ref() {
+            "--standby" => {
+                info!("Runtime mode is standby...");
+                mode = ExopticonMode::Standby;
+            }
+            _ => (),
+        }
+    }
+
+    let root_supervisor = RootSupervisor::new(mode, db_address);
 
     root_supervisor.start();
 
