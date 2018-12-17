@@ -1,12 +1,12 @@
 use actix::*;
 
-use actix_web::actix::fut;
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
 use crate::file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
 use crate::models::{
     CameraGroup, CameraGroupAndCameras, DbExecutor, FetchAllCameraGroup,
-    FetchAllCameraGroupAndCameras, FetchEmptyVideoFile, UpdateVideoFile, VideoFile,
+    FetchAllCameraGroupAndCameras,
 };
+use actix_web::actix::fut;
 
 pub enum ExopticonMode {
     Standby,

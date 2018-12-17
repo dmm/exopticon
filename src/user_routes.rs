@@ -1,5 +1,4 @@
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, Path, ResponseError, State};
-use chrono_tz::Tz;
+use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, ResponseError, State};
 use futures::future::Future;
 
 use crate::app::AppState;

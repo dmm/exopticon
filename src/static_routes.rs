@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use actix_web::dev::FromParam;
-use actix_web::{Body, HttpRequest, HttpResponse, Responder};
+use actix_web::{Body, HttpRequest, HttpResponse};
 use askama::Template;
 use mime_guess::guess_mime_type;
 

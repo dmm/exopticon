@@ -1,4 +1,4 @@
-#[allow(deprecated)]
+#![allow(deprecated)]
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -10,6 +10,7 @@ use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
+
 use tokio_io::codec::length_delimited;
 use tokio_process::CommandExt;
 

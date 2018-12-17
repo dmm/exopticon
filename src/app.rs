@@ -32,7 +32,6 @@ pub fn ws_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
 pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
     // secret is a random 32 character long base 64 string
     let secret: String = env::var("SECRET_KEY").unwrap_or_else(|_| "0".repeat(32));
-    let domain: String = env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
 
     App::with_state(AppState { db })
         // setup builtin logger to get nice logging for each request

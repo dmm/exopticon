@@ -5,7 +5,6 @@
 
 extern crate actix;
 extern crate actix_web;
-#[macro_use]
 extern crate askama;
 extern crate bytes;
 extern crate chrono;

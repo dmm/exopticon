@@ -1,5 +1,4 @@
 use actix::{Handler, Message};
-use actix_web::{middleware::identity::RequestIdentity, FromRequest, HttpRequest};
 use bcrypt::verify;
 use diesel::prelude::*;
 

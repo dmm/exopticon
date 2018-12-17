@@ -1,9 +1,8 @@
 use actix_web::http;
-use actix_web::http::{header, HttpTryFrom};
 use actix_web::middleware::identity::RequestIdentity;
-use actix_web::middleware::{Middleware, Response, Started};
+use actix_web::middleware::{Middleware, Started};
 use actix_web::{
-    App, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Json, ResponseError, Result,
+    AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Json, ResponseError, Result,
 };
 use futures::future::Future;
 
@@ -42,7 +41,7 @@ impl Middleware<AppState> for WebAuthMiddleware {
                 .expect("user_id should always be a i32");
             info!("authenticated user id: {}", user_id);
             Ok(Started::Done)
-        } else if (req.path() == "/login") {
+        } else if req.path() == "/login" {
             return Ok(Started::Done);
         } else {
             Ok(Started::Response(
