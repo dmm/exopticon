@@ -47,5 +47,3 @@ impl Handler<AuthData> for DbExecutor {
         mismatch_error
     }
 }
-
-pub type LoggedUser = SlimUser;

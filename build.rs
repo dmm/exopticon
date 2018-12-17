@@ -4,6 +4,7 @@ use std::process::Command;
 
 fn main() {
     askama::rerun_if_templates_changed();
+
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/cworkers/captureworker.c");
     println!("cargo:rerun-if-changed=src/cworkers/exvid.c");

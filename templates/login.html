@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>EXOPTICON Login</title>
+    <script>
+  function attemptLogin() {
+    const username = document.querySelector("#username").value;
+    const password = document.querySelector("#password").value;
+    fetch(window.location.href + '/../auth', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({
+        'username': username,
+        'password': password
+      })
+    }).then(()=> {
+      window.location.href += '/../';
+    });
+
+    return false;
+  }
+    </script>
+  </head>
+  <body>
+    <h1>Login to EXOPTICON</h1>
+    <form onsubmit="return attemptLogin();" method="POST">
+      <input id="username" name="username" type="text"></input>
+      <input id="password" name="password" type="password"></input>
+      <button type="submit" id="loginButton">LOGIN</button>
+  </body>
+</html>

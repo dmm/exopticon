@@ -17,16 +17,26 @@ pub fn index(_req: HttpRequest<AppState>) -> HttpResponse {
     HttpResponse::Ok().content_type("text/html").body(s)
 }
 
+#[derive(Template)]
+#[template(path = "login.html")]
+struct Login;
+
+pub fn login(_req: HttpRequest<AppState>) -> HttpResponse {
+    let s = Login.render().unwrap();
+
+    HttpResponse::Ok().content_type("text/html").body(s)
+}
+
 #[derive(RustEmbed)]
 #[folder = "web/static"]
 struct Asset;
 
-pub fn fetch_static_file(req: &HttpRequest<AppState>) -> impl Responder {
+pub fn fetch_static_file(req: &HttpRequest<AppState>) -> HttpResponse {
     let tail: String = match req.match_info().query("tail") {
         Ok(t) => t,
         Err(_e) => return HttpResponse::NotFound().body("404 Not Found"),
     };
-
+    info!("Static path: {}", tail);
     let relpath = match PathBuf::from_param(tail.trim_left_matches('/')) {
         Ok(r) => r,
         Err(_e) => return HttpResponse::NotFound().body("404 Not Found"),
