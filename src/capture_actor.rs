@@ -213,7 +213,10 @@ impl Handler<StartWorker> for CaptureActor {
     fn handle(&mut self, _msg: StartWorker, ctx: &mut Context<Self>) -> Self::Result {
         info!("Launching worker for stream: {}", self.stream_url);
         let storage_path = Path::new(&self.storage_path).join(self.camera_id.to_string());
-        std::fs::create_dir(&storage_path);
+        match std::fs::create_dir(&storage_path) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
         let mut cmd = Command::new("src/cworkers/captureworker");
         cmd.arg(&self.stream_url);
         cmd.arg("0");
