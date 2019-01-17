@@ -10,7 +10,9 @@ use crate::auth_routes::{login, logout, AuthMiddleware, WebAuthMiddleware};
 use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
 };
-use crate::camera_routes::{create_camera, fetch_all_cameras, fetch_camera, update_camera};
+use crate::camera_routes::{
+    create_camera, discover, fetch_all_cameras, fetch_camera, fetch_time, set_time, update_camera,
+};
 use crate::chrono::Duration;
 use crate::models::DbExecutor;
 use crate::static_routes;
@@ -79,9 +81,16 @@ pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
                     r.method(Method::POST).with(create_camera);
                     r.method(Method::GET).with(fetch_all_cameras);
                 })
+                .resource("/cameras/discover", |r| {
+                    r.method(Method::GET).with(discover)
+                })
                 .resource("/cameras/{id}", |r| {
                     r.method(Method::POST).with(update_camera);
                     r.method(Method::GET).with(fetch_camera);
+                })
+                .resource("/cameras/{id}/time", |r| {
+                    r.method(Method::GET).with(fetch_time);
+                    r.method(Method::POST).with(set_time);
                 })
                 // routes to video_unit
                 .resource("/video_units/{id}", |r| {
