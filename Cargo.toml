@@ -4,11 +4,14 @@ version = "0.1.0"
 authors = ["David Matthew Mattli <dmm@mattli.us>"]
 edition = "2018"
 
+[workspace]
+
 [profile.dev]
 opt-level = 2
 debug = true
 
 [dependencies]
+onvif = { path = "onvif" }
 actix = "0.7.4"
 actix-web = "0.7.8"
 askama = "0.7"
@@ -22,7 +25,7 @@ env_logger = "0.5.13"
 log = "0.4"
 mime_guess = "2.0.0-alpha.6"
 failure = "0.1.2"
-jsonwebtoken = "5.0"
+
 rmp = "^0.8"
 rmp-serde = "0.13.7"
 futures = "0.1"
