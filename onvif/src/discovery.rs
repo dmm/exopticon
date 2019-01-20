@@ -5,7 +5,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
-use uuid;
+use uuid::Uuid;
 
 /// Struct representing onvif discover probe
 pub struct ProbeServer {
@@ -45,11 +45,12 @@ impl Future for ProbeServer {
 
     fn poll(&mut self) -> Poll<usize, io::Error> {
         let request_body =
+            format!(
             r#"
             <Envelope xmlns="http://www.w3.org/2003/05/soap-envelope"
                       xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
               <Header>
-                <wsa:MessageID xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">0001</wsa:MessageID>
+                <wsa:MessageID xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">{}</wsa:MessageID>
                 <wsa:To xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">urn:schemas-xmlsoap-org:ws:2005:04:discovery</wsa:To>
                 <wsa:Action xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action>
               </Header>
@@ -61,7 +62,8 @@ impl Future for ProbeServer {
                   <Scopes />
                 </Probe>
               </Body>
-            </Envelope>"#;
+            </Envelope>"#,
+                Uuid::new_v4());
 
         let remote_addr = "239.255.255.250:3702"
             .parse::<SocketAddr>()
