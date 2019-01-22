@@ -62,18 +62,75 @@ mod ws_session;
 use crate::models::DbExecutor;
 use actix::prelude::*;
 use actix_web::server;
+use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use std::env;
 
+use crate::models::{CreateCameraGroup, CreateUser};
 use crate::root_supervisor::{ExopticonMode, RootSupervisor};
+
+fn add_user(
+    sys: &mut actix::SystemRunner,
+    address: &Addr<DbExecutor>,
+) -> Result<bool, std::io::Error> {
+    let username = Input::new()
+        .with_prompt("Enter username for initial user")
+        .interact()?;
+
+    let password = PasswordInput::new()
+        .with_prompt("Enter password for initial user")
+        .interact()?;
+
+    let fut2 = address.send(CreateUser {
+        username: username,
+        password: password,
+        timezone: String::from("UTC"),
+    });
+
+    match sys.block_on(fut2) {
+        Ok(_) => (),
+        Err(err) => {
+            error!("Error creating user! {}", err);
+        }
+    }
+    println!("Created user!");
+    Ok(true)
+}
+
+fn add_camera_group(
+    sys: &mut actix::SystemRunner,
+    address: &Addr<DbExecutor>,
+) -> Result<bool, std::io::Error> {
+    let storage_path = Input::new()
+        .with_prompt("Enter storage path for recorded video")
+        .interact()?;
+
+    let max_storage_size: i64 = Input::new()
+        .with_prompt("Enter max space used at this path, in megabytes")
+        .interact()?;
+
+    let fut = address.send(CreateCameraGroup {
+        name: String::from("default"),
+        storage_path: storage_path,
+        max_storage_size: max_storage_size,
+    });
+    match sys.block_on(fut) {
+        Ok(_) => (),
+        Err(err) => {
+            error!("Error creating camera group! {}", err);
+        }
+    }
+    println!("Created camera group!");
+    Ok(true)
+}
 
 fn main() {
     env_logger::init();
 
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let sys = actix::System::new("Exopticon");
+    let mut sys = actix::System::new("Exopticon");
 
     // create db connection pool
     let manager = ConnectionManager::<PgConnection>::new(database_url);
@@ -84,6 +141,7 @@ fn main() {
     let address: Addr<DbExecutor> = SyncArbiter::start(4, move || DbExecutor(pool.clone()));
 
     let db_address = address.clone();
+    let setup_address = address.clone();
 
     server::new(move || app::create_app(address.clone()))
         .bind("0.0.0.0:3000")
@@ -91,12 +149,20 @@ fn main() {
         .start();
 
     let mut mode = ExopticonMode::Run;
+    let mut add_user_flag = false;
+    let mut add_camera_group_flag = false;
     // Prints each argument on a separate line
     for argument in env::args() {
         match argument.as_ref() {
             "--standby" => {
                 info!("Runtime mode is standby...");
                 mode = ExopticonMode::Standby;
+            }
+            "--add-user" => {
+                add_user_flag = true;
+            }
+            "--add-camera-group" => {
+                add_camera_group_flag = true;
             }
             _ => (),
         }
@@ -105,6 +171,26 @@ fn main() {
     let root_supervisor = RootSupervisor::new(mode, db_address);
 
     root_supervisor.start();
+
+    if add_user_flag {
+        match add_user(&mut sys, &setup_address) {
+            Err(_) => {
+                println!("Error creating user!");
+                return;
+            }
+            _ => (),
+        }
+    }
+
+    if add_camera_group_flag {
+        match add_camera_group(&mut sys, &setup_address) {
+            Err(_) => {
+                println!("Error creating camera group!");
+                return;
+            }
+            _ => (),
+        }
+    }
 
     sys.run();
 }
