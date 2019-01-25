@@ -14,6 +14,11 @@ use crate::ws_camera_server::{
     CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer,
 };
 
+pub enum WsSerialization {
+    MsgPack,
+    Json,
+}
+
 /// A command from the client, transported over the websocket
 /// connection
 #[derive(Serialize, Deserialize)]
@@ -35,10 +40,19 @@ struct RawCameraFrame {
 }
 
 /// An actor representing a websocket connection
-#[derive(Default)]
 pub struct WsSession {
     /// True when the websocket is ready to send
     pub ready: bool,
+    pub serialization: WsSerialization,
+}
+
+impl WsSession {
+    pub fn new(serialization: WsSerialization) -> WsSession {
+        WsSession {
+            ready: true,
+            serialization: serialization,
+        }
+    }
 }
 
 impl Actor for WsSession {

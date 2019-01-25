@@ -19,7 +19,7 @@ use crate::static_routes;
 use crate::static_routes::{fetch_static_file, index};
 use crate::user_routes::create_user;
 use crate::video_unit_routes::{fetch_video_unit, fetch_video_units_between};
-use crate::ws_session::WsSession;
+use crate::ws_session::{WsSerialization, WsSession};
 
 pub struct AppState {
     pub db: Addr<DbExecutor>,
@@ -27,7 +27,12 @@ pub struct AppState {
 
 pub fn ws_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
     debug!("Starting websocket session...");
-    ws::start(req, WsSession::default())
+    ws::start(req, WsSession::new(WsSerialization::MsgPack))
+}
+
+pub fn ws_json_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
+    debug!("Starting json websocket session...");
+    ws::start(req, WsSession::new(WsSerialization::Json))
 }
 
 // helper function to create and returns the app after mounting all routes/resources
