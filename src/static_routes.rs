@@ -28,7 +28,7 @@ pub fn login(_req: HttpRequest<AppState>) -> HttpResponse {
 }
 
 #[derive(RustEmbed)]
-#[folder = "web/static"]
+#[folder = "web/src/assets"]
 struct Asset;
 
 pub fn fetch_static_file(req: &HttpRequest<AppState>) -> HttpResponse {
