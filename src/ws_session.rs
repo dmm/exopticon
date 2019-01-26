@@ -99,11 +99,18 @@ impl Handler<CameraFrame> for WsSession {
             jpeg: ByteBuf::from(msg.jpeg),
             resolution: msg.resolution,
         };
-        let mut se = Serializer::with(Vec::new(), StructMapWriter);
-        frame
-            .serialize(&mut se)
-            .expect("Camera frame serialization failed");
-        ctx.binary(se.into_inner());
+        match &self.serialization {
+            WsSerialization::MsgPack => {
+                let mut se = Serializer::with(Vec::new(), StructMapWriter);
+                frame
+                    .serialize(&mut se)
+                    .expect("Messagepack camera frame serialization failed!");
+                ctx.binary(se.into_inner());
+            }
+            WsSerialization::Json => ctx.text(
+                serde_json::to_string(&frame).expect("Json camera frame serialization failed!"),
+            ),
+        };
 
         // spawn drain future
         ctx.spawn(fut);

@@ -72,6 +72,7 @@ pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
         .scope("/v1", |s| {
             s.middleware(AuthMiddleware)
                 .resource("/ws", |r| r.route().f(ws_route))
+                .resource("/ws_json", |r| r.route().f(ws_json_route))
                 // routes to camera_group
                 .resource("/camera_groups", |r| {
                     r.method(Method::POST).with(create_camera_group);
