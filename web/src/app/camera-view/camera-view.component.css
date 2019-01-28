@@ -1,0 +1,28 @@
+div {
+  position: relative; /* Make a positioned element so it will contain ptz-controls */
+  width: 100%;
+  height: 100%;
+  box-sizing: content-box;
+}
+
+img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-drag: none;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  object-fit: contain;
+}
+
+app-camera-overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  padding: 1px;
+  overflow: hidden;
+  box-sizing: border-box;
+}

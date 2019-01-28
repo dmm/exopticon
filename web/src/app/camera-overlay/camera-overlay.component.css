@@ -1,0 +1,12 @@
+
+:host {
+  border: 1px solid #0F0;
+}
+
+.camera-name {
+  position: absolute;
+  bottom: 5px;
+  padding: 3px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 5px;
+}

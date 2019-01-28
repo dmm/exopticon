@@ -1,5 +1,14 @@
-  <ul class="cameras">
-    <li *ngFor="let camera of cameras">
-      <span>{{camera.id}}</span>
-    </li>
-  </ul>
+<div class="panel">
+  <div class="wrapper"
+       *ngFor="let camera of cameras"
+       (mouseenter)="selectCameraView(camera.id)"
+       (mouseleave)="deselectCameraview">
+    <div class="camera-width"></div>
+    <div class="content">
+      <app-camera-view [camera]="camera"
+                       [selected]="selectedCameraId === camera.id"
+                       [videoService]="videoService">
+      </app-camera-view>
+    </div>
+  </div>
+</div>

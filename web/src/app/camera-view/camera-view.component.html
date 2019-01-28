@@ -1,0 +1,4 @@
+<div snInViewport (inViewportChange)="onInViewportChange($event)">
+  <app-camera-overlay [camera]="camera" *ngIf="selected"></app-camera-overlay>
+  <img #imgframe />
+</div>
