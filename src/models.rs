@@ -19,6 +19,7 @@ use chrono::NaiveDateTime;
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
 #[table_name = "camera_groups"]
+#[serde(rename_all = "camelCase")]
 pub struct CameraGroup {
     pub id: i32,
     pub name: String,
@@ -62,6 +63,7 @@ pub struct FetchCameraGroupFiles {
     Identifiable, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
 )]
 #[belongs_to(CameraGroup)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "cameras"]
 pub struct Camera {
     pub id: i32,

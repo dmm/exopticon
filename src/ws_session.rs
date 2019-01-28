@@ -4,10 +4,13 @@ use rmp::encode::{write_map_len, write_str, ValueWriteError};
 use rmp::Marker;
 use rmp_serde::encode::VariantWriter;
 use rmp_serde::Serializer;
+use serde;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json;
 use std::io::Write;
+
+use base64::{STANDARD_NO_PAD};
 
 use crate::app::AppState;
 use crate::ws_camera_server::{
@@ -18,6 +21,10 @@ pub enum WsSerialization {
     MsgPack,
     Json,
 }
+
+base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
+
+
 
 /// A command from the client, transported over the websocket
 /// connection
@@ -33,9 +40,11 @@ struct WsCommand {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RawCameraFrame {
     pub camera_id: i32,
     pub resolution: FrameResolution,
+    #[serde(with = "Base64Standard")]
     pub jpeg: ByteBuf,
 }
 

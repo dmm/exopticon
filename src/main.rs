@@ -6,6 +6,8 @@
 extern crate actix;
 extern crate actix_web;
 extern crate askama;
+#[macro_use]
+extern crate base64_serde;
 extern crate bytes;
 extern crate chrono;
 extern crate dotenv;
@@ -24,6 +26,7 @@ extern crate failure;
 #[macro_use]
 extern crate log;
 extern crate mime_guess;
+extern crate rand;
 extern crate rmp;
 extern crate rmp_serde;
 #[macro_use]

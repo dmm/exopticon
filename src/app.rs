@@ -14,6 +14,7 @@ use crate::camera_routes::{
     create_camera, discover, fetch_all_cameras, fetch_camera, fetch_time, set_time, update_camera,
 };
 use crate::chrono::Duration;
+
 use crate::models::DbExecutor;
 use crate::static_routes;
 use crate::static_routes::{fetch_static_file, index};
