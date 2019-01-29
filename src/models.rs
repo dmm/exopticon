@@ -30,6 +30,7 @@ pub struct CameraGroup {
 }
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "camera_groups"]
 pub struct CreateCameraGroup {
     pub name: String,
@@ -38,6 +39,7 @@ pub struct CreateCameraGroup {
 }
 
 #[derive(AsChangeset, Debug, Deserialize, Identifiable, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "camera_groups"]
 pub struct UpdateCameraGroup {
     pub id: i32,
@@ -86,6 +88,7 @@ pub struct Camera {
 pub struct CameraGroupAndCameras(pub CameraGroup, pub Vec<Camera>);
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "cameras"]
 pub struct CreateCamera {
     pub camera_group_id: i32,
@@ -102,6 +105,7 @@ pub struct CreateCamera {
 }
 
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "cameras"]
 pub struct UpdateCamera {
     pub id: i32,
@@ -125,6 +129,7 @@ pub struct FetchCamera {
 pub struct FetchAllCamera {}
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OutputVideoUnit {
     pub id: i32,
     pub camera_id: i32,
@@ -137,6 +142,7 @@ pub struct OutputVideoUnit {
 }
 
 #[derive(Identifiable, Associations, Serialize, Queryable)]
+#[serde(rename_all = "camelCase")]
 #[belongs_to(Camera)]
 #[table_name = "video_units"]
 pub struct VideoUnit {
@@ -150,6 +156,7 @@ pub struct VideoUnit {
 }
 
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "video_units"]
 pub struct CreateVideoUnit {
     pub camera_id: i32,
@@ -159,6 +166,7 @@ pub struct CreateVideoUnit {
 }
 
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "video_units"]
 pub struct UpdateVideoUnit {
     pub id: i32,
@@ -178,6 +186,7 @@ pub struct FetchBetweenVideoUnit {
 }
 
 #[derive(Queryable, Associations, Identifiable, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "video_files"]
 #[belongs_to(VideoUnit)]
 pub struct VideoFile {
@@ -190,6 +199,7 @@ pub struct VideoFile {
 }
 
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "video_files"]
 pub struct CreateVideoFile {
     pub video_unit_id: i32,
@@ -198,6 +208,7 @@ pub struct CreateVideoFile {
 }
 
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "video_files"]
 pub struct UpdateVideoFile {
     pub id: i32,
@@ -233,6 +244,7 @@ pub struct DeleteVideoUnitFiles {
 pub struct FetchEmptyVideoFile;
 
 #[derive(Queryable, Associations, Identifiable, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
@@ -261,6 +273,7 @@ impl From<User> for SlimUser {
 }
 
 #[derive(Debug, Serialize, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
 #[table_name = "users"]
 pub struct CreateUser {
     pub username: String,
