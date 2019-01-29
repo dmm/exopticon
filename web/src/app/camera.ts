@@ -1,16 +1,17 @@
 
 export class Camera {
   id: number;
-  camera_group_id: number;
+  cameraGroupId: number;
+  name: string;
   ip: string;
-  onvif_port: number;
+  onvifPort: number;
   mac: string;
   username: string;
   password: string;
-  rtsp_url: string;
-  ptz_type: string;
-  ptz_profile_token: string;
+  rtspUrl: string;
+  ptzType: string;
+  ptzProfile_token: string;
   enabled: boolean;
-  inserted_at: string;
-  updated_at: string;
+  insertedAt: string;
+  updatedAt: string;
 }
