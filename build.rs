@@ -36,7 +36,10 @@ fn main() {
         assert!(Command::new("npm")
             .current_dir("web")
             .arg("run")
-            .arg("deploy")
+            .arg("ng")
+            .arg("build")
+            .arg("--")
+            .arg("--prod")
             .status()
             .expect("building web assets failed.")
             .success());
