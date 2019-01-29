@@ -43,6 +43,36 @@ pub fn get_js_file(req: HttpRequest<AppState>) -> HttpResponse {
     }
 }
 
+pub fn get_js_map_file(req: HttpRequest<AppState>) -> HttpResponse {
+    let filename: String = match req.match_info().query("scriptmap") {
+        Ok(t) => t,
+        Err(_e) => return HttpResponse::NotFound().body("js map file not found"),
+    };
+
+    let path = format!("{}.js.map", filename);
+    match Asset::get(&path) {
+        Some(content) => HttpResponse::Ok()
+            .content_type("application/octet-stream")
+            .body(Body::from_slice(content.as_ref())),
+        None => HttpResponse::NotFound().body("404 Not Found"),
+    }
+}
+
+pub fn get_css_file(req: HttpRequest<AppState>) -> HttpResponse {
+    let filename: String = match req.match_info().query("stylesheet") {
+        Ok(t) => t,
+        Err(_e) => return HttpResponse::NotFound().body("css file not found"),
+    };
+
+    let path = format!("{}.css", filename);
+    match Asset::get(&path) {
+        Some(content) => HttpResponse::Ok()
+            .content_type("text/css")
+            .body(Body::from_slice(content.as_ref())),
+        None => HttpResponse::NotFound().body("404 Not Found"),
+    }
+}
+
 #[derive(RustEmbed)]
 #[folder = "web/dist"]
 struct Asset;
