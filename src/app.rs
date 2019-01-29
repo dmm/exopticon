@@ -65,7 +65,11 @@ pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
             r.middleware(WebAuthMiddleware);
             r.method(Method::GET).with(index);
         })
-        .scope("/static/", |s| {
+        .resource("/{script}.js", |r| {
+            r.middleware(WebAuthMiddleware);
+            r.method(Method::GET).with(static_routes::get_js_file);
+        })
+        .scope("/static", |s| {
             s.middleware(WebAuthMiddleware)
                 .handler("/", fetch_static_file)
         })

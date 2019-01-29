@@ -21,7 +21,7 @@ export class VideoService {
       }
       url += "//" + loc.host;
       url += loc.pathname + "v1/ws_json";
-      url = 'ws://localhost:3000/v1/ws_json';
+      //      url = 'ws://localhost:3000/v1/ws_json';
     }
     if (!this.subject) {
       this.subject = webSocket(url);
