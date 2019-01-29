@@ -20,7 +20,7 @@ export class CameraPanelComponent implements OnInit {
     this.cameraService
       .getCameras()
       .subscribe(
-        cameras => (this.cameras = cameras),
+        cameras => (this.cameras = cameras.filter(c => c.enabled)),
         error => (this.error = error)
       )
   }

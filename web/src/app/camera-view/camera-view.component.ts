@@ -56,7 +56,6 @@ export class CameraViewComponent implements OnInit {
   }
 
   onInViewportChange(inViewport: boolean) {
-    console.log(`Viewport change for camera: ${this.camera.id} ${inViewport}`);
     this.inViewport = inViewport;
     if (inViewport) {
       this.activate();

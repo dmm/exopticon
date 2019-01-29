@@ -25,13 +25,13 @@ div.panel  div.wrapper > div.content {
 }
 
 @media screen and (min-width: 767px) {
-  .camera-panel .wrapper {
+  div.panel > div.wrapper {
     width: 100%;
   }
 }
 
 @media screen and (min-width: 980px) {
-  .camera-panel .wrapper {
+  div.panel > div.wrapper {
     width: 50%;
   }
 }
