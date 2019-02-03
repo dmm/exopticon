@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, Input } from '@angular/core';
+import { Component, ChangeDetectorRef, ElementRef, OnInit, Input } from '@angular/core';
 import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Observable, Subscription } from 'rxjs';
 
@@ -20,34 +20,53 @@ export class CameraViewComponent implements OnInit {
   private subscription?: Subscription;
   private img: HTMLImageElement;
   private inViewport: boolean;
+  private status: string;
 
-  constructor(private elementRef: ElementRef) { }
+  constructor(private elementRef: ElementRef, private cdr: ChangeDetectorRef) { }
 
   ngAfterContentInit() {
     this.img = this.elementRef.nativeElement.querySelector('img');
+    this.status = 'loading';
   }
 
   ngOnInit() {
+    this.status = 'paused';
+    this.inViewport = true;
+
     this.activate();
+  }
+
+  ngOnDestroy() {
+    this.deactivate();
   }
 
   @OnPageVisible()
   activate() {
     if (this.inViewport) {
       this.deactivate();
+      this.status = 'loading';
       this.frameService = this.videoService.getObservable(this.camera.id, 'SD');
-      this.subscription = this.frameService.subscribe((message) => {
-
-        if (this.img.complete) {
-          this.img.onerror = () => { console.log("error!"); };
-          this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
-        }
-      });
+      this.subscription = this.frameService.subscribe(
+        (message) => {
+          if (this.status !== 'active') {
+            this.status = 'active';
+            this.cdr.detectChanges(); // WTF?
+          }
+          if (this.img.complete) {
+            this.img.onerror = () => { console.log("error!"); };
+            this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
+          }
+        },
+        (error) => {
+          console.log(`Caught websocket error! ${error}`);
+        },
+      );
     }
   }
 
   @OnPageHidden()
   deactivate() {
+    this.status = 'paused';
     if (this.subscription) {
       this.subscription.unsubscribe();
       this.subscription = null;

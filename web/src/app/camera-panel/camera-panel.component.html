@@ -2,7 +2,8 @@
   <div class="wrapper"
        *ngFor="let camera of cameras"
        (mouseenter)="selectCameraView(camera.id)"
-       (mouseleave)="deselectCameraview">
+       (mouseleave)="deselectCameraview"
+       (touchstart)="handleTouch(camera.id)">
     <div class="camera-width"></div>
     <div class="content">
       <app-camera-view [camera]="camera"

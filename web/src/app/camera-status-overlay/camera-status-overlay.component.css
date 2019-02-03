@@ -1,0 +1,11 @@
+div {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+span {
+    background: black;
+    border-radius: 15px;
+    padding: 5px 10px 5px 10px;
+}

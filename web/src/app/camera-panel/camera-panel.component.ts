@@ -37,5 +37,4 @@ export class CameraPanelComponent implements OnInit {
   deselectCameraView() {
     this.selectedCameraId = null;
   }
-
 }
