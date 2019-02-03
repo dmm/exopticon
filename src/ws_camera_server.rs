@@ -117,7 +117,11 @@ impl WsCameraServer {
 
             for i in failed.iter() {
                 debug!("Send failed. Removing subscriber...");
-                self.subscriptions[pos].subscribers.remove(*i);
+                if i < &self.subscriptions[pos].subscribers.len() {
+                    self.subscriptions[pos].subscribers.remove(*i);
+                } else {
+                    error!("Weird out of bound subscription?");
+                }
             }
         }
     }
