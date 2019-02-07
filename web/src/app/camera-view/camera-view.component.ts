@@ -20,7 +20,7 @@ export class CameraViewComponent implements OnInit {
   private subscription?: Subscription;
   private img: HTMLImageElement;
   private inViewport: boolean;
-  private status: string;
+  public status: string;
 
   constructor(private elementRef: ElementRef, private cdr: ChangeDetectorRef) { }
 

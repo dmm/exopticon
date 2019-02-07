@@ -18,6 +18,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/cworkers/mpack_frame.h");
     println!("cargo:rerun-if-changed=src/cworkers/mpack.h");
     println!("cargo:rerun-if-changed=src/cworkers/timing.h");
+    println!("cargo:rerun-if-changed=web");
 
     assert!(Command::new("make")
         .current_dir("src/cworkers")
