@@ -1,15 +1,19 @@
 <div class="panel">
   <div class="wrapper"
        *ngFor="let camera of cameras"
-       (mouseenter)="selectCameraView(camera.id)"
-       (mouseleave)="deselectCameraview"
-       (touchstart)="handleTouch(camera.id)">
-    <div class="camera-width"></div>
-    <div class="content">
-      <app-camera-view [camera]="camera"
-                       [selected]="selectedCameraId === camera.id"
-                       [videoService]="videoService">
-      </app-camera-view>
-    </div>
+       (mouseover)="selectCameraView(camera.id); $event.stopPropogation();"
+       (mouseleave)="deselectCameraview; $event.stopPropogation();"
+       (touchstart)="onTouchStart(camera.id); $event.stopPropogation();"
+       (inViewportChange)="onInViewportChange($event, camera.id)"
+       snInViewport
+       [inViewportOptions]="{rootMargin: '-10% 0% -10% 0%'}">
+  <div class="camera-width"></div>
+  <div class="content">
+    <app-camera-view [camera]="camera"
+                     [selected]="selectedCameraId === camera.id"
+                     [videoService]="videoService"
+                     [active]="inViewCameraIds[camera.id] && pageVisible">
+    </app-camera-view>
+  </div>
   </div>
 </div>

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef, ElementRef, OnInit, Input } from '@angular/core';
+import { Component, ChangeDetectorRef, ElementRef, OnInit, Input, SimpleChanges } from '@angular/core';
 import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Observable, Subscription } from 'rxjs';
 
@@ -15,11 +15,11 @@ export class CameraViewComponent implements OnInit {
   @Input() camera: Camera;
   @Input() selected: boolean;
   @Input() videoService: VideoService;
+  @Input() active: boolean;
 
   private frameService?: Observable<FrameMessage>;
   private subscription?: Subscription;
   private img: HTMLImageElement;
-  private inViewport: boolean;
   public status: string;
 
   constructor(private elementRef: ElementRef, private cdr: ChangeDetectorRef) { }
@@ -31,8 +31,6 @@ export class CameraViewComponent implements OnInit {
 
   ngOnInit() {
     this.status = 'paused';
-    this.inViewport = true;
-
     this.activate();
   }
 
@@ -40,49 +38,46 @@ export class CameraViewComponent implements OnInit {
     this.deactivate();
   }
 
-  @OnPageVisible()
-  activate() {
-    if (this.inViewport) {
-      this.deactivate();
-      this.status = 'loading';
-      this.frameService = this.videoService.getObservable(this.camera.id, 'SD');
-      this.subscription = this.frameService.subscribe(
-        (message) => {
-          if (this.status !== 'active') {
-            this.status = 'active';
-            this.cdr.detectChanges(); // WTF?
-          }
-          if (this.img.complete) {
-            this.img.onerror = () => { console.log("error!"); };
-            this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
-          }
-        },
-        (error) => {
-          console.log(`Caught websocket error! ${error}`);
-        },
-      );
+  ngOnChanges(changeRecord: SimpleChanges) {
+    if (changeRecord.active !== undefined) {
+      console.log(changeRecord.active);
+      if (this.active) {
+        this.activate();
+      } else {
+        this.deactivate();
+      }
     }
   }
 
-  @OnPageHidden()
+  activate() {
+    //    this.deactivate();
+    this.status = 'loading';
+    this.frameService = this.videoService.getObservable(this.camera.id, 'SD');
+    this.subscription = this.frameService.subscribe(
+      (message) => {
+        if (this.status !== 'active') {
+          this.status = 'active';
+        }
+        if (this.img.complete && this.active) {
+          this.img.onerror = () => { console.log("error!"); };
+          this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
+        }
+      },
+      (error) => {
+        console.log(`Caught websocket error! ${error}`);
+      },
+    );
+  }
+
   deactivate() {
     this.status = 'paused';
+    this.cdr.detectChanges();
     if (this.subscription) {
       this.subscription.unsubscribe();
       this.subscription = null;
       this.frameService = null;
     }
   }
-
-  onInViewportChange(inViewport: boolean) {
-    this.inViewport = inViewport;
-    if (inViewport) {
-      this.activate();
-    } else {
-      this.deactivate();
-    }
-  }
-
 }
 
 
