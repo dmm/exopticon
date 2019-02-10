@@ -15,14 +15,11 @@ export class CameraPanelComponent implements OnInit {
   error: any;
   selectedCameraId?: number;
   overlayDisabledId?: number;
-  inViewCameraIds: boolean[];
   pageVisible: boolean;
 
   constructor(private cameraService: CameraService,
     private videoService: VideoService,
     private cdr: ChangeDetectorRef) {
-    this.inViewCameraIds = [];
-
   }
 
   getCameras(): void {
@@ -31,12 +28,11 @@ export class CameraPanelComponent implements OnInit {
       .subscribe(
         cameras => {
           this.cameras = cameras.filter(c => c.enabled);
-          this.cameras.forEach((c) => {
-            this.inViewCameraIds.push(false);
-          });
         }
         ,
-        error => (this.error = error)
+        () => {
+          window.location.pathname = '/login';
+        }
       )
   }
 
@@ -46,9 +42,9 @@ export class CameraPanelComponent implements OnInit {
     this.videoService.connect();
   }
 
-  selectCameraView(i: number) {
-    if (i !== this.overlayDisabledId) {
-      this.selectedCameraId = i;
+  selectCameraView(cameraIndex: number) {
+    if (cameraIndex !== this.overlayDisabledId) {
+      this.selectedCameraId = cameraIndex;
     }
   }
 
@@ -56,23 +52,20 @@ export class CameraPanelComponent implements OnInit {
     this.selectedCameraId = null;
   }
 
-  onTouchStart(cameraId: number) {
-    if (this.selectedCameraId === cameraId) {
+  onTouchStart(cameraIndex: number) {
+    if (this.selectedCameraId === cameraIndex) {
       this.selectedCameraId = null;
-      this.overlayDisabledId = cameraId;
+      this.overlayDisabledId = cameraIndex;
     } else {
-      this.selectedCameraId = cameraId;
+      this.selectedCameraId = cameraIndex;
       this.overlayDisabledId = null;
     }
-  }
-
-  onInViewportChange(inViewport: boolean, cameraId: number) {
-    this.inViewCameraIds[cameraId] = inViewport;
   }
 
   @OnPageVisible()
   onPageVisible() {
     this.pageVisible = true;
+    this.getCameras();
     this.cdr.detectChanges();
   }
 

@@ -1,5 +1,5 @@
-import { Component, ChangeDetectorRef, ElementRef, OnInit, Input, SimpleChanges } from '@angular/core';
-
+import { Component, ChangeDetectorRef, ElementRef, OnInit, Input, NgZone } from '@angular/core';
+import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Observable, Subscription } from 'rxjs';
 
 import { Camera } from '../camera';
@@ -21,40 +21,47 @@ export class CameraViewComponent implements OnInit {
   private subscription?: Subscription;
   private img: HTMLImageElement;
   public status: string;
+  private visible: boolean;
 
-  constructor(private elementRef: ElementRef, private cdr: ChangeDetectorRef) { }
+  constructor(private elementRef: ElementRef, private ngZone: NgZone) {
+    this.status = 'paused';
+  }
+
+  ngOnInit() { }
 
   ngAfterContentInit() {
     this.img = this.elementRef.nativeElement.querySelector('img');
-    this.status = 'loading';
-  }
 
-  ngOnInit() {
-    this.status = 'paused';
   }
 
   ngOnDestroy() {
     this.deactivate();
   }
 
-  ngOnChanges(changeRecord: SimpleChanges) {
-    if (changeRecord.active !== undefined) {
-      if (this.active) {
-        this.activate();
-      } else {
-        this.deactivate();
-      }
+  ngDoCheck() {
+  }
+
+  @OnPageVisible()
+  onPageVisible() {
+    if (this.visible && this.active) {
+      this.activate();
     }
+  }
+
+  @OnPageHidden()
+  onPageHidden() {
+    this.deactivate();
   }
 
   activate() {
     this.status = 'loading';
+    this.deactivate();
     this.frameService = this.videoService.getObservable(this.camera.id, 'SD');
     this.subscription = this.frameService.subscribe(
       (message) => {
         if (this.status !== 'active') {
-          this.status = 'active';
-          this.cdr.detectChanges();
+          this.ngZone.run(() => this.status = 'active');;
+
         }
         if (this.img.complete && this.active) {
           this.img.onerror = () => { console.log("error!"); };
@@ -72,8 +79,18 @@ export class CameraViewComponent implements OnInit {
 
     if (this.subscription) {
       this.subscription.unsubscribe();
-      this.subscription = null;
-      this.frameService = null;
+      this.subscription = undefined;
+      this.frameService = undefined;
+    }
+  }
+
+  onInViewportChange(inViewport: boolean) {
+    this.visible = inViewport;
+    if (this.visible && this.active && this.subscription === undefined) {
+      this.activate();
+    }
+    if (!inViewport) {
+      this.deactivate();
     }
   }
 }
