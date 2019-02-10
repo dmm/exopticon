@@ -1,18 +1,10 @@
 .top-menu {
   font-weight: bold;
   height: 36px;
-  background-color: #040;
 }
 
 div.logo {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 35px;
-  width: 173px;
-  background: #0F0;
-
-
 }
 
 div.logo img {
