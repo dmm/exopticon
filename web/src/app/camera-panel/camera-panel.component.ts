@@ -68,8 +68,6 @@ export class CameraPanelComponent implements OnInit {
 
   onInViewportChange(inViewport: boolean, cameraId: number) {
     this.inViewCameraIds[cameraId] = inViewport;
-
-    console.log(`PanelViewport: ${inViewport} ${cameraId}`);
   }
 
   @OnPageVisible()

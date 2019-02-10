@@ -1,5 +1,5 @@
 import { Component, ChangeDetectorRef, ElementRef, OnInit, Input, SimpleChanges } from '@angular/core';
-import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
+
 import { Observable, Subscription } from 'rxjs';
 
 import { Camera } from '../camera';
@@ -31,7 +31,6 @@ export class CameraViewComponent implements OnInit {
 
   ngOnInit() {
     this.status = 'paused';
-    this.activate();
   }
 
   ngOnDestroy() {
@@ -40,7 +39,6 @@ export class CameraViewComponent implements OnInit {
 
   ngOnChanges(changeRecord: SimpleChanges) {
     if (changeRecord.active !== undefined) {
-      console.log(changeRecord.active);
       if (this.active) {
         this.activate();
       } else {
@@ -50,13 +48,13 @@ export class CameraViewComponent implements OnInit {
   }
 
   activate() {
-    //    this.deactivate();
     this.status = 'loading';
     this.frameService = this.videoService.getObservable(this.camera.id, 'SD');
     this.subscription = this.frameService.subscribe(
       (message) => {
         if (this.status !== 'active') {
           this.status = 'active';
+          this.cdr.detectChanges();
         }
         if (this.img.complete && this.active) {
           this.img.onerror = () => { console.log("error!"); };
@@ -71,7 +69,7 @@ export class CameraViewComponent implements OnInit {
 
   deactivate() {
     this.status = 'paused';
-    this.cdr.detectChanges();
+
     if (this.subscription) {
       this.subscription.unsubscribe();
       this.subscription = null;
