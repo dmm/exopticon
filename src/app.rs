@@ -39,7 +39,6 @@ pub fn ws_json_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error>
 
 // helper function to create and returns the app after mounting all routes/resources
 pub fn create_app(db: Addr<DbExecutor>, secret: &String) -> App<AppState> {
-    println!("SECRET KEY: {}", secret);
     App::with_state(AppState { db })
         // setup builtin logger to get nice logging for each request
         .middleware(Logger::default())
