@@ -62,17 +62,4 @@ export class CameraPanelComponent implements OnInit {
     }
   }
 
-  @OnPageVisible()
-  onPageVisible() {
-    this.pageVisible = true;
-    this.getCameras();
-    this.cdr.detectChanges();
-  }
-
-  @OnPageHidden()
-  onPageHidden() {
-    this.pageVisible = false;
-    this.cdr.detectChanges();
-  }
-
 }

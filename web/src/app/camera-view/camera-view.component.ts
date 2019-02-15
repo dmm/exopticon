@@ -15,7 +15,6 @@ export class CameraViewComponent implements OnInit {
   @Input() camera: Camera;
   @Input() selected: boolean;
   @Input() videoService: VideoService;
-  @Input() active: boolean;
 
   private frameService?: Observable<FrameMessage>;
   private subscription?: Subscription;
@@ -38,32 +37,39 @@ export class CameraViewComponent implements OnInit {
     this.deactivate();
   }
 
-  ngDoCheck() {
-  }
-
   @OnPageVisible()
   onPageVisible() {
-    if (this.visible && this.active) {
-      this.activate();
-    }
+    this.ngZone.run(() => {
+      if (this.visible) {
+        this.activate();
+      }
+    });
   }
+
 
   @OnPageHidden()
   onPageHidden() {
-    this.deactivate();
+    this.ngZone.run(() => {
+      this.deactivate();
+    });
   }
 
   activate() {
     this.status = 'loading';
-    this.deactivate();
+
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+      this.subscription = undefined;
+      this.frameService = undefined;
+    }
+
     this.frameService = this.videoService.getObservable(this.camera.id, 'SD');
     this.subscription = this.frameService.subscribe(
       (message) => {
         if (this.status !== 'active') {
-          this.ngZone.run(() => this.status = 'active');;
-
+          this.status = 'active';
         }
-        if (this.img.complete && this.active) {
+        if (this.img.complete && this.visible) {
           this.img.onerror = () => { console.log("error!"); };
           this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
         }
@@ -86,7 +92,7 @@ export class CameraViewComponent implements OnInit {
 
   onInViewportChange(inViewport: boolean) {
     this.visible = inViewport;
-    if (this.visible && this.active && this.subscription === undefined) {
+    if (this.visible && this.subscription === undefined) {
       this.activate();
     }
     if (!inViewport) {
