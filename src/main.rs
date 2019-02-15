@@ -6,6 +6,7 @@
 extern crate actix;
 extern crate actix_web;
 extern crate askama;
+extern crate base64;
 #[macro_use]
 extern crate base64_serde;
 extern crate bytes;
@@ -65,6 +66,8 @@ mod ws_session;
 use crate::models::DbExecutor;
 use actix::prelude::*;
 use actix_web::server;
+use base64::encode;
+use rand::Rng;
 use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
@@ -145,8 +148,10 @@ fn main() {
 
     let db_address = address.clone();
     let setup_address = address.clone();
+    // secret is a random 32 character long base 64 string
+    let secret: String = env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 24]>()));
 
-    server::new(move || app::create_app(address.clone()))
+    server::new(move || app::create_app(address.clone(), &secret))
         .bind("0.0.0.0:3000")
         .expect("Can not bind to '0.0.0.0:3000'")
         .start();

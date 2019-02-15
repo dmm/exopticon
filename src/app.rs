@@ -6,6 +6,7 @@ use crate::actix_web::middleware::identity::{CookieIdentityPolicy, IdentityServi
 use crate::actix_web::{
     http::Method, middleware::Logger, ws, App, Error, HttpRequest, HttpResponse,
 };
+
 use crate::auth_routes::{login, logout, AuthMiddleware, WebAuthMiddleware};
 use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
@@ -37,10 +38,8 @@ pub fn ws_json_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error>
 }
 
 // helper function to create and returns the app after mounting all routes/resources
-pub fn create_app(db: Addr<DbExecutor>) -> App<AppState> {
-    // secret is a random 32 character long base 64 string
-    let secret: String = env::var("SECRET_KEY").unwrap_or_else(|_| "0".repeat(32));
-
+pub fn create_app(db: Addr<DbExecutor>, secret: &String) -> App<AppState> {
+    println!("SECRET KEY: {}", secret);
     App::with_state(AppState { db })
         // setup builtin logger to get nice logging for each request
         .middleware(Logger::default())
