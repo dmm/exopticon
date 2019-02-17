@@ -1,5 +1,4 @@
 import { Component, ChangeDetectorRef, OnInit, Input } from '@angular/core';
-import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 
 import { Camera } from '../camera';
 import { CameraService } from '../camera.service';

@@ -1,5 +1,4 @@
 // app.rs
-use std::env;
 
 use crate::actix::prelude::*;
 use crate::actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};

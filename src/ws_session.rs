@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::actix::prelude::*;
 use actix_web::ws;
 use rmp::encode::{write_map_len, write_str, ValueWriteError};
@@ -8,9 +10,8 @@ use serde;
 use serde::Serialize;
 use serde_bytes::ByteBuf;
 use serde_json;
-use std::io::Write;
 
-use base64::{STANDARD_NO_PAD};
+use base64::STANDARD_NO_PAD;
 
 use crate::app::AppState;
 use crate::ws_camera_server::{
@@ -23,8 +24,6 @@ pub enum WsSerialization {
 }
 
 base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
-
-
 
 /// A command from the client, transported over the websocket
 /// connection
@@ -53,13 +52,46 @@ pub struct WsSession {
     /// True when the websocket is ready to send
     pub ready: bool,
     pub serialization: WsSerialization,
+    pub window_size: u32,
+    pub live_frames: u32,
 }
-
 impl WsSession {
     pub fn new(serialization: WsSerialization) -> WsSession {
         WsSession {
             ready: true,
             serialization: serialization,
+            window_size: 1,
+            live_frames: 0,
+        }
+    }
+
+    fn ready_to_send(&self) -> bool {
+        return self.live_frames < self.window_size && self.ready;
+    }
+
+    fn ack(&mut self) {
+        self.live_frames = self.live_frames - 1;
+
+        if self.live_frames < self.window_size && self.window_size < 10 {
+            self.window_size = self.window_size + 1;
+        }
+    }
+
+    fn adjust_window(&mut self) {
+        if self.live_frames == self.window_size {
+            self.window_size = self.window_size / 2;
+        }
+
+        if self.live_frames < self.window_size {
+            self.window_size = self.window_size + 1;
+        }
+
+        if self.window_size <= 0 {
+            self.window_size = 1;
+        }
+
+        if self.window_size > 10 {
+            self.window_size = 10;
         }
     }
 }
@@ -93,8 +125,9 @@ impl VariantWriter for StructMapWriter {
 impl Handler<CameraFrame> for WsSession {
     type Result = ();
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
-        if !self.ready {
+        if !self.ready_to_send() {
             debug!("Dropping frame!");
+            self.adjust_window();
             return;
         }
         // wait for buffer to drain before sending another
@@ -121,6 +154,9 @@ impl Handler<CameraFrame> for WsSession {
             ),
         };
 
+        // add live frame
+        self.live_frames = self.live_frames + 1;
+
         // spawn drain future
         ctx.spawn(fut);
     }
@@ -130,7 +166,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Text(text) => {
-                debug!("Got text {}: ", text);
                 let cmd: Result<WsCommand, serde_json::Error> = serde_json::from_str(&text);
                 match cmd {
                     Ok(c) => match c.command.as_ref() {
@@ -151,6 +186,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                                     resolution: c.resolution.clone(),
                                 });
                             }
+                        }
+                        "ack" => {
+                            debug!(
+                                "window_size: {}, live_size: {}",
+                                self.window_size, self.live_frames
+                            );
+                            self.ack();
                         }
                         _ => {}
                     },
