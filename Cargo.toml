@@ -11,6 +11,11 @@ edition = "2018"
 opt-level = 2
 debug = true
 
+[profile.release]
+lto = true
+opt-level = 3
+panic = "abort"
+
 [dependencies]
 onvif = { path = "onvif" }
 actix = "0.7"
