@@ -18,8 +18,13 @@ use crate::ws_camera_server::{
     CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer,
 };
 
+/// Represents different serializations available for communicating
+/// over websockets.
 pub enum WsSerialization {
+    /// MessagePack Serialization
     MsgPack,
+
+    /// Json Serialization
     Json,
 }
 
@@ -31,18 +36,27 @@ base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
 struct WsCommand {
     /// command type
     command: String,
+
     /// selected frame resolution
     resolution: FrameResolution,
+
     /// affected camera ids
     #[serde(rename = "cameraIds")]
     camera_ids: Vec<i32>,
 }
 
+/// A frame of video from a camera stream. This struct is used to
+/// deliver a frame to the browser over the websocket connection.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RawCameraFrame {
+    /// Camera id
     pub camera_id: i32,
+
+    /// Frame resolution
     pub resolution: FrameResolution,
+
+    /// Frame image encoded as jpeg
     #[serde(with = "Base64Standard")]
     pub jpeg: ByteBuf,
 }
@@ -51,13 +65,26 @@ struct RawCameraFrame {
 pub struct WsSession {
     /// True when the websocket is ready to send
     pub ready: bool,
+
+    /// Serialization to use for this socket
     pub serialization: WsSerialization,
+
+    /// Maximum number of frames to have in flight
     pub window_size: u32,
+
+    /// Current number of frames in flight
     pub live_frames: u32,
 }
 impl WsSession {
-    pub fn new(serialization: WsSerialization) -> WsSession {
-        WsSession {
+    /// Returns new WsSession struct initialized with default values
+    /// and specified serialization type
+    ///
+    /// # Arguments
+    ///
+    /// * `serialization` - Type of serialization to use MsgPack or Json
+    ///
+    pub fn new(serialization: WsSerialization) -> Self {
+        Self {
             ready: true,
             serialization: serialization,
             window_size: 1,
@@ -65,10 +92,13 @@ impl WsSession {
         }
     }
 
+    /// Returns true if session can send another frame.
     fn ready_to_send(&self) -> bool {
         return self.live_frames < self.window_size && self.ready;
     }
 
+    /// Modifies send window, intended to be called when acking a
+    /// frame.
     fn ack(&mut self) {
         self.live_frames -= 1;
 
@@ -77,6 +107,7 @@ impl WsSession {
         }
     }
 
+    /// Examines the current window state and adjusts window size.
     fn adjust_window(&mut self) {
         if self.live_frames == self.window_size {
             self.window_size /= 2;
