@@ -1,7 +1,17 @@
 // main.rs
+
 // to avoid the warning from diesel macros
 #![allow(proc_macro_derive_resolution_fallback)]
-#![warn(clippy::all, clippy::restriction, clippy::pedantic, clippy::cargo)]
+#![warn(
+    clippy::all,
+    clippy::restriction,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo
+)]
+#![allow(clippy::integer_arithmetic)]
+#![allow(clippy::missing_inline_in_public_items)]
+#![allow(clippy::multiple_crate_versions)]
 
 extern crate actix;
 extern crate actix_web;
@@ -67,15 +77,24 @@ use crate::models::DbExecutor;
 use actix::prelude::*;
 use actix_web::server;
 use base64::encode;
-use rand::Rng;
 use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
+use rand::Rng;
 use std::env;
 
 use crate::models::{CreateCameraGroup, CreateUser};
 use crate::root_supervisor::{ExopticonMode, RootSupervisor};
 
+/// Interactively prompts the operator and adds a new user with the
+/// details provided. This is for bootstrapping users on a new
+/// install. It should be run before the main system is started.
+///
+/// # Arguments
+///
+/// * `sys` - The actix system runner
+/// * `address` - The address of the DbExecutor
+///
 fn add_user(
     sys: &mut actix::SystemRunner,
     address: &Addr<DbExecutor>,
@@ -104,6 +123,15 @@ fn add_user(
     Ok(true)
 }
 
+/// Adds a camera group. This is really only for setting up initial
+/// camera groups for boostrapping.. It should be run before the full
+/// system is started.
+///
+/// # Arguments
+///
+/// * `sys` - The actix system runner
+/// * `address` - The address of the DbExecutor
+///
 fn add_camera_group(
     sys: &mut actix::SystemRunner,
     address: &Addr<DbExecutor>,
@@ -149,7 +177,8 @@ fn main() {
     let db_address = address.clone();
     let setup_address = address.clone();
     // secret is a random 32 character long base 64 string
-    let secret: String = env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 24]>()));
+    let secret: String =
+        env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 24]>()));
 
     server::new(move || app::create_app(address.clone(), &secret))
         .bind("0.0.0.0:3000")
@@ -181,22 +210,16 @@ fn main() {
     root_supervisor.start();
 
     if add_user_flag {
-        match add_user(&mut sys, &setup_address) {
-            Err(_) => {
-                println!("Error creating user!");
-                return;
-            }
-            _ => (),
+        if add_user(&mut sys, &setup_address).is_err() {
+            println!("Error creating user!");
+            return;
         }
     }
 
     if add_camera_group_flag {
-        match add_camera_group(&mut sys, &setup_address) {
-            Err(_) => {
-                println!("Error creating camera group!");
-                return;
-            }
-            _ => (),
+        if add_camera_group(&mut sys, &setup_address).is_err() {
+            println!("Error creating camera group!");
+            return;
         }
     }
 

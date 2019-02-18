@@ -155,7 +155,7 @@ impl Handler<CameraFrame> for WsSession {
         };
 
         // add live frame
-        self.live_frames = self.live_frames + 1;
+        self.live_frames += 1;
 
         // spawn drain future
         ctx.spawn(fut);
