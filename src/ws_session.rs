@@ -70,23 +70,23 @@ impl WsSession {
     }
 
     fn ack(&mut self) {
-        self.live_frames = self.live_frames - 1;
+        self.live_frames -= 1;
 
         if self.live_frames < self.window_size && self.window_size < 10 {
-            self.window_size = self.window_size + 1;
+            self.window_size += 1;
         }
     }
 
     fn adjust_window(&mut self) {
         if self.live_frames == self.window_size {
-            self.window_size = self.window_size / 2;
+            self.window_size /= 2;
         }
 
         if self.live_frames < self.window_size {
-            self.window_size = self.window_size + 1;
+            self.window_size += 1;
         }
 
-        if self.window_size <= 0 {
+        if self.window_size == 0 {
             self.window_size = 1;
         }
 
