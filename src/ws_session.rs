@@ -157,7 +157,6 @@ impl Handler<CameraFrame> for WsSession {
     type Result = ();
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
         if !self.ready_to_send() {
-            debug!("Dropping frame!");
             self.adjust_window();
             return;
         }
@@ -219,10 +218,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             }
                         }
                         "ack" => {
-                            debug!(
-                                "window_size: {}, live_size: {}",
-                                self.window_size, self.live_frames
-                            );
                             self.ack();
                         }
                         _ => {}
