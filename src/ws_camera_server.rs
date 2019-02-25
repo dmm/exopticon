@@ -1,126 +1,139 @@
+use std::collections::{HashMap, HashSet};
+
 use crate::actix::prelude::*;
 
-//use std::collections::HashMap;
-//use std::mem;
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+/// Available frame types
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 #[serde(tag = "type")]
 pub enum FrameResolution {
+    /// Standard definition frame, 480p
     SD,
+    /// High definition frame, camera native resolution
     HD,
 }
 
+/// An actor address that can receive CameraFrame messages
 type Client = Recipient<CameraFrame>;
 
 // MESSAGES
+/// Represents a frame of video
 #[derive(Clone, Message, Serialize)]
 pub struct CameraFrame {
+    /// id of camera that produced frame
     pub camera_id: i32,
+    /// jpeg image data
     pub jpeg: Vec<u8>,
+    /// resolution of frame
     pub resolution: FrameResolution,
 }
 
+/// subscribe message
 #[derive(Clone, Message)]
 pub struct Subscribe {
+    /// camera id
     pub camera_id: i32,
+    /// address of WsSession to send frames
     pub client: Client,
+    /// resolution specifier
     pub resolution: FrameResolution,
 }
 
+/// Unsubscribe message
 #[derive(Clone, Message)]
 pub struct Unsubscribe {
+    /// camera id
     pub camera_id: i32,
+    /// Address of WsSession to stop sending frames
     pub client: Client,
+    /// resolution specifier
     pub resolution: FrameResolution,
 }
 
 // Server definitions
 
-struct CameraSubscription {
+/// Type of camera frames
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct FrameType {
+    /// Camera id, identifies source of frame
     pub camera_id: i32,
-    pub subscribers: Vec<(Client, FrameResolution)>,
+    /// Represents resolution of frame
+    pub resolution: FrameResolution,
 }
 
+/// Represents the WsCameraServer actor
 #[derive(Default)]
 pub struct WsCameraServer {
-    subscriptions: Vec<CameraSubscription>,
+    /// Collection of Client's subscribed to a particular FrameType
+    subscriptions: HashMap<FrameType, HashSet<Client>>,
 }
 
 impl WsCameraServer {
-    fn add_subscriber(&mut self, camera_id: i32, client: Client, resolution: FrameResolution) {
+    /// Add WsSession subscriber
+    fn add_subscriber(
+        &mut self,
+        camera_id: i32,
+        client: Client,
+        resolution: FrameResolution,
+    ) -> bool {
         // Try to find CameraSubscription for camera_id
-        let pos = self
-            .subscriptions
-            .iter()
-            .position(|s| s.camera_id == camera_id);
-
-        let pos = match pos {
-            Some(p) => p,
-            None => {
-                self.subscriptions.push(CameraSubscription {
-                    camera_id: camera_id,
-                    subscribers: Vec::new(),
-                });
-                self.subscriptions.len() - 1
-            }
+        let frame_type = FrameType {
+            camera_id: camera_id,
+            resolution: resolution,
         };
 
-        let client_pos = self.subscriptions[pos]
-            .subscribers
-            .iter()
-            .position(|(c, r)| *c == client && *r == resolution);
-
-        match client_pos {
-            Some(_c) => {
-                // client is already subscribed, do nothing
-            }
-            None => {
-                self.subscriptions[pos]
-                    .subscribers
-                    .push((client, resolution));
-            }
-        };
-    }
-
-    fn remove_subscriber(&mut self, camera_id: i32, client: Client, resolution: FrameResolution) {
-        if let Some(pos) = self
-            .subscriptions
-            .iter()
-            .position(|ref s| s.camera_id == camera_id)
-        {
-            debug!("Couldn't find the subscription camera...");
-            if let Some(client_pos) = self.subscriptions[pos]
-                .subscribers
-                .iter()
-                .position(|(c, r)| *c == client && *r == resolution)
-            {
-                debug!("Removing subscriber... {} {:?}", camera_id, resolution);
-                self.subscriptions[pos].subscribers.remove(client_pos);
-            }
+        if let Some(subscription) = self.subscriptions.get_mut(&frame_type) {
+            subscription.insert(client)
+        } else {
+            self.subscriptions
+                .insert(frame_type.clone(), HashSet::new());
+            self.subscriptions
+                .get_mut(&frame_type)
+                .expect("The subscriptions HashSet we just inserted is missing.")
+                .insert(client)
         }
     }
 
-    fn send_frame(&mut self, frame: CameraFrame) {
-        let mut failed = Vec::new();
-
-        if let Some(pos) = self
-            .subscriptions
-            .iter()
-            .position(|ref s| s.camera_id == frame.camera_id)
-        {
-            for (i, (client, resolution)) in self.subscriptions[pos].subscribers.iter().enumerate()
-            {
-                if *resolution == frame.resolution && !client.do_send(frame.to_owned()).is_ok() {
-                    failed.push(i);
-                }
+    /// Removes WsSession as subscriber
+    fn remove_subscriber(&mut self, camera_id: i32, client: &Client, resolution: &FrameResolution) {
+        let frame_type = FrameType {
+            camera_id: camera_id,
+            resolution: resolution.clone(),
+        };
+        if let Some(subscription) = self.subscriptions.get_mut(&frame_type) {
+            if subscription.remove(client) {
+                debug!("Removing subscriber... {}", camera_id);
+            } else {
+                debug!("Couldn't find the subscription camera...");
             }
+        } else {
+            return;
+        }
+    }
 
-            for i in failed.iter() {
-                debug!("Send failed. Removing subscriber...");
-                if i < &self.subscriptions[pos].subscribers.len() {
-                    self.subscriptions[pos].subscribers.remove(*i);
-                } else {
-                    error!("Weird out of bound subscription?");
+    /// Sends frame to subscribed WsSessions
+    ///
+    /// # Arguments
+    ///
+    /// * `frame` - CameraFrame to send
+    /// * `ctx` - WsCameraServer Context
+    ///
+    fn send_frame(&mut self, frame: &CameraFrame, ctx: &<Self as Actor>::Context) {
+        let frame_type = FrameType {
+            camera_id: frame.camera_id,
+            resolution: frame.resolution.clone(),
+        };
+        if let Some(subscription) = self.subscriptions.get(&frame_type) {
+            for client in subscription.iter() {
+                if client.do_send(frame.to_owned()).is_err() {
+                    debug!(
+                        "Send failed for {} {:?}",
+                        &frame.camera_id, &frame.resolution
+                    );
+                    ctx.address().do_send(Unsubscribe {
+                        camera_id: frame.camera_id,
+                        resolution: frame.resolution.clone(),
+                        client: client.clone(),
+                    });
                 }
             }
         }
@@ -148,15 +161,15 @@ impl Handler<Unsubscribe> for WsCameraServer {
 
     fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) -> Self::Result {
         debug!("Message: Unsubscribe");
-        self.remove_subscriber(msg.camera_id, msg.client, msg.resolution);
+        self.remove_subscriber(msg.camera_id, &msg.client, &msg.resolution);
     }
 }
 
 impl Handler<CameraFrame> for WsCameraServer {
     type Result = ();
 
-    fn handle(&mut self, msg: CameraFrame, _ctx: &mut Self::Context) -> Self::Result {
-        self.send_frame(msg);
+    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
+        self.send_frame(&msg, ctx);
     }
 }
 
