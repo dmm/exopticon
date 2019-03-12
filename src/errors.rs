@@ -1,14 +1,18 @@
 // errors.rs
 use actix_web::{error::ResponseError, HttpResponse};
 
+/// Enum of service errors
 #[derive(Fail, Debug)]
 pub enum ServiceError {
+    /// Internal server error
     #[fail(display = "Internal Server Error")]
     InternalServerError,
 
+    /// Bad Request
     #[fail(display = "BadRequest: {}", _0)]
     BadRequest(String),
 
+    /// Resource Not Found
     #[fail(display = "Not Found")]
     NotFound,
 }

@@ -1,3 +1,6 @@
+// clippy doesn't like the base64_serde_type macro
+#![allow(clippy::empty_enum)]
+
 use std::io::Write;
 
 use crate::actix::prelude::*;
@@ -13,7 +16,7 @@ use serde_json;
 
 use base64::STANDARD_NO_PAD;
 
-use crate::app::AppState;
+use crate::app::RouteState;
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer,
 };
@@ -86,7 +89,7 @@ impl WsSession {
     pub fn new(serialization: WsSerialization) -> Self {
         Self {
             ready: true,
-            serialization: serialization,
+            serialization,
             window_size: 1,
             live_frames: 0,
         }
@@ -94,7 +97,7 @@ impl WsSession {
 
     /// Returns true if session can send another frame.
     fn ready_to_send(&self) -> bool {
-        return self.live_frames < self.window_size && self.ready;
+        self.live_frames < self.window_size && self.ready
     }
 
     /// Modifies send window, intended to be called when acking a
@@ -128,7 +131,7 @@ impl WsSession {
 }
 
 impl Actor for WsSession {
-    type Context = ws::WebsocketContext<Self, AppState>;
+    type Context = ws::WebsocketContext<Self, RouteState>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
         debug!("Starting websocket!");
@@ -140,7 +143,7 @@ impl Actor for WsSession {
     }
 }
 
-/// An empty struct to implement VariantWriter so we can serialize frames as structs/maps.
+/// An empty struct to implement `VariantWriter` so we can serialize frames as structs/maps.
 struct StructMapWriter;
 
 impl VariantWriter for StructMapWriter {

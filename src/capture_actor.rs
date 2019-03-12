@@ -17,64 +17,84 @@ use tokio_process::CommandExt;
 use crate::models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, WsCameraServer};
 
+/// Holds messages from capture worker
 #[derive(Default, Debug, PartialEq, Deserialize, Serialize)]
 struct CaptureMessage {
+    /// type of worker message
     #[serde(rename = "type")]
     #[serde(default)]
     pub message_type: String,
 
+    /// if message is a log, the log level
     #[serde(default)]
     pub level: String,
 
+    /// if the message is a log, the log message
     #[serde(default)]
     pub message: String,
 
+    /// if the message is a frame, the jpeg frame
     #[serde(rename = "jpegFrame")]
     #[serde(default)]
     #[serde(with = "serde_bytes")]
     pub jpeg: Vec<u8>,
 
+    /// if the message is a frame, the sd scaled jpeg frame
     #[serde(rename = "jpegFrameScaled")]
     #[serde(default)]
     #[serde(with = "serde_bytes")]
     pub scaled_jpeg: Vec<u8>,
 
+    /// if message is a frame, the offset from the beginning of file
     #[serde(default)]
     pub offset: i64,
 
+    ///
     #[serde(default)]
     pub height: i32,
 
+    /// if message is a new file, the created file name
     #[serde(default)]
     pub filename: String,
 
+    /// if message is a new file, the file creation time
     #[serde(rename = "beginTime")]
     #[serde(default)]
     pub begin_time: String,
 
+    /// if the message is a closed file, the file end time
     #[serde(rename = "endTime")]
     #[serde(default)]
     pub end_time: String,
 }
 
+/// Holds state of capture actor
 pub struct CaptureActor {
+    /// id of camera actor is capturing video for
     pub camera_id: i32,
+    /// url of video stream
     pub stream_url: String,
+    /// absolute path to video storage
     pub storage_path: String,
+    /// address of database worker
     pub db_addr: Addr<DbExecutor>,
+    /// id of currently open video unit
     pub video_unit_id: Option<i32>,
+    /// id of currently open video file
     pub video_file_id: Option<i32>,
+    /// filename currently being captured
     pub filename: Option<String>,
 }
 
 impl CaptureActor {
+    /// Returns new initialized CaptureActor
     pub fn new(
         db_addr: Addr<DbExecutor>,
         camera_id: i32,
         stream_url: String,
         storage_path: String,
-    ) -> CaptureActor {
-        CaptureActor {
+    ) -> Self {
+        Self {
             camera_id,
             stream_url,
             storage_path,
@@ -84,21 +104,20 @@ impl CaptureActor {
             filename: None,
         }
     }
-    fn close_file(
-        &self,
-        ctx: &mut Context<CaptureActor>,
-        filename: &String,
-        end_time: DateTime<Utc>,
-    ) {
+
+    /// Called when the underlying capture worker signals the file as
+    /// closed. The database record is updated
+    #[allow(clippy::cast_possible_truncation)]
+    fn close_file(&self, ctx: &mut Context<Self>, filename: &str, end_time: DateTime<Utc>) {
         if let (Some(video_unit_id), Some(video_file_id), Ok(metadata)) = (
             self.video_unit_id,
             self.video_file_id,
             fs::metadata(filename),
         ) {
             let fut = self.db_addr.send(UpdateVideoUnitFile {
-                video_unit_id: video_unit_id,
+                video_unit_id,
                 end_time: end_time.naive_utc(),
-                video_file_id: video_file_id,
+                video_file_id,
                 size: metadata.len() as i32,
             });
             ctx.spawn(
@@ -116,7 +135,9 @@ impl CaptureActor {
         }
     }
 
-    fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<CaptureActor>) {
+    /// Processes a `CaptureMessage` from the capture worker,
+    /// performing the appropriate action.
+    fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<Self>) {
         // Check if log
         match msg.message_type.as_str() {
             "log" => debug!("Worker log message: {}", msg.message),
@@ -186,7 +207,7 @@ impl CaptureActor {
 }
 
 impl StreamHandler<BytesMut, std::io::Error> for CaptureActor {
-    fn handle(&mut self, item: BytesMut, ctx: &mut Context<CaptureActor>) {
+    fn handle(&mut self, item: BytesMut, ctx: &mut Context<Self>) {
         let mut de = Deserializer::new(&item[..]);
 
         let frame: Result<CaptureMessage, rmp_serde::decode::Error> =
@@ -201,6 +222,7 @@ impl StreamHandler<BytesMut, std::io::Error> for CaptureActor {
     fn finished(&mut self, _ctx: &mut Self::Context) {}
 }
 
+/// Message for capture actor to start worker
 struct StartWorker;
 
 impl Message for StartWorker {
@@ -213,9 +235,8 @@ impl Handler<StartWorker> for CaptureActor {
     fn handle(&mut self, _msg: StartWorker, ctx: &mut Context<Self>) -> Self::Result {
         info!("Launching worker for stream: {}", self.stream_url);
         let storage_path = Path::new(&self.storage_path).join(self.camera_id.to_string());
-        match std::fs::create_dir(&storage_path) {
-            Ok(_) => {}
-            Err(_) => {}
+        if std::fs::create_dir(&storage_path).is_err() {
+            info!("failed to create directory, but that's probably ok...");
         }
         let mut cmd = Command::new("src/cworkers/captureworker");
         cmd.arg(&self.stream_url);
@@ -225,7 +246,10 @@ impl Handler<StartWorker> for CaptureActor {
         cmd.stdout(Stdio::piped());
 
         let mut child = cmd.spawn_async().expect("Failed to launch");
-        let stdout = child.stdout().take().unwrap();
+        let stdout = child
+            .stdout()
+            .take()
+            .expect("Failed to open stdout on worker child");
         let framed_stream = length_delimited::FramedRead::new(stdout);
         Self::add_stream(framed_stream, ctx);
         let fut = wrap_future::<_, Self>(child)

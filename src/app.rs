@@ -22,23 +22,27 @@ use crate::user_routes::create_user;
 use crate::video_unit_routes::{fetch_video_unit, fetch_video_units_between};
 use crate::ws_session::{WsSerialization, WsSession};
 
-pub struct AppState {
+/// Struct representing main application state
+pub struct RouteState {
+    /// address of database actor
     pub db: Addr<DbExecutor>,
 }
 
-pub fn ws_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
+/// Route to return a websocket session using messagepack serialization
+pub fn ws_route(req: &HttpRequest<RouteState>) -> Result<HttpResponse, Error> {
     debug!("Starting websocket session...");
     ws::start(req, WsSession::new(WsSerialization::MsgPack))
 }
 
-pub fn ws_json_route(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
+/// Route to return a websocket session using json serialization
+pub fn ws_json_route(req: &HttpRequest<RouteState>) -> Result<HttpResponse, Error> {
     debug!("Starting json websocket session...");
     ws::start(req, WsSession::new(WsSerialization::Json))
 }
 
-// helper function to create and returns the app after mounting all routes/resources
-pub fn create_app(db: Addr<DbExecutor>, secret: &String) -> App<AppState> {
-    App::with_state(AppState { db })
+/// helper function to create and returns the app after mounting all routes/resources
+pub fn new(db: Addr<DbExecutor>, secret: &str) -> App<RouteState> {
+    App::with_state(RouteState { db })
         // setup builtin logger to get nice logging for each request
         .middleware(Logger::default())
         .middleware(IdentityService::new(

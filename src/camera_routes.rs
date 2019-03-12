@@ -7,11 +7,12 @@ use std::time::Duration;
 use onvif;
 use onvif::camera::DeviceDateAndTime;
 
-use crate::app::AppState;
+use crate::app::RouteState;
 use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
 
+/// Route to create new camera
 pub fn create_camera(
-    (camera_request, state): (Json<CreateCamera>, State<AppState>),
+    (camera_request, state): (Json<CreateCamera>, State<RouteState>),
 ) -> FutureResponse<HttpResponse> {
     state
         .db
@@ -24,8 +25,9 @@ pub fn create_camera(
         .responder()
 }
 
+/// Route to update existing camera
 pub fn update_camera(
-    (path, camera_request, state): (Path<i32>, Json<UpdateCamera>, State<AppState>),
+    (path, camera_request, state): (Path<i32>, Json<UpdateCamera>, State<RouteState>),
 ) -> FutureResponse<HttpResponse> {
     let camera_update = UpdateCamera {
         id: path.into_inner(),
@@ -42,7 +44,8 @@ pub fn update_camera(
         .responder()
 }
 
-pub fn fetch_camera((path, state): (Path<i32>, State<AppState>)) -> FutureResponse<HttpResponse> {
+/// Route to fetch specific camera by camera id
+pub fn fetch_camera((path, state): (Path<i32>, State<RouteState>)) -> FutureResponse<HttpResponse> {
     state
         .db
         .send(FetchCamera {
@@ -56,7 +59,8 @@ pub fn fetch_camera((path, state): (Path<i32>, State<AppState>)) -> FutureRespon
         .responder()
 }
 
-pub fn fetch_all_cameras((state,): (State<AppState>,)) -> FutureResponse<HttpResponse> {
+/// Route to fetch all cameras
+pub fn fetch_all_cameras((state,): (State<RouteState>,)) -> FutureResponse<HttpResponse> {
     state
         .db
         .send(FetchAllCamera {})
@@ -68,8 +72,9 @@ pub fn fetch_all_cameras((state,): (State<AppState>,)) -> FutureResponse<HttpRes
         .responder()
 }
 
+/// Discovery cameras using ONVIF discovery
 pub fn discover(
-    (_state,): (State<AppState>,),
+    (_state,): (State<RouteState>,),
 ) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     onvif::discovery::probe(Duration::new(5, 0))
         .map_err(actix_web::error::ErrorBadRequest)
@@ -77,8 +82,9 @@ pub fn discover(
         .responder()
 }
 
+/// Returns current time of specified camera
 pub fn fetch_time(
-    (path, state): (Path<i32>, State<AppState>),
+    (path, state): (Path<i32>, State<RouteState>),
 ) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db
@@ -106,8 +112,20 @@ pub fn fetch_time(
         .responder()
 }
 
+/// Api route to set a cameras time
+///
+/// # Arguments
+///
+/// * `path` - path containing camera id to set time for
+/// * `datetime` - new time for camera
+/// * `state` - route state struct
+///
 pub fn set_time(
-    (path, datetime, state): (Path<i32>, Option<Json<DeviceDateAndTime>>, State<AppState>),
+    (path, datetime, state): (
+        Path<i32>,
+        Option<Json<DeviceDateAndTime>>,
+        State<RouteState>,
+    ),
 ) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db

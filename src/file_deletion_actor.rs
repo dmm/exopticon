@@ -7,8 +7,14 @@ use crate::models::{
     Camera, DbExecutor, DeleteVideoUnitFiles, FetchCameraGroupFiles, VideoFile, VideoUnit,
 };
 
+/// A video unit/video file pair with the corresponding camera
+type VideoUnitPair = (Camera, (VideoUnit, VideoFile));
+
+/// File deletion actor state
 pub struct FileDeletionActor {
+    /// id of camera group this actor will deletion excess files for
     camera_group_id: i32,
+    /// Address of database worker
     db_addr: Addr<DbExecutor>,
 }
 
@@ -25,17 +31,19 @@ impl Actor for FileDeletionActor {
 }
 
 impl FileDeletionActor {
-    pub fn new(camera_group_id: i32, db_addr: Addr<DbExecutor>) -> FileDeletionActor {
-        FileDeletionActor {
-            camera_group_id: camera_group_id,
-            db_addr: db_addr,
+    /// Returns newly initialized `FileDeletionActor`
+    pub fn new(camera_group_id: i32, db_addr: Addr<DbExecutor>) -> Self {
+        Self {
+            camera_group_id,
+            db_addr,
         }
     }
 
+    /// Processes a group of files and deletes excess
     fn handle_files(
         &self,
-        (max_size, current_size, files): (i64, i64, Vec<(Camera, (VideoUnit, VideoFile))>),
-        ctx: &mut Context<FileDeletionActor>,
+        (max_size, current_size, files): (i64, i64, Vec<VideoUnitPair>),
+        ctx: &mut Context<Self>,
     ) {
         let max_size_bytes = max_size * 1024 * 1024;
         let mut delete_amount: i64 = current_size - max_size_bytes;
@@ -57,7 +65,7 @@ impl FileDeletionActor {
                 break;
             }
 
-            delete_amount -= video_file.size as i64;
+            delete_amount -= i64::from(video_file.size);
             video_unit_ids.push(video_unit.id);
             video_file_ids.push(video_file.id);
             debug!(
@@ -70,8 +78,8 @@ impl FileDeletionActor {
         }
 
         let fut = self.db_addr.send(DeleteVideoUnitFiles {
-            video_unit_ids: video_unit_ids,
-            video_file_ids: video_file_ids,
+            video_unit_ids,
+            video_file_ids,
         });
 
         ctx.spawn(
@@ -82,6 +90,7 @@ impl FileDeletionActor {
     }
 }
 
+/// Message indicating `FileDeletionActor` should begin work
 struct StartWork;
 
 impl Message for StartWork {
@@ -100,10 +109,11 @@ impl Handler<StartWork> for FileDeletionActor {
                 count: 100,
             })
             .into_actor(self)
-            .map(|result, actor: &mut FileDeletionActor, ctx| {
-                match result {
-                    Ok(result) => actor.handle_files(result, ctx),
-                    _ => error!("Error fetching camera group files."),
+            .map(|result, actor: &mut Self, ctx| {
+                if let Ok(r) = result {
+                    actor.handle_files(r, ctx);
+                } else {
+                    error!("Error fetching camera group files.");
                 }
                 ctx.notify_later(StartWork {}, Duration::from_millis(5000));
             })

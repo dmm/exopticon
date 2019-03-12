@@ -5,9 +5,12 @@ use diesel::prelude::*;
 use crate::errors::ServiceError;
 use crate::models::{DbExecutor, SlimUser, User};
 
+/// Represents data for an authentication attempt
 #[derive(Debug, Deserialize)]
 pub struct AuthData {
+    /// username
     pub username: String,
+    /// plaintext password
     pub password: String,
 }
 
@@ -30,17 +33,12 @@ impl Handler<AuthData> for DbExecutor {
             .map_err(|_error| ServiceError::InternalServerError)?;
 
         if let Some(user) = items.pop() {
-            match verify(&msg.password, &user.password) {
-                Ok(matching) => {
-                    if matching {
-                        return Ok(user.into());
-                    } else {
-                        return mismatch_error;
-                    }
+            if let Ok(matching) = verify(&msg.password, &user.password) {
+                if matching {
+                    return Ok(user.into());
                 }
-                Err(_) => {
-                    return mismatch_error;
-                }
+            } else {
+                return mismatch_error;
             }
         }
         mismatch_error

@@ -3,8 +3,11 @@ use actix::*;
 use crate::file_deletion_actor::FileDeletionActor;
 use crate::models::DbExecutor;
 
+/// Request supervisor to start file deletion actor
 pub struct StartDeletionWorker {
+    /// address of database actor
     pub db_addr: Addr<DbExecutor>,
+    /// id of camera group actor is to work for
     pub camera_group_id: i32,
 }
 
@@ -12,7 +15,9 @@ impl Message for StartDeletionWorker {
     type Result = ();
 }
 
+/// File Deletion Supervisor actor state
 pub struct FileDeletionSupervisor {
+    /// tuple of camera group id and address of file deletion actor
     workers: Vec<(i32, Addr<FileDeletionActor>)>,
 }
 
@@ -35,8 +40,9 @@ impl Handler<StartDeletionWorker> for FileDeletionSupervisor {
 }
 
 impl FileDeletionSupervisor {
-    pub fn new() -> FileDeletionSupervisor {
-        FileDeletionSupervisor {
+    /// Create new file deletion supervisor
+    pub fn new() -> Self {
+        Self {
             workers: Vec::new(),
         }
     }

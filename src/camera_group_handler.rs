@@ -8,6 +8,9 @@ use crate::schema::camera_groups::dsl::*;
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 
+/// A segment of video paired with the source camera
+type CameraVideoSegment = (Camera, (VideoUnit, VideoFile));
+
 impl Message for CreateCameraGroup {
     type Result = Result<CameraGroup, ServiceError>;
 }
@@ -22,9 +25,8 @@ impl Handler<CreateCameraGroup> for DbExecutor {
         diesel::insert_into(camera_groups)
             .values(&msg)
             .get_result(conn)
-            .map_err(|error| {
-                println!("ERROR HERE WOO");
-                println!("{:#?}", error);
+            .map_err(|_error| {
+                error!("Error creating camera group!");
                 ServiceError::InternalServerError
             })
     }
@@ -40,13 +42,11 @@ impl Handler<UpdateCameraGroup> for DbExecutor {
     fn handle(&mut self, msg: UpdateCameraGroup, _: &mut Self::Context) -> Self::Result {
         use crate::schema::camera_groups::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
-        println!("{:?}", msg);
         diesel::update(camera_groups.filter(id.eq(msg.id)))
             .set(&msg)
             .get_result(conn)
-            .map_err(|error| {
-                println!("ERROR HERE WOO");
-                println!("{:#?}", error);
+            .map_err(|_error| {
+                error!("Error updating camera group");
                 ServiceError::InternalServerError
             })
     }
@@ -127,11 +127,11 @@ impl Handler<FetchAllCameraGroupAndCameras> for DbExecutor {
 }
 
 impl Message for FetchCameraGroupFiles {
-    type Result = Result<(i64, i64, Vec<(Camera, (VideoUnit, VideoFile))>), ServiceError>;
+    type Result = Result<(i64, i64, Vec<CameraVideoSegment>), ServiceError>;
 }
 
 impl Handler<FetchCameraGroupFiles> for DbExecutor {
-    type Result = Result<(i64, i64, Vec<(Camera, (VideoUnit, VideoFile))>), ServiceError>;
+    type Result = Result<(i64, i64, Vec<CameraVideoSegment>), ServiceError>;
 
     fn handle(&mut self, msg: FetchCameraGroupFiles, _: &mut Self::Context) -> Self::Result {
         use crate::schema::camera_groups;

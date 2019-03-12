@@ -1,11 +1,18 @@
 use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, ResponseError, State};
 use futures::future::Future;
 
-use crate::app::AppState;
+use crate::app::RouteState;
 use crate::models::CreateUser;
 
+/// Implements route to create user, returns future returning created
+/// user or error.
+///
+/// # Arguments
+/// `create_user` - `Json` representation of `CreateUser` struct
+/// `state` - `RouteState` struct
+///
 pub fn create_user(
-    (create_user, state): (Json<CreateUser>, State<AppState>),
+    (create_user, state): (Json<CreateUser>, State<RouteState>),
 ) -> FutureResponse<HttpResponse> {
     state
         .db

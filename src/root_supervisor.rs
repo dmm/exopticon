@@ -8,21 +8,31 @@ use crate::models::{
 };
 use actix_web::actix::fut;
 
+/// Enumeration of Exopticon run modes
 pub enum ExopticonMode {
+    /// System should not run capture and deletion workers
     Standby,
+    /// System should run normally
     Run,
 }
 
+/// struct representing `RootSupervisor` actor. Contains state of
+/// non-web application.
 pub struct RootSupervisor {
+    /// Supervisor for capture workers
     pub capture_supervisor: Addr<CaptureSupervisor>,
+    /// Supervisor for deletion workers
     pub deletion_supervisor: Addr<FileDeletionSupervisor>,
+    /// Database actor
     pub db_worker: Addr<DbExecutor>,
+    /// exopticon runtime mode
     pub mode: ExopticonMode,
 }
 
 impl Actor for RootSupervisor {
     type Context = Context<Self>;
 
+    /// Starts child works if mode is `Run`
     fn started(&mut self, ctx: &mut Self::Context) {
         match self.mode {
             ExopticonMode::Standby => {}
@@ -33,29 +43,18 @@ impl Actor for RootSupervisor {
     }
 }
 
-pub struct StartFileDeletionWorkers;
-
-impl Message for StartFileDeletionWorkers {
-    type Result = ();
-}
-
-impl Handler<StartFileDeletionWorkers> for RootSupervisor {
-    type Result = ();
-    fn handle(&mut self, _msg: StartFileDeletionWorkers, _ctx: &mut Context<Self>) -> Self::Result {
-    }
-}
-
 impl RootSupervisor {
+    /// Starts all child workers for this supervisor
     fn start_workers(&self, ctx: &mut Context<Self>) {
         let capture_future = self
             .db_worker
             .send(FetchAllCameraGroupAndCameras {})
             .into_actor(self)
             .then(|res, act, _ctx| {
-                match res {
-                    Ok(Ok(res)) => act.start_capture_workers(res),
-                    _ => (),
+                if let Ok(Ok(r)) = res {
+                    act.start_capture_workers(r);
                 }
+
                 fut::ok(())
             });
 
@@ -66,14 +65,16 @@ impl RootSupervisor {
             .send(FetchAllCameraGroup {})
             .into_actor(self)
             .then(|res, act, _ctx| {
-                match res {
-                    Ok(Ok(res)) => act.start_deletion_workers(res),
-                    _ => (),
+                if let Ok(Ok(r)) = res {
+                    act.start_deletion_workers(r);
                 }
+
                 fut::ok(())
             });
         ctx.spawn(fut);
     }
+
+    /// Starts capture workers using provided camera structs
     fn start_capture_workers(&self, cameras: Vec<CameraGroupAndCameras>) {
         for g in cameras {
             for c in g.1 {
@@ -89,6 +90,7 @@ impl RootSupervisor {
         }
     }
 
+    /// Starts deletion workers based on the `CameraGroup`s provided.
     fn start_deletion_workers(&self, camera_groups: Vec<CameraGroup>) {
         for c in camera_groups {
             self.deletion_supervisor.do_send(StartDeletionWorker {
@@ -98,14 +100,21 @@ impl RootSupervisor {
         }
     }
 
-    pub fn new(start_mode: ExopticonMode, db_worker: Addr<DbExecutor>) -> RootSupervisor {
+    /// Returns new `RootSupervisor` with initialized with the arguments provided.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_mode` - `StandBy` or `Run`
+    /// * `db_worker` - `Addr` of `DbExecutor`
+    ///
+    pub fn new(start_mode: ExopticonMode, db_worker: Addr<DbExecutor>) -> Self {
         let capture_supervisor = CaptureSupervisor::new().start();
         let deletion_supervisor = FileDeletionSupervisor::new().start();
 
-        RootSupervisor {
-            capture_supervisor: capture_supervisor,
-            deletion_supervisor: deletion_supervisor,
-            db_worker: db_worker,
+        Self {
+            capture_supervisor,
+            deletion_supervisor,
+            db_worker,
             mode: start_mode,
         }
     }

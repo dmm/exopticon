@@ -1,3 +1,6 @@
+// Disable this lint because we pass by value to implement the
+// actix-web interface.
+#![allow(clippy::needless_pass_by_value)]
 use actix_web::http;
 use actix_web::middleware::identity::RequestIdentity;
 use actix_web::middleware::{Middleware, Started};
@@ -6,11 +9,12 @@ use actix_web::{
 };
 use futures::future::Future;
 
-use crate::app::AppState;
+use crate::app::RouteState;
 use crate::auth_handler::AuthData;
 
+/// Route to make login attempt
 pub fn login(
-    (auth_data, req): (Json<AuthData>, HttpRequest<AppState>),
+    (auth_data, req): (Json<AuthData>, HttpRequest<RouteState>),
 ) -> FutureResponse<HttpResponse> {
     req.state()
         .db
@@ -26,15 +30,17 @@ pub fn login(
         .responder()
 }
 
-pub fn logout(req: HttpRequest<AppState>) -> HttpResponse {
+/// Route to make logout attempt
+pub fn logout(req: HttpRequest<RouteState>) -> HttpResponse {
     req.forget();
     HttpResponse::Ok().into()
 }
 
+/// Struct implementing Authentication middleware for api
 pub struct WebAuthMiddleware;
 
-impl Middleware<AppState> for WebAuthMiddleware {
-    fn start(&self, req: &HttpRequest<AppState>) -> Result<Started> {
+impl Middleware<RouteState> for WebAuthMiddleware {
+    fn start(&self, req: &HttpRequest<RouteState>) -> Result<Started> {
         if let Some(user_id) = req.identity() {
             let user_id = user_id
                 .parse::<i32>()
@@ -53,10 +59,11 @@ impl Middleware<AppState> for WebAuthMiddleware {
     }
 }
 
+/// Struct implementing authentication middleware
 pub struct AuthMiddleware;
 
-impl Middleware<AppState> for AuthMiddleware {
-    fn start(&self, req: &HttpRequest<AppState>) -> Result<Started> {
+impl Middleware<RouteState> for AuthMiddleware {
+    fn start(&self, req: &HttpRequest<RouteState>) -> Result<Started> {
         if let Some(user_id) = req.identity() {
             let user_id = user_id
                 .parse::<i32>()

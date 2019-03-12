@@ -3,10 +3,15 @@ use actix::*;
 use crate::capture_actor::CaptureActor;
 use crate::models::DbExecutor;
 
+/// Message instructing `CaptureSupervisor` to start a capture actor
 pub struct StartCaptureWorker {
+    /// id of camera to start capture worker for
     pub id: i32,
+    /// rtsp url of video stream to capture
     pub stream_url: String,
+    /// full path to capture video to
     pub storage_path: String,
+    /// database actor address
     pub db_addr: Addr<DbExecutor>,
 }
 
@@ -14,7 +19,9 @@ impl Message for StartCaptureWorker {
     type Result = ();
 }
 
+/// Message instructing `CaptureSupervisor` to stop the specified worker
 pub struct StopCaptureWorker {
+    /// stop the capture actor associated with this camera id
     pub id: i32,
 }
 
@@ -22,7 +29,9 @@ impl Message for StopCaptureWorker {
     type Result = ();
 }
 
+/// holds state of `CaptureSupervisor` actor
 pub struct CaptureSupervisor {
+    /// Child workers
     workers: Vec<(i32, Addr<CaptureActor>)>,
 }
 
@@ -34,7 +43,7 @@ impl Handler<StartCaptureWorker> for CaptureSupervisor {
     type Result = ();
 
     fn handle(&mut self, msg: StartCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
-        println!("Supervisor: Starting camera id: {}", msg.id);
+        info!("Supervisor: Starting camera id: {}", msg.id);
         let id = msg.id.to_owned();
         // Launch each CaptureActor in a new thread. This is really
         // only necessary for debug builds because they are otherwise too slow on one thread.
@@ -49,20 +58,18 @@ impl Handler<StopCaptureWorker> for CaptureSupervisor {
     type Result = ();
 
     fn handle(&mut self, msg: StopCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
-        println!("Supervisor: Stopping camera id: {}", msg.id);
+        info!("Stopping camera id: {}", msg.id);
         let camera_address = self.workers.iter().find(|(id, _)| *id == msg.id);
-        match camera_address {
-            Some(_a) => {
-                println!("Found camera!");
-            }
-            None => {}
-        };
+        if camera_address.is_some() {
+            info!("Found Camera!");
+        }
     }
 }
 
 impl CaptureSupervisor {
-    pub fn new() -> CaptureSupervisor {
-        CaptureSupervisor {
+    /// Returns new initialized `CaptureSupervisor` struct, ready to be run
+    pub fn new() -> Self {
+        Self {
             workers: Vec::new(),
         }
     }

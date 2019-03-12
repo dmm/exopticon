@@ -12,7 +12,7 @@ pub enum FrameResolution {
     HD,
 }
 
-/// An actor address that can receive CameraFrame messages
+/// An actor address that can receive `CameraFrame` messages
 type Client = Recipient<CameraFrame>;
 
 // MESSAGES
@@ -60,7 +60,7 @@ struct FrameType {
     pub resolution: FrameResolution,
 }
 
-/// Represents the WsCameraServer actor
+/// Represents the `WsCameraServer` actor
 #[derive(Default)]
 pub struct WsCameraServer {
     /// Collection of Client's subscribed to a particular FrameType
@@ -77,8 +77,8 @@ impl WsCameraServer {
     ) -> bool {
         // Try to find CameraSubscription for camera_id
         let frame_type = FrameType {
-            camera_id: camera_id,
-            resolution: resolution,
+            camera_id,
+            resolution,
         };
 
         if let Some(subscription) = self.subscriptions.get_mut(&frame_type) {
@@ -96,7 +96,7 @@ impl WsCameraServer {
     /// Removes WsSession as subscriber
     fn remove_subscriber(&mut self, camera_id: i32, client: &Client, resolution: &FrameResolution) {
         let frame_type = FrameType {
-            camera_id: camera_id,
+            camera_id,
             resolution: resolution.clone(),
         };
         if let Some(subscription) = self.subscriptions.get_mut(&frame_type) {

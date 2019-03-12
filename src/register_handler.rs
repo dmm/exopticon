@@ -5,9 +5,10 @@ use crate::errors::ServiceError;
 use crate::models::{CreateUser, DbExecutor, SlimUser, User};
 use crate::utils::hash_password;
 
-// UserData is used to extract data from a post request by the client
+/// `UserData` is used to extract data from a post request by the client
 #[derive(Debug, Deserialize)]
 pub struct UserData {
+    /// plaintext password
     pub password: String,
 }
 
@@ -25,12 +26,12 @@ impl Handler<CreateUser> for DbExecutor {
         let user: User = diesel::insert_into(users)
             .values(CreateUser {
                 username: msg.username,
-                password: password,
+                password,
                 timezone: msg.timezone,
             })
             .get_result(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
-        return Ok(user.into());
+        Ok(user.into())
     }
 }
