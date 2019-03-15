@@ -15,7 +15,7 @@ img {
   -webkit-user-drag: none;
   -webkit-user-select: none;
   -ms-user-select: none;
-  object-fit: scale-down;
+  object-fit: contain;
 }
 
 app-camera-overlay {
