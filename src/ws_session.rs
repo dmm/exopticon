@@ -62,6 +62,12 @@ struct RawCameraFrame {
     /// Frame image encoded as jpeg
     #[serde(with = "Base64Standard")]
     pub jpeg: ByteBuf,
+
+    /// id of owning video unit
+    pub video_unit_id: i32,
+
+    /// frame offset from beginning of video unit
+    pub offset: i64,
 }
 
 /// An actor representing a websocket connection
@@ -173,6 +179,8 @@ impl Handler<CameraFrame> for WsSession {
             camera_id: msg.camera_id,
             jpeg: ByteBuf::from(msg.jpeg),
             resolution: msg.resolution,
+            video_unit_id: msg.video_unit_id,
+            offset: msg.offset,
         };
         match &self.serialization {
             WsSerialization::MsgPack => {

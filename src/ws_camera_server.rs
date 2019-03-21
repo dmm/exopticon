@@ -25,6 +25,10 @@ pub struct CameraFrame {
     pub jpeg: Vec<u8>,
     /// resolution of frame
     pub resolution: FrameResolution,
+    /// id of video unit
+    pub video_unit_id: i32,
+    /// offset from beginning of video unit
+    pub offset: i64,
 }
 
 /// subscribe message

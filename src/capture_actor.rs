@@ -82,6 +82,8 @@ pub struct CaptureActor {
     pub video_unit_id: Option<i32>,
     /// id of currently open video file
     pub video_file_id: Option<i32>,
+    /// frame offset from beginning of the current video unit
+    pub offset: i64,
     /// filename currently being captured
     pub filename: Option<String>,
 }
@@ -101,6 +103,7 @@ impl CaptureActor {
             db_addr,
             video_unit_id: None,
             video_file_id: None,
+            offset: 0,
             filename: None,
         }
     }
@@ -142,18 +145,27 @@ impl CaptureActor {
         match msg.message_type.as_str() {
             "log" => debug!("Worker log message: {}", msg.message),
             "frame" => {
+                if self.video_unit_id.is_none() {
+                    error!("Video Unit id not set!");
+                }
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
                     jpeg: msg.jpeg,
                     resolution: FrameResolution::HD,
+                    video_unit_id: self.video_unit_id.unwrap_or(-1),
+                    offset: self.offset,
                 });
+                self.offset += 1;
             }
             "frameScaled" => {
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
                     jpeg: msg.scaled_jpeg,
                     resolution: FrameResolution::SD,
+                    video_unit_id: self.video_unit_id.unwrap_or(-1),
+                    offset: self.offset,
                 });
+                self.offset += 1;
             }
             "newFile" => {
                 // worker has created a new file. Write video_unit and
@@ -187,6 +199,7 @@ impl CaptureActor {
                         msg.begin_time
                     );
                 }
+                self.offset = 0;
             }
             "endFile" => {
                 if let Ok(end_time) = msg.end_time.parse::<DateTime<Utc>>() {
