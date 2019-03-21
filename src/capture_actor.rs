@@ -249,6 +249,10 @@ impl Handler<StartWorker> for CaptureActor {
         info!("Launching worker for stream: {}", self.stream_url);
         let storage_path = Path::new(&self.storage_path).join(self.camera_id.to_string());
         if std::fs::create_dir(&storage_path).is_err() {
+            // The error returned by create_dir has no information so
+            // we can't really distinguish between failure
+            // scenarios. If the directory already exists everything
+            // is fine, otherwise we fail later.
             info!("failed to create directory, but that's probably ok...");
         }
         let mut cmd = Command::new("src/cworkers/captureworker");
