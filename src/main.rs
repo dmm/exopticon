@@ -58,6 +58,12 @@ mod auth_handler;
 /// Implements auth routes
 mod auth_routes;
 
+/// Implements analysis actor
+mod analysis_actor;
+
+/// Implements analysis supervisor
+mod analysis_supervisor;
+
 /// implements camera group api logic
 mod camera_group_handler;
 

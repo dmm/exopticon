@@ -1,5 +1,6 @@
 use actix::*;
 
+use crate::analysis_supervisor::{AnalysisSupervisor, StartAnalysisActor, StopAnalysisActor};
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
 use crate::file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
 use crate::models::{
@@ -19,9 +20,11 @@ pub enum ExopticonMode {
 /// struct representing `RootSupervisor` actor. Contains state of
 /// non-web application.
 pub struct RootSupervisor {
-    /// Supervisor for capture workers
+    /// Supervisor for analysis actors
+    pub analysis_supervisor: Addr<AnalysisSupervisor>,
+    /// Supervisor for capture actors
     pub capture_supervisor: Addr<CaptureSupervisor>,
-    /// Supervisor for deletion workers
+    /// Supervisor for deletion actors
     pub deletion_supervisor: Addr<FileDeletionSupervisor>,
     /// Database actor
     pub db_worker: Addr<DbExecutor>,
@@ -100,6 +103,16 @@ impl RootSupervisor {
         }
     }
 
+    /// Starts a new analysis actor
+    fn start_analysis_actor(&self, msg: StartAnalysisActor) {
+        self.analysis_supervisor.do_send(msg);
+    }
+
+    /// Stops an analysis actor, if started
+    fn stop_analysis_actor(&self, msg: StopAnalysisActor) {
+        self.analysis_supervisor.do_send(msg);
+    }
+
     /// Returns new `RootSupervisor` with initialized with the arguments provided.
     ///
     /// # Arguments
@@ -108,10 +121,12 @@ impl RootSupervisor {
     /// * `db_worker` - `Addr` of `DbExecutor`
     ///
     pub fn new(start_mode: ExopticonMode, db_worker: Addr<DbExecutor>) -> Self {
+        let analysis_supervisor = AnalysisSupervisor::new().start();
         let capture_supervisor = CaptureSupervisor::new().start();
         let deletion_supervisor = FileDeletionSupervisor::new().start();
 
         Self {
+            analysis_supervisor,
             capture_supervisor,
             deletion_supervisor,
             db_worker,
