@@ -1,6 +1,6 @@
 use actix::*;
 
-use crate::analysis_supervisor::{AnalysisSupervisor, StartAnalysisActor, StopAnalysisActor};
+use crate::analysis_supervisor::AnalysisSupervisor;
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
 use crate::file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
 use crate::models::{
@@ -101,16 +101,6 @@ impl RootSupervisor {
                 camera_group_id: c.id,
             });
         }
-    }
-
-    /// Starts a new analysis actor
-    fn start_analysis_actor(&self, msg: StartAnalysisActor) {
-        self.analysis_supervisor.do_send(msg);
-    }
-
-    /// Stops an analysis actor, if started
-    fn stop_analysis_actor(&self, msg: StopAnalysisActor) {
-        self.analysis_supervisor.do_send(msg);
     }
 
     /// Returns new `RootSupervisor` with initialized with the arguments provided.

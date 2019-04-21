@@ -15,6 +15,7 @@ use crate::camera_routes::{
 };
 use crate::chrono::Duration;
 
+use crate::analysis_routes::create_analysis_engine;
 use crate::models::DbExecutor;
 use crate::static_routes;
 use crate::static_routes::{fetch_static_file, index};
@@ -123,6 +124,10 @@ pub fn new(db: Addr<DbExecutor>, secret: &str) -> App<RouteState> {
                 .resource("/users", |r| {
                     r.method(Method::POST).with(create_user);
                     //            r.method(Method::GET).with(fetch_all_users);
+                })
+                // routes to analysis engine
+                .resource("/analysis_engines", |r| {
+                    r.method(Method::POST).with(create_analysis_engine)
                 })
         })
 }

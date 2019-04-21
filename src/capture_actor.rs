@@ -1,4 +1,3 @@
-#![allow(deprecated)]
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -11,7 +10,7 @@ use chrono::{DateTime, Utc};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
-use tokio_io::codec::length_delimited;
+use tokio::codec::length_delimited;
 use tokio_process::CommandExt;
 
 use crate::models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
@@ -253,7 +252,7 @@ impl Handler<StartWorker> for CaptureActor {
             // we can't really distinguish between failure
             // scenarios. If the directory already exists everything
             // is fine, otherwise we fail later.
-            info!("failed to create directory, but that's probably ok...");
+
         }
         let mut cmd = Command::new("src/cworkers/captureworker");
         cmd.arg(&self.stream_url);
@@ -267,7 +266,7 @@ impl Handler<StartWorker> for CaptureActor {
             .stdout()
             .take()
             .expect("Failed to open stdout on worker child");
-        let framed_stream = length_delimited::FramedRead::new(stdout);
+        let framed_stream = length_delimited::Builder::new().new_read(stdout);
         Self::add_stream(framed_stream, ctx);
         let fut = wrap_future::<_, Self>(child)
             .map(|_status, actor, ctx| {

@@ -1,13 +1,8 @@
 // clippy doesn't like the base64_serde_type macro
 #![allow(clippy::empty_enum)]
 
-use std::io::Write;
-
 use crate::actix::prelude::*;
 use actix_web::ws;
-use rmp::encode::{write_map_len, write_str, ValueWriteError};
-use rmp::Marker;
-use rmp_serde::encode::VariantWriter;
 use rmp_serde::Serializer;
 use serde;
 use serde::Serialize;
@@ -17,6 +12,7 @@ use serde_json;
 use base64::STANDARD_NO_PAD;
 
 use crate::app::RouteState;
+use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer,
 };
@@ -146,19 +142,6 @@ impl Actor for WsSession {
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         debug!("Stopping websocket!");
-    }
-}
-
-/// An empty struct to implement `VariantWriter` so we can serialize frames as structs/maps.
-struct StructMapWriter;
-
-impl VariantWriter for StructMapWriter {
-    fn write_struct_len<W: Write>(&self, wr: &mut W, len: u32) -> Result<Marker, ValueWriteError> {
-        write_map_len(wr, len)
-    }
-
-    fn write_field_name<W: Write>(&self, wr: &mut W, key: &str) -> Result<(), ValueWriteError> {
-        write_str(wr, key)
     }
 }
 

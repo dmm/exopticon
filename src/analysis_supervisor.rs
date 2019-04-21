@@ -5,6 +5,7 @@ use actix::prelude::*;
 use crate::analysis_actor::AnalysisActor;
 
 /// Message telling supervisor to start new analysis actor
+#[derive(Serialize, Deserialize)]
 pub struct StartAnalysisActor {
     /// id of analysis actor
     pub id: i32,
@@ -15,7 +16,7 @@ pub struct StartAnalysisActor {
 }
 
 impl Message for StartAnalysisActor {
-    type Result = ();
+    type Result = i32;
 }
 
 /// Message telling supervisor to stop existing analysis actor
@@ -32,20 +33,37 @@ impl Message for StopAnalysisActor {
 pub struct AnalysisSupervisor {
     /// supervised actors
     actors: HashMap<i32, Addr<AnalysisActor>>,
+    /// tracks last actor id, only need this until we implement the database
+    last_actor_id: i32,
 }
 
 impl Actor for AnalysisSupervisor {
     type Context = Context<Self>;
 }
 
+impl Default for AnalysisSupervisor {
+    fn default() -> Self {
+        Self {
+            actors: HashMap::new(),
+            last_actor_id: 1,
+        }
+    }
+}
+
+impl SystemService for AnalysisSupervisor {}
+impl Supervised for AnalysisSupervisor {}
+
 impl Handler<StartAnalysisActor> for AnalysisSupervisor {
-    type Result = ();
+    type Result = i32;
 
     fn handle(&mut self, msg: StartAnalysisActor, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Starting analysis actor id: {}", msg.id);
-        let id = msg.id.to_owned();
-        let address = AnalysisActor::new(msg.id, msg.executable_name, msg.arguments).start();
-        self.actors.insert(id, address);
+        let id = self.last_actor_id;
+        self.last_actor_id += 1;
+        info!("Starting analysis actor id: {}", id);
+        let actor = AnalysisActor::new(id, msg.executable_name, msg.arguments);
+        let address = actor.start();
+        self.actors.insert(id, address.clone());
+        id
     }
 }
 
@@ -54,7 +72,6 @@ impl Handler<StopAnalysisActor> for AnalysisSupervisor {
 
     fn handle(&mut self, msg: StopAnalysisActor, _ctx: &mut Context<Self>) -> Self::Result {
         info!("Stopping analysis actor id: {}", &msg.id);
-
         self.actors.remove(&msg.id);
     }
 }
@@ -64,6 +81,7 @@ impl AnalysisSupervisor {
     pub fn new() -> Self {
         Self {
             actors: HashMap::new(),
+            last_actor_id: 1,
         }
     }
 }
