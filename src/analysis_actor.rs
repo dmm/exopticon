@@ -10,12 +10,11 @@ use log::Level;
 use rmp_serde::to_vec_named;
 use rmp_serde::Deserializer;
 use serde::Deserialize;
-use serde_bytes::ByteBuf;
 use tokio::codec::length_delimited;
 use tokio::prelude::Sink;
 use tokio_process::CommandExt;
 
-use crate::ws_camera_server::{CameraFrame, FrameResolution};
+use crate::ws_camera_server::CameraFrame;
 
 /// Worker Log Levels
 #[derive(Serialize, Deserialize)]
@@ -56,40 +55,15 @@ enum AnalysisWorkerMessage {
     FrameRequest(u8),
     /// Observation message from worker
     Observation,
+    /// Processed frame from worker
+    FrameReport { tag: String, frame: CameraFrame },
 }
 
 /// Represents message sent to worker
 #[derive(Serialize, Deserialize)]
 enum AnalysisWorkerCommand {
     /// A frame of video send for analysis
-    Frame(WorkerFrame),
-}
-
-/// Represents frame of video send to analysis worker
-#[derive(Serialize, Deserialize)]
-struct WorkerFrame {
-    /// id of frame source camera
-    pub camera_id: i32,
-    /// resolution of camera frame
-    pub resolution: FrameResolution,
-    /// Bytes of jpeg encoded frame of video
-    pub jpeg: ByteBuf,
-    /// id of video unit
-    pub video_unit_id: i32,
-    /// index of video unit frame offset
-    pub offset: i64,
-}
-
-impl From<CameraFrame> for WorkerFrame {
-    fn from(frame: CameraFrame) -> Self {
-        Self {
-            camera_id: frame.camera_id,
-            resolution: frame.resolution,
-            jpeg: ByteBuf::from(frame.jpeg),
-            video_unit_id: frame.video_unit_id,
-            offset: frame.offset,
-        }
-    }
+    Frame(CameraFrame),
 }
 
 /// Analysis Actor context
@@ -131,6 +105,9 @@ impl AnalysisActor {
                 self.frames_requested = count;
             }
             AnalysisWorkerMessage::Observation => {}
+            AnalysisWorkerMessage::FrameReport { tag, frame: _frame } => {
+                debug!("Analysis got frame report {}", tag);
+            }
         }
     }
 }
@@ -249,8 +226,9 @@ impl Handler<CameraFrame> for AnalysisActor {
 
         if let Some(framed_stdin) = self.worker_stdin.take() {
             info!("Analysis actor: sending frame to worker...");
-            let worker_message = AnalysisWorkerCommand::Frame(WorkerFrame::from(msg));
+            let worker_message = AnalysisWorkerCommand::Frame(msg);
             if let Ok(serialized) = to_vec_named(&worker_message) {
+                self.frames_requested = self.frames_requested - 1;
                 let fut = wrap_future(framed_stdin.send(Bytes::from(serialized)))
                     .map(|sink, actor: &mut Self, _ctx| {
                         actor.worker_stdin = Some(sink);

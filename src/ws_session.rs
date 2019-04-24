@@ -6,7 +6,6 @@ use actix_web::ws;
 use rmp_serde::Serializer;
 use serde;
 use serde::Serialize;
-use serde_bytes::ByteBuf;
 use serde_json;
 
 use base64::STANDARD_NO_PAD;
@@ -14,7 +13,7 @@ use base64::STANDARD_NO_PAD;
 use crate::app::RouteState;
 use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
-    CameraFrame, FrameResolution, Subscribe, Unsubscribe, WsCameraServer,
+    CameraFrame, FrameResolution, Subscribe, SubscriptionSubject, Unsubscribe, WsCameraServer,
 };
 
 /// Represents different serializations available for communicating
@@ -57,7 +56,7 @@ struct RawCameraFrame {
 
     /// Frame image encoded as jpeg
     #[serde(with = "Base64Standard")]
-    pub jpeg: ByteBuf,
+    pub jpeg: Vec<u8>,
 
     /// id of owning video unit
     pub video_unit_id: i32,
@@ -160,7 +159,7 @@ impl Handler<CameraFrame> for WsSession {
 
         let frame = RawCameraFrame {
             camera_id: msg.camera_id,
-            jpeg: ByteBuf::from(msg.jpeg),
+            jpeg: msg.jpeg,
             resolution: msg.resolution,
             video_unit_id: msg.video_unit_id,
             offset: msg.offset,
@@ -196,18 +195,16 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         "subscribe" => {
                             for id in c.camera_ids {
                                 WsCameraServer::from_registry().do_send(Subscribe {
-                                    camera_id: id,
+                                    subject: SubscriptionSubject::Camera(id, c.resolution.clone()),
                                     client: ctx.address().recipient(),
-                                    resolution: c.resolution.clone(),
                                 });
                             }
                         }
                         "unsubscribe" => {
                             for id in c.camera_ids {
                                 WsCameraServer::from_registry().do_send(Unsubscribe {
-                                    camera_id: id,
+                                    subject: SubscriptionSubject::Camera(id, c.resolution.clone()),
                                     client: ctx.address().recipient(),
-                                    resolution: c.resolution.clone(),
                                 });
                             }
                         }

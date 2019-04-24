@@ -12,45 +12,62 @@ pub enum FrameResolution {
     HD,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+pub enum FrameSource {
+    /// Camera with camera id
+    Camera(i32),
+    /// Analysis Engine, with engine id
+    AnalysisEngine {
+        analysis_engine_id: i32,
+        tag: String,
+    },
+}
+
 /// An actor address that can receive `CameraFrame` messages
 type Client = Recipient<CameraFrame>;
 
 // MESSAGES
 /// Represents a frame of video
-#[derive(Clone, Message, Serialize)]
+#[derive(Clone, Message, Serialize, Deserialize)]
 pub struct CameraFrame {
     /// id of camera that produced frame
     pub camera_id: i32,
     /// jpeg image data
+    #[serde(with = "serde_bytes")]
     pub jpeg: Vec<u8>,
     /// resolution of frame
     pub resolution: FrameResolution,
+    /// source of frame
+    pub source: FrameSource,
     /// id of video unit
     pub video_unit_id: i32,
     /// offset from beginning of video unit
     pub offset: i64,
 }
 
+/// Subscription subject
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+pub enum SubscriptionSubject {
+    Camera(i32, FrameResolution),
+    AnalysisEngine(i32),
+}
+
 /// subscribe message
 #[derive(Clone, Message)]
 pub struct Subscribe {
-    /// camera id
-    pub camera_id: i32,
+    /// subscription subject
+    pub subject: SubscriptionSubject,
     /// address of WsSession to send frames
     pub client: Client,
-    /// resolution specifier
-    pub resolution: FrameResolution,
 }
 
 /// Unsubscribe message
 #[derive(Clone, Message)]
 pub struct Unsubscribe {
-    /// camera id
-    pub camera_id: i32,
+    /// unsubscription subject
+    pub subject: SubscriptionSubject,
     /// Address of WsSession to stop sending frames
     pub client: Client,
-    /// resolution specifier
-    pub resolution: FrameResolution,
 }
 
 // Server definitions
@@ -73,7 +90,7 @@ pub struct WsCameraServer {
 
 impl WsCameraServer {
     /// Add WsSession subscriber
-    fn add_subscriber(
+    fn add_camera_subscriber(
         &mut self,
         camera_id: i32,
         client: Client,
@@ -98,7 +115,12 @@ impl WsCameraServer {
     }
 
     /// Removes WsSession as subscriber
-    fn remove_subscriber(&mut self, camera_id: i32, client: &Client, resolution: &FrameResolution) {
+    fn remove_camera_subscriber(
+        &mut self,
+        camera_id: i32,
+        client: &Client,
+        resolution: &FrameResolution,
+    ) {
         let frame_type = FrameType {
             camera_id,
             resolution: resolution.clone(),
@@ -134,8 +156,10 @@ impl WsCameraServer {
                         &frame.camera_id, &frame.resolution
                     );
                     ctx.address().do_send(Unsubscribe {
-                        camera_id: frame.camera_id,
-                        resolution: frame.resolution.clone(),
+                        subject: SubscriptionSubject::Camera(
+                            frame.camera_id,
+                            frame.resolution.clone(),
+                        ),
                         client: client.clone(),
                     });
                 }
@@ -156,7 +180,11 @@ impl Handler<Subscribe> for WsCameraServer {
     type Result = ();
 
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> Self::Result {
-        self.add_subscriber(msg.camera_id, msg.client, msg.resolution);
+        if let (SubscriptionSubject::Camera(camera_id, resolution), client) =
+            (msg.subject, msg.client)
+        {
+            self.add_camera_subscriber(camera_id, client, resolution);
+        }
     }
 }
 
@@ -164,8 +192,11 @@ impl Handler<Unsubscribe> for WsCameraServer {
     type Result = ();
 
     fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) -> Self::Result {
-        debug!("Message: Unsubscribe");
-        self.remove_subscriber(msg.camera_id, &msg.client, &msg.resolution);
+        if let (SubscriptionSubject::Camera(camera_id, resolution), client) =
+            (msg.subject, msg.client)
+        {
+            self.remove_camera_subscriber(camera_id, &client, &resolution);
+        }
     }
 }
 

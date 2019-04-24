@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use actix::prelude::*;
 
 use crate::analysis_actor::AnalysisActor;
-use crate::ws_camera_server::{FrameResolution, Subscribe, WsCameraServer};
+use crate::ws_camera_server::{FrameResolution, Subscribe, SubscriptionSubject, WsCameraServer};
 
 /// Message telling supervisor to start new analysis actor
 #[derive(Serialize, Deserialize)]
@@ -67,12 +67,13 @@ impl Handler<StartAnalysisActor> for AnalysisSupervisor {
         let address = actor.start();
         self.actors.insert(id, address.clone());
 
-        // setup camera subscriptions
-        WsCameraServer::from_registry().do_send(Subscribe {
-            camera_id: 9,
-            client: address.recipient(),
-            resolution: FrameResolution::SD,
-        });
+        for camera_id in msg.subscribed_camera_ids {
+            // setup camera subscriptions
+            WsCameraServer::from_registry().do_send(Subscribe {
+                subject: SubscriptionSubject::Camera(camera_id, FrameResolution::SD),
+                client: address.clone().recipient(),
+            });
+        }
 
         id
     }

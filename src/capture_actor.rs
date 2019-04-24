@@ -14,7 +14,7 @@ use tokio::codec::length_delimited;
 use tokio_process::CommandExt;
 
 use crate::models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
-use crate::ws_camera_server::{CameraFrame, FrameResolution, WsCameraServer};
+use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
 /// Holds messages from capture worker
 #[derive(Default, Debug, PartialEq, Deserialize, Serialize)]
@@ -151,6 +151,7 @@ impl CaptureActor {
                     camera_id: self.camera_id,
                     jpeg: msg.jpeg,
                     resolution: FrameResolution::HD,
+                    source: FrameSource::Camera(self.camera_id),
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
                     offset: self.offset,
                 });
@@ -161,6 +162,7 @@ impl CaptureActor {
                     camera_id: self.camera_id,
                     jpeg: msg.scaled_jpeg,
                     resolution: FrameResolution::SD,
+                    source: FrameSource::Camera(self.camera_id),
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
                     offset: self.offset,
                 });
