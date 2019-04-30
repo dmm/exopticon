@@ -149,13 +149,45 @@ time_t get_time()
         return tv.tv_sec;
 }
 
-int encode_jpeg(AVFrame *frame, AVPacket *pkt)
+void free_buffer(void *opaque, uint8_t *data)
+{
+        tjFree(data);
+}
+
+int encode_jpeg_turbo(AVFrame *frame, AVPacket *pkt)
+{
+        const int JPEG_QUALITY = 80;
+
+        unsigned char* output_buf = NULL;
+        long unsigned int jpeg_size = 0;
+        tjhandle jpeg_compressor = tjInitCompress();
+
+        const unsigned char* planes[3] = {frame->data[0], frame->data[1], frame->data[2]};
+        int strides[3] = {frame->linesize[0], frame->linesize[1], frame->linesize[2]};
+        tjCompressFromYUVPlanes(jpeg_compressor,
+                                planes,
+                                frame->width,
+                                strides,
+                                frame->height,
+                                TJSAMP_420,
+                                &output_buf,
+                                &jpeg_size,
+                                JPEG_QUALITY,
+                                TJFLAG_FASTDCT);
+
+        pkt->buf = av_buffer_create(output_buf, jpeg_size, &free_buffer, NULL, AV_BUFFER_FLAG_READONLY);
+
+        tjDestroy(jpeg_compressor);
+        return 0;
+}
+
+int encode_jpeg_ffmpeg(AVFrame *frame, AVPacket *pkt)
 {
         AVCodec *codec = NULL;
         AVCodecContext *ccx = NULL;
         enum AVPixelFormat img_fmt = AV_PIX_FMT_YUVJ420P;
         int ret = 0;
-
+        bs_log("Frame format: %d", frame->format);
         // Find the mjpeg encoder
         codec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
         if (!codec) {
@@ -214,6 +246,15 @@ cleanup:
         avcodec_close(ccx);
         av_free(ccx);
         return ret;
+}
+
+int encode_jpeg(AVFrame *frame, AVPacket *pkt)
+{
+        if (frame->format == AV_PIX_FMT_YUV420P || frame->format == AV_PIX_FMT_YUVJ420P) {
+                return encode_jpeg_turbo(frame, pkt);
+        }
+
+        return encode_jpeg_ffmpeg(frame, pkt);
 }
 
 int write_jpeg(AVPacket *pkt, const char *filename)

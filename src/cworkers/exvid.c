@@ -133,6 +133,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         AVDictionary *opts = 0;
         av_dict_set(&opts, "buffer_size", "26214400", 0);
         av_dict_set(&opts, "rtsp_transport", "udp", 0);
+        av_dict_set(&opts, "reorder_queue_size", "2500", 0);
         c->fcx->max_delay = 500000; // 500ms
         clock_gettime(CLOCK_MONOTONIC, &(c->last_frame_time));
         int err = avformat_open_input(&(c->fcx), url, NULL, &opts);

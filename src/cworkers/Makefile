@@ -3,7 +3,7 @@ mycflags= -W -Wall -Wextra -Wcast-align -Wpointer-arith -Wsign-compare -Wformat=
           -std=c99 -flto -D_FORTIFY_SOURCE=2 -fstack-protector-strong
 devcflags= -fsanitize=undefined -fsanitize=address
 
-LIBRARIES= -lavformat -lavutil -lavcodec -lswscale
+LIBRARIES= -lavformat -lavutil -lavcodec -lswscale -lturbojpeg
 CC ?= clang
 EXWORKER_BINDIR ?= .
 
