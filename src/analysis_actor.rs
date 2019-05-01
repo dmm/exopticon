@@ -14,7 +14,7 @@ use tokio::codec::length_delimited;
 use tokio::prelude::Sink;
 use tokio_process::CommandExt;
 
-use crate::ws_camera_server::CameraFrame;
+use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
 /// Worker Log Levels
 #[derive(Serialize, Deserialize)]
@@ -56,7 +56,13 @@ enum AnalysisWorkerMessage {
     /// Observation message from worker
     Observation,
     /// Processed frame from worker
-    FrameReport { tag: String, frame: CameraFrame },
+    FrameReport {
+        /// tag identifying frame report
+        tag: String,
+        /// image data
+        #[serde(with = "serde_bytes")]
+        jpeg: Vec<u8>,
+    },
 }
 
 /// Represents message sent to worker
@@ -105,8 +111,19 @@ impl AnalysisActor {
                 self.frames_requested = count;
             }
             AnalysisWorkerMessage::Observation => {}
-            AnalysisWorkerMessage::FrameReport { tag, frame: _frame } => {
+            AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
                 debug!("Analysis got frame report {}", tag);
+                WsCameraServer::from_registry().do_send(CameraFrame {
+                    camera_id: 0,
+                    jpeg,
+                    resolution: FrameResolution::SD,
+                    source: FrameSource::AnalysisEngine {
+                        analysis_engine_id: self.id,
+                        tag,
+                    },
+                    video_unit_id: 0,
+                    offset: 0,
+                });
             }
         }
     }
@@ -117,24 +134,11 @@ impl Actor for AnalysisActor {
 
     fn started(&mut self, ctx: &mut Context<Self>) {
         debug!("Analysis actor starting!");
-        // Subscribe actor to camera
-        //        WsCameraServer::from_registry().do_send(Subscribe {
-        //            camera_id: 9,
-        //            client: ctx.address().recipient(),
-        //            resolution: FrameResolution::SD,
-        //        });
-
         ctx.address().do_send(StartWorker {});
     }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         debug!("Analysis actor stopping!");
-        // Unsubscribe actor
-        //        WsCameraServer::from_registry().do_send(Unsubscribe {
-        //            camera_id: 9,
-        //            client: ctx.address().recipient(),
-        //            resolution: FrameResolution::SD,
-        //        });
     }
 }
 
@@ -147,7 +151,7 @@ impl StreamHandler<BytesMut, std::io::Error> for AnalysisActor {
 
         match frame {
             Ok(f) => self.message_to_action(f, ctx),
-            Err(e) => error!("Error deserializing frame! {:?}", e.cause()),
+            Err(e) => error!("Error deserializing worker message! {:?}", e.cause()),
         }
     }
 
@@ -228,7 +232,7 @@ impl Handler<CameraFrame> for AnalysisActor {
             info!("Analysis actor: sending frame to worker...");
             let worker_message = AnalysisWorkerCommand::Frame(msg);
             if let Ok(serialized) = to_vec_named(&worker_message) {
-                self.frames_requested = self.frames_requested - 1;
+                self.frames_requested -= 1;
                 let fut = wrap_future(framed_stdin.send(Bytes::from(serialized)))
                     .map(|sink, actor: &mut Self, _ctx| {
                         actor.worker_stdin = Some(sink);

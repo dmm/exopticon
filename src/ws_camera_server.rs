@@ -4,7 +4,7 @@ use crate::actix::prelude::*;
 
 /// Available frame types
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
-#[serde(tag = "type")]
+//#[serde(tag = "type")]
 pub enum FrameResolution {
     /// Standard definition frame, 480p
     SD,
@@ -12,13 +12,16 @@ pub enum FrameResolution {
     HD,
 }
 
+/// Description of source that produced frame
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 pub enum FrameSource {
     /// Camera with camera id
     Camera(i32),
     /// Analysis Engine, with engine id
     AnalysisEngine {
+        /// id of source analysis engine
         analysis_engine_id: i32,
+        /// identifying tag for analysis frame
         tag: String,
     },
 }
@@ -48,7 +51,9 @@ pub struct CameraFrame {
 /// Subscription subject
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 pub enum SubscriptionSubject {
+    /// A camera id and frame resolution
     Camera(i32, FrameResolution),
+    /// Analysis engine id
     AnalysisEngine(i32),
 }
 

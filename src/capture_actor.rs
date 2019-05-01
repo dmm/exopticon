@@ -142,7 +142,10 @@ impl CaptureActor {
     fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<Self>) {
         // Check if log
         match msg.message_type.as_str() {
-            "log" => debug!("Worker log message: {}", msg.message),
+            "log" => debug!(
+                "Capture worker {} log message: {}",
+                self.camera_id, msg.message
+            ),
             "frame" => {
                 if self.video_unit_id.is_none() {
                     error!("Video Unit id not set!");

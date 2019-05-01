@@ -38,13 +38,7 @@ export class VideoService {
     if (this.subscriberCount == 0) {
       this.subscription = this.subject.subscribe(
         () => {
-          this.subject.next(
-            {
-              command: 'ack',
-              resolution: { type: 'HD' },
-              cameraIds: [],
-            }
-          );
+          this.subject.next('Ack');
         },
         () => { },
         () => { }
@@ -66,22 +60,22 @@ export class VideoService {
         this.setupAcker();
         this.subscriberCount++;
         return {
-          command: 'subscribe',
-          resolution: { type: resolution },
-          cameraIds: [cameraId],
+          'Subscribe': {
+            'Camera': [cameraId, resolution],
+          }
         }
       },
       () => {
         this.subscriberCount--;
         this.cleanupAcker();
         return {
-          command: 'unsubscribe',
-          resolution: { type: resolution },
-          cameraIds: [cameraId],
-        };
+          'Unsubscribe': {
+            'Camera': [cameraId, resolution]
+          }
+        }
       },
       (m) => {
-        return m.cameraId === cameraId && m.resolution.type === resolution;
+        return m.cameraId === cameraId && m.resolution === resolution;
       }
     );
   }

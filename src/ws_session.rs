@@ -31,16 +31,13 @@ base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
 /// A command from the client, transported over the websocket
 /// connection
 #[derive(Serialize, Deserialize)]
-struct WsCommand {
-    /// command type
-    command: String,
-
-    /// selected frame resolution
-    resolution: FrameResolution,
-
-    /// affected camera ids
-    #[serde(rename = "cameraIds")]
-    camera_ids: Vec<i32>,
+pub enum WsCommand {
+    /// Subscription request
+    Subscribe(SubscriptionSubject),
+    /// Unsubscription request
+    Unsubscribe(SubscriptionSubject),
+    /// frame ack response
+    Ack,
 }
 
 /// A frame of video from a camera stream. This struct is used to
@@ -191,28 +188,27 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             ws::Message::Text(text) => {
                 let cmd: Result<WsCommand, serde_json::Error> = serde_json::from_str(&text);
                 match cmd {
-                    Ok(c) => match c.command.as_ref() {
-                        "subscribe" => {
-                            for id in c.camera_ids {
-                                WsCameraServer::from_registry().do_send(Subscribe {
-                                    subject: SubscriptionSubject::Camera(id, c.resolution.clone()),
-                                    client: ctx.address().recipient(),
-                                });
-                            }
-                        }
-                        "unsubscribe" => {
-                            for id in c.camera_ids {
-                                WsCameraServer::from_registry().do_send(Unsubscribe {
-                                    subject: SubscriptionSubject::Camera(id, c.resolution.clone()),
-                                    client: ctx.address().recipient(),
-                                });
-                            }
-                        }
-                        "ack" => {
-                            self.ack();
-                        }
-                        _ => {}
-                    },
+                    Ok(WsCommand::Subscribe(SubscriptionSubject::Camera(id, resolution))) => {
+                        WsCameraServer::from_registry().do_send(Subscribe {
+                            subject: SubscriptionSubject::Camera(id, resolution),
+                            client: ctx.address().recipient(),
+                        });
+                    }
+                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::Camera(id, resolution))) => {
+                        WsCameraServer::from_registry().do_send(Unsubscribe {
+                            subject: SubscriptionSubject::Camera(id, resolution),
+                            client: ctx.address().recipient(),
+                        });
+                    }
+                    Ok(WsCommand::Subscribe(SubscriptionSubject::AnalysisEngine(_id))) => {
+                        error!("Analysis subscription isn't handled yet!");
+                    }
+                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::AnalysisEngine(_id))) => {
+                        error!("Analysis unsubscription isn't handled yet!");
+                    }
+                    Ok(WsCommand::Ack) => {
+                        self.ack();
+                    }
                     Err(e) => {
                         error!("Error deserializing message {}. Ignoring...", e);
                     }
