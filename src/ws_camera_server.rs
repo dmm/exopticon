@@ -90,49 +90,28 @@ struct FrameType {
 #[derive(Default)]
 pub struct WsCameraServer {
     /// Collection of Client's subscribed to a particular FrameType
-    subscriptions: HashMap<FrameType, HashSet<Client>>,
+    subscriptions: HashMap<SubscriptionSubject, HashSet<Client>>,
 }
 
 impl WsCameraServer {
     /// Add WsSession subscriber
-    fn add_camera_subscriber(
-        &mut self,
-        camera_id: i32,
-        client: Client,
-        resolution: FrameResolution,
-    ) -> bool {
-        // Try to find CameraSubscription for camera_id
-        let frame_type = FrameType {
-            camera_id,
-            resolution,
-        };
-
-        if let Some(subscription) = self.subscriptions.get_mut(&frame_type) {
+    fn add_subscriber(&mut self, subject: &SubscriptionSubject, client: Client) -> bool {
+        if let Some(subscription) = self.subscriptions.get_mut(subject) {
             subscription.insert(client)
         } else {
+            self.subscriptions.insert(subject.clone(), HashSet::new());
             self.subscriptions
-                .insert(frame_type.clone(), HashSet::new());
-            self.subscriptions
-                .get_mut(&frame_type)
+                .get_mut(subject)
                 .expect("The subscriptions HashSet we just inserted is missing.")
                 .insert(client)
         }
     }
 
     /// Removes WsSession as subscriber
-    fn remove_camera_subscriber(
-        &mut self,
-        camera_id: i32,
-        client: &Client,
-        resolution: &FrameResolution,
-    ) {
-        let frame_type = FrameType {
-            camera_id,
-            resolution: resolution.clone(),
-        };
-        if let Some(subscription) = self.subscriptions.get_mut(&frame_type) {
+    fn remove_subscriber(&mut self, subject: &SubscriptionSubject, client: &Client) {
+        if let Some(subscription) = self.subscriptions.get_mut(subject) {
             if subscription.remove(client) {
-                debug!("Removing subscriber... {}", camera_id);
+                debug!("Removing subscriber...",);
             } else {
                 debug!("Couldn't find the subscription camera...");
             }
@@ -149,11 +128,16 @@ impl WsCameraServer {
     /// * `ctx` - WsCameraServer Context
     ///
     fn send_frame(&mut self, frame: &CameraFrame, ctx: &<Self as Actor>::Context) {
-        let frame_type = FrameType {
-            camera_id: frame.camera_id,
-            resolution: frame.resolution.clone(),
+        let subject = match frame.source {
+            FrameSource::Camera(camera_id) => {
+                SubscriptionSubject::Camera(camera_id, frame.resolution.clone())
+            }
+
+            FrameSource::AnalysisEngine {
+                analysis_engine_id, ..
+            } => SubscriptionSubject::AnalysisEngine(analysis_engine_id),
         };
-        if let Some(subscription) = self.subscriptions.get(&frame_type) {
+        if let Some(subscription) = self.subscriptions.get(&subject) {
             for client in subscription.iter() {
                 if client.do_send(frame.to_owned()).is_err() {
                     debug!(
@@ -185,11 +169,7 @@ impl Handler<Subscribe> for WsCameraServer {
     type Result = ();
 
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> Self::Result {
-        if let (SubscriptionSubject::Camera(camera_id, resolution), client) =
-            (msg.subject, msg.client)
-        {
-            self.add_camera_subscriber(camera_id, client, resolution);
-        }
+        self.add_subscriber(&msg.subject, msg.client);
     }
 }
 
@@ -197,11 +177,7 @@ impl Handler<Unsubscribe> for WsCameraServer {
     type Result = ();
 
     fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) -> Self::Result {
-        if let (SubscriptionSubject::Camera(camera_id, resolution), client) =
-            (msg.subject, msg.client)
-        {
-            self.remove_camera_subscriber(camera_id, &client, &resolution);
-        }
+        self.remove_subscriber(&msg.subject, &msg.client);
     }
 }
 

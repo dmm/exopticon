@@ -75,7 +75,7 @@ export class VideoService {
         }
       },
       (m) => {
-        return m.cameraId === cameraId && m.resolution === resolution;
+        return m.source.Camera === cameraId && m.resolution === resolution;
       }
     );
   }

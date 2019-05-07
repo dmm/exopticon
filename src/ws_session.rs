@@ -13,7 +13,8 @@ use base64::STANDARD_NO_PAD;
 use crate::app::RouteState;
 use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
-    CameraFrame, FrameResolution, Subscribe, SubscriptionSubject, Unsubscribe, WsCameraServer,
+    CameraFrame, FrameResolution, FrameSource, Subscribe, SubscriptionSubject, Unsubscribe,
+    WsCameraServer,
 };
 
 /// Represents different serializations available for communicating
@@ -45,20 +46,18 @@ pub enum WsCommand {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RawCameraFrame {
-    /// Camera id
+    /// id of camera that produced frame
     pub camera_id: i32,
-
-    /// Frame resolution
-    pub resolution: FrameResolution,
-
-    /// Frame image encoded as jpeg
+    /// jpeg image data
     #[serde(with = "Base64Standard")]
     pub jpeg: Vec<u8>,
-
-    /// id of owning video unit
+    /// resolution of frame
+    pub resolution: FrameResolution,
+    /// source of frame
+    pub source: FrameSource,
+    /// id of video unit
     pub video_unit_id: i32,
-
-    /// frame offset from beginning of video unit
+    /// offset from beginning of video unit
     pub offset: i64,
 }
 
@@ -158,6 +157,7 @@ impl Handler<CameraFrame> for WsSession {
             camera_id: msg.camera_id,
             jpeg: msg.jpeg,
             resolution: msg.resolution,
+            source: msg.source,
             video_unit_id: msg.video_unit_id,
             offset: msg.offset,
         };
@@ -200,8 +200,11 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             client: ctx.address().recipient(),
                         });
                     }
-                    Ok(WsCommand::Subscribe(SubscriptionSubject::AnalysisEngine(_id))) => {
-                        error!("Analysis subscription isn't handled yet!");
+                    Ok(WsCommand::Subscribe(SubscriptionSubject::AnalysisEngine(id))) => {
+                        WsCameraServer::from_registry().do_send(Subscribe {
+                            subject: SubscriptionSubject::AnalysisEngine(id),
+                            client: ctx.address().recipient(),
+                        });
                     }
                     Ok(WsCommand::Unsubscribe(SubscriptionSubject::AnalysisEngine(_id))) => {
                         error!("Analysis unsubscription isn't handled yet!");
