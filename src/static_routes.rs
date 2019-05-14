@@ -101,7 +101,7 @@ pub fn fetch_static_file(req: &HttpRequest<RouteState>) -> HttpResponse {
         Err(_e) => return HttpResponse::NotFound().body("404 Not Found"),
     };
     info!("Static path: {}", tail);
-    let relpath = match PathBuf::from_param(tail.trim_left_matches('/')) {
+    let relpath = match PathBuf::from_param(tail.trim_start_matches('/')) {
         Ok(r) => r,
         Err(_e) => return HttpResponse::NotFound().body("404 Not Found"),
     };

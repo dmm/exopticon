@@ -151,7 +151,7 @@ impl StreamHandler<BytesMut, std::io::Error> for AnalysisActor {
 
         match frame {
             Ok(f) => self.message_to_action(f, ctx),
-            Err(e) => error!("Error deserializing worker message! {:?}", e.cause()),
+            Err(e) => error!("Error deserializing worker message! {:?}", e.source()),
         }
     }
 
