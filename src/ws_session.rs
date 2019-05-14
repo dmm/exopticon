@@ -83,7 +83,7 @@ impl WsSession {
     ///
     /// * `serialization` - Type of serialization to use MsgPack or Json
     ///
-    pub fn new(serialization: WsSerialization) -> Self {
+    pub const fn new(serialization: WsSerialization) -> Self {
         Self {
             ready: true,
             serialization,

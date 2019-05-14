@@ -90,7 +90,7 @@ pub struct AnalysisActor {
 
 impl AnalysisActor {
     /// Returns initialized `AnalysisActor`
-    pub fn new(id: i32, executable_name: String, arguments: Vec<String>) -> Self {
+    pub const fn new(id: i32, executable_name: String, arguments: Vec<String>) -> Self {
         Self {
             id,
             executable_name,

@@ -66,6 +66,7 @@ impl Handler<StopCaptureWorker> for CaptureSupervisor {
 impl CaptureSupervisor {
     /// Returns new initialized `CaptureSupervisor` struct, ready to be run
     pub fn new() -> Self {
+        #![allow(clippy::missing_const_for_fn)] // Vec::new not allowed in const_fn
         Self {
             workers: Vec::new(),
         }

@@ -41,7 +41,9 @@ impl Handler<StartDeletionWorker> for FileDeletionSupervisor {
 
 impl FileDeletionSupervisor {
     /// Create new file deletion supervisor
+
     pub fn new() -> Self {
+        #![allow(clippy::missing_const_for_fn)] // Vec::new not allowed in const_fn
         Self {
             workers: Vec::new(),
         }

@@ -89,7 +89,7 @@ pub struct CaptureActor {
 
 impl CaptureActor {
     /// Returns new initialized CaptureActor
-    pub fn new(
+    pub const fn new(
         db_addr: Addr<DbExecutor>,
         camera_id: i32,
         stream_url: String,

@@ -32,7 +32,7 @@ impl Actor for FileDeletionActor {
 
 impl FileDeletionActor {
     /// Returns newly initialized `FileDeletionActor`
-    pub fn new(camera_group_id: i32, db_addr: Addr<DbExecutor>) -> Self {
+    pub const fn new(camera_group_id: i32, db_addr: Addr<DbExecutor>) -> Self {
         Self {
             camera_group_id,
             db_addr,
