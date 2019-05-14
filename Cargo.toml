@@ -1,8 +1,14 @@
 
 [package]
 name = "exopticon"
+description = "A video surveillance system."
 version = "0.1.0"
+repository = "https://gitlab.com/dmattli/exopticon"
 authors = ["David Matthew Mattli <dmm@mattli.us>"]
+readme = "README.md"
+license = "AGPL-3.0"
+keywords = ["camera", "cctv", "onvif", "surveillance"]
+categories = ["web-programming"]
 edition = "2018"
 
 [workspace]

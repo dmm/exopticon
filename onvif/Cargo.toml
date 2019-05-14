@@ -2,6 +2,12 @@
 name = "onvif"
 version = "0.1.0"
 authors = ["David Matthew Mattli <dmm@mattli.us>"]
+description = "A binding for the ONVIF protocol used to control ip cameras."
+repository = "https://gitlab.com/dmattli/exopticon"
+readme = "README.md"
+license = "AGPL-3.0"
+keywords = ["camera", "cctv", "onvif"]
+categories = ["api-wrapper", "network-programming"]
 edition = "2018"
 
 [dependencies]
