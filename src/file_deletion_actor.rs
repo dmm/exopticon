@@ -73,7 +73,7 @@ impl FileDeletionActor {
                 self.camera_group_id, video_file.filename, video_file.size
             );
             match std::fs::remove_file(video_file.filename) {
-                _ => {}
+                serde::export::Ok(_) | serde::export::Err(_) => {}
             };
         }
 
