@@ -12,6 +12,7 @@
 #![allow(clippy::integer_arithmetic)]
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::multiple_crate_versions)]
+#![allow(clippy::implicit_return)]
 
 /// Exopticon is a free video surveillance system
 extern crate actix;
