@@ -2,7 +2,7 @@
   <div class="wrapper"
        *ngFor="let camera of cameras; let i = index"
        (mouseover)="selectCameraView(i); $event.stopPropagation();"
-       (mouseleave)="deselectCameraview; $event.stopPropagation();"
+       (mouseleave)="deselectCameraView; $event.stopPropagation();"
        (touchstart)="onTouchStart(i); $event.stopPropagation();">
     <div class="camera-width"></div>
     <div class="content">

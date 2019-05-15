@@ -17,7 +17,7 @@ export class CameraPanelComponent implements OnInit {
   pageVisible: boolean;
 
   constructor(private cameraService: CameraService,
-    private videoService: VideoService,
+    public videoService: VideoService,
     private cdr: ChangeDetectorRef) {
   }
 
