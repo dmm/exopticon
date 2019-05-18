@@ -17,15 +17,17 @@ export class VideoService {
 
   public connect(url?: string): WebSocketSubject<Object> {
     if (!url) {
+      let parse = document.createElement('a');
+      parse.href = document.querySelector('base')['href'];
+
       let loc = window.location;
       if (loc.protocol === "https:") {
         url = "wss:";
       } else {
         url = "ws:";
       }
-      url += "//" + loc.host;
-      url += loc.pathname + "v1/ws_json";
-      //      url = 'ws://localhost:3000/v1/ws_json';
+      url += `//${parse.host}/${parse.pathname}/v1/ws_json`;
+      console.log(`websocket url: ${url}`);
     }
     if (!this.subject) {
       this.subject = webSocket(url);
