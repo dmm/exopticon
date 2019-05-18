@@ -63,7 +63,7 @@ pub fn new(db: Addr<DbExecutor>, secret: &str) -> App<RouteState> {
             r.method(Method::DELETE).with(logout);
         })
         // routes for static files
-        .resource("/", |r| {
+        .default_resource(|r| {
             r.middleware(WebAuthMiddleware);
             r.method(Method::GET).with(index);
         })
