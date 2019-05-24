@@ -1,10 +1,8 @@
-use std::collections::{HashMap, HashSet};
-
 use crate::actix::prelude::*;
+use std::collections::{HashMap, HashSet};
 
 /// Available frame types
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
-//#[serde(tag = "type")]
 pub enum FrameResolution {
     /// Standard definition frame, 480p
     SD,
@@ -14,9 +12,15 @@ pub enum FrameResolution {
 
 /// Description of source that produced frame
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
 pub enum FrameSource {
     /// Camera with camera id
-    Camera(i32),
+    Camera {
+        /// id of camera
+        #[serde(rename = "cameraId")]
+        camera_id: i32,
+    },
     /// Analysis Engine, with engine id
     AnalysisEngine {
         /// id of source analysis engine
@@ -129,7 +133,7 @@ impl WsCameraServer {
     ///
     fn send_frame(&mut self, frame: &CameraFrame, ctx: &<Self as Actor>::Context) {
         let subject = match frame.source {
-            FrameSource::Camera(camera_id) => {
+            FrameSource::Camera { camera_id } => {
                 SubscriptionSubject::Camera(camera_id, frame.resolution.clone())
             }
 

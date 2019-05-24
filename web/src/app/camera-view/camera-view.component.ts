@@ -4,7 +4,7 @@ import { Observable, Subscription } from 'rxjs';
 
 import { Camera } from '../camera';
 import { VideoService } from '../video.service';
-import { FrameMessage } from '../frame-message';
+import { CameraResolution, FrameMessage } from '../frame-message';
 
 @Component({
   selector: 'app-camera-view',
@@ -63,7 +63,11 @@ export class CameraViewComponent implements OnInit {
       this.frameService = undefined;
     }
 
-    this.frameService = this.videoService.getObservable(this.camera.id, 'SD');
+    this.frameService = this.videoService.getObservable({
+      kind: 'camera',
+      cameraId: this.camera.id,
+      resolution: CameraResolution.Sd,
+    });
     this.subscription = this.frameService.subscribe(
       (message) => {
         if (this.status !== 'active') {

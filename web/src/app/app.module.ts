@@ -11,6 +11,7 @@ import { CameraService } from './camera.service';
 import { CameraViewComponent } from './camera-view/camera-view.component';
 import { CameraOverlayComponent } from './camera-overlay/camera-overlay.component';
 import { CameraStatusOverlayComponent } from './camera-status-overlay/camera-status-overlay.component';
+import { AnalysisPanelComponent } from './analysis-panel/analysis-panel.component';
 
 @NgModule({
   declarations: [
@@ -19,6 +20,7 @@ import { CameraStatusOverlayComponent } from './camera-status-overlay/camera-sta
     CameraViewComponent,
     CameraOverlayComponent,
     CameraStatusOverlayComponent,
+    AnalysisPanelComponent,
   ],
   imports: [
     AngularPageVisibilityModule,

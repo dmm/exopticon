@@ -154,7 +154,9 @@ impl CaptureActor {
                     camera_id: self.camera_id,
                     jpeg: msg.jpeg,
                     resolution: FrameResolution::HD,
-                    source: FrameSource::Camera(self.camera_id),
+                    source: FrameSource::Camera {
+                        camera_id: self.camera_id,
+                    },
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
                     offset: self.offset,
                 });
@@ -165,7 +167,9 @@ impl CaptureActor {
                     camera_id: self.camera_id,
                     jpeg: msg.scaled_jpeg,
                     resolution: FrameResolution::SD,
-                    source: FrameSource::Camera(self.camera_id),
+                    source: FrameSource::Camera {
+                        camera_id: self.camera_id,
+                    },
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
                     offset: self.offset,
                 });

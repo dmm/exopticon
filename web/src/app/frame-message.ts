@@ -1,19 +1,25 @@
 
-export class AnalysisSource {
-  analysis_engine_id: number;
-  tag: string;
+export enum CameraResolution {
+  Sd = 'SD',
+  Hd = 'HD',
 }
 
-export class FrameSource {
-  Camera: number;
-  AnalysisEngine: AnalysisSource;
+export interface CameraSource {
+  kind: 'camera';
+  cameraId: number;
 }
+
+export interface AnalysisSource {
+  kind: 'analysis';
+  analysisEngineId: number;
+}
+
+export type FrameSource = AnalysisSource | CameraSource;
 
 export class FrameMessage {
-  cameraId: number;
-  resolution: string;
   source: FrameSource;
+  resolution: CameraResolution;
   jpeg: string;
-  video_unit_id: number;
+  videoUnitId: number;
   offset: number;
 }

@@ -2,7 +2,22 @@ import { Injectable } from '@angular/core';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
-import { FrameMessage } from './frame-message';
+import { FrameMessage, CameraResolution } from './frame-message';
+
+
+
+export interface CameraSubject {
+  kind: 'camera';
+  cameraId: number;
+  resolution: CameraResolution;
+}
+
+export interface AnalysisSubject {
+  kind: 'analysis';
+  analysisEngineId: number;
+}
+
+export type SubscriptionSubject = AnalysisSubject | CameraSubject;
 
 @Injectable({
   providedIn: 'root'
@@ -54,32 +69,45 @@ export class VideoService {
     }
   }
 
-  public getObservable(cameraId: number, resolution: string): Observable<FrameMessage> {
+  public getObservable(subject: SubscriptionSubject): Observable<FrameMessage> {
     let frameSub: WebSocketSubject<FrameMessage> = this.subject as unknown as WebSocketSubject<FrameMessage>;
 
     return frameSub.multiplex(
       () => {
         this.setupAcker();
         this.subscriberCount++;
-        return {
-          'Subscribe': {
-            'Camera': [cameraId, resolution],
-          }
+        switch (subject.kind) {
+          case 'camera':
+            return {
+              'Subscribe': {
+                'Camera': [subject.cameraId, subject.resolution],
+              }
+            }
         }
       },
       () => {
         this.subscriberCount--;
         this.cleanupAcker();
-        return {
-          'Unsubscribe': {
-            'Camera': [cameraId, resolution]
-          }
+        switch (subject.kind) {
+          case 'camera':
+            return {
+              'Unsubscribe': {
+                'Camera': [subject.cameraId, subject.resolution],
+              }
+            }
         }
       },
-      (m) => {
-        return m.source.Camera === cameraId && m.resolution === resolution;
-      }
-    );
+      (m: FrameMessage): boolean => {
+        switch (m.source.kind) {
+          case 'camera':
+            return subject.kind === 'camera'
+              && subject.cameraId === m.source.cameraId
+              && subject.resolution === m.resolution;
+          case 'analysis':
+            return subject.kind === 'analysis'
+              && subject.analysisEngineId === m.source.analysisEngineId;
+        }
+      });
   }
 
   public getWriteSubject(): Subject<Object> {
