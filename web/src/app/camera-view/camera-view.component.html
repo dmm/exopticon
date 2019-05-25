@@ -1,9 +1,8 @@
-<div
-  (inViewportChange)="onInViewportChange($event)"
-  snInViewport
-  [inViewportOptions]="{rootMargin: '-10% 0% -10% 0%'}">
+<div>
   <app-camera-overlay [camera]="camera" *ngIf="selected"></app-camera-overlay>
   <app-camera-status-overlay *ngIf="status !== 'active'"
                              [status]="status"></app-camera-status-overlay>
-  <img #imgframe />
+  <app-video-view [videoService]="videoService" [videoSubject]="videoSubject"
+                  (status)="onVideoStatusChange($event)">
+  </app-video-view>
 </div>

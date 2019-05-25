@@ -12,6 +12,7 @@ import { CameraViewComponent } from './camera-view/camera-view.component';
 import { CameraOverlayComponent } from './camera-overlay/camera-overlay.component';
 import { CameraStatusOverlayComponent } from './camera-status-overlay/camera-status-overlay.component';
 import { AnalysisPanelComponent } from './analysis-panel/analysis-panel.component';
+import { VideoViewComponent } from './video-view/video-view.component';
 
 @NgModule({
   declarations: [
@@ -21,6 +22,7 @@ import { AnalysisPanelComponent } from './analysis-panel/analysis-panel.componen
     CameraOverlayComponent,
     CameraStatusOverlayComponent,
     AnalysisPanelComponent,
+    VideoViewComponent,
   ],
   imports: [
     AngularPageVisibilityModule,
