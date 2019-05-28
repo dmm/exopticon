@@ -206,8 +206,11 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             client: ctx.address().recipient(),
                         });
                     }
-                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::AnalysisEngine(_id))) => {
-                        error!("Analysis unsubscription isn't handled yet!");
+                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::AnalysisEngine(id))) => {
+                        WsCameraServer::from_registry().do_send(Unsubscribe {
+                            subject: SubscriptionSubject::AnalysisEngine(id),
+                            client: ctx.address().recipient(),
+                        });
                     }
                     Ok(WsCommand::Ack) => {
                         self.ack();

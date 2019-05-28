@@ -10,7 +10,7 @@ export interface CameraSource {
 }
 
 export interface AnalysisSource {
-  kind: 'analysis';
+  kind: 'analysisEngine';
   analysisEngineId: number;
 }
 

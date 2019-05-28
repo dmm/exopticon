@@ -1,5 +1,7 @@
-import { Component, OnInit } from '@angular/core';
-import { VideoService } from '../video.service';
+import { Component, OnInit, Input } from '@angular/core';
+import { SubscriptionSubject, VideoService } from '../video.service';
+import { switchMap } from 'rxjs/operators';
+import { Router, ActivatedRoute, ParamMap } from '@angular/router';
 
 @Component({
   selector: 'app-analysis-panel',
@@ -7,10 +9,21 @@ import { VideoService } from '../video.service';
   styleUrls: ['./analysis-panel.component.css']
 })
 export class AnalysisPanelComponent implements OnInit {
+  @Input() analysisEngineId: number;
 
-  constructor(private videoService: VideoService) { }
+  public videoSubject: SubscriptionSubject;
+
+  constructor(public route: ActivatedRoute,
+    public videoService: VideoService) { }
 
   ngOnInit() {
+    this.videoService.connect();
+    let id = this.route.snapshot.paramMap.get('id');
+    this.videoSubject =
+      {
+        kind: 'analysisEngine',
+        analysisEngineId: parseInt(id, 10),
+      };
   }
 
 }

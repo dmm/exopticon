@@ -24,6 +24,7 @@ pub enum FrameSource {
     /// Analysis Engine, with engine id
     AnalysisEngine {
         /// id of source analysis engine
+        #[serde(rename = "analysisEngineId")]
         analysis_engine_id: i32,
         /// identifying tag for analysis frame
         tag: String,
@@ -142,11 +143,12 @@ impl WsCameraServer {
             } => SubscriptionSubject::AnalysisEngine(analysis_engine_id),
         };
         if let Some(subscription) = self.subscriptions.get(&subject) {
+            let sub_count = subscription.len();
             for client in subscription.iter() {
                 if client.do_send(frame.to_owned()).is_err() {
                     debug!(
-                        "Send failed for {} {:?}",
-                        &frame.camera_id, &frame.resolution
+                        "Send failed for {} {:?}, {} subscribers",
+                        &frame.camera_id, &frame.resolution, sub_count
                     );
                     ctx.address().do_send(Unsubscribe {
                         subject: SubscriptionSubject::Camera(

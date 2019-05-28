@@ -13,7 +13,7 @@ export interface CameraSubject {
 }
 
 export interface AnalysisSubject {
-  kind: 'analysis';
+  kind: 'analysisEngine';
   analysisEngineId: number;
 }
 
@@ -82,7 +82,13 @@ export class VideoService {
               'Subscribe': {
                 'Camera': [subject.cameraId, subject.resolution],
               }
-            }
+            };
+          case 'analysisEngine':
+            return {
+              'Subscribe': {
+                'AnalysisEngine': subject.analysisEngineId,
+              }
+            };
         }
       },
       () => {
@@ -94,7 +100,14 @@ export class VideoService {
               'Unsubscribe': {
                 'Camera': [subject.cameraId, subject.resolution],
               }
-            }
+            };
+          case 'analysisEngine':
+            return {
+              'Unsubscribe': {
+                'AnalysisEngine': subject.analysisEngineId,
+              }
+            };
+
         }
       },
       (m: FrameMessage): boolean => {
@@ -103,8 +116,8 @@ export class VideoService {
             return subject.kind === 'camera'
               && subject.cameraId === m.source.cameraId
               && subject.resolution === m.resolution;
-          case 'analysis':
-            return subject.kind === 'analysis'
+          case 'analysisEngine':
+            return subject.kind === 'analysisEngine'
               && subject.analysisEngineId === m.source.analysisEngineId;
         }
       });
