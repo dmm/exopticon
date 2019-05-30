@@ -102,6 +102,8 @@ impl WsSession {
     fn ack(&mut self) {
         self.live_frames -= 1;
 
+        self.live_frames = std::cmp::max(self.live_frames, 0);
+
         if self.live_frames < self.window_size && self.window_size < 10 {
             self.window_size += 1;
         }
