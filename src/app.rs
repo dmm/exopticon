@@ -11,7 +11,8 @@ use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
 };
 use crate::camera_routes::{
-    create_camera, discover, fetch_all_cameras, fetch_camera, fetch_time, set_time, update_camera,
+    create_camera, discover, fetch_all_cameras, fetch_camera, fetch_ntp, fetch_time, set_ntp,
+    set_time, update_camera,
 };
 use crate::chrono::Duration;
 
@@ -112,6 +113,10 @@ pub fn new(db: Addr<DbExecutor>, secret: &str) -> App<RouteState> {
                 .resource("/cameras/{id}/time", |r| {
                     r.method(Method::GET).with(fetch_time);
                     r.method(Method::POST).with(set_time);
+                })
+                .resource("/cameras/{id}/ntp", |r| {
+                    r.method(Method::GET).with(fetch_ntp);
+                    r.method(Method::POST).with(set_ntp);
                 })
                 // routes to video_unit
                 .resource("/video_units/{id}", |r| {

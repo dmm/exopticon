@@ -5,7 +5,7 @@ use futures::future::Future;
 use std::time::Duration;
 
 use onvif;
-use onvif::camera::DeviceDateAndTime;
+use onvif::camera::{DeviceDateAndTime, DeviceNtpSettings};
 
 use crate::app::RouteState;
 use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
@@ -121,11 +121,7 @@ pub fn fetch_time(
 /// * `state` - route state struct
 ///
 pub fn set_time(
-    (path, datetime, state): (
-        Path<i32>,
-        Option<Json<DeviceDateAndTime>>,
-        State<RouteState>,
-    ),
+    (path, datetime, state): (Path<i32>, Json<DeviceDateAndTime>, State<RouteState>),
 ) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db
@@ -141,16 +137,73 @@ pub fn set_time(
                     username: camera.username,
                     password: camera.password,
                 };
-                let dt = match datetime {
-                    Some(a) => a.into_inner(),
-                    None => DeviceDateAndTime::new(chrono::Utc::now()),
-                };
+                let dt = datetime.into_inner();
 
                 Either::A(
                     onvif_cam
                         .set_date_and_time(&dt)
                         .map_err(actix_web::error::ErrorBadRequest)
                         .and_then(|_| Ok(HttpResponse::Ok().finish())),
+                )
+            }
+            Err(_err) => Either::B(future::done(Ok(HttpResponse::NotFound().finish()))),
+        })
+        .responder()
+}
+
+/// Returns current ntp settings of camera
+pub fn fetch_ntp(
+    (path, state): (Path<i32>, State<RouteState>),
+) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+    state
+        .db
+        .send(FetchCamera {
+            id: path.into_inner(),
+        })
+        .map_err(actix_web::error::ErrorBadRequest)
+        .and_then(|db_response| match db_response {
+            Ok(camera) => {
+                let onvif_cam = onvif::camera::Camera {
+                    host: camera.ip,
+                    port: camera.onvif_port,
+                    username: camera.username,
+                    password: camera.password,
+                };
+                Either::A(
+                    onvif_cam
+                        .get_ntp()
+                        .map_err(actix_web::error::ErrorBadRequest)
+                        .and_then(|datetime| Ok(HttpResponse::Ok().json(datetime))),
+                )
+            }
+            Err(_err) => Either::B(future::done(Ok(HttpResponse::NotFound().finish()))),
+        })
+        .responder()
+}
+
+/// Returns current ntp settings of camera
+pub fn set_ntp(
+    (path, ntp_settings, state): (Path<i32>, Json<DeviceNtpSettings>, State<RouteState>),
+) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+    state
+        .db
+        .send(FetchCamera {
+            id: path.into_inner(),
+        })
+        .map_err(actix_web::error::ErrorBadRequest)
+        .and_then(|db_response| match db_response {
+            Ok(camera) => {
+                let onvif_cam = onvif::camera::Camera {
+                    host: camera.ip,
+                    port: camera.onvif_port,
+                    username: camera.username,
+                    password: camera.password,
+                };
+                Either::A(
+                    onvif_cam
+                        .set_ntp(ntp_settings.into_inner())
+                        .map_err(actix_web::error::ErrorBadRequest)
+                        .and_then(|datetime| Ok(HttpResponse::Ok().json(datetime))),
                 )
             }
             Err(_err) => Either::B(future::done(Ok(HttpResponse::NotFound().finish()))),

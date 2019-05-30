@@ -75,6 +75,7 @@ impl<'de> Deserialize<'de> for TimeType {
 
 /// Struct representing device date and time settings
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DeviceDateAndTime {
     /// specifies whether ntp is enabled for device
     pub time_type: TimeType,
@@ -86,19 +87,45 @@ pub struct DeviceDateAndTime {
     pub timezone: String,
 
     /// utc time for device
-    pub utc_datetime: DateTime<Utc>,
+    pub utc_datetime: Option<DateTime<Utc>>,
 }
 
 impl DeviceDateAndTime {
     /// Returns new DeviceDateAndTime struct
-    pub fn new(time: DateTime<Utc>) -> Self {
+    pub fn new() -> Self {
         Self {
             time_type: TimeType::Manual,
             daylight_savings: false,
             timezone: String::from("UTC"),
-            utc_datetime: time,
+            utc_datetime: None,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum NtpType {
+    Ipv4,
+    Ipv6,
+    Dns,
+}
+
+impl std::fmt::Display for NtpType {
+    /// Implementing display format for the TimeType enum
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            NtpType::Ipv4 => write!(f, "IPv4"),
+            NtpType::Ipv6 => write!(f, "IPv6"),
+            NtpType::Dns => write!(f, "DNS"),
+        }
+    }
+}
+
+/// Struct representing device ntp settings
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceNtpSettings {
+    pub from_dhcp: bool,
+    pub ntp_specification: Option<(NtpType, String)>,
 }
 
 impl Camera {
@@ -112,7 +139,6 @@ impl Camera {
         )
     }
 
-    /// Returns unparsed body of get date and time request
     pub fn request_get_date_and_time(&self) -> impl Future<Item = Vec<u8>, Error = Error> {
         let request_body = r#"
   <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
@@ -191,7 +217,7 @@ impl Camera {
             time_type: date_time_type,
             daylight_savings,
             timezone,
-            utc_datetime: camera_datetime,
+            utc_datetime: Some(camera_datetime),
         })
     }
 
@@ -214,12 +240,10 @@ impl Camera {
         &self,
         datetime: &DeviceDateAndTime,
     ) -> impl Future<Item = Vec<u8>, Error = Error> {
-        let body = format!(
-            r#"
-          <SetSystemDateAndTime
-             xmlns="http://www.onvif.org/ver10/device/wsdl">
-            <DateTimeType>{}</DateTimeType>
-            <DaylightSavings>{}</DaylightSavings>
+        let utc_body = match datetime.utc_datetime {
+            None => String::new(),
+            Some(utc) => format!(
+                r#"
             <UTCDateTime>
               <Time xmlns="http://www.onvif.org/ver10/schema">
                 <Hour>{}</Hour>
@@ -232,16 +256,28 @@ impl Camera {
                 <Day>{}</Day>
               </Date>
             </UTCDateTime>
+            "#,
+                utc.hour(),
+                utc.minute(),
+                utc.second(),
+                utc.year(),
+                utc.month(),
+                utc.day()
+            ),
+        };
+        let body = format!(
+            r#"
+          <SetSystemDateAndTime
+             xmlns="http://www.onvif.org/ver10/device/wsdl">
+            <DateTimeType>{}</DateTimeType>
+            <DaylightSavings>{}</DaylightSavings>
+            <Timezone>
+              <TZ xmlns="http://www.onvif.org/ver10/schema">{}</TZ>
+            </Timezone>
+            {}
           </SetSystemDateAndTime>
            "#,
-            datetime.time_type,
-            datetime.daylight_savings,
-            datetime.utc_datetime.hour(),
-            datetime.utc_datetime.minute(),
-            datetime.utc_datetime.second(),
-            datetime.utc_datetime.year(),
-            datetime.utc_datetime.month(),
-            datetime.utc_datetime.day(),
+            datetime.time_type, datetime.daylight_savings, datetime.timezone, utc_body,
         );
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
@@ -302,6 +338,106 @@ impl Camera {
         Box::new(
             self.request_set_date_and_time(datetime)
                 .and_then(Self::parse_set_date_and_time)
+                .map_err(|_err| Error::ConnectionFailed),
+        )
+    }
+
+    /// Returns NTP configuration on success.
+    pub fn request_get_ntp(&self) -> impl Future<Item = Vec<u8>, Error = Error> {
+        {
+            let body = format!(
+                r#"
+          <GetNTP
+             xmlns="http://www.onvif.org/ver10/device/wsdl">
+          </GetNTP>
+           "#
+            );
+
+            let header = match envelope_header(&self.username, &self.password) {
+                Ok(h) => h,
+                Err(err) => return Either::A(futures::future::err(err)),
+            };
+            let body = format!("{}{}{}", header, body, envelope_footer());
+
+            Either::B(soap_request(&self.url(), body))
+        }
+    }
+
+    /// Returns NTP configuration
+    pub fn parse_get_ntp(body: Vec<u8>) -> Result<(), Error> {
+        let string_body = String::from_utf8(body)?;
+        let doc = parser::parse(&string_body)?;
+        let doc = doc.as_document();
+        info!("{}", string_body);
+        let from_dhcp = evaluate_xpath(&doc, "//*[local-name()='FromDHCP'][1]")?
+            .string()
+            .parse::<bool>()?;
+
+        info!("From dhcp: {}", from_dhcp);
+        return Err(Error::InvalidResponse);
+    }
+
+    pub fn get_ntp(&self) -> Box<Future<Item = (), Error = Error>> {
+        Box::new(
+            self.request_get_ntp()
+                .and_then(Self::parse_get_ntp)
+                .map_err(|_err| Error::ConnectionFailed),
+        )
+    }
+
+    pub fn request_set_ntp(
+        &self,
+        ntp_settings: DeviceNtpSettings,
+    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+        let manual_body = match ntp_settings.ntp_specification {
+            Some((ntp_type, ntp_server)) => format!(
+                r#"
+                <NTPManual>
+                  <Type xmlns="http://www.onvif.org/ver10/schema">{}</Type>
+                  <IPv4Address xmlns="http://www.onvif.org/ver10/schema">{}</IPv4Address>
+                </NTPManual>
+                "#,
+                ntp_type, ntp_server,
+            ),
+            None => String::new(),
+        };
+
+        let body = format!(
+            r#"
+          <SetNTP xmlns="http://www.onvif.org/ver10/device/wsdl">
+            <FromDHCP>{}</FromDHCP>
+            {}
+          </SetNTP>
+           "#,
+            ntp_settings.from_dhcp, manual_body,
+        );
+
+        let header = match envelope_header(&self.username, &self.password) {
+            Ok(h) => h,
+            Err(err) => return Either::A(futures::future::err(err)),
+        };
+        let body = format!("{}{}{}", header, body, envelope_footer());
+        debug!("SetNTP: {}", body);
+        Either::B(soap_request(&self.url(), body))
+    }
+
+    pub fn parse_set_ntp(body: Vec<u8>) -> Result<(), Error> {
+        let string_body = String::from_utf8(body)?;
+        let doc = parser::parse(&string_body)?;
+        let doc = doc.as_document();
+        debug!("SetNtp Response: {}", string_body);
+        evaluate_xpath(&doc, "//*[local-name()='SetNTPResponse'][1]")?.string();
+        // If the SetNTPResponse node is present the command was a success
+        Ok(())
+    }
+
+    pub fn set_ntp(
+        &self,
+        ntp_settings: DeviceNtpSettings,
+    ) -> Box<Future<Item = (), Error = Error>> {
+        Box::new(
+            self.request_set_ntp(ntp_settings)
+                .and_then(Self::parse_set_ntp)
                 .map_err(|_err| Error::ConnectionFailed),
         )
     }

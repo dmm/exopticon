@@ -55,3 +55,9 @@ impl From<std::num::ParseIntError> for Error {
         Error::InvalidResponse
     }
 }
+
+impl From<std::str::ParseBoolError> for Error {
+    fn from(_err: std::str::ParseBoolError) -> Self {
+        Error::InvalidResponse
+    }
+}

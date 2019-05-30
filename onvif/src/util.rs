@@ -75,7 +75,12 @@ fn generate_security_block(username: &str, password: &str) -> Result<String, Err
 pub fn envelope_header(username: &str, password: &str) -> Result<String, Error> {
     let security_block = generate_security_block(username, password)?;
     Ok(format!(r#"
-     <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing">
+     <s:Envelope
+      xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+      xmlns:a="http://www.w3.org/2005/08/addressing"
+      xmlns:tt="http://www.onvif.org/ver10/schema"
+      xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+
   <s:Header>{}</s:Header>
   <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">"#, security_block))
 }
