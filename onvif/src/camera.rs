@@ -5,8 +5,9 @@ use chrono::{DateTime, Datelike, Timelike, Utc};
 use futures::future::Either;
 use futures::Future;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::str::FromStr;
 use sxd_document::parser;
-use sxd_xpath::evaluate_xpath;
+use sxd_xpath::{evaluate_xpath, Value};
 
 use crate::error::Error;
 use crate::util::{envelope_footer, envelope_header, soap_request};
@@ -90,9 +91,9 @@ pub struct DeviceDateAndTime {
     pub utc_datetime: Option<DateTime<Utc>>,
 }
 
-impl DeviceDateAndTime {
+impl Default for DeviceDateAndTime {
     /// Returns new DeviceDateAndTime struct
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self {
             time_type: TimeType::Manual,
             daylight_savings: false,
@@ -102,10 +103,14 @@ impl DeviceDateAndTime {
     }
 }
 
+/// Specifies format of ntp server
 #[derive(Debug, Serialize, Deserialize)]
 pub enum NtpType {
+    /// an ipv4 address
     Ipv4,
+    /// an ipv6 address
     Ipv6,
+    /// a dns hostname
     Dns,
 }
 
@@ -119,13 +124,27 @@ impl std::fmt::Display for NtpType {
         }
     }
 }
+impl FromStr for NtpType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "IPV4" => Ok(NtpType::Ipv4),
+            "IPV6" => Ok(NtpType::Ipv6),
+            "DNS" => Ok(NtpType::Dns),
+            _ => Err(Error::InvalidArgument),
+        }
+    }
+}
 
 /// Struct representing device ntp settings
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DeviceNtpSettings {
-    pub from_dhcp: bool,
-    pub ntp_specification: Option<(NtpType, String)>,
+pub struct NtpSettings {
+    /// should ntp settings come from ntp
+    from_dhcp: bool,
+    /// vec of ntp server names
+    ntp_server_hostnames: Option<Vec<String>>,
 }
 
 impl Camera {
@@ -139,6 +158,9 @@ impl Camera {
         )
     }
 
+    /// Perform request for date and time information from
+    /// camera. Returns xml response body.
+    ///
     pub fn request_get_date_and_time(&self) -> impl Future<Item = Vec<u8>, Error = Error> {
         let request_body = r#"
   <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
@@ -151,7 +173,12 @@ impl Camera {
         soap_request(&self.url(), request_body.to_string())
     }
 
-    /// Returns parsed date and time body
+    /// Returns parsed date and time body.
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - response body from camera
+    ///
     pub fn parse_get_date_and_time(body: Vec<u8>) -> Result<DeviceDateAndTime, Error> {
         let string_body = String::from_utf8(body)?;
         let doc = parser::parse(&string_body)?;
@@ -342,16 +369,15 @@ impl Camera {
         )
     }
 
-    /// Returns NTP configuration on success.
+    /// Performs request to get ntp configuration and returns response
+    /// text on success.
     pub fn request_get_ntp(&self) -> impl Future<Item = Vec<u8>, Error = Error> {
         {
-            let body = format!(
-                r#"
+            let body = r#"
           <GetNTP
              xmlns="http://www.onvif.org/ver10/device/wsdl">
           </GetNTP>
-           "#
-            );
+           "#;
 
             let header = match envelope_header(&self.username, &self.password) {
                 Ok(h) => h,
@@ -363,21 +389,57 @@ impl Camera {
         }
     }
 
-    /// Returns NTP configuration
-    pub fn parse_get_ntp(body: Vec<u8>) -> Result<(), Error> {
+    /// Returns NTP configuration struct
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - utf8 encoded xml response body
+    ///
+    pub fn parse_get_ntp(body: Vec<u8>) -> Result<NtpSettings, Error> {
         let string_body = String::from_utf8(body)?;
+        info!("{}", string_body);
         let doc = parser::parse(&string_body)?;
         let doc = doc.as_document();
-        info!("{}", string_body);
+
         let from_dhcp = evaluate_xpath(&doc, "//*[local-name()='FromDHCP'][1]")?
             .string()
             .parse::<bool>()?;
 
-        info!("From dhcp: {}", from_dhcp);
-        return Err(Error::InvalidResponse);
+        if from_dhcp {
+            match evaluate_xpath(&doc, "//*[local-name()='NTPFromDHCP'][1]")? {
+                Value::Nodeset(nodes) => Ok(NtpSettings {
+                    from_dhcp,
+                    ntp_server_hostnames: Some(
+                        nodes
+                            .iter()
+                            .map(|node| node.string_value().trim().to_string())
+                            .collect(),
+                    ),
+                }),
+                sxd_xpath::Value::Boolean(..)
+                | sxd_xpath::Value::Number(..)
+                | sxd_xpath::Value::String(..) => Err(Error::InvalidResponse),
+            }
+        } else {
+            match evaluate_xpath(&doc, "//*[local-name()='NTPManual'][1]")? {
+                Value::Nodeset(nodes) => Ok(NtpSettings {
+                    from_dhcp,
+                    ntp_server_hostnames: Some(
+                        nodes
+                            .iter()
+                            .map(|node| node.string_value().trim().to_string())
+                            .collect(),
+                    ),
+                }),
+                sxd_xpath::Value::Boolean(..)
+                | sxd_xpath::Value::Number(..)
+                | sxd_xpath::Value::String(..) => Err(Error::InvalidResponse),
+            }
+        }
     }
 
-    pub fn get_ntp(&self) -> Box<Future<Item = (), Error = Error>> {
+    /// Fetch camera's ntp settings
+    pub fn get_ntp(&self) -> Box<Future<Item = NtpSettings, Error = Error>> {
         Box::new(
             self.request_get_ntp()
                 .and_then(Self::parse_get_ntp)
@@ -385,23 +447,26 @@ impl Camera {
         )
     }
 
+    /// Performs a request to set camera's ntp settings. Returns
+    /// response body.
+    ///
+    /// # Arguments
+    ///
+    /// * `ntp_settings` - new settings for camera
+    ///
     pub fn request_set_ntp(
         &self,
-        ntp_settings: DeviceNtpSettings,
+        ntp_settings: &NtpSettings,
     ) -> impl Future<Item = Vec<u8>, Error = Error> {
-        let manual_body = match ntp_settings.ntp_specification {
-            Some((ntp_type, ntp_server)) => format!(
-                r#"
+        let manual_body = format!(
+            r#"
                 <NTPManual>
                   <Type xmlns="http://www.onvif.org/ver10/schema">{}</Type>
                   <IPv4Address xmlns="http://www.onvif.org/ver10/schema">{}</IPv4Address>
                 </NTPManual>
                 "#,
-                ntp_type, ntp_server,
-            ),
-            None => String::new(),
-        };
-
+            "type", "hostname"
+        );
         let body = format!(
             r#"
           <SetNTP xmlns="http://www.onvif.org/ver10/device/wsdl">
@@ -421,6 +486,12 @@ impl Camera {
         Either::B(soap_request(&self.url(), body))
     }
 
+    /// Parse set ntp response body. Returns () on success.
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - utf-8 encoded response body from set ntp call
+    ///
     pub fn parse_set_ntp(body: Vec<u8>) -> Result<(), Error> {
         let string_body = String::from_utf8(body)?;
         let doc = parser::parse(&string_body)?;
@@ -431,10 +502,13 @@ impl Camera {
         Ok(())
     }
 
-    pub fn set_ntp(
-        &self,
-        ntp_settings: DeviceNtpSettings,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    /// Attempts to set camera's ntp settings. Returns () on success.
+    ///
+    /// # Arguments
+    ///
+    /// * `ntp_settings` - new ntp settings
+    ///
+    pub fn set_ntp(&self, ntp_settings: &NtpSettings) -> Box<Future<Item = (), Error = Error>> {
         Box::new(
             self.request_set_ntp(ntp_settings)
                 .and_then(Self::parse_set_ntp)

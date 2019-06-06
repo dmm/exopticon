@@ -5,7 +5,7 @@ use futures::future::Future;
 use std::time::Duration;
 
 use onvif;
-use onvif::camera::{DeviceDateAndTime, DeviceNtpSettings};
+use onvif::camera::{DeviceDateAndTime, NtpSettings};
 
 use crate::app::RouteState;
 use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
@@ -183,7 +183,7 @@ pub fn fetch_ntp(
 
 /// Returns current ntp settings of camera
 pub fn set_ntp(
-    (path, ntp_settings, state): (Path<i32>, Json<DeviceNtpSettings>, State<RouteState>),
+    (path, ntp_settings, state): (Path<i32>, Json<NtpSettings>, State<RouteState>),
 ) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db
@@ -201,9 +201,9 @@ pub fn set_ntp(
                 };
                 Either::A(
                     onvif_cam
-                        .set_ntp(ntp_settings.into_inner())
+                        .set_ntp(&ntp_settings.into_inner())
                         .map_err(actix_web::error::ErrorBadRequest)
-                        .and_then(|datetime| Ok(HttpResponse::Ok().json(datetime))),
+                        .and_then(|_| Ok(HttpResponse::Ok().finish())),
                 )
             }
             Err(_err) => Either::B(future::done(Ok(HttpResponse::NotFound().finish()))),
