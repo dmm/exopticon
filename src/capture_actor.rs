@@ -126,7 +126,7 @@ impl CaptureActor {
                 wrap_future::<_, Self>(fut)
                     .map(|result, _actor, _ctx| match result {
                         Ok((_video_unit, _video_file)) => {}
-                        Err(e) => error!("CaptureWorker: Error updating video unit: {}", e),
+                        Err(e) => panic!("CaptureWorker: Error updating video unit: {}", e),
                     })
                     .map_err(|_e, _actor, _ctx| {
                         error!("CaptureWorker: Error calling UpdateVideoUnitFile");
@@ -195,7 +195,7 @@ impl CaptureActor {
                                     actor.video_file_id = Some(video_file.id);
                                     actor.filename = Some(filename)
                                 }
-                                Err(e) => error!("Error! {}", e),
+                                Err(e) => panic!("Error inserting video unit: {}", e),
                             })
                             .map_err(|e, _actor, _ctx| {
                                 error!("Captureworker: Error sending new file message: {}", e);
@@ -254,7 +254,7 @@ impl Handler<StartWorker> for CaptureActor {
     type Result = ();
 
     fn handle(&mut self, _msg: StartWorker, ctx: &mut Context<Self>) -> Self::Result {
-        info!("Launching worker for stream: {}", self.stream_url);
+        debug!("Launching worker for stream: {}", self.stream_url);
         let storage_path = Path::new(&self.storage_path).join(self.camera_id.to_string());
         if std::fs::create_dir(&storage_path).is_err() {
             // The error returned by create_dir has no information so
@@ -281,11 +281,11 @@ impl Handler<StartWorker> for CaptureActor {
             .map(|_status, actor, ctx| {
                 // Change this to an error when we can't distinguish
                 // between intentional and unintentional exits.
-                info!("CaptureWorker {}: capture process died...", actor.camera_id);
+                debug!("CaptureWorker {}: capture process died...", actor.camera_id);
 
                 // Close file if open
                 if let Some(filename) = &actor.filename {
-                    info!(
+                    debug!(
                         "CaptureActor {}: capture process died, closing file: {}",
                         actor.camera_id, &filename
                     );

@@ -30,7 +30,10 @@ impl Handler<AuthData> for DbExecutor {
         let mut items = users
             .filter(username.eq(&msg.username))
             .load::<User>(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Unable to load users! {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         if let Some(user) = items.pop() {
             if let Ok(matching) = verify(&msg.password, &user.password) {
