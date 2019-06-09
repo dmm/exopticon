@@ -8,6 +8,7 @@ import struct
 import sys
 import time
 from functools import partial
+import imutils
 
 class ExopticonWorker(object):
     def __init__(self, handle_frame=None, setup=None):
@@ -55,7 +56,7 @@ class ExopticonWorker(object):
         msg = msgpack.unpackb(msg_buf, raw=False)
         self.current_frame = msg[1][0]
         msg_buf = numpy.frombuffer(msg[1][0]["jpeg"], dtype=numpy.uint8)
-        return cv2.imdecode(msg_buf, cv2.IMREAD_GRAYSCALE)
+        return cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
 
     def write_frame(self, tag, image):
         if not self.current_frame:
@@ -82,14 +83,35 @@ class ExopticonWorker(object):
         except EOFerror:
             self.cleanup()
             sys.exit(0)
+# End ExopticonWorker
 
 def my_setup(self):
     fgbg = cv2.createBackgroundSubtractorKNN()
     self.state['fgbg'] = fgbg
 
 def my_handle_frame(self, frame):
-    fgmask = self.state['fgbg'].apply(frame)
-    self.write_frame("foreground", fgmask)
+    #frame = imutils.resize(frame, width=500)
+    #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(frame, (21, 21), 0)
+
+    fgmask = self.state['fgbg'].apply(gray)
+    #self.write_frame("foreground", fgmask)
+
+    # dilate the thresholded image to fill in holes then find contours
+    thresh = cv2.dilate(fgmask, None, iterations=2)
+    cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+
+    # loop over contours
+    for c in cnts:
+        # ignore small contours
+        if cv2.contourArea(c) < 50:
+            continue
+        # compute the bounding box and draw it on frame
+        (x, y, w, h) = cv2.boundingRect(c)
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+    self.write_frame("contours", frame)
 
 def main():
     worker = ExopticonWorker(setup=my_setup, handle_frame=my_handle_frame)
