@@ -1,11 +1,10 @@
 // Disable this lint because we pass by value to implement the
 // actix-web interface.
 #![allow(clippy::needless_pass_by_value)]
-use actix_web::http;
 use actix_web::middleware::identity::RequestIdentity;
 use actix_web::middleware::{Middleware, Started};
 use actix_web::{
-    AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Json, ResponseError, Result,
+    http, AsyncResponder, FutureResponse, HttpRequest, HttpResponse, Json, ResponseError, Result,
 };
 use futures::future::Future;
 

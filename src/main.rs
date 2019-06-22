@@ -3,6 +3,11 @@
 // to avoid the warning from diesel macros
 #![allow(proc_macro_derive_resolution_fallback)]
 #![deny(
+    nonstandard_style,
+    warnings,
+    rust_2018_idioms,
+    unused,
+    future_incompatible,
     clippy::all,
     clippy::restriction,
     clippy::pedantic,
@@ -15,40 +20,18 @@
 #![allow(clippy::implicit_return)]
 
 /// Exopticon is a free video surveillance system
-extern crate actix;
-extern crate actix_web;
-extern crate askama;
-extern crate base64;
 #[macro_use]
 extern crate base64_serde;
-extern crate bytes;
-extern crate chrono;
-extern crate dotenv;
-extern crate env_logger;
-extern crate futures;
-extern crate r2d2;
-extern crate serde;
-extern crate uuid;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 #[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate log;
-extern crate mime_guess;
-extern crate rand;
-extern crate rmp;
-extern crate rmp_serde;
 #[macro_use]
 extern crate rust_embed;
-extern crate serde_bytes;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_io;
-extern crate tokio_process;
 
 /// Actix route specification
 mod app;

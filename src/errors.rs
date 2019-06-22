@@ -1,5 +1,6 @@
 // errors.rs
-use actix_web::{error::ResponseError, HttpResponse};
+use actix_web::error::ResponseError;
+use actix_web::HttpResponse;
 
 /// Enum of service errors
 #[derive(Fail, Debug)]

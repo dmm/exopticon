@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::actix::prelude::*;
+use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
 use actix_web::actix::fut::wrap_future;
 
 use crate::models::{

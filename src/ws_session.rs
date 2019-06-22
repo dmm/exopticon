@@ -1,7 +1,9 @@
 // clippy doesn't like the base64_serde_type macro
 #![allow(clippy::empty_enum)]
 
-use crate::actix::prelude::*;
+use actix::{
+    Actor, ActorContext, ActorFuture, AsyncContext, Handler, StreamHandler, SystemService,
+};
 use actix_web::ws;
 use rmp_serde::Serializer;
 use serde;

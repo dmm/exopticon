@@ -1,11 +1,13 @@
 // app.rs
 
-use crate::actix::prelude::*;
-use crate::actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
-use crate::actix_web::{
-    http::Method, middleware::Logger, ws, App, Error, HttpRequest, HttpResponse,
-};
+use actix::Addr;
+use actix_web::http::Method;
+use actix_web::middleware::identity::{CookieIdentityPolicy, IdentityService};
+use actix_web::{middleware::Logger, ws, App, Error, HttpRequest, HttpResponse};
 
+use chrono::Duration;
+
+use crate::analysis_routes::create_analysis_engine;
 use crate::auth_routes::{login, logout, AuthMiddleware, WebAuthMiddleware};
 use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
@@ -14,9 +16,6 @@ use crate::camera_routes::{
     create_camera, discover, fetch_all_cameras, fetch_camera, fetch_ntp, fetch_time, set_ntp,
     set_time, update_camera,
 };
-use crate::chrono::Duration;
-
-use crate::analysis_routes::create_analysis_engine;
 use crate::models::DbExecutor;
 use crate::static_routes;
 use crate::static_routes::{fetch_static_file, index};

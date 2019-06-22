@@ -1,4 +1,5 @@
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, ResponseError, State};
+use actix_web::error::ResponseError;
+use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, State};
 use chrono::NaiveDateTime;
 use futures::future::Future;
 

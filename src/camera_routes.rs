@@ -75,7 +75,7 @@ pub fn fetch_all_cameras((state,): (State<RouteState>,)) -> FutureResponse<HttpR
 /// Discovery cameras using ONVIF discovery
 pub fn discover(
     (_state,): (State<RouteState>,),
-) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     onvif::discovery::probe(Duration::new(5, 0))
         .map_err(actix_web::error::ErrorBadRequest)
         .and_then(|_| Ok(HttpResponse::Ok().finish()))
@@ -85,7 +85,7 @@ pub fn discover(
 /// Returns current time of specified camera
 pub fn fetch_time(
     (path, state): (Path<i32>, State<RouteState>),
-) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db
         .send(FetchCamera {
@@ -122,7 +122,7 @@ pub fn fetch_time(
 ///
 pub fn set_time(
     (path, datetime, state): (Path<i32>, Json<DeviceDateAndTime>, State<RouteState>),
-) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db
         .send(FetchCamera {
@@ -154,7 +154,7 @@ pub fn set_time(
 /// Returns current ntp settings of camera
 pub fn fetch_ntp(
     (path, state): (Path<i32>, State<RouteState>),
-) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db
         .send(FetchCamera {
@@ -184,7 +184,7 @@ pub fn fetch_ntp(
 /// Returns current ntp settings of camera
 pub fn set_ntp(
     (path, ntp_settings, state): (Path<i32>, Json<NtpSettings>, State<RouteState>),
-) -> Box<Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     state
         .db
         .send(FetchCamera {
