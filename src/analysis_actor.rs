@@ -63,6 +63,13 @@ enum AnalysisWorkerMessage {
         #[serde(with = "serde_bytes")]
         jpeg: Vec<u8>,
     },
+    /// Timing report
+    TimingReport {
+        /// tag identifying timing type
+        tag: String,
+        /// timing values
+        times: Vec<f64>,
+    },
 }
 
 /// Represents message sent to worker
@@ -107,7 +114,7 @@ impl AnalysisActor {
                 info!("Capture Worker log: {}", message);
             }
             AnalysisWorkerMessage::FrameRequest(count) => {
-                info!("{} frames requested!", count);
+                debug!("{} frames requested!", count);
                 self.frames_requested = count;
             }
             AnalysisWorkerMessage::Observation => {}
@@ -124,6 +131,16 @@ impl AnalysisActor {
                     video_unit_id: 0,
                     offset: 0,
                 });
+            }
+            AnalysisWorkerMessage::TimingReport { tag, times } => {
+                let (avg, min, max) = calculate_statistics(times);
+                info!(
+                    "Analysis Actor got {} time report! {:.2} avg, {:.2} min, {:.2} max",
+                    tag,
+                    avg * 1000.0,
+                    min * 1000.0,
+                    max * 1000.0
+                )
             }
         }
     }
@@ -229,7 +246,7 @@ impl Handler<CameraFrame> for AnalysisActor {
         }
 
         if let Some(framed_stdin) = self.worker_stdin.take() {
-            info!("Analysis actor: sending frame to worker...");
+            debug!("Analysis actor: sending frame to worker...");
             let worker_message = AnalysisWorkerCommand::Frame(msg);
             if let Ok(serialized) = to_vec_named(&worker_message) {
                 self.frames_requested -= 1;
@@ -244,4 +261,22 @@ impl Handler<CameraFrame> for AnalysisActor {
             }
         }
     }
+}
+
+fn calculate_statistics(timings: Vec<f64>) -> (f64, f64, f64) {
+    let mut min: f64 = std::f64::MAX;
+    let mut max: f64 = std::f64::MIN;
+    let mut avg: f64 = 0.0;
+
+    for t in &timings {
+        if *t < min {
+            min = *t;
+        }
+        if *t > max {
+            max = *t;
+        }
+        avg += *t;
+    }
+
+    (avg / timings.len() as f64, min, max)
 }
