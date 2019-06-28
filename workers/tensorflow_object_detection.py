@@ -27,8 +27,8 @@ from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
 
 # What model to download.
-MODEL_NAME = 'ssd_mobilenet_v2_coco_2018_03_29'
-#MODEL_NAME = 'faster_rcnn_inception_v2_coco_2018_01_28'
+#MODEL_NAME = 'ssd_mobilenet_v2_coco_2018_03_29'
+MODEL_NAME = 'faster_rcnn_inception_v2_coco_2018_01_28'
 MODEL_FILE = MODEL_NAME + '.tar.gz'
 
 # Path to frozen detection graph. This is the actual model that is used for the object detection.
@@ -107,7 +107,7 @@ def my_handle_frame(self, frame):
 
   output_dict = run_inference_for_single_image(image_expanded,
                                                self.state['session'])
-  self.log_info('Detection count: ' + str(output_dict['num_detections']))
+#  self.log_info('Detection count: ' + str(output_dict['num_detections']))
 
   vis_util.visualize_boxes_and_labels_on_image_array(
     frame,
@@ -124,13 +124,16 @@ def my_handle_frame(self, frame):
     self.state['session'].close()
 
 def main():
+  import sys
+
   state = my_setup()
   config = tf.ConfigProto()
-  config.gpu_options.per_process_gpu_memory_fraction = 0.2
+  config.gpu_options.per_process_gpu_memory_fraction = 0.1
   with state['detection_graph'].as_default():
     with tf.Session(config=config) as sess:
       state['session'] = sess
       worker = ExopticonWorker(handle_frame=my_handle_frame, state=state)
+
       worker.run()
 
 if __name__ == "__main__":

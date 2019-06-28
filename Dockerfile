@@ -85,7 +85,8 @@ RUN apt-get install -yq libavcodec-dev libavformat-dev libswscale-dev libavfilte
            zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
            curl
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
+    && ~/.cargo/bin/rustup component add clippy
 
 RUN pip3 install msgpack
 
