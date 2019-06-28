@@ -68,7 +68,7 @@ enum AnalysisWorkerMessage {
         /// tag identifying timing type
         tag: String,
         /// timing values
-        times: Vec<f64>,
+        times: Vec<u64>,
     },
 }
 
@@ -133,13 +133,13 @@ impl AnalysisActor {
                 });
             }
             AnalysisWorkerMessage::TimingReport { tag, times } => {
-                let (avg, min, max) = calculate_statistics(times);
+                let (avg, min, max) = calculate_statistics(&times);
                 info!(
                     "Analysis Actor got {} time report! {:.2} avg, {:.2} min, {:.2} max",
                     tag,
-                    avg * 1000.0,
-                    min * 1000.0,
-                    max * 1000.0
+                    avg / 1000,
+                    min / 1000,
+                    max / 1000
                 )
             }
         }
@@ -263,20 +263,24 @@ impl Handler<CameraFrame> for AnalysisActor {
     }
 }
 
-fn calculate_statistics(timings: Vec<f64>) -> (f64, f64, f64) {
-    let mut min: f64 = std::f64::MAX;
-    let mut max: f64 = std::f64::MIN;
-    let mut avg: f64 = 0.0;
+/// Calculate average, min, and max, all times in microseconds
+fn calculate_statistics(timings: &[u64]) -> (u64, u64, u64) {
+    let mut min: u64 = u64::max_value();
+    let mut max: u64 = u64::min_value();
+    let mut avg: u64 = 0;
 
-    for t in &timings {
+    for t in timings {
         if *t < min {
             min = *t;
         }
         if *t > max {
             max = *t;
         }
+        // add to average and convert to microseconds
         avg += *t;
     }
 
-    (avg / timings.len() as f64, min, max)
+    avg /= timings.len() as u64;
+
+    (avg, min, max)
 }

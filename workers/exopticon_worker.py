@@ -17,6 +17,7 @@ class ExopticonWorker(object):
         self.setup_callback = self.builtin_setup_callback
         self.cleanup_callback = self.builtin_cleanup_callback
         self.state = state
+        self.frame_times = []
 
         if handle_frame:
             self.handle_frame_callback = partial(handle_frame, self)
@@ -43,8 +44,12 @@ class ExopticonWorker(object):
     def handle_frame(self, frame):
         start_time = time.monotonic()
         self.handle_frame_callback(frame)
-        duration = time.monotonic() - start_time
-        self.log_info('Ran for :' + str(duration * 1000) + ' ms')
+        duration = int((time.monotonic() - start_time) * 1000 * 1000)
+        self.frame_times.append(duration)
+        if len(self.frame_times) >= 10:
+            self.write_timing('frame', self.frame_times)
+            self.frame_times = []
+        #self.log_info('Ran for :' + str(duration * 1000) + ' ms')
 
     def log_info(self, message):
         log_dict = [0, [message]]
@@ -72,6 +77,11 @@ class ExopticonWorker(object):
         jpeg = cv2.imencode('.jpg', image)[1].tobytes()
         frame_dict = [3, [tag, jpeg]]
         serialized = msgpack.packb(frame_dict, use_bin_type=True)
+        self.write_framed_message(serialized)
+
+    def write_timing(self, tag, times):
+        timing_dict = [4, [tag, times]]
+        serialized = msgpack.packb(timing_dict, use_bin_type=True)
         self.write_framed_message(serialized)
 
     def write_framed_message(self, serialized):
