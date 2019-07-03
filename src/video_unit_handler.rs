@@ -208,13 +208,20 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
 
     fn handle(&mut self, msg: DeleteVideoUnitFiles, _: &mut Self::Context) -> Self::Result {
         use crate::schema;
+        use crate::schema::observations::dsl::*;
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
         use diesel::dsl::any;
         let conn: &PgConnection = &self.0.get().unwrap();
 
         diesel::delete(
-            video_files.filter(schema::video_files::columns::id.eq(any(msg.video_file_ids))),
+            video_files.filter(schema::video_files::columns::id.eq(any(&msg.video_file_ids))),
+        )
+        .execute(conn)
+        .map_err(|_error| ServiceError::InternalServerError)?;
+        diesel::delete(
+            observations
+                .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids))),
         )
         .execute(conn)
         .map_err(|_error| ServiceError::InternalServerError)?;

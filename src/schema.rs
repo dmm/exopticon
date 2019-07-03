@@ -29,6 +29,22 @@ table! {
 }
 
 table! {
+    observations (id) {
+        id -> Int8,
+        video_unit_id -> Int4,
+        frame_offset -> Int4,
+        tag -> Text,
+        details -> Text,
+        score -> Int2,
+        ul_x -> Int2,
+        ul_y -> Int2,
+        lr_x -> Int2,
+        lr_y -> Int2,
+        inserted_at -> Timestamptz,
+    }
+}
+
+table! {
     users (id) {
         id -> Int4,
         username -> Varchar,
@@ -63,12 +79,14 @@ table! {
 }
 
 joinable!(cameras -> camera_groups (camera_group_id));
+joinable!(observations -> video_units (video_unit_id));
 joinable!(video_files -> video_units (video_unit_id));
 joinable!(video_units -> cameras (camera_id));
 
 allow_tables_to_appear_in_same_query!(
     camera_groups,
     cameras,
+    observations,
     users,
     video_files,
     video_units,

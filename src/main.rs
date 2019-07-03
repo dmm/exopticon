@@ -81,6 +81,9 @@ mod file_deletion_supervisor;
 /// Actor message structs
 mod models;
 
+/// Implemenents `DbExecutor` handler for creating and querying observations.
+mod observation_handler;
+
 /// Implements `DbExecutor` handler for creating users
 mod register_handler;
 

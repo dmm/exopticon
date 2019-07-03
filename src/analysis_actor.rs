@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use actix::fut::wrap_future;
 use actix::prelude::*;
@@ -93,6 +93,7 @@ pub struct AnalysisActor {
     >,
     /// number of frames requested by worker process
     pub frames_requested: u8,
+    pub last_frame_time: Option<Instant>,
 }
 
 impl AnalysisActor {
@@ -104,6 +105,7 @@ impl AnalysisActor {
             arguments,
             worker_stdin: None,
             frames_requested: 0,
+            last_frame_time: None,
         }
     }
 
@@ -241,7 +243,15 @@ impl Handler<CameraFrame> for AnalysisActor {
     type Result = ();
 
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Context<Self>) -> Self::Result {
-        if self.frames_requested == 0 {
+        let rate_ready = match self.last_frame_time {
+            None => true,
+            Some(last_frame_time) => {
+                let now = Instant::now();
+                let min_duration = Duration::from_millis(200);
+                now.duration_since(last_frame_time) > min_duration
+            }
+        };
+        if self.frames_requested == 0 && rate_ready {
             return;
         }
 

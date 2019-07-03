@@ -14,8 +14,8 @@ impl Actor for DbExecutor {
     type Context = SyncContext<Self>;
 }
 
-use crate::schema::{camera_groups, cameras, users, video_files, video_units};
-use chrono::NaiveDateTime;
+use crate::schema::{camera_groups, cameras, observations, users, video_files, video_units};
+use chrono::{DateTime, NaiveDateTime, Utc};
 
 /// Full camera group model. Represents a full row returned from the
 /// database.
@@ -379,6 +379,44 @@ pub struct DeleteVideoUnitFiles {
 /// Represents a request to fetch empty video files, video files
 /// without a size specified.
 pub struct FetchEmptyVideoFile;
+
+#[derive(Queryable, Associations, Identifiable, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "observations"]
+#[belongs_to(VideoUnit)]
+pub struct Observation {
+    pub id: i64,
+    pub video_unit_id: i32,
+    pub frame_offset: i32,
+    pub tag: String,
+    pub details: String,
+    pub score: i16,
+    pub ul_x: i16,
+    pub ul_y: i16,
+    pub lr_x: i16,
+    pub lr_y: i16,
+    pub inserted_at: DateTime<Utc>,
+}
+
+#[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "observations"]
+pub struct CreateObservation {
+    pub video_unit_id: i32,
+    pub frame_offset: i32,
+    pub tag: String,
+    pub details: String,
+    pub score: i16,
+    pub ul_x: i16,
+    pub ul_y: i16,
+    pub lr_x: i16,
+    pub lr_y: i16,
+    pub inserted_at: DateTime<Utc>,
+}
+
+pub struct CreateObservations {
+    pub observations: Vec<CreateObservation>,
+}
 
 /// Full user model struct, represents full value from database.
 #[derive(Queryable, Associations, Identifiable, Serialize)]
