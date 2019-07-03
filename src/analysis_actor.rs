@@ -93,6 +93,7 @@ pub struct AnalysisActor {
     >,
     /// number of frames requested by worker process
     pub frames_requested: u8,
+    /// represents the previous time a frame was sent to worker
     pub last_frame_time: Option<Instant>,
 }
 

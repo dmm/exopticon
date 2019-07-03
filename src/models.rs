@@ -380,41 +380,66 @@ pub struct DeleteVideoUnitFiles {
 /// without a size specified.
 pub struct FetchEmptyVideoFile;
 
+/// Represents an observation derived from a frame of video
 #[derive(Queryable, Associations, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "observations"]
 #[belongs_to(VideoUnit)]
 pub struct Observation {
+    /// id of Observation
     pub id: i64,
+    /// id of owning video unit
     pub video_unit_id: i32,
+    /// offset from beginning of video unit, starts at 0
     pub frame_offset: i32,
+    /// Identifies the type of observation, eg Person, Motion, Deer
     pub tag: String,
+    /// Details associated with observation, eg John, Male, whatever
     pub details: String,
+    /// A value between 0-100 representing the percentage certainty of
+    /// the observation.
     pub score: i16,
+    /// upper-left x coordinate
     pub ul_x: i16,
+    /// upper-left y coordinate
     pub ul_y: i16,
+    /// lower-right x coordinate
     pub lr_x: i16,
+    /// lower-right y coordinate
     pub lr_y: i16,
+    /// Time that observation record was inserted
     pub inserted_at: DateTime<Utc>,
 }
 
+/// Represents a request to create a single observation.
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "observations"]
 pub struct CreateObservation {
+    /// id of owning video unit
     pub video_unit_id: i32,
+    /// offset from beginning of video unit, starts at 0
     pub frame_offset: i32,
+    /// Identifies the type of observation, eg Person, Motion, Deer
     pub tag: String,
+    /// Details associated with observation, eg John, Male, whatever
     pub details: String,
+    /// A value between 0-100 representing the percentage certainty of
+    /// the observation.
     pub score: i16,
+    /// upper-left x coordinate
     pub ul_x: i16,
+    /// upper-left y coordinate
     pub ul_y: i16,
+    /// lower-right x coordinate
     pub lr_x: i16,
+    /// lower-right y coordinate
     pub lr_y: i16,
-    pub inserted_at: DateTime<Utc>,
 }
 
+/// Represents a request to create one or more observation records.
 pub struct CreateObservations {
+    /// Vec of observations to create
     pub observations: Vec<CreateObservation>,
 }
 
