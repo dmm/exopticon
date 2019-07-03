@@ -64,10 +64,17 @@ ENV PYTHONPATH=$PYTHONPATH:.:/root/tensorflow-models/research:/root/tensorflow-m
 
 # install opencv
 RUN apt-get build-dep -y opencv
-RUN git clone --branch 4.1.0 https://github.com/opencv/opencv.git /root/opencv \
+RUN git clone --depth 1 --branch 4.1.0 https://github.com/opencv/opencv.git /root/opencv \
+    && git clone --depth 1 --branch 4.1.0 https://github.com/opencv/opencv_contrib.git  /root/opencv-contrib \
     && cd /root/opencv \
     && mkdir build && cd build \
-    && cmake .. \
+    && cmake \
+    -DOPENCV_EXTRA_MODULES_PATH=/root/opencv-contrib/modules \
+    -DWITH_CUDA=ON \
+    -DENABLE_FAST_MATH=1 \
+    -DCUDA_FAST_MATH=1 \
+    -DWITH_CUBLAS=1 \
+    .. \
     && make -j20 \
     && make install \
     && cd && rm -r /root/opencv
@@ -88,7 +95,7 @@ RUN apt-get install -yq libavcodec-dev libavformat-dev libswscale-dev libavfilte
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && ~/.cargo/bin/rustup component add clippy
 
-RUN pip3 install msgpack
+RUN pip3 install msgpack imutils
 
 RUN apt-get install -y libcudnn7=7.1.4.18-1+cuda9.0 libcudnn7-dev=7.1.4.18-1+cuda9.0
 
