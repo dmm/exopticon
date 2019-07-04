@@ -2,10 +2,7 @@
 **/*.rs.bk
 Cargo.lock
 /public
-web-old/node_modules
 *.dat
 src/cworkers/captureworker
 src/cworkers/playbackworker
 **/.#*
-web-old/static/css
-web-old/static/js
