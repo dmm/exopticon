@@ -216,6 +216,23 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             client: ctx.address().recipient(),
                         });
                     }
+                    Ok(WsCommand::Subscribe(SubscriptionSubject::Playback(
+                        name,
+                        video_unit_id,
+                        offset,
+                    ))) => WsCameraServer::from_registry().do_send(Subscribe {
+                        subject: SubscriptionSubject::Playback(name, video_unit_id, offset),
+                        client: ctx.address().recipient(),
+                    }),
+                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::Playback(
+                        name,
+                        video_unit_id,
+                        offset,
+                    ))) => WsCameraServer::from_registry().do_send(Unsubscribe {
+                        subject: SubscriptionSubject::Playback(name, video_unit_id, offset),
+                        client: ctx.address().recipient(),
+                    }),
+
                     Ok(WsCommand::Ack) => {
                         self.ack();
                     }

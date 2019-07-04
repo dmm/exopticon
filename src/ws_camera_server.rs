@@ -11,7 +11,7 @@ pub enum FrameResolution {
     HD,
 }
 
-/// Description of source that produced frame
+/// Description of source that produced a `CameraFrame`
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
@@ -29,6 +29,15 @@ pub enum FrameSource {
         analysis_engine_id: i32,
         /// identifying tag for analysis frame
         tag: String,
+    },
+    /// Video Playback
+    Playback {
+        /// Playback name, must be unique per socket
+        name: String,
+        /// initial video unit id to play
+        initial_video_unit_id: i32,
+        /// initial offset to play
+        initial_offset: i64,
     },
 }
 
@@ -54,13 +63,15 @@ pub struct CameraFrame {
     pub offset: i64,
 }
 
-/// Subscription subject
+/// Subscription subject, used to subscribe and unsubscribe
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 pub enum SubscriptionSubject {
     /// A camera id and frame resolution
     Camera(i32, FrameResolution),
     /// Analysis engine id
     AnalysisEngine(i32),
+    /// Playback subject, name, initial video unit id, initial offset
+    Playback(String, i32, i64),
 }
 
 /// subscribe message
@@ -134,14 +145,17 @@ impl WsCameraServer {
     /// * `ctx` - WsCameraServer Context
     ///
     fn send_frame(&mut self, frame: &CameraFrame, ctx: &<Self as Actor>::Context) {
-        let subject = match frame.source {
+        let subject = match &frame.source {
             FrameSource::Camera { camera_id } => {
-                SubscriptionSubject::Camera(camera_id, frame.resolution.clone())
+                SubscriptionSubject::Camera(*camera_id, frame.resolution.clone())
             }
 
             FrameSource::AnalysisEngine {
                 analysis_engine_id, ..
-            } => SubscriptionSubject::AnalysisEngine(analysis_engine_id),
+            } => SubscriptionSubject::AnalysisEngine(*analysis_engine_id),
+            FrameSource::Playback { name, .. } => {
+                SubscriptionSubject::Playback(name.to_string(), 0, 0)
+            }
         };
         if let Some(subscription) = self.subscriptions.get(&subject) {
             let sub_count = subscription.len();
