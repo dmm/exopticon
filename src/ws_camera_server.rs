@@ -166,10 +166,7 @@ impl WsCameraServer {
                         &frame.camera_id, &frame.resolution, sub_count
                     );
                     ctx.address().do_send(Unsubscribe {
-                        subject: SubscriptionSubject::Camera(
-                            frame.camera_id,
-                            frame.resolution.clone(),
-                        ),
+                        subject: subject.clone(),
                         client: client.clone(),
                     });
                 }
@@ -190,6 +187,7 @@ impl Handler<Subscribe> for WsCameraServer {
     type Result = ();
 
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> Self::Result {
+        debug!("Adding subscriber: {:?}", &msg.subject);
         self.add_subscriber(&msg.subject, msg.client);
     }
 }
@@ -198,6 +196,7 @@ impl Handler<Unsubscribe> for WsCameraServer {
     type Result = ();
 
     fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) -> Self::Result {
+        debug!("Removing subscriber {:?}", &msg.subject);
         self.remove_subscriber(&msg.subject, &msg.client);
     }
 }
