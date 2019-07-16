@@ -192,46 +192,19 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             ws::Message::Text(text) => {
                 let cmd: Result<WsCommand, serde_json::Error> = serde_json::from_str(&text);
                 match cmd {
-                    Ok(WsCommand::Subscribe(SubscriptionSubject::Camera(id, resolution))) => {
+                    Ok(WsCommand::Subscribe(subject)) => {
                         WsCameraServer::from_registry().do_send(Subscribe {
-                            subject: SubscriptionSubject::Camera(id, resolution),
+                            subject,
                             client: ctx.address().recipient(),
                         });
                     }
-                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::Camera(id, resolution))) => {
+
+                    Ok(WsCommand::Unsubscribe(subject)) => {
                         WsCameraServer::from_registry().do_send(Unsubscribe {
-                            subject: SubscriptionSubject::Camera(id, resolution),
+                            subject,
                             client: ctx.address().recipient(),
                         });
                     }
-                    Ok(WsCommand::Subscribe(SubscriptionSubject::AnalysisEngine(id))) => {
-                        WsCameraServer::from_registry().do_send(Subscribe {
-                            subject: SubscriptionSubject::AnalysisEngine(id),
-                            client: ctx.address().recipient(),
-                        });
-                    }
-                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::AnalysisEngine(id))) => {
-                        WsCameraServer::from_registry().do_send(Unsubscribe {
-                            subject: SubscriptionSubject::AnalysisEngine(id),
-                            client: ctx.address().recipient(),
-                        });
-                    }
-                    Ok(WsCommand::Subscribe(SubscriptionSubject::Playback(
-                        name,
-                        video_unit_id,
-                        offset,
-                    ))) => WsCameraServer::from_registry().do_send(Subscribe {
-                        subject: SubscriptionSubject::Playback(name, video_unit_id, offset),
-                        client: ctx.address().recipient(),
-                    }),
-                    Ok(WsCommand::Unsubscribe(SubscriptionSubject::Playback(
-                        name,
-                        video_unit_id,
-                        offset,
-                    ))) => WsCameraServer::from_registry().do_send(Unsubscribe {
-                        subject: SubscriptionSubject::Playback(name, video_unit_id, offset),
-                        client: ctx.address().recipient(),
-                    }),
 
                     Ok(WsCommand::Ack) => {
                         self.ack();
