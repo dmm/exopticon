@@ -84,6 +84,24 @@ class ExopticonWorker(object):
         serialized = msgpack.packb(timing_dict, use_bin_type=True)
         self.write_framed_message(serialized)
 
+    def write_observations(self, observations):
+        observation_list = []
+        for o in observations:
+            observation_list.append([
+                o.video_unit_id,
+                o.frame_offset,
+                o.tag,
+                o.details,
+                o.score,
+                o.ul_x,
+                o.ul_y,
+                o.lr_x,
+                o.lr_y
+            ])
+        observation_dict = [2, [observation_list]]
+        serialized = msgpack.packb(observation_dict, use_bin_type=True)
+        self.write_framed_message(serialized)
+
     def write_framed_message(self, serialized):
         packed_len = struct.pack('>L', len(serialized))
         sys.stdout.buffer.write(packed_len)
