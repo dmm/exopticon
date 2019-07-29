@@ -69,6 +69,8 @@ mod capture_actor;
 /// Actor that supervises capture actors
 mod capture_supervisor;
 
+mod db_registry;
+
 /// Error type
 mod errors;
 
@@ -220,6 +222,8 @@ fn main() {
         .expect("Failed to create pool.");
 
     let address: Addr<DbExecutor> = SyncArbiter::start(4, move || DbExecutor(pool.clone()));
+
+    db_registry::set_db(address.clone());
 
     let db_address = address.clone();
     let setup_address = address.clone();
