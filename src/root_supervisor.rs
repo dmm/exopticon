@@ -1,4 +1,4 @@
-use actix::*;
+use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
 
 use crate::analysis_supervisor::AnalysisSupervisor;
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
