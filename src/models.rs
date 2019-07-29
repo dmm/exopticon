@@ -412,7 +412,7 @@ pub struct Observation {
 }
 
 /// Represents a request to create a single observation.
-#[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[derive(AsChangeset, Debug, Serialize, Deserialize, Insertable)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "observations"]
 pub struct CreateObservation {
@@ -438,6 +438,7 @@ pub struct CreateObservation {
 }
 
 /// Represents a request to create one or more observation records.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateObservations {
     /// Vec of observations to create
     pub observations: Vec<CreateObservation>,

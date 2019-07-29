@@ -14,6 +14,7 @@ use tokio::codec::length_delimited;
 use tokio::prelude::Sink;
 use tokio_process::CommandExt;
 
+use crate::models::{CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
 /// Worker Log Levels
@@ -54,7 +55,7 @@ enum AnalysisWorkerMessage {
     /// A request to send more frames
     FrameRequest(u8),
     /// Observation message from worker
-    Observation,
+    Observation(Vec<CreateObservation>),
     /// Processed frame from worker
     FrameReport {
         /// tag identifying frame report
@@ -95,11 +96,18 @@ pub struct AnalysisActor {
     pub frames_requested: u8,
     /// represents the previous time a frame was sent to worker
     pub last_frame_time: Option<Instant>,
+    /// Address of database actor
+    pub db_address: Addr<DbExecutor>,
 }
 
 impl AnalysisActor {
     /// Returns initialized `AnalysisActor`
-    pub const fn new(id: i32, executable_name: String, arguments: Vec<String>) -> Self {
+    pub const fn new(
+        id: i32,
+        executable_name: String,
+        arguments: Vec<String>,
+        db_address: Addr<DbExecutor>,
+    ) -> Self {
         Self {
             id,
             executable_name,
@@ -107,11 +115,12 @@ impl AnalysisActor {
             worker_stdin: None,
             frames_requested: 0,
             last_frame_time: None,
+            db_address,
         }
     }
 
     /// Processes the analysis worker message
-    fn message_to_action(&mut self, msg: AnalysisWorkerMessage, _ctx: &mut Context<Self>) {
+    fn message_to_action(&mut self, msg: AnalysisWorkerMessage, ctx: &mut Context<Self>) {
         match msg {
             AnalysisWorkerMessage::Log { message } => {
                 info!("Capture Worker log: {}", message);
@@ -120,7 +129,14 @@ impl AnalysisActor {
                 debug!("{} frames requested!", count);
                 self.frames_requested = count;
             }
-            AnalysisWorkerMessage::Observation => {}
+            AnalysisWorkerMessage::Observation(observations) => {
+                let fut = self.db_address.send(CreateObservations { observations });
+                ctx.spawn(wrap_future(fut).map(|_result, _actor, _ctx| {}).map_err(
+                    |_e, _actor, _ctx| {
+                        error!("AnalysisActor: Unable to save aobservation.");
+                    },
+                ));
+            }
             AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
                 debug!("Analysis got frame report {}", tag);
                 WsCameraServer::from_registry().do_send(CameraFrame {

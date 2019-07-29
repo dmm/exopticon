@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use actix::prelude::*;
 
 use crate::analysis_actor::AnalysisActor;
+use crate::db_registry;
 use crate::ws_camera_server::{FrameResolution, Subscribe, SubscriptionSubject, WsCameraServer};
 
 /// Message telling supervisor to start new analysis actor
@@ -63,7 +64,12 @@ impl Handler<StartAnalysisActor> for AnalysisSupervisor {
         let id = self.last_actor_id;
         self.last_actor_id += 1;
         info!("Starting analysis actor id: {}", id);
-        let actor = AnalysisActor::new(id, msg.executable_name, msg.arguments);
+        let actor = AnalysisActor::new(
+            id,
+            msg.executable_name,
+            msg.arguments,
+            db_registry::get_db(),
+        );
         let address = actor.start();
         self.actors.insert(id, address.clone());
 
