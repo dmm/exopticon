@@ -27,8 +27,8 @@ from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
 
 # What model to download.
-#MODEL_NAME = 'ssd_mobilenet_v2_coco_2018_03_29'
-MODEL_NAME = 'faster_rcnn_inception_v2_coco_2018_01_28'
+MODEL_NAME = 'ssd_mobilenet_v2_coco_2018_03_29'
+#MODEL_NAME = 'faster_rcnn_inception_v2_coco_2018_01_28'
 MODEL_FILE = MODEL_NAME + '.tar.gz'
 
 # Path to frozen detection graph. This is the actual model that is used for the object detection.
@@ -103,14 +103,30 @@ def my_setup():
 
 def my_handle_frame(self, frame):
   # Expand dimensions since the model expects image to have shape: [1, None, None, 3]
-  image_expanded = np.expand_dims(frame, axis=0)
+  image_expanded = np.expand_dims(frame["image"], axis=0)
 
   output_dict = run_inference_for_single_image(image_expanded,
                                                self.state['session'])
 #  self.log_info('Detection count: ' + str(output_dict['num_detections']))
 
+#  self.log_info('detections' + str(output_dict['detection_scores']));
+  observations = []
+  for i in range(0, output_dict['detection_boxes'].shape[0]):
+    if output_dict['detection_scores'][i] < 0.5:
+      continue
+    observations.append([
+      frame["video_unit_id"],
+      frame["offset"],
+      'object',
+      self.state['category_index'][output_dict['detection_classes'][i]]['name'],
+      int(output_dict['detection_scores'][i].item() * 100),
+      0,
+      0,
+      0,
+      0
+      ])
   vis_util.visualize_boxes_and_labels_on_image_array(
-    frame,
+    frame["image"],
     output_dict['detection_boxes'],
     output_dict['detection_classes'],
     output_dict['detection_scores'],
@@ -118,7 +134,9 @@ def my_handle_frame(self, frame):
     instance_masks=output_dict.get('detection_masks'),
     use_normalized_coordinates=True,
     line_thickness=8)
-  self.write_frame('objects', frame)
+  if len(observations) > 0:
+    self.write_observations(observations)
+  self.write_frame('objects', frame["image"])
 
   def my_cleanup(self):
     self.state['session'].close()

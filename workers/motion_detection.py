@@ -21,7 +21,7 @@ def my_setup(self):
     self.state['fgbg'] = fgbg
 
 def my_handle_frame(self, frame):
-    frame = imutils.resize(frame, width=400)
+    frame = imutils.resize(frame["image"], width=400)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 #    gray = cv2.GaussianBlur(frame, (21, 21), 0)
 
@@ -36,7 +36,7 @@ def my_handle_frame(self, frame):
     # loop over contours
     for c in cnts:
         # ignore small contours
-        if cv2.contourArea(c) < 100: #50
+        if cv2.contourArea(c) < 50: #50
             continue
         # compute the bounding box and draw it on frame
         (x, y, w, h) = cv2.boundingRect(c)

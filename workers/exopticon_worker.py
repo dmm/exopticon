@@ -68,7 +68,12 @@ class ExopticonWorker(object):
         msg = msgpack.unpackb(msg_buf, raw=False)
         self.current_frame = msg[1][0]
         msg_buf = numpy.frombuffer(msg[1][0]["jpeg"], dtype=numpy.uint8)
-        return cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
+
+        return dict(camera_id=msg[1][0]["camera_id"],
+                    image=cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED),
+                    video_unit_id=msg[1][0]["video_unit_id"],
+                    offset=msg[1][0]["offset"])
+#        return cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
 
     def write_frame(self, tag, image):
         if not self.current_frame:
@@ -85,20 +90,8 @@ class ExopticonWorker(object):
         self.write_framed_message(serialized)
 
     def write_observations(self, observations):
-        observation_list = []
-        for o in observations:
-            observation_list.append([
-                o.video_unit_id,
-                o.frame_offset,
-                o.tag,
-                o.details,
-                o.score,
-                o.ul_x,
-                o.ul_y,
-                o.lr_x,
-                o.lr_y
-            ])
-        observation_dict = [2, [observation_list]]
+        self.log_info('observations: ' + str(observations))
+        observation_dict = [2, [observations]]
         serialized = msgpack.packb(observation_dict, use_bin_type=True)
         self.write_framed_message(serialized)
 
