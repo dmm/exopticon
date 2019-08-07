@@ -1,14 +1,16 @@
 <div class="panel">
   <div class="wrapper"
        *ngFor="let camera of cameras; let i = index"
-       (mouseover)="selectCameraView(i); $event.stopPropagation();"
+       (mouseover)="selectCameraView(camera.id); $event.stopPropagation();"
        (mouseleave)="deselectCameraView; $event.stopPropagation();"
-       (touchstart)="onTouchStart(i); $event.stopPropagation();">
+       (touchstart)="onTouchStart(camera.id); $event.stopPropagation();">
     <div class="camera-width"></div>
     <div class="content">
       <app-camera-view [camera]="camera"
-                       [selected]="selectedCameraId === i"
-                       [videoService]="videoService">
+                       [selected]="selectedCameraId === camera.id"
+                       [enabled]="pageVisible && cameraVisibility.get(camera.id)"
+                       [videoService]="videoService"
+                       (isVisible)="updateCameraViewVisibility(camera.id, $event)">
       </app-camera-view>
     </div>
   </div>

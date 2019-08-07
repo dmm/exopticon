@@ -1,5 +1,5 @@
-import { Component, ChangeDetectorRef, OnInit, Input } from '@angular/core';
-
+import { Component, ChangeDetectorRef, OnInit, Input, NgZone } from '@angular/core';
+import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Camera } from '../camera';
 import { CameraService } from '../camera.service';
 import { VideoService } from '../video.service';
@@ -15,10 +15,13 @@ export class CameraPanelComponent implements OnInit {
   selectedCameraId?: number;
   overlayDisabledId?: number;
   pageVisible: boolean;
+  private cameraVisibility: Map<number, boolean>;
 
   constructor(private cameraService: CameraService,
     public videoService: VideoService,
-    private cdr: ChangeDetectorRef) {
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone) {
+    this.cameraVisibility = new Map<number, boolean>();
   }
 
   getCameras(): void {
@@ -41,6 +44,21 @@ export class CameraPanelComponent implements OnInit {
     this.videoService.connect();
   }
 
+  @OnPageVisible()
+  onPageVisible() {
+    this.ngZone.run(() => {
+      this.pageVisible = true;
+    });
+  }
+
+  @OnPageHidden()
+  onPageHidden() {
+    this.ngZone.run(() => {
+      this.pageVisible = false;
+    });
+  }
+
+
   selectCameraView(cameraIndex: number) {
     if (cameraIndex !== this.overlayDisabledId) {
       this.selectedCameraId = cameraIndex;
@@ -59,6 +77,10 @@ export class CameraPanelComponent implements OnInit {
       this.selectedCameraId = cameraIndex;
       this.overlayDisabledId = null;
     }
+  }
+
+  updateCameraViewVisibility(cameraId: number, visible: boolean) {
+    this.cameraVisibility.set(cameraId, visible);
   }
 
 }

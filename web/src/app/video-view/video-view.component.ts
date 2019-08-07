@@ -14,31 +14,42 @@ import { SubscriptionSubject, VideoService } from '../video.service';
 export class VideoViewComponent implements OnInit {
   @Input() videoService: VideoService;
   @Input() videoSubject: SubscriptionSubject;
+  @Input() set enabled(value: boolean) {
+    console.log(`Video view enable: ${value}`);
+    if (value && this.ready) {
+      setTimeout(() => {
+        this.activate();
+      }, 0)
+    } else {
+      if (this.ready) {
+        setTimeout(() => {
+          this.deactivate();
+        }, 0);
+      }
+    }
+  }
 
   @Output() status = new EventEmitter<string>();
 
   private frameService?: Observable<FrameMessage>;
   private subscription?: Subscription;
   private img: HTMLImageElement;
-  private visible: boolean;
+  private ready: boolean;
   private isActive: boolean;
 
-  constructor(private elementRef: ElementRef, private ngZone: NgZone) { }
+  constructor(private elementRef: ElementRef,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone) { }
 
-  ngOnInit() { }
+  ngOnInit() {
+    this.ready = true;
+    this.activate(); // !!!! remove this
+
+  }
 
   ngAfterContentInit() {
     this.img = this.elementRef.nativeElement.querySelector('img');
 
-  }
-
-  @OnPageVisible()
-  onPageVisible() {
-    this.ngZone.run(() => {
-      if (this.visible) {
-        this.activate();
-      }
-    });
   }
 
   ngOnDestroy() {
@@ -63,7 +74,7 @@ export class VideoViewComponent implements OnInit {
           this.isActive = true;
           this.status.emit('active');
         }
-        if (this.img.complete && this.visible) {
+        if (this.img.complete) {
           this.img.onerror = () => { console.log("error!"); };
           this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
         }
@@ -82,16 +93,6 @@ export class VideoViewComponent implements OnInit {
       this.subscription.unsubscribe();
       this.subscription = undefined;
       this.frameService = undefined;
-    }
-  }
-
-  onInViewportChange(inViewport: boolean) {
-    this.visible = inViewport;
-    if (this.visible && this.subscription === undefined) {
-      this.activate();
-    }
-    if (!inViewport) {
-      this.deactivate();
     }
   }
 }

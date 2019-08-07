@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef, ElementRef, OnInit, Input, NgZone } from '@angular/core';
+import { Component, ChangeDetectorRef, ElementRef, OnInit, Output, EventEmitter, Input, NgZone } from '@angular/core';
 import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Observable, Subscription } from 'rxjs';
 
@@ -14,12 +14,15 @@ import { CameraResolution } from '../frame-message';
 export class CameraViewComponent implements OnInit {
   @Input() camera: Camera;
   @Input() selected: boolean;
+  @Input() enabled: boolean;
   @Input() videoService: VideoService;
+
+  @Output() isVisible = new EventEmitter<boolean>();
 
   public status: string;
 
   public videoSubject: SubscriptionSubject;
-  constructor() {
+  constructor(private changeRef: ChangeDetectorRef) {
   }
 
   ngOnInit() {
@@ -32,5 +35,9 @@ export class CameraViewComponent implements OnInit {
 
   onVideoStatusChange(status: string) {
     this.status = status;
+  }
+
+  onInViewportChange(inViewport: boolean) {
+    this.isVisible.emit(inViewport);
   }
 }
