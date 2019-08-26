@@ -17,7 +17,11 @@ export interface AnalysisSubject {
   analysisEngineId: number;
 }
 
-export type SubscriptionSubject = AnalysisSubject | CameraSubject;
+export interface PlaybackSubject {
+  kind: 'playback';
+  id: number;
+}
+export type SubscriptionSubject = AnalysisSubject | CameraSubject | PlaybackSubject;
 
 @Injectable({
   providedIn: 'root'
@@ -89,6 +93,14 @@ export class VideoService {
                 'AnalysisEngine': subject.analysisEngineId,
               }
             };
+          case 'playback':
+            return {
+              'StartPlayback': {
+                id: 1,
+                video_unit_id: 1456336,
+                offset: 0,
+              }
+            }
         }
       },
       () => {
@@ -119,6 +131,9 @@ export class VideoService {
           case 'analysisEngine':
             return subject.kind === 'analysisEngine'
               && subject.analysisEngineId === m.source.analysisEngineId;
+          case 'playback':
+            return subject.kind === 'playback'
+              && subject.id === m.source.id;
         }
       });
   }

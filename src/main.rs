@@ -15,6 +15,7 @@
     clippy::cargo
 )]
 #![allow(clippy::integer_arithmetic)]
+#![allow(clippy::integer_division)]
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::multiple_crate_versions)]
 #![allow(clippy::implicit_return)]
@@ -85,6 +86,12 @@ mod models;
 
 /// Implemenents `DbExecutor` handler for creating and querying observations.
 mod observation_handler;
+
+/// Implements playback actor
+mod playback_actor;
+
+/// Implements playback supervisor
+mod playback_supervisor;
 
 /// Implements `DbExecutor` handler for creating users
 mod register_handler;

@@ -2,7 +2,8 @@
 #![allow(clippy::empty_enum)]
 
 use actix::{
-    Actor, ActorContext, ActorFuture, AsyncContext, Handler, StreamHandler, SystemService,
+    fut, Actor, ActorContext, ActorFuture, AsyncContext, Handler, StreamHandler, SystemService,
+    WrapFuture,
 };
 use actix_web::ws;
 use rmp_serde::Serializer;
@@ -10,14 +11,17 @@ use serde;
 use serde::Serialize;
 use serde_json;
 
-use base64::STANDARD_NO_PAD;
-
 use crate::app::RouteState;
+use crate::db_registry;
+use crate::models::FetchVideoUnit;
+use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback};
 use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, Subscribe, SubscriptionSubject, Unsubscribe,
     WsCameraServer,
 };
+
+use base64::STANDARD_NO_PAD;
 
 /// Represents different serializations available for communicating
 /// over websockets.
@@ -41,6 +45,17 @@ pub enum WsCommand {
     Unsubscribe(SubscriptionSubject),
     /// frame ack response
     Ack,
+    /// Start playback request
+    StartPlayback {
+        /// playback id, currently supplied by client
+        id: u64,
+        /// id of video unit id to play
+        video_unit_id: i32,
+        /// initial offset to begin playback
+        offset: i32,
+    },
+    /// Stop playback request
+    StopPlayback,
 }
 
 /// A frame of video from a camera stream. This struct is used to
@@ -77,6 +92,7 @@ pub struct WsSession {
     /// Current number of frames in flight
     pub live_frames: u32,
 }
+
 impl WsSession {
     /// Returns new WsSession struct initialized with default values
     /// and specified serialization type
@@ -205,6 +221,45 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             client: ctx.address().recipient(),
                         });
                     }
+
+                    Ok(WsCommand::StartPlayback {
+                        id,
+                        video_unit_id,
+                        offset,
+                    }) => {
+                        debug!("StartPlayback: {} {}, {}", id, video_unit_id, offset);
+                        // Right now we are trusting that the client
+                        // is sending a random id.  Eventually we
+                        // should stop doing that and generate an id
+                        // and map between the client provided and
+                        // generated ids.
+
+                        // Ask playback supervisor to begin playback
+                        let create_actor = db_registry::get_db()
+                            .send(FetchVideoUnit { id: video_unit_id })
+                            .into_actor(self)
+                            .then(move |res, _act, ctx| {
+                                if let Ok(Ok(video_unit)) = res {
+                                    if let Some(video_file) = video_unit.files.first() {
+                                        PlaybackSupervisor::from_registry().do_send(
+                                            StartPlayback {
+                                                id,
+                                                video_unit_id,
+                                                offset,
+                                                video_filename: video_file.filename.clone(),
+                                                address: ctx.address(),
+                                            },
+                                        );
+                                    }
+                                }
+                                fut::ok(())
+                            });
+                        ctx.spawn(create_actor);
+
+                        // subscribe to playback subject
+                    }
+
+                    Ok(WsCommand::StopPlayback) => {}
 
                     Ok(WsCommand::Ack) => {
                         self.ack();

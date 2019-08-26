@@ -32,12 +32,8 @@ pub enum FrameSource {
     },
     /// Video Playback
     Playback {
-        /// Playback name, must be unique per socket
-        name: String,
-        /// initial video unit id to play
-        initial_video_unit_id: i32,
-        /// initial offset to play
-        initial_offset: i64,
+        /// Playback id, must be unique per socket
+        id: u64,
     },
 }
 
@@ -70,8 +66,8 @@ pub enum SubscriptionSubject {
     Camera(i32, FrameResolution),
     /// Analysis engine id
     AnalysisEngine(i32),
-    /// Playback subject, name, initial video unit id, initial offset
-    Playback(String, i32, i64),
+    /// Playback id, name, initial video unit id, initial offset
+    Playback(u64, i32, i64),
 }
 
 /// subscribe message
@@ -132,8 +128,6 @@ impl WsCameraServer {
             } else {
                 debug!("Couldn't find the subscription camera...");
             }
-        } else {
-            return;
         }
     }
 
@@ -153,9 +147,8 @@ impl WsCameraServer {
             FrameSource::AnalysisEngine {
                 analysis_engine_id, ..
             } => SubscriptionSubject::AnalysisEngine(*analysis_engine_id),
-            FrameSource::Playback { name, .. } => {
-                SubscriptionSubject::Playback(name.to_string(), 0, 0)
-            }
+            // FrameSource::Playback is not really used... probably remove this...
+            FrameSource::Playback { id, .. } => SubscriptionSubject::Playback(*id, 0, 0),
         };
         if let Some(subscription) = self.subscriptions.get(&subject) {
             let sub_count = subscription.len();

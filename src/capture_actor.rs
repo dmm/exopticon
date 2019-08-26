@@ -20,7 +20,7 @@ use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCamer
 
 /// Holds messages from capture worker
 #[derive(Default, Debug, PartialEq, Deserialize, Serialize)]
-struct CaptureMessage {
+pub struct CaptureMessage {
     /// type of worker message
     #[serde(rename = "type")]
     #[serde(default)]

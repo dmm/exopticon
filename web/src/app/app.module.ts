@@ -13,6 +13,7 @@ import { CameraOverlayComponent } from './camera-overlay/camera-overlay.componen
 import { CameraStatusOverlayComponent } from './camera-status-overlay/camera-status-overlay.component';
 import { AnalysisPanelComponent } from './analysis-panel/analysis-panel.component';
 import { VideoViewComponent } from './video-view/video-view.component';
+import { PlaybackViewComponent } from './playback-view/playback-view.component';
 
 @NgModule({
   declarations: [
@@ -23,6 +24,7 @@ import { VideoViewComponent } from './video-view/video-view.component';
     CameraStatusOverlayComponent,
     AnalysisPanelComponent,
     VideoViewComponent,
+    PlaybackViewComponent,
   ],
   imports: [
     AngularPageVisibilityModule,

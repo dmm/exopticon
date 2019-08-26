@@ -14,7 +14,12 @@ export interface AnalysisSource {
   analysisEngineId: number;
 }
 
-export type FrameSource = AnalysisSource | CameraSource;
+export interface PlaybackSource {
+  kind: 'playback';
+  id: number;
+}
+
+export type FrameSource = AnalysisSource | CameraSource | PlaybackSource;
 
 export class FrameMessage {
   source: FrameSource;
