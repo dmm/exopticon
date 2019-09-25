@@ -7,8 +7,11 @@ use crate::models::{
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 
+/// A segment of video
+type VideoSegment = (VideoUnit, VideoFile);
+
 /// A segment of video paired with the source camera
-type CameraVideoSegment = (Camera, (VideoUnit, VideoFile));
+type CameraVideoSegment = (Camera, VideoSegment);
 
 impl Message for CreateVideoUnit {
     type Result = Result<VideoUnit, ServiceError>;
@@ -167,9 +170,13 @@ impl Handler<FetchBetweenVideoUnit> for DbExecutor {
         let conn: &PgConnection = &self.0.get().unwrap();
 
         video_units
-            .filter(begin_time.le(msg.end_time))
-            .filter(end_time.ge(msg.begin_time))
-            .load::<VideoUnit>(conn)
+            .filter(camera_id.eq(msg.camera_id))
+            .filter(begin_time.le(msg.end_time.naive_utc()))
+            .filter(end_time.ge(msg.begin_time.naive_utc()))
+            .filter(begin_time.ne(end_time))
+            .order(begin_time.asc())
+            .limit(1000)
+            .load(conn)
             .map_err(|_error| ServiceError::InternalServerError)
     }
 }

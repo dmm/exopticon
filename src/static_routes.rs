@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use actix_web::dev::FromParam;
 use actix_web::{Body, HttpRequest, HttpResponse};
 use askama::Template;
-use mime_guess::guess_mime_type;
+use mime_guess;
 
 use crate::app::RouteState;
 
@@ -64,7 +64,7 @@ pub fn get_js_map_file(req: HttpRequest<RouteState>) -> HttpResponse {
     let path = format!("{}.js.map", filename);
     match Asset::get(&path) {
         Some(content) => HttpResponse::Ok()
-            .content_type("application/octet-stream")
+            .content_type("application/json")
             .body(Body::from_slice(content.as_ref())),
         None => HttpResponse::NotFound().body("404 Not Found"),
     }
@@ -113,7 +113,7 @@ pub fn fetch_static_file(req: &HttpRequest<RouteState>) -> HttpResponse {
 
     match Asset::get(path) {
         Some(content) => HttpResponse::Ok()
-            .content_type(guess_mime_type(path).as_ref())
+            .content_type(mime_guess::from_path(path).first_or_octet_stream().as_ref())
             .body(Body::from_slice(content.as_ref())),
         None => HttpResponse::NotFound().body("404 Not Found"),
     }

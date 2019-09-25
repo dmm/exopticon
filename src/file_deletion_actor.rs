@@ -84,8 +84,14 @@ impl FileDeletionActor {
 
         ctx.spawn(
             wrap_future(fut)
-                .map(|_result, _actor, _ctx| {})
-                .map_err(|_e, _actor, _ctx| {}),
+                .map(|result, _actor, _ctx| {
+                    if let Err(e) = result {
+                        panic!("Failed to delete video unit/files: {}", e);
+                    }
+                })
+                .map_err(|e, _actor, _ctx| {
+                    panic!("Failed to delete video unit/files: {}", e);
+                }),
         );
     }
 }

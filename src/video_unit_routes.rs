@@ -1,6 +1,6 @@
 use actix_web::error::ResponseError;
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, State};
-use chrono::NaiveDateTime;
+use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, Query, State};
+use chrono::{DateTime, Utc};
 use futures::future::Future;
 
 use crate::app::RouteState;
@@ -12,7 +12,7 @@ use crate::models::{FetchBetweenVideoUnit, FetchVideoUnit};
 ///
 /// * `path` - `Path` containing `VideoUnit` id
 /// * `state` - `RouteState` struct
-///
+///p
 pub fn fetch_video_unit(
     (path, state): (Path<i32>, State<RouteState>),
 ) -> FutureResponse<HttpResponse> {
@@ -29,23 +29,34 @@ pub fn fetch_video_unit(
         .responder()
 }
 
+/// Struct used to match time parameters on api route
+#[derive(Deserialize)]
+pub struct DateRange {
+    /// end time - inclusive
+    pub end_time: DateTime<Utc>,
+    /// begin_time - exclusive
+    pub begin_time: DateTime<Utc>,
+}
+
 /// Implements route that fetches `VideoUnit`s from the database
 /// between the specified times, inclusively.
 ///
 /// # Arguments
 ///
+/// * `camera_id` - id of camera to fetch video for
 /// * `begin` - begin time in UTC
 /// * `end` - end time in UTC
 /// * `state` - `RouteState` struct
 ///
 pub fn fetch_video_units_between(
-    (begin, end, state): (Path<NaiveDateTime>, Path<NaiveDateTime>, State<RouteState>),
+    (camera_id, range, state): (Path<i32>, Query<DateRange>, State<RouteState>),
 ) -> FutureResponse<HttpResponse> {
     state
         .db
         .send(FetchBetweenVideoUnit {
-            begin_time: begin.into_inner(),
-            end_time: end.into_inner(),
+            camera_id: camera_id.into_inner(),
+            begin_time: range.begin_time,
+            end_time: range.end_time,
         })
         .from_err()
         .and_then(|db_response| match db_response {

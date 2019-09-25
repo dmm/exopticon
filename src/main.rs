@@ -87,6 +87,9 @@ mod models;
 /// Implemenents `DbExecutor` handler for creating and querying observations.
 mod observation_handler;
 
+///
+mod observation_routes;
+
 /// Implements playback actor
 mod playback_actor;
 

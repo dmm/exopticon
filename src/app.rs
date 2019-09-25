@@ -17,6 +17,7 @@ use crate::camera_routes::{
     set_time, update_camera,
 };
 use crate::models::DbExecutor;
+use crate::observation_routes::fetch_observations_between;
 use crate::static_routes;
 use crate::static_routes::{fetch_static_file, index};
 use crate::user_routes::create_user;
@@ -117,12 +118,16 @@ pub fn new(db: Addr<DbExecutor>, secret: &str) -> App<RouteState> {
                     r.method(Method::GET).with(fetch_ntp);
                     r.method(Method::POST).with(set_ntp);
                 })
+                .resource("/cameras/{camera_id}/video", |r| {
+                    r.method(Method::GET).with_async(fetch_video_units_between);
+                })
+                // routes to observations
+                .resource("/cameras/{camera_id}/observations", |r| {
+                    r.method(Method::GET).with_async(fetch_observations_between);
+                })
                 // routes to video_unit
                 .resource("/video_units/{id}", |r| {
                     r.method(Method::GET).with(fetch_video_unit);
-                })
-                .resource("/video_units/between/{begin}/{end}", |r| {
-                    r.method(Method::GET).with(fetch_video_units_between);
                 })
                 // routes to user
                 .resource("/users", |r| {

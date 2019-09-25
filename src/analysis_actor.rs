@@ -123,22 +123,26 @@ impl AnalysisActor {
     fn message_to_action(&mut self, msg: AnalysisWorkerMessage, ctx: &mut Context<Self>) {
         match msg {
             AnalysisWorkerMessage::Log { message } => {
-                info!("Capture Worker log: {}", message);
+                info!("Analysis Worker log: {}", message);
             }
             AnalysisWorkerMessage::FrameRequest(count) => {
-                debug!("{} frames requested!", count);
                 self.frames_requested = count;
             }
             AnalysisWorkerMessage::Observation(observations) => {
+                debug!("Analysis observations: {}", observations.len());
                 let fut = self.db_address.send(CreateObservations { observations });
-                ctx.spawn(wrap_future(fut).map(|_result, _actor, _ctx| {}).map_err(
+                ctx.spawn(wrap_future(fut).map(|result, _actor, _ctx| {
+                    match result {
+                        Ok(count) => debug!("Inserted {} observations.", count),
+                        Err(err) => error!("Error inserting observations: {}", err)
+                    }
+                }).map_err(
                     |_e, _actor, _ctx| {
                         error!("AnalysisActor: Unable to save aobservation.");
                     },
                 ));
             }
             AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
-                debug!("Analysis got frame report {}", tag);
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: 0,
                     jpeg,
@@ -273,7 +277,6 @@ impl Handler<CameraFrame> for AnalysisActor {
         }
 
         if let Some(framed_stdin) = self.worker_stdin.take() {
-            debug!("Analysis actor: sending frame to worker...");
             let worker_message = AnalysisWorkerCommand::Frame(msg);
             if let Ok(serialized) = to_vec_named(&worker_message) {
                 self.frames_requested -= 1;

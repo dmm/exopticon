@@ -14,7 +14,7 @@ use serde_json;
 use crate::app::RouteState;
 use crate::db_registry;
 use crate::models::FetchVideoUnit;
-use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback};
+use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback, StopPlayback};
 use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, Subscribe, SubscriptionSubject, Unsubscribe,
@@ -55,7 +55,10 @@ pub enum WsCommand {
         offset: i32,
     },
     /// Stop playback request
-    StopPlayback,
+    StopPlayback {
+        /// playback id, supplied by client
+        id: u64
+    },
 }
 
 /// A frame of video from a camera stream. This struct is used to
@@ -118,9 +121,12 @@ impl WsSession {
     /// Modifies send window, intended to be called when acking a
     /// frame.
     fn ack(&mut self) {
+        if self.live_frames == 0 {
+            error!("live frame count should never be zero when acking!");
+            return;
+        }
+        self.live_frames = std::cmp::max(self.live_frames, 1);
         self.live_frames -= 1;
-
-        self.live_frames = std::cmp::max(self.live_frames, 0);
 
         if self.live_frames < self.window_size && self.window_size < 10 {
             self.window_size += 1;
@@ -259,7 +265,15 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         // subscribe to playback subject
                     }
 
-                    Ok(WsCommand::StopPlayback) => {}
+                    Ok(WsCommand::StopPlayback {
+                        id
+                    }) => {
+                        PlaybackSupervisor::from_registry().do_send(
+                            StopPlayback {
+                                id
+                            },
+                        );
+                    }
 
                     Ok(WsCommand::Ack) => {
                         self.ack();

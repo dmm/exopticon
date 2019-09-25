@@ -47,7 +47,7 @@ impl Middleware<RouteState> for WebAuthMiddleware {
             info!("authenticated user id: {}", user_id);
             Ok(Started::Done)
         } else if req.path() == "/login" {
-            return Ok(Started::Done);
+            Ok(Started::Done)
         } else {
             Ok(Started::Response(
                 HttpResponse::Found()

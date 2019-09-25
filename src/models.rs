@@ -1,5 +1,6 @@
 // models.rs
 use actix::{Actor, SyncContext};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 
@@ -15,7 +16,6 @@ impl Actor for DbExecutor {
 }
 
 use crate::schema::{camera_groups, cameras, observations, users, video_files, video_units};
-use chrono::{DateTime, NaiveDateTime, Utc};
 
 /// Full camera group model. Represents a full row returned from the
 /// database.
@@ -282,10 +282,12 @@ pub struct FetchVideoUnit {
 
 /// Represents a request to fetch video units between specified times
 pub struct FetchBetweenVideoUnit {
+    /// id of camera to fetch video for
+    pub camera_id: i32,
     /// in UTC
-    pub begin_time: NaiveDateTime,
+    pub begin_time: DateTime<Utc>,
     /// in UTC
-    pub end_time: NaiveDateTime,
+    pub end_time: DateTime<Utc>,
 }
 
 /// Full video file model, represents full database row
@@ -442,6 +444,17 @@ pub struct CreateObservation {
 pub struct CreateObservations {
     /// Vec of observations to create
     pub observations: Vec<CreateObservation>,
+}
+
+/// Represents a request to query `Observations`
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FetchObservations {
+    /// camera id to fetch observations for
+    pub camera_id: i32,
+    /// beginning time - inclusive
+    pub begin_time: DateTime<Utc>,
+    /// end time - exclusive
+    pub end_time: DateTime<Utc>,
 }
 
 /// Full user model struct, represents full value from database.
