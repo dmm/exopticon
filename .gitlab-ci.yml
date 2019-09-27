@@ -4,6 +4,7 @@ stages:
 
 app-build:
   stage: build
+    - rustup component add clippy
   script:
     - cargo clippy
     - cargo build --release
