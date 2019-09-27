@@ -20,6 +20,8 @@ export interface AnalysisSubject {
 export interface PlaybackSubject {
   kind: 'playback';
   id: number;
+  videoUnitId: number;
+  offset: number;
 }
 export type SubscriptionSubject = AnalysisSubject | CameraSubject | PlaybackSubject;
 
@@ -45,7 +47,8 @@ export class VideoService {
       } else {
         url = "ws:";
       }
-      url += `//${parse.host}/${parse.pathname}/v1/ws_json`;
+      var pathname = parse.pathname === '/' ? '' : `/${parse.pathname}`;
+      url += `//${parse.host}${pathname}/v1/ws_json`;
       console.log(`websocket url: ${url}`);
     }
     if (!this.subject) {
@@ -96,9 +99,9 @@ export class VideoService {
           case 'playback':
             return {
               'StartPlayback': {
-                id: 1,
-                video_unit_id: 1456336,
-                offset: 0,
+                id: subject.id,
+                video_unit_id: subject.videoUnitId,
+                offset: subject.offset,
               }
             }
         }
@@ -117,6 +120,12 @@ export class VideoService {
             return {
               'Unsubscribe': {
                 'AnalysisEngine': subject.analysisEngineId,
+              }
+            };
+          case 'playback':
+            return {
+              'StopPlayback': {
+                id: subject.id,
               }
             };
 

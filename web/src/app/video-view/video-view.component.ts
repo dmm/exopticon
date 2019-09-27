@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef, ElementRef, EventEmitter, OnInit, Input, Output, NgZone } from '@angular/core';
+import { SimpleChanges, Component, ChangeDetectorRef, ElementRef, EventEmitter, OnInit, Input, Output, NgZone } from '@angular/core';
 import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Observable, Subscription } from 'rxjs';
 
@@ -12,29 +12,12 @@ import { SubscriptionSubject, VideoService } from '../video.service';
   styleUrls: ['./video-view.component.css']
 })
 export class VideoViewComponent implements OnInit {
-  @Input() videoService: VideoService;
-  @Input() videoSubject: SubscriptionSubject;
-  @Input() set enabled(value: boolean) {
-    console.log(`Video view enable: ${value}`);
-    if (value && this.ready) {
-      setTimeout(() => {
-        this.activate();
-      }, 0)
-    } else {
-      if (this.ready) {
-        setTimeout(() => {
-          this.deactivate();
-        }, 0);
-      }
-    }
-  }
+  @Input() frameService?: Observable<FrameMessage>;
 
   @Output() status = new EventEmitter<string>();
 
-  private frameService?: Observable<FrameMessage>;
   private subscription?: Subscription;
   private img: HTMLImageElement;
-  private ready: boolean;
   private isActive: boolean;
 
   constructor(private elementRef: ElementRef,
@@ -42,14 +25,20 @@ export class VideoViewComponent implements OnInit {
     private ngZone: NgZone) { }
 
   ngOnInit() {
-    this.ready = true;
-    this.activate(); // !!!! remove this
-
   }
 
   ngAfterContentInit() {
     this.img = this.elementRef.nativeElement.querySelector('img');
+  }
 
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes.hasOwnProperty('frameService')) {
+      if (changes['frameService'].currentValue) {
+        this.activate();
+      } else {
+        this.deactivate();
+      }
+    }
   }
 
   ngOnDestroy() {
@@ -60,13 +49,7 @@ export class VideoViewComponent implements OnInit {
     this.isActive = false;
     this.status.emit('loading');
 
-    if (this.subscription) {
-      this.subscription.unsubscribe();
-      this.subscription = undefined;
-      this.frameService = undefined;
-    }
-
-    this.frameService = this.videoService.getObservable(this.videoSubject);
+    let oldSubscription = this.subscription;
 
     this.subscription = this.frameService.subscribe(
       (message) => {
@@ -83,6 +66,13 @@ export class VideoViewComponent implements OnInit {
         console.log(`Caught websocket error! ${error}`);
       },
     );
+
+    if (oldSubscription) {
+      // still potentially bad if a frame from the old subscription
+      // hits first.
+      oldSubscription.unsubscribe();
+    }
+
   }
 
   deactivate() {
@@ -92,7 +82,6 @@ export class VideoViewComponent implements OnInit {
     if (this.subscription) {
       this.subscription.unsubscribe();
       this.subscription = undefined;
-      this.frameService = undefined;
     }
   }
 }

@@ -1,10 +1,10 @@
-import { Component, ChangeDetectorRef, ElementRef, OnInit, Output, EventEmitter, Input, NgZone } from '@angular/core';
+import { SimpleChanges, Component, ChangeDetectorRef, ElementRef, OnInit, Output, EventEmitter, Input, NgZone } from '@angular/core';
 import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Observable, Subscription } from 'rxjs';
 
 import { Camera } from '../camera';
 import { SubscriptionSubject, VideoService } from '../video.service';
-import { CameraResolution } from '../frame-message';
+import { CameraResolution, FrameMessage } from '../frame-message';
 
 @Component({
   selector: 'app-camera-view',
@@ -21,20 +21,45 @@ export class CameraViewComponent implements OnInit {
 
   public status: string;
 
-  public videoSubject: SubscriptionSubject;
+  private videoSubject: SubscriptionSubject;
+  public frameService?: Observable<FrameMessage>;
+
   constructor(private changeRef: ChangeDetectorRef) {
   }
 
   ngOnInit() {
+    if (this.enabled) {
+      this.activate();
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes.hasOwnProperty('enabled')) {
+      if (changes['enabled'].currentValue) {
+        this.activate()
+      } else {
+        this.deactivate();
+      }
+    }
+  }
+
+  activate() {
     this.videoSubject = {
       kind: 'camera',
       cameraId: this.camera.id,
       resolution: CameraResolution.Sd,
     };
+    this.frameService = this.videoService.getObservable(this.videoSubject);
+  }
+
+  deactivate() {
+    this.frameService = undefined;
   }
 
   onVideoStatusChange(status: string) {
-    this.status = status;
+    setTimeout(() => {
+      this.status = status;
+    }, 0);
   }
 
   onInViewportChange(inViewport: boolean) {

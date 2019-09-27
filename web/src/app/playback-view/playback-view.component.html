@@ -1,6 +1,14 @@
-<div>
-  <app-video-view [videoService]="videoService"
-                  [videoSubject]="videoSubject"
-                  [enabled]="enabled"
-                  ></app-video-view>
+<app-video-view
+  [frameService]="currentVideoService"
+  class="video-view">
+  </app-video-view>
+<div class="control-bar">
+  <div class="begin-time-display">{{viewStartFormatted}}</div>
+  <div class="button prev-button" (click)="timeShift(-1)"><<</div>
+  <div class="button next-button" (click)="timeShift(1)">>></div>
+</div>
+<div class="progress-bar">
+  <canvas #observations width="1000" height="20" class="observations"></canvas>
+  <canvas #canvas width="1000" height="20" class="video-availability"
+          (click)="handleProgressClick($event)"></canvas>
 </div>

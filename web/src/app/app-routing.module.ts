@@ -7,7 +7,7 @@ import { PlaybackViewComponent } from './playback-view/playback-view.component';
 const routes: Routes = [
   { path: 'cameras', component: CameraPanelComponent },
   { path: 'analysis_engine/:id', component: AnalysisPanelComponent },
-  { path: 'playback', component: PlaybackViewComponent },
+  { path: 'cameras/:id/playback', component: PlaybackViewComponent },
   { path: '', redirectTo: '/cameras', pathMatch: 'full' },
   { path: '**', redirectTo: '/cameras', pathMatch: 'full' },
 ];
