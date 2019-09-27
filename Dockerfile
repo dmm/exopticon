@@ -1,8 +1,12 @@
-FROM gw000/debian-cuda:9.1_7.0
+#FROM gw000/debian-cuda:9.1_7.0
+FROM gw000/debian-cuda:10.1
+
+ENV CC=gcc-7
+ENV CXX=g++-7
 
 # Install system packages
-RUN echo 'deb-src http://http.debian.net/debian stretch main contrib non-free' > /etc/apt/sources.list.d/src.list \
-&& apt-get update && apt-get install --no-install-recommends -y \
+RUN echo 'deb-src http://http.debian.net/debian buster main contrib non-free' > /etc/apt/sources.list.d/src.list
+RUN apt-get update && apt-get install --no-install-recommends -y \
 # Exopticon Dependencies
 libavcodec-dev libavformat-dev libswscale-dev libavfilter-dev \
            libavutil-dev libturbojpeg0-dev autoconf automake bzip2 \
@@ -14,23 +18,24 @@ libavcodec-dev libavformat-dev libswscale-dev libavfilter-dev \
            libreadline-dev libsqlite3-dev libssl-dev libtool libwebp-dev \
            libxml2-dev libxslt-dev libyaml-dev make patch xz-utils \
            zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
-           curl \
+           curl python3-pil python3-lxml \
+           python3 python3-pip python3-setuptools python3-wheel \
 # install cuDNN
-libcudnn7=7.1.4.18-1+cuda9.0 libcudnn7-dev=7.1.4.18-1+cuda9.0 \
+#libcudnn7=7.1.4.18-1+cuda9.0 libcudnn7-dev=7.1.4.18-1+cuda9.0 \
 && apt-get clean \
 && rm -rf /var/lib/apt/lists/*
 
 # install Python 3.7
-RUN echo 'deb-src http://http.debian.net/debian stretch main contrib non-free' > /etc/apt/sources.list.d/src.list \
-&& apt-get update && apt-get build-dep -y python3 \
-&& apt-get clean \
-&& rm -rf /var/lib/apt/lists/* \
-&& wget -nv -P /root/src https://www.python.org/ftp/python/3.7.3/Python-3.7.3.tgz \
-&& cd /root/src/ && tar xf Python-3.7.3.tgz && cd Python-3.7.3 \
-&& ./configure --enable-optimizations --with-ensurepip=install \
-&& make -j4 \
-&& make altinstall \
-&& rm -r /root/src
+#RUN echo 'deb-src http://http.debian.net/debian stretch main contrib non-free' > /etc/apt/sources.list.d/src.list \
+#&& apt-get update && apt-get build-dep -y python3 \
+#&& apt-get clean \
+#&& rm -rf /var/lib/apt/lists/* \
+#&& wget -nv -P /root/src https://www.python.org/ftp/python/3.7.3/Python-3.7.3.tgz \
+#&& cd /root/src/ && tar xf Python-3.7.3.tgz && cd Python-3.7.3 \
+#&& ./configure --enable-optimizations --with-ensurepip=install \
+#&& make -j4 \
+#&& make altinstall \
+#&& rm -r /root/src
 
 # install dlib
 ## dlib dependencies
@@ -56,19 +61,18 @@ lsb-release \
 
 # install lightnet
 ## install lightnet dependencies
-RUN pip3.7 install torch==0.4.1.post2 torchvision==0.2.2
+RUN pip3 install torch torchvision
 RUN git clone https://gitlab.com/EAVISE/lightnet.git /root/lightnet
-RUN cd /root/lightnet && pip3.7 install -r develop.txt
+RUN cd /root/lightnet && git checkout tags/v1.0.0 && pip3 install -r develop.txt
 
 # install tensorflow
-RUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler python3-pil python3-lxml \
-    python3 python3-pip python3-setuptools python3-wheel \
+RUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler  \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
 
 ## install 1.12.2 b/c is uses cuda 9
-RUN pip3 install tensorflow-gpu==1.12.2 Cython contextlib2 matplotlib pillow \
+RUN pip3 install tensorflow-gpu==1.14.0 Cython contextlib2 matplotlib pillow \
                  lxml
 RUN git clone https://github.com/tensorflow/models.git /root/tensorflow-models
 RUN cd /root/tensorflow-models/research \
@@ -77,7 +81,7 @@ ENV PYTHONPATH=$PYTHONPATH:.:/root/tensorflow-models/research:/root/tensorflow-m
 
 # install opencv
 RUN apt-get update && apt-get install -y --no-install-recommends libopenblas-dev python3-dev \
-    && apt-get build-dep -y opencv \
+    && apt-get build-dep -y --no-install-recommends opencv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -93,6 +97,17 @@ RUN git clone --depth 1 --branch 4.1.0 https://github.com/opencv/opencv.git /roo
     -DWITH_CUBLAS=1 \
     -DBUILD_opencv_python3=yes \
     -DBUILD_opencv_java=off \
+    -DCMAKE_BUILD_TYPE=RELEASE \
+    -D BUILD_EXAMPLES=OFF \
+    -D BUILD_DOCS=OFF \
+    -D BUILD_PERF_TESTS=OFF \
+    -D BUILD_TESTS=OFF \
+    -D WITH_TBB=ON \
+    -D WITH_OPENMP=ON \
+    -D WITH_IPP=ON \
+    -D WITH_NVCUVID=ON \
+    -D WITH_OPENCL=ON \
+    -D WITH_CSTRIPES=ON \
     .. \
     && make -j20 \
     && make install \
@@ -100,10 +115,17 @@ RUN git clone --depth 1 --branch 4.1.0 https://github.com/opencv/opencv.git /roo
 
 RUN pip3 install msgpack imutils
 
+# install node.js and npm
+RUN mkdir /node && cd /node \
+    && wget https://nodejs.org/dist/v12.10.0/node-v12.10.0-linux-x64.tar.xz  \
+    && tar xf node-v12.10.0-linux-x64.tar.xz \
+    && rm -rf node-v12.10.0-linux-x64.tar.xz
+ENV PATH=$PATH:/node/node-v12.10.0-linux-x64/bin
+
 # configure environment
 ENV PATH=/root/.cargo/bin:/exopticon/workers:$PATH
-ENV CUDA_HOME=/usr/local/cuda-9.0
-ENV CUDA_PATH=/usr/local/cuda-9.0/bin
+ENV CUDA_HOME=/usr/local/cuda-10.0
+ENV CUDA_PATH=/usr/local/cuda-10.0/bin
 
 # configure run user
 RUN groupadd -r exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
