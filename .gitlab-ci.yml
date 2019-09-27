@@ -1,11 +1,9 @@
-image: dmattli/exopticon
+image: dmattli/exopticonbuild:1
 stages:
   - build
 
 app-build:
   stage: build
-  before_script:
-    - rustup component add clippy
   script:
-    - cargo build --release
     - cargo clippy
+    - cargo build --release
