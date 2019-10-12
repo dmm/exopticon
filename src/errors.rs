@@ -22,11 +22,11 @@ pub enum ServiceError {
 impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
         match *self {
-            ServiceError::InternalServerError => {
+            Self::InternalServerError => {
                 HttpResponse::InternalServerError().json("Internal Server Error")
             }
-            ServiceError::NotFound => HttpResponse::NotFound().json("Not Found"),
-            ServiceError::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
+            Self::NotFound => HttpResponse::NotFound().json("Not Found"),
+            Self::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
         }
     }
 }
