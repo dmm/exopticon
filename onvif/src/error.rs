@@ -18,46 +18,46 @@ impl std::error::Error for Error {}
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::ConnectionFailed => write!(f, "Connection failed!"),
-            Error::Unauthorized => write!(f, "Unauthorized"),
-            Error::InvalidResponse => write!(f, "Invalid Response from device"),
-            Error::InvalidArgument => write!(f, "Invalid argument provided"),
+            Self::ConnectionFailed => write!(f, "Connection failed!"),
+            Self::Unauthorized => write!(f, "Unauthorized"),
+            Self::InvalidResponse => write!(f, "Invalid Response from device"),
+            Self::InvalidArgument => write!(f, "Invalid argument provided"),
         }
     }
 }
 
 impl From<hyper::error::Error> for Error {
     fn from(_err: hyper::error::Error) -> Self {
-        Error::ConnectionFailed
+        Self::ConnectionFailed
     }
 }
 
 impl From<std::string::FromUtf8Error> for Error {
     fn from(_err: std::string::FromUtf8Error) -> Self {
-        Error::InvalidResponse
+        Self::InvalidResponse
     }
 }
 
 impl From<sxd_document::parser::Error> for Error {
     fn from(_err: sxd_document::parser::Error) -> Self {
-        Error::InvalidResponse
+        Self::InvalidResponse
     }
 }
 
 impl From<sxd_xpath::Error> for Error {
     fn from(_err: sxd_xpath::Error) -> Self {
-        Error::InvalidResponse
+        Self::InvalidResponse
     }
 }
 
 impl From<std::num::ParseIntError> for Error {
     fn from(_err: std::num::ParseIntError) -> Self {
-        Error::InvalidResponse
+        Self::InvalidResponse
     }
 }
 
 impl From<std::str::ParseBoolError> for Error {
     fn from(_err: std::str::ParseBoolError) -> Self {
-        Error::InvalidResponse
+        Self::InvalidResponse
     }
 }

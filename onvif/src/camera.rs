@@ -41,8 +41,8 @@ impl std::fmt::Display for TimeType {
     /// Implementing display format for the TimeType enum
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TimeType::Manual => write!(f, "Manual"),
-            TimeType::Ntp => write!(f, "Ntp"),
+            Self::Manual => write!(f, "Manual"),
+            Self::Ntp => write!(f, "Ntp"),
         }
     }
 }
@@ -53,8 +53,8 @@ impl Serialize for TimeType {
         S: Serializer,
     {
         match self {
-            TimeType::Manual => serializer.serialize_str("Manual"),
-            TimeType::Ntp => serializer.serialize_str("NTP"),
+            Self::Manual => serializer.serialize_str("Manual"),
+            Self::Ntp => serializer.serialize_str("NTP"),
         }
     }
 }
@@ -67,8 +67,8 @@ impl<'de> Deserialize<'de> for TimeType {
         let s = String::deserialize(deserializer)?;
 
         match s.as_ref() {
-            "Manual" => Ok(TimeType::Manual),
-            "NTP" => Ok(TimeType::Ntp),
+            "Manual" => Ok(Self::Manual),
+            "NTP" => Ok(Self::Ntp),
             _ => Err(serde::de::Error::custom("invalid TimeType specified")),
         }
     }
@@ -118,9 +118,9 @@ impl std::fmt::Display for NtpType {
     /// Implementing display format for the TimeType enum
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            NtpType::Ipv4 => write!(f, "IPv4"),
-            NtpType::Ipv6 => write!(f, "IPv6"),
-            NtpType::Dns => write!(f, "DNS"),
+            Self::Ipv4 => write!(f, "IPv4"),
+            Self::Ipv6 => write!(f, "IPv6"),
+            Self::Dns => write!(f, "DNS"),
         }
     }
 }
@@ -129,9 +129,9 @@ impl FromStr for NtpType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "IPV4" => Ok(NtpType::Ipv4),
-            "IPV6" => Ok(NtpType::Ipv6),
-            "DNS" => Ok(NtpType::Dns),
+            "IPV4" => Ok(Self::Ipv4),
+            "IPV6" => Ok(Self::Ipv6),
+            "DNS" => Ok(Self::Dns),
             _ => Err(Error::InvalidArgument),
         }
     }
@@ -249,7 +249,7 @@ impl Camera {
     }
 
     /// Requests date and time settings from camera
-    pub fn get_date_and_time(&self) -> Box<Future<Item = DeviceDateAndTime, Error = Error>> {
+    pub fn get_date_and_time(&self) -> impl Future<Item = DeviceDateAndTime, Error = Error> {
         Box::new(
             self.request_get_date_and_time()
                 .and_then(Self::parse_get_date_and_time)
@@ -361,7 +361,7 @@ impl Camera {
     pub fn set_date_and_time(
         &self,
         datetime: &DeviceDateAndTime,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> impl Future<Item = (), Error = Error> {
         Box::new(
             self.request_set_date_and_time(datetime)
                 .and_then(Self::parse_set_date_and_time)
@@ -439,7 +439,7 @@ impl Camera {
     }
 
     /// Fetch camera's ntp settings
-    pub fn get_ntp(&self) -> Box<Future<Item = NtpSettings, Error = Error>> {
+    pub fn get_ntp(&self) -> impl Future<Item = NtpSettings, Error = Error> {
         Box::new(
             self.request_get_ntp()
                 .and_then(Self::parse_get_ntp)
@@ -508,7 +508,7 @@ impl Camera {
     ///
     /// * `ntp_settings` - new ntp settings
     ///
-    pub fn set_ntp(&self, ntp_settings: &NtpSettings) -> Box<Future<Item = (), Error = Error>> {
+    pub fn set_ntp(&self, ntp_settings: &NtpSettings) -> impl Future<Item = (), Error = Error> {
         Box::new(
             self.request_set_ntp(ntp_settings)
                 .and_then(Self::parse_set_ntp)
