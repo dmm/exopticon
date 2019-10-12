@@ -10,6 +10,7 @@ use log::Level;
 use rmp_serde::to_vec_named;
 use rmp_serde::Deserializer;
 use serde::Deserialize;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use tokio::codec::length_delimited;
 use tokio::prelude::Sink;
 use tokio_process::CommandExt;
@@ -17,29 +18,39 @@ use tokio_process::CommandExt;
 use crate::models::{CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
-/// Worker Log Levels
-#[derive(Serialize, Deserialize)]
+/// Represents logging levels
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
+#[repr(u8)]
 enum LogLevel {
-    /// Error Log
-    Error,
-    /// Warning Log
-    Warn,
-    /// Info Log
-    Info,
-    /// Debug Log
-    Debug,
-    /// Trace Log
-    Trace,
+    Critical = 50,
+    Error = 40,
+    Warning = 30,
+    Info = 20,
+    Debug = 10,
+    NotSet = 0,
 }
 
 impl From<Level> for LogLevel {
-    fn from(level: Level) -> Self {
-        match level {
-            Level::Error => LogLevel::Error,
-            Level::Warn => LogLevel::Warn,
-            Level::Info => LogLevel::Info,
-            Level::Debug => LogLevel::Debug,
-            Level::Trace => LogLevel::Trace,
+    fn from(item: Level) -> Self {
+        match item {
+            Level::Error => Self::Error,
+            Level::Warn => Self::Warning,
+            Level::Info => Self::Info,
+            Level::Debug => Self::Debug,
+            Level::Trace => Self::Debug,
+        }
+    }
+}
+
+impl From<LogLevel> for Level {
+    fn from(item: LogLevel) -> Self {
+        match item {
+            LogLevel::Critical => Level::Error,
+            LogLevel::Error => Level::Error,
+            LogLevel::Warning => Level::Warn,
+            LogLevel::Info => Level::Info,
+            LogLevel::Debug => Level::Debug,
+            LogLevel::NotSet => Level::Debug,
         }
     }
 }
@@ -49,6 +60,8 @@ impl From<Level> for LogLevel {
 enum AnalysisWorkerMessage {
     /// Log message from worker
     Log {
+        /// log level index
+        level: LogLevel,
         /// Worker log message
         message: String,
     },
@@ -122,8 +135,8 @@ impl AnalysisActor {
     /// Processes the analysis worker message
     fn message_to_action(&mut self, msg: AnalysisWorkerMessage, ctx: &mut Context<Self>) {
         match msg {
-            AnalysisWorkerMessage::Log { message } => {
-                info!("Analysis Worker log: {}", message);
+            AnalysisWorkerMessage::Log { level, message } => {
+                log!(level.into(), "Analysis Worker log: {}", message)
             }
             AnalysisWorkerMessage::FrameRequest(count) => {
                 self.frames_requested = count;
@@ -131,16 +144,16 @@ impl AnalysisActor {
             AnalysisWorkerMessage::Observation(observations) => {
                 debug!("Analysis observations: {}", observations.len());
                 let fut = self.db_address.send(CreateObservations { observations });
-                ctx.spawn(wrap_future(fut).map(|result, _actor, _ctx| {
-                    match result {
-                        Ok(count) => debug!("Inserted {} observations.", count),
-                        Err(err) => error!("Error inserting observations: {}", err)
-                    }
-                }).map_err(
-                    |_e, _actor, _ctx| {
-                        error!("AnalysisActor: Unable to save aobservation.");
-                    },
-                ));
+                ctx.spawn(
+                    wrap_future(fut)
+                        .map(|result, _actor, _ctx| match result {
+                            Ok(count) => debug!("Inserted {} observations.", count),
+                            Err(err) => error!("Error inserting observations: {}", err),
+                        })
+                        .map_err(|_e, _actor, _ctx| {
+                            error!("AnalysisActor: Unable to save aobservation.");
+                        }),
+                );
             }
             AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
                 WsCameraServer::from_registry().do_send(CameraFrame {
