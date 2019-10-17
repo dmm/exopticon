@@ -1,5 +1,8 @@
 use crate::errors::ServiceError;
-use crate::models::{CreateObservations, DbExecutor, FetchObservations, Observation, VideoUnit};
+use crate::models::{
+    CreateObservations, DbExecutor, FetchObservations, FetchObservationsByVideoUnit, Observation,
+    VideoUnit,
+};
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 
@@ -45,6 +48,29 @@ impl Handler<FetchObservations> for DbExecutor {
             .load(conn)
             .map_err(|error| {
                 error!("FetchObservations error: {}", error);
+                ServiceError::InternalServerError
+            })
+    }
+}
+
+impl Message for FetchObservationsByVideoUnit {
+    type Result = Result<Vec<Observation>, ServiceError>;
+}
+
+impl Handler<FetchObservationsByVideoUnit> for DbExecutor {
+    type Result = Result<Vec<Observation>, ServiceError>;
+
+    fn handle(&mut self, msg: FetchObservationsByVideoUnit, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::observations::dsl::*;
+
+        let conn: &PgConnection = &self.0.get().unwrap();
+        observations
+            .filter(video_unit_id.eq(msg.video_unit_id))
+            .order(frame_offset.asc())
+            .limit(1000)
+            .load(conn)
+            .map_err(|error| {
+                error!("FetchObservationsByVideoUnit error: {}", error);
                 ServiceError::InternalServerError
             })
     }

@@ -1,4 +1,6 @@
 
+import { Observation } from './observation';
+
 export enum CameraResolution {
   Sd = 'SD',
   Hd = 'HD',
@@ -27,4 +29,5 @@ export class FrameMessage {
   jpeg: string;
   videoUnitId: number;
   offset: number;
+  observations: Observation[];
 }

@@ -383,7 +383,7 @@ pub struct DeleteVideoUnitFiles {
 pub struct FetchEmptyVideoFile;
 
 /// Represents an observation derived from a frame of video
-#[derive(Queryable, Associations, Identifiable, Serialize)]
+#[derive(Clone, Queryable, Associations, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "observations"]
 #[belongs_to(VideoUnit)]
@@ -455,6 +455,12 @@ pub struct FetchObservations {
     pub begin_time: DateTime<Utc>,
     /// end time - exclusive
     pub end_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FetchObservationsByVideoUnit {
+    /// video unit id to fetch observations for
+    pub video_unit_id: i32,
 }
 
 /// Full user model struct, represents full value from database.

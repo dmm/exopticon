@@ -21,11 +21,12 @@ use std::collections::HashMap;
 
 use actix::{Actor, Addr, Context, Handler, Message, Supervised, SystemService};
 
+use crate::models::Observation;
 use crate::playback_actor::PlaybackActor;
 use crate::ws_session::WsSession;
 
 /// Start playback message
-#[derive(Clone, Message)]
+#[derive(Message)]
 pub struct StartPlayback {
     /// id of playback session
     pub id: u64,
@@ -37,6 +38,8 @@ pub struct StartPlayback {
     pub offset: i32,
     /// filename
     pub video_filename: String,
+    /// observations
+    pub observations: Vec<Observation>,
 }
 
 /// Stop playback message
@@ -79,11 +82,17 @@ impl Handler<StartPlayback> for PlaybackSupervisor {
             msg.video_unit_id,
             msg.offset,
             msg.video_filename.clone(),
+            msg.observations,
             msg.address.clone().recipient(),
         )
         .start();
 
         self.actors.insert(msg.id, address);
+        debug!(
+            "Created playback actor: {}, actors len: {}",
+            msg.id,
+            self.actors.len()
+        )
     }
 }
 
@@ -91,7 +100,15 @@ impl Handler<StopPlayback> for PlaybackSupervisor {
     type Result = ();
 
     fn handle(&mut self, msg: StopPlayback, _ctx: &mut Self::Context) {
-        debug!("Got request to kill playback actor: {}", &msg.id);
-        self.actors.remove(&msg.id);
+        debug!(
+            "Got request to kill playback actor: {}, actors len: {}",
+            &msg.id,
+            self.actors.len()
+        );
+
+        if let Some(address) = self.actors.get(&msg.id) {
+            address.do_send(StopPlayback { id: msg.id });
+            self.actors.remove(&msg.id);
+        }
     }
 }

@@ -6,6 +6,7 @@ use actix::{
     WrapFuture,
 };
 use actix_web::ws;
+use futures::Future;
 use rmp_serde::Serializer;
 use serde;
 use serde::Serialize;
@@ -13,7 +14,8 @@ use serde_json;
 
 use crate::app::RouteState;
 use crate::db_registry;
-use crate::models::FetchVideoUnit;
+use crate::models::{FetchObservationsByVideoUnit, FetchVideoUnit, Observation};
+use crate::playback_actor::PlaybackFrame;
 use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback, StopPlayback};
 use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
@@ -57,7 +59,7 @@ pub enum WsCommand {
     /// Stop playback request
     StopPlayback {
         /// playback id, supplied by client
-        id: u64
+        id: u64,
     },
 }
 
@@ -79,6 +81,8 @@ struct RawCameraFrame {
     pub video_unit_id: i32,
     /// offset from beginning of video unit
     pub offset: i64,
+    /// observations associated with frame
+    pub observations: Vec<Observation>,
 }
 
 /// An actor representing a websocket connection
@@ -151,24 +155,13 @@ impl WsSession {
             self.window_size = 10;
         }
     }
-}
 
-impl Actor for WsSession {
-    type Context = ws::WebsocketContext<Self, RouteState>;
-
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        debug!("Starting websocket!");
-        self.ready = true;
-    }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        debug!("Stopping websocket!");
-    }
-}
-
-impl Handler<CameraFrame> for WsSession {
-    type Result = ();
-    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
+    fn handle_frame(
+        &mut self,
+        msg: CameraFrame,
+        observations: Vec<Observation>,
+        ctx: &mut <WsSession as Actor>::Context,
+    ) {
         if !self.ready_to_send() {
             self.adjust_window();
             return;
@@ -186,6 +179,7 @@ impl Handler<CameraFrame> for WsSession {
             source: msg.source,
             video_unit_id: msg.video_unit_id,
             offset: msg.offset,
+            observations: observations,
         };
         match &self.serialization {
             WsSerialization::MsgPack => {
@@ -205,6 +199,34 @@ impl Handler<CameraFrame> for WsSession {
 
         // spawn drain future
         ctx.spawn(fut);
+    }
+}
+
+impl Actor for WsSession {
+    type Context = ws::WebsocketContext<Self, RouteState>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        debug!("Starting websocket!");
+        self.ready = true;
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        debug!("Stopping websocket!");
+    }
+}
+
+impl Handler<CameraFrame> for WsSession {
+    type Result = ();
+    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
+        self.handle_frame(msg, Vec::new(), ctx);
+    }
+}
+
+impl Handler<PlaybackFrame> for WsSession {
+    type Result = ();
+
+    fn handle(&mut self, msg: PlaybackFrame, ctx: &mut Self::Context) -> Self::Result {
+        self.handle_frame(msg.frame, msg.observations, ctx);
     }
 }
 
@@ -241,11 +263,16 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         // generated ids.
 
                         // Ask playback supervisor to begin playback
+                        let fetch_observations = db_registry::get_db()
+                            .send(FetchObservationsByVideoUnit { video_unit_id });
+
                         let create_actor = db_registry::get_db()
                             .send(FetchVideoUnit { id: video_unit_id })
+                            .join(fetch_observations)
                             .into_actor(self)
                             .then(move |res, _act, ctx| {
-                                if let Ok(Ok(video_unit)) = res {
+                                if let Ok((Ok(video_unit), Ok(observations))) = res {
+                                    info!("Fetched {} observations.", observations.len());
                                     if let Some(video_file) = video_unit.files.first() {
                                         PlaybackSupervisor::from_registry().do_send(
                                             StartPlayback {
@@ -253,6 +280,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                                                 video_unit_id,
                                                 offset,
                                                 video_filename: video_file.filename.clone(),
+                                                observations,
                                                 address: ctx.address(),
                                             },
                                         );
@@ -265,14 +293,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         // subscribe to playback subject
                     }
 
-                    Ok(WsCommand::StopPlayback {
-                        id
-                    }) => {
-                        PlaybackSupervisor::from_registry().do_send(
-                            StopPlayback {
-                                id
-                            },
-                        );
+                    Ok(WsCommand::StopPlayback { id }) => {
+                        debug!("Got unsubscribe message for playback id: {}", id);
+                        PlaybackSupervisor::from_registry().do_send(StopPlayback { id });
                     }
 
                     Ok(WsCommand::Ack) => {

@@ -28,8 +28,16 @@ use tokio::codec::length_delimited;
 use tokio_process::CommandExt;
 
 use crate::capture_actor::CaptureMessage;
+use crate::models::Observation;
 use crate::playback_supervisor::{PlaybackSupervisor, StopPlayback};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource};
+
+/// struct representing playback frame with list of observations
+#[derive(Message, Serialize)]
+pub struct PlaybackFrame {
+    pub frame: CameraFrame,
+    pub observations: Vec<Observation>,
+}
 
 /// struct representing playback actor state
 pub struct PlaybackActor {
@@ -41,8 +49,12 @@ pub struct PlaybackActor {
     pub initial_offset: i32,
     /// path to video file to play
     pub video_file_path: String,
+    /// observations included in this video unit
+    pub observations: Vec<Observation>,
     /// address to send playback frames
-    pub target_address: Recipient<CameraFrame>,
+    pub target_address: Recipient<PlaybackFrame>,
+    /// current frame count offset, not really used yet
+    pub offset: i64,
 }
 
 impl Actor for PlaybackActor {
@@ -66,20 +78,39 @@ impl PlaybackActor {
         video_unit_id: i32,
         initial_offset: i32,
         video_file_path: String,
-        target_address: Recipient<CameraFrame>,
+        observations: Vec<Observation>,
+        target_address: Recipient<PlaybackFrame>,
     ) -> Self {
         Self {
             id,
             video_unit_id,
             initial_offset,
             video_file_path,
+            observations,
             target_address,
+            offset: 0,
         }
+    }
+    pub fn slurp_observations(&self, offset: i64) -> Vec<Observation> {
+        let mut current_obs = Vec::new();
+        let mut iter = self.observations.iter();
+
+        while let Some(obs) = iter.next() {
+            if obs.frame_offset as i64 == offset {
+                current_obs.push((*obs).clone());
+            }
+        }
+
+        if current_obs.len() > 0 {
+            debug!("Found {} observations", current_obs.len());
+        }
+
+        return current_obs;
     }
 }
 
 impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
-    fn handle(&mut self, item: BytesMut, ctx: &mut Context<Self>) {
+    fn handle(&mut self, item: BytesMut, _ctx: &mut Context<Self>) {
         let mut de = Deserializer::new(&item[..]);
 
         let frame: Result<CaptureMessage, rmp_serde::decode::Error> =
@@ -90,13 +121,16 @@ impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
                 if f.message_type == "frame"
                     && self
                         .target_address
-                        .do_send(CameraFrame {
-                            camera_id: 0,
-                            jpeg: f.jpeg,
-                            resolution: FrameResolution::HD,
-                            source: FrameSource::Playback { id: self.id },
-                            video_unit_id: self.video_unit_id,
-                            offset: f.offset,
+                        .do_send(PlaybackFrame {
+                            frame: CameraFrame {
+                                camera_id: 0,
+                                jpeg: f.jpeg,
+                                resolution: FrameResolution::HD,
+                                source: FrameSource::Playback { id: self.id },
+                                video_unit_id: self.video_unit_id,
+                                offset: self.offset,
+                            },
+                            observations: self.slurp_observations(self.offset),
                         })
                         .is_err()
                 {
@@ -104,8 +138,10 @@ impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
                         "Playback Actor: {} Unable to send message to recipient, dying..",
                         self.id
                     );
-                    ctx.stop();
+                    // Notify supervisor that we are done.
+                    PlaybackSupervisor::from_registry().do_send(StopPlayback { id: self.id });
                 }
+                self.offset += 1;
             }
 
             Err(e) => error!("Error deserializing frame! {}", e),
@@ -157,5 +193,14 @@ impl Handler<StartWorker> for PlaybackActor {
             });
 
         ctx.spawn(fut);
+    }
+}
+
+impl Handler<StopPlayback> for PlaybackActor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: StopPlayback, ctx: &mut Context<Self>) -> Self::Result {
+        debug!("Stopping playback for: {}", self.id);
+        ctx.stop();
     }
 }
