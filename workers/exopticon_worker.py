@@ -11,62 +11,52 @@ import argparse
 import logging
 import cv2
 
+class WorkerHandler(logging.Handler):
+    def __init__(self, worker):
+        super().__init__()
+        self.worker = worker
+    def emit(self, record):
+        log_entry = self.format(record)
+        self.worker.raw_log(record.levelno, log_entry)
+
 class ExopticonWorker(object):
-    def __init__(self, handle_frame=None, setup=None, cleanup=None, state={}):
-        self.handle_frame_callback = self.builtin_handle_frame_callback
-        self.setup_callback = self.builtin_setup_callback
-        self.cleanup_callback = self.builtin_cleanup_callback
-        self.state = state
-        self.frame_times = []
+    # Implement private methods
+    def __init__(self, worker_name):
+        self.__worker_name = worker_name
+        self.__current_frame = None
+        self.__frame_times = []
 
-        if handle_frame:
-            self.handle_frame_callback = partial(handle_frame, self)
-        if setup:
-            self.setup_callback = partial(setup, self)
-        if cleanup:
-            self.cleanup_callback = partial(cleanup, self)
+    def __setup(self):
+        # configure logging
+        self.logger = logging.getLogger(self.__worker_name)
+        self.logger.setLevel(logging.DEBUG)
+        self.__log_handler = WorkerHandler(self)
+        self.__log_handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(self.__log_handler)
 
-    def builtin_setup_callback(self):
-        self.log_info('running builtin setup');
+        # call subclass setup
+        self.logger.info("Starting worker...")
+        self.setup()
 
-    def builtin_handle_frame_callback(self, frame):
-        self.log_info('frame size' + str(frame.shape))
+    def __cleanup(self):
+        self.cleanup()
 
-    def builtin_cleanup_callback(self):
-        self.log_info('analysis worker cleaning up.')
-
-    def setup(self):
-        self.setup_callback()
-
-    def cleanup(self):
-        self.cleanup_callback()
-
-    def handle_frame(self, frame):
-        start_time = time.monotonic()
-        self.handle_frame_callback(frame)
-        duration = int((time.monotonic() - start_time) * 1000 * 1000)
-        self.frame_times.append(duration)
-        if len(self.frame_times) >= 10:
-            self.write_timing('frame', self.frame_times)
-            self.frame_times = []
-        #self.log_info('Ran for :' + str(duration * 1000) + ' ms')
-
-    def log_info(self, message):
-        log_dict = [0, [message]]
+    def raw_log(self, level_number, message):
+        log_dict = [0, [level_number, message]]
         serialized = msgpack.packb(log_dict, use_bin_type=True)
-        self.write_framed_message(serialized)
+        self.__write_framed_message(serialized)
 
-    def request_frame(self):
+    def __request_frame(self):
         request = [1, [1]]
         serialized = msgpack.packb(request, use_bin_type=True)
-        self.write_framed_message(serialized)
+        self.__write_framed_message(serialized)
 
-    def read_frame(self):
+    def __read_frame(self):
         len_buf = sys.stdin.buffer.read(4)
         msg_len = struct.unpack('>L', len_buf)[0]
         msg_buf = sys.stdin.buffer.read(msg_len)
         msg = msgpack.unpackb(msg_buf, raw=False)
-        self.current_frame = msg[1][0]
+        self.__current_frame = msg[1][0]
         msg_buf = numpy.frombuffer(msg[1][0]["jpeg"], dtype=numpy.uint8)
 
         return dict(camera_id=msg[1][0]["camera_id"],
@@ -76,39 +66,58 @@ class ExopticonWorker(object):
 #        return cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
 
     def write_frame(self, tag, image):
-        if not self.current_frame:
+        if not self.__current_frame:
             return
-        frame = copy.copy(self.current_frame)
+        frame = copy.copy(self.__current_frame)
         jpeg = cv2.imencode('.jpg', image)[1].tobytes()
         frame_dict = [3, [tag, jpeg]]
         serialized = msgpack.packb(frame_dict, use_bin_type=True)
-        self.write_framed_message(serialized)
+        self.__write_framed_message(serialized)
 
-    def write_timing(self, tag, times):
+    def __write_timing(self, tag, times):
         timing_dict = [4, [tag, times]]
         serialized = msgpack.packb(timing_dict, use_bin_type=True)
-        self.write_framed_message(serialized)
+        self.__write_framed_message(serialized)
 
     def write_observations(self, observations):
-        self.log_info('observations: ' + str(observations))
+        self.logger.info('observations: ' + str(observations))
         observation_dict = [2, [observations]]
         serialized = msgpack.packb(observation_dict, use_bin_type=True)
-        self.write_framed_message(serialized)
+        self.__write_framed_message(serialized)
 
-    def write_framed_message(self, serialized):
+    def __write_framed_message(self, serialized):
         packed_len = struct.pack('>L', len(serialized))
         sys.stdout.buffer.write(packed_len)
         sys.stdout.buffer.write(serialized)
         sys.stdout.buffer.flush()
 
+    def __handle_frame(self, frame):
+        start_time = time.monotonic()
+        self.handle_frame(frame)
+        duration = int((time.monotonic() - start_time) * 1000 * 1000)
+        self.__frame_times.append(duration)
+        if len(self.__frame_times) >= 100:
+            self.__write_timing('frame', self.__frame_times)
+            self.__frame_times = []
+        #self.log_info('Ran for :' + str(duration * 1000) + ' ms')
+
+
+    # Implement extendable methods
+    def setup(self):
+        []
+    def cleanup(self):
+        []
+    def handle_frame(self, frame):
+        []
+
     def run(self):
-        self.setup()
+        self.__setup()
         try:
             while True:
-                self.request_frame()
-                frame = self.read_frame()
-                self.handle_frame(frame)
-        except EOFerror:
-            self.cleanup()
+                self.__request_frame()
+                frame = self.__read_frame()
+                self.__handle_frame(frame)
+        except EOFError:
             sys.exit(0)
-# End ExopticonWorker
+        finally:
+            self.__cleanup()
