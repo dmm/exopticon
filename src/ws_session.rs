@@ -70,11 +70,12 @@ pub enum WsCommand {
 struct RawCameraFrame {
     /// id of camera that produced frame
     pub camera_id: i32,
-    /// jpeg image data
-    #[serde(with = "Base64Standard")]
-    pub jpeg: Vec<u8>,
     /// resolution of frame
     pub resolution: FrameResolution,
+    /// original width of frame
+    pub unscaled_width: i32,
+    /// original height of frame
+    pub unscaled_height: i32,
     /// source of frame
     pub source: FrameSource,
     /// id of video unit
@@ -83,6 +84,9 @@ struct RawCameraFrame {
     pub offset: i64,
     /// observations associated with frame
     pub observations: Vec<Observation>,
+    /// jpeg image data
+    #[serde(with = "Base64Standard")]
+    pub jpeg: Vec<u8>,
 }
 
 /// An actor representing a websocket connection
@@ -176,6 +180,8 @@ impl WsSession {
             camera_id: msg.camera_id,
             jpeg: msg.jpeg,
             resolution: msg.resolution,
+            unscaled_width: msg.unscaled_width,
+            unscaled_height: msg.unscaled_height,
             source: msg.source,
             video_unit_id: msg.video_unit_id,
             offset: msg.offset,

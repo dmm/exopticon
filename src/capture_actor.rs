@@ -46,6 +46,16 @@ pub struct CaptureMessage {
     #[serde(with = "serde_bytes")]
     pub scaled_jpeg: Vec<u8>,
 
+    /// if the message is a frame the original width of the image
+    #[serde(rename = "unscaledWidth")]
+    #[serde(default)]
+    pub unscaled_width: i32,
+
+    /// if the message is a frame the original height of the image
+    #[serde(rename = "unscaledHeight")]
+    #[serde(default)]
+    pub unscaled_height: i32,
+
     /// if message is a frame, the offset from the beginning of file
     #[serde(default)]
     pub offset: i64,
@@ -160,7 +170,9 @@ impl CaptureActor {
                         camera_id: self.camera_id,
                     },
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
-                    offset: self.offset,
+                    offset: msg.offset,
+                    unscaled_width: msg.unscaled_width,
+                    unscaled_height: msg.unscaled_height,
                 });
                 self.offset += 1;
             }
@@ -173,7 +185,9 @@ impl CaptureActor {
                         camera_id: self.camera_id,
                     },
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
-                    offset: self.offset,
+                    offset: msg.offset,
+                    unscaled_width: msg.unscaled_width,
+                    unscaled_height: msg.unscaled_height,
                 });
                 self.offset += 1;
             }
@@ -263,7 +277,6 @@ impl Handler<StartWorker> for CaptureActor {
             // we can't really distinguish between failure
             // scenarios. If the directory already exists everything
             // is fine, otherwise we fail later.
-
         }
         let mut cmd = Command::new("src/cworkers/captureworker");
         cmd.arg(&self.stream_url);

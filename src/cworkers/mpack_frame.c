@@ -2,7 +2,7 @@
  * This file is a part of Exopticon, a free video surveillance tool. Visit
  * https://exopticon.org for more information.
  *
- * Copyright (C) 2018 David Matthew Mattli
+ * Copyright (C) 2018,2019 David Matthew Mattli
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -36,13 +36,17 @@ void send_frame_message(struct FrameMessage *msg)
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
-        mpack_start_map(&writer, 3);
+        mpack_start_map(&writer, 5);
         mpack_write_cstr(&writer, "type");
         mpack_write_cstr(&writer, "frame");
         mpack_write_cstr(&writer, "jpegFrame");
         mpack_write_bin(&writer, (char*)msg->jpeg, (uint32_t)msg->jpeg_size);
         mpack_write_cstr(&writer, "offset");
         mpack_write_i64(&writer, msg->offset);
+        mpack_write_cstr(&writer, "unscaledWidth");
+        mpack_write_i32(&writer, msg->unscaled_width);
+        mpack_write_cstr(&writer, "unscaledHeight");
+        mpack_write_i32(&writer, msg->unscaled_height);
         mpack_finish_map(&writer);
 
         if (mpack_writer_destroy(&writer) != mpack_ok) {
@@ -66,7 +70,7 @@ void send_scaled_frame_message(struct FrameMessage *msg, const int32_t height)
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
-        mpack_start_map(&writer, 4);
+        mpack_start_map(&writer, 6);
         mpack_write_cstr(&writer, "type");
         mpack_write_cstr(&writer, "frameScaled");
         mpack_write_cstr(&writer, "jpegFrameScaled");
@@ -75,6 +79,10 @@ void send_scaled_frame_message(struct FrameMessage *msg, const int32_t height)
         mpack_write_i32(&writer, height);
         mpack_write_cstr(&writer, "offset");
         mpack_write_i64(&writer, msg->offset);
+        mpack_write_cstr(&writer, "unscaledWidth");
+        mpack_write_i32(&writer, msg->unscaled_width);
+        mpack_write_cstr(&writer, "unscaledHeight");
+        mpack_write_i32(&writer, msg->unscaled_height);
         mpack_finish_map(&writer);
 
         if (mpack_writer_destroy(&writer) != mpack_ok) {

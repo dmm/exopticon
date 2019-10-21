@@ -29,11 +29,12 @@ export class VideoViewComponent implements OnInit {
     private ngZone: NgZone) { }
 
   ngOnInit() {
-    this.ctx = this.canvas.nativeElement.getContext('2d');
+
   }
 
   ngAfterContentInit() {
     this.img = this.elementRef.nativeElement.querySelector('img');
+    this.ctx = this.canvas.nativeElement.getContext('2d');
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -65,7 +66,7 @@ export class VideoViewComponent implements OnInit {
         if (this.img.complete) {
           this.img.onerror = () => { console.log("error!"); };
           this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
-          this.drawObservations(message.observations);
+          this.drawObservations(message.unscaledWidth, message.unscaledHeight, message.observations);
         }
       },
       (error) => {
@@ -83,14 +84,23 @@ export class VideoViewComponent implements OnInit {
 
   }
 
-  drawObservations(observations: Observation[]) {
+  drawObservations(canvasWidth: number, canvasHeight: number, observations: Observation[]) {
+    //    this.ctx.clearRect(0, 0, this.canvas.nativeElement.width, this.canvas.nativeElement.height);
+    this.canvas.nativeElement.width = canvasWidth;
+    this.canvas.nativeElement.height = canvasHeight;
+    this.ctx.strokeStyle = '#0F0';
+    this.ctx.fillStyle = '#0F0';
+    this.ctx.lineWidth = 5.0;
+    this.ctx.font = '32pt sans';
+
     observations.forEach((o) => {
       console.log("Rendering: " + o);
-      this.ctx.fillStyle = 'green';
-      //      this.ctx.clearRect(0, 0, this.canvas.nativeElement.width, this.canvas.nativeElement.height);
+
       let width = o.lrX - o.ulX;
       let height = o.lrY - o.ulY;
       this.ctx.strokeRect(o.ulX, o.ulY, width, height);
+      this.ctx.strokeText(o.details, o.ulX, o.ulY);
+      console.log(`Drawing ${o.ulX}, ${o.ulY}, ${width}, ${height}`);
     });
   }
 

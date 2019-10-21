@@ -128,9 +128,11 @@ impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
                                 resolution: FrameResolution::HD,
                                 source: FrameSource::Playback { id: self.id },
                                 video_unit_id: self.video_unit_id,
-                                offset: self.offset,
+                                offset: f.offset,
+                                unscaled_width: f.unscaled_width,
+                                unscaled_height: f.unscaled_height,
                             },
-                            observations: self.slurp_observations(self.offset),
+                            observations: self.slurp_observations(f.offset),
                         })
                         .is_err()
                 {

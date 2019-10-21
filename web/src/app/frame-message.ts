@@ -29,5 +29,7 @@ export class FrameMessage {
   jpeg: string;
   videoUnitId: number;
   offset: number;
+  unscaledWidth: number;
+  unscaledHeight: number;
   observations: Observation[];
 }

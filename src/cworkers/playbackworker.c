@@ -249,6 +249,8 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, int64_t first_p
         struct FrameMessage message;
         message.jpeg = jpeg_packet.buf->data;
         message.jpeg_size = jpeg_packet.buf->size;
+        message.unscaled_width = frame->width;
+        message.unscaled_height = frame->height;
         //        message.pts = frame->pts;
         int64_t pts = frame->pts - first_pts;
 

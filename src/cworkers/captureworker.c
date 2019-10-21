@@ -480,6 +480,8 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
 int send_scaled_frame(AVFrame *frame, const int offset, const int width, const int height)
 {
         struct FrameMessage message;
+        message.unscaled_height = frame->height;
+        message.unscaled_width = frame->width;
         message.offset = offset;
 
         AVPacket jpeg_pkt;
@@ -504,7 +506,6 @@ int send_scaled_frame(AVFrame *frame, const int offset, const int width, const i
 int send_full_frame(AVFrame *frame, const int offset)
 {
         struct FrameMessage message;
-        message.offset = offset;
 
         AVPacket jpegPkt;
         av_init_packet(&jpegPkt);
@@ -512,6 +513,8 @@ int send_full_frame(AVFrame *frame, const int offset)
 
         message.jpeg = jpegPkt.buf->data;
         message.jpeg_size = jpegPkt.buf->size;
+        message.unscaled_height = frame->height;
+        message.unscaled_width = frame->width;
         message.offset = offset;
 
         send_frame_message(&message);

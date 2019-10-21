@@ -164,8 +164,10 @@ impl AnalysisActor {
                         analysis_engine_id: self.id,
                         tag,
                     },
-                    video_unit_id: 0,
-                    offset: 0,
+                    video_unit_id: -1,
+                    offset: -1,
+                    unscaled_width: -1,
+                    unscaled_height: -1,
                 });
             }
             AnalysisWorkerMessage::TimingReport { tag, times } => {
@@ -281,7 +283,7 @@ impl Handler<CameraFrame> for AnalysisActor {
             None => true,
             Some(last_frame_time) => {
                 let now = Instant::now();
-                let min_duration = Duration::from_millis(200);
+                let min_duration = Duration::from_millis(0); // FIXME
                 now.duration_since(last_frame_time) > min_duration
             }
         };

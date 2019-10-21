@@ -57,6 +57,10 @@ pub struct CameraFrame {
     pub video_unit_id: i32,
     /// offset from beginning of video unit
     pub offset: i64,
+    /// original width of image
+    pub unscaled_width: i32,
+    /// original height of image,
+    pub unscaled_height: i32,
 }
 
 /// Subscription subject, used to subscribe and unsubscribe

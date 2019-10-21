@@ -6,6 +6,8 @@ struct FrameMessage {
         uint8_t *jpeg;
         int32_t jpeg_size;
         int32_t offset;
+        int32_t unscaled_height;
+        int32_t unscaled_width;
 };
 
 void send_frame_message(struct FrameMessage *msg);
