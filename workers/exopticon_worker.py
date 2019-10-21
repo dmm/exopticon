@@ -59,8 +59,13 @@ class ExopticonWorker(object):
         self.__current_frame = msg[1][0]
         msg_buf = numpy.frombuffer(msg[1][0]["jpeg"], dtype=numpy.uint8)
 
+        img = cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
+        height, width, channels = img.shape
+
         return dict(camera_id=msg[1][0]["camera_id"],
-                    image=cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED),
+                    image=img,
+                    unscaled_height=msg[1][0]["unscaled_height"],
+                    unscaled_width=msg[1][0]["unscaled_width"],
                     video_unit_id=msg[1][0]["video_unit_id"],
                     offset=msg[1][0]["offset"])
 #        return cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
