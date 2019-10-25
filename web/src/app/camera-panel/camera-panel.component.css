@@ -7,7 +7,6 @@ div.panel {
 
 div.panel > div.wrapper {
   position: relative;
-  width: 100%;
 }
 
 div.panel > div.wrapper.background {
@@ -24,14 +23,3 @@ div.panel  div.wrapper > div.content {
   top: 0; left: 0; bottom: 0; right: 0;
 }
 
-@media screen and (min-width: 767px) {
-  div.panel > div.wrapper {
-    width: 100%;
-  }
-}
-
-@media screen and (min-width: 980px) {
-  div.panel > div.wrapper {
-    width: 50%;
-  }
-}

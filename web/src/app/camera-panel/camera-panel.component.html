@@ -1,10 +1,12 @@
 <div class="panel">
   <div class="wrapper"
-       *ngFor="let camera of cameras; let i = index"
+       *ngFor="let camera of enabledCameras; let i = index"
        (mouseover)="selectCameraView(camera.id); $event.stopPropagation();"
        (mouseleave)="deselectCameraView; $event.stopPropagation();"
-       (touchstart)="onTouchStart(camera.id); $event.stopPropagation();">
-    <div class="camera-width"></div>
+       (touchstart)="onTouchStart(camera.id); $event.stopPropagation();"
+       [style.width.%]="(100 / columns)"
+       [style.height.vh]="(100 / rows)">
+    <div class="camera-width" *ngIf="rows === -1"></div>
     <div class="content">
       <app-camera-view [camera]="camera"
                        [selected]="selectedCameraId === camera.id"
