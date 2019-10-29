@@ -51,6 +51,8 @@ export class CameraPanelComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.pageVisible = true;
+
     this.route.paramMap.subscribe(params => {
       if (params.has('columns')) {
         this.columns = parseInt(params.get('columns'), 10);
@@ -68,11 +70,9 @@ export class CameraPanelComponent implements OnInit {
       } else {
         this.enabledCamerasOffset = 0;
       }
-
       this.enableCameras();
     });
 
-    this.pageVisible = true;
     this.getCameras();
     this.videoService.connect();
   }
@@ -127,6 +127,7 @@ export class CameraPanelComponent implements OnInit {
   }
 
   rotateArray(arr: Array<any>, length: number): Array<any> {
+    if (arr.length === 0) return [];
     arr = arr.slice();
 
     if (length > 0) {

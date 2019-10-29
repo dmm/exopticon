@@ -1,6 +1,6 @@
 <div class="panel">
   <div class="wrapper"
-       *ngFor="let camera of enabledCameras; let i = index"
+       *ngFor="let camera of enabledCameras"
        (mouseover)="selectCameraView(camera.id); $event.stopPropagation();"
        (mouseleave)="deselectCameraView; $event.stopPropagation();"
        (touchstart)="onTouchStart(camera.id); $event.stopPropagation();"
