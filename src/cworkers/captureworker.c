@@ -151,6 +151,9 @@ time_t get_time()
 
 void free_buffer(void *opaque, uint8_t *data)
 {
+        // Silence unused parameter warning for callback
+        (void)(opaque);
+
         tjFree(data);
 }
 
@@ -369,61 +372,6 @@ int64_t find_string_in_file(FILE *file, char *string)
         return pos;
 }
 
-int close_output_file(struct CameraState *cam)
-{
-        int ret = 0;
-        char *end_time;
-        char filename[1024];
-        FILE *output_file = NULL;
-
-        ret = clock_gettime(CLOCK_REALTIME, &(cam->end_time));
-        if (ret == -1) {
-                // error!
-        }
-
-        end_time = timespec_to_8601(&(cam->end_time));
-
-        strncpy(filename, cam->ofcx->filename, sizeof(filename));
-        filename[sizeof(filename) - 1] = '\0';
-
-        av_write_trailer(cam->ofcx);
-        avio_close(cam->ofcx->pb);
-        avformat_free_context(cam->ofcx);
-        cam->ofcx = NULL;
-
-        /* We need to set the ENDTIME tag in the output file but
-         * ffmpeg only lets us set tags before calling
-         * avformat_write_header and that has to be done before
-         * writing anything. So instead we set a dummy tag ENDTIME tag
-         * and overwrite it manually with fwrite. This only works
-         * because the replacement tag value is exactly the same size
-         * as the dummy value.
-         */
-
-        output_file = fopen(filename, "r+");
-        if (output_file == NULL) {
-                ret = -1;
-                goto cleanup;
-        }
-
-        int64_t pos = find_string_in_file(output_file, "ENDTIMED");
-        if (pos > 0) {
-                fseek(output_file, pos + 3, SEEK_SET);
-                fwrite(end_time, strlen(end_time), 1, output_file);
-        }
-
-        // Report file as finished
-        report_finished_file(filename, cam->end_time);
-
-cleanup:
-        if (output_file != NULL) {
-                fclose(output_file);
-        }
-        free(end_time);
-
-        return ret;
-}
-
 int64_t timespec_to_ms(const struct timespec time)
 {
         const int64_t million = 1E6;
@@ -613,48 +561,6 @@ cleanup:
         return 0;
 }
 
-int checkforquit()
-{
-        int ret = 0;
-        int quit = 0;
-        char buf[1024];
-        fd_set rfds;
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 0;
-
-        FD_ZERO(&rfds);
-        FD_SET(0, &rfds);
-
-        do {
-                ret = select(1, &rfds, NULL, NULL, &timeout);
-                size_t read_size = 0;
-                if (ret > 0 && FD_ISSET(0, &rfds)) {
-
-                        // select return value is greater than 0 and stdin is in
-                        // the set, read!
-                        read_size = fread(buf, 1, 1, stdin);
-                }
-
-                if (feof(stdin) != 0) {
-                        quit = 1;
-                }
-
-
-
-                // TODO change second loop condition to assert
-                for (size_t i = 0; i < read_size && i < sizeof(buf); ++i) {
-                        if (buf[i] == 'q') {
-                                quit = 1;
-                                break;
-                        }
-                }
-        } while (ret > 0 && quit == 0);
-
-
-        return quit;
-}
-
 int main(int argc, char *argv[])
 {
         int return_value = EXIT_SUCCESS;
@@ -726,7 +632,7 @@ cleanup:
         bs_log("Cleaning up!");
         ex_free_input(&cam.in);
         if (cam.ofcx != NULL) {
-                close_output_file(&cam);
+                ex_close_output_stream(&cam.out);
         }
 
         av_frame_free(&cam.frame);
