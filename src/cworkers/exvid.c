@@ -109,8 +109,7 @@ int ex_init(void(*log_callback)(void *, int, const char *, va_list)) {
         if (log_callback != NULL) {
                 av_log_set_callback(log_callback);
         }
-        av_register_all();
-        avcodec_register_all();
+
         avformat_network_init();
 
         return 0;
@@ -363,7 +362,7 @@ int ex_close_output_stream(struct out_context *c)
 
         end_time = timespec_to_8601(&end_timestamp);
 
-        strncpy(filename, c->fcx->filename, sizeof(filename));
+        strncpy(filename, c->fcx->url, sizeof(filename));
         filename[sizeof(filename) - 1] = '\0';
 
         av_write_trailer(c->fcx);
