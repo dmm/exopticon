@@ -107,29 +107,31 @@ export class VideoService {
         }
       },
       () => {
-        this.subscriberCount--;
-        this.cleanupAcker();
-        switch (subject.kind) {
-          case 'camera':
-            return {
-              'Unsubscribe': {
-                'Camera': [subject.cameraId, subject.resolution],
-              }
-            };
-          case 'analysisEngine':
-            return {
-              'Unsubscribe': {
-                'AnalysisEngine': subject.analysisEngineId,
-              }
-            };
-          case 'playback':
-            return {
-              'StopPlayback': {
-                id: subject.id,
-              }
-            };
+        setTimeout(() => {
+          this.subscriberCount--;
+          this.cleanupAcker();
+          switch (subject.kind) {
+            case 'camera':
+              return {
+                'Unsubscribe': {
+                  'Camera': [subject.cameraId, subject.resolution],
+                }
+              };
+            case 'analysisEngine':
+              return {
+                'Unsubscribe': {
+                  'AnalysisEngine': subject.analysisEngineId,
+                }
+              };
+            case 'playback':
+              return {
+                'StopPlayback': {
+                  id: subject.id,
+                }
+              };
 
-        }
+          }
+        }, 100);
       },
       (m: FrameMessage): boolean => {
         switch (m.source.kind) {
