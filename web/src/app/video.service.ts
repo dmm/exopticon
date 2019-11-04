@@ -31,10 +31,12 @@ export type SubscriptionSubject = AnalysisSubject | CameraSubject | PlaybackSubj
 export class VideoService {
   private subject: WebSocketSubject<Object>;
   private subscriberCount = 0;
-  private subscription: Subscription;
+  private subscription?: Subscription;
 
 
-  constructor() { }
+  constructor() {
+    this.subscription = null;
+  }
 
   public connect(url?: string): WebSocketSubject<Object> {
     if (!url) {
@@ -59,7 +61,7 @@ export class VideoService {
   }
 
   private setupAcker() {
-    if (this.subscriberCount == 0) {
+    if (this.subscription === null) {
       this.subscription = this.subject.subscribe(
         () => {
           this.subject.next('Ack');
@@ -72,7 +74,13 @@ export class VideoService {
 
   private cleanupAcker() {
     if (this.subscriberCount == 0 && this.subscription) {
-      this.subscription.unsubscribe();
+      setTimeout(() => {
+        if (this.subscriberCount == 0 && this.subscription) {
+          // if after a moment, there are still zero subscribers, close the socket.
+          this.subscription.unsubscribe();
+          this.subscription = null;
+        }
+      }, 100);
     }
   }
 
@@ -107,31 +115,29 @@ export class VideoService {
         }
       },
       () => {
-        setTimeout(() => {
-          this.subscriberCount--;
-          this.cleanupAcker();
-          switch (subject.kind) {
-            case 'camera':
-              return {
-                'Unsubscribe': {
-                  'Camera': [subject.cameraId, subject.resolution],
-                }
-              };
-            case 'analysisEngine':
-              return {
-                'Unsubscribe': {
-                  'AnalysisEngine': subject.analysisEngineId,
-                }
-              };
-            case 'playback':
-              return {
-                'StopPlayback': {
-                  id: subject.id,
-                }
-              };
+        this.subscriberCount--;
+        this.cleanupAcker();
+        switch (subject.kind) {
+          case 'camera':
+            return {
+              'Unsubscribe': {
+                'Camera': [subject.cameraId, subject.resolution],
+              }
+            };
+          case 'analysisEngine':
+            return {
+              'Unsubscribe': {
+                'AnalysisEngine': subject.analysisEngineId,
+              }
+            };
+          case 'playback':
+            return {
+              'StopPlayback': {
+                id: subject.id,
+              }
+            };
 
-          }
-        }, 100);
+        }
       },
       (m: FrameMessage): boolean => {
         switch (m.source.kind) {
