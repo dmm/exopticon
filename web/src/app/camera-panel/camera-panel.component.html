@@ -2,7 +2,7 @@
   <div class="wrapper"
        *ngFor="let camera of enabledCameras"
        (mouseover)="selectCameraView(camera.id); $event.stopPropagation();"
-       (mouseleave)="deselectCameraView; $event.stopPropagation();"
+       (mouseleave)="deselectCameraView(); $event.stopPropagation();"
        (touchstart)="onTouchStart(camera.id); $event.stopPropagation();"
        [style.width.%]="(100 / columns)"
        [style.height.vh]="(100 / rows)">
