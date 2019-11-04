@@ -88,6 +88,7 @@ static int interrupt_cb(void *ctx)
         clock_gettime(CLOCK_MONOTONIC, &cur);
         int64_t interval = timespec_to_ms_interval(c->last_frame_time,
                                                    cur);
+
         struct pollfd pfd;
         pfd.fd = 0;
         pfd.events = 0;
@@ -209,7 +210,6 @@ cleanup:
 
 int ex_read_frame(struct in_context *c, AVPacket *pkt)
 {
-        clock_gettime(CLOCK_MONOTONIC, &c->last_frame_time);
         return av_read_frame(c->fcx, pkt);
 }
 

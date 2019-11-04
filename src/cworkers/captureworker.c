@@ -603,6 +603,7 @@ int main(int argc, char *argv[])
         av_init_packet(&cam.pkt);
         cam.switch_file = 1;
         int ret = 0;
+        clock_gettime(CLOCK_MONOTONIC, &(cam.in.last_frame_time));
         while ((ret = ex_read_frame(&cam.in, &cam.pkt)) >= 0) {
                 if (cam.pkt.stream_index == cam.in.stream_index) {
                         int handle_ret = handle_output_file(&cam.in, &cam.out, &cam.pkt, cam.output_directory_name);
@@ -611,14 +612,19 @@ int main(int argc, char *argv[])
                                 goto cleanup;
                         }
                         if (cam.out.fcx == NULL) {
+                                bs_log("FCX null???");
                                 continue;
                         }
+
                         push_frame(&cam.in, &cam.out, &cam.pkt);
                         int write_ret = ex_write_output_packet(&cam.out, cam.in.st->time_base, &cam.pkt);
                         if (write_ret != 0) {
                                 bs_log("Write Error!");
                                 goto cleanup;
                         }
+                        clock_gettime(CLOCK_MONOTONIC, &(cam.in.last_frame_time));
+                } else {
+                        // handle non-video ?
                 }
                 av_packet_unref(&cam.pkt);
                 av_init_packet(&cam.pkt);

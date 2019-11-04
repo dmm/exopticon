@@ -39,6 +39,7 @@ struct in_context {
         int               stream_index;
 
         struct timespec   last_frame_time;
+        struct timespec  interrupt_time;
 };
 
 struct out_context {
