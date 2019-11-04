@@ -12,6 +12,7 @@
                        [selected]="selectedCameraId === camera.id"
                        [enabled]="pageVisible && cameraVisibility.get(camera.id)"
                        [videoService]="videoService"
+                       [resolution]="resolution"
                        (isVisible)="updateCameraViewVisibility(camera.id, $event)">
       </app-camera-view>
     </div>

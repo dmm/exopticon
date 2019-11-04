@@ -16,6 +16,7 @@ export class CameraViewComponent implements OnInit {
   @Input() selected: boolean;
   @Input() enabled: boolean;
   @Input() videoService: VideoService;
+  @Input() resolution: CameraResolution;
 
   @Output() isVisible = new EventEmitter<boolean>();
 
@@ -41,13 +42,17 @@ export class CameraViewComponent implements OnInit {
         this.deactivate();
       }
     }
+
+    if (changes.hasOwnProperty('resolution')) {
+      // handle changing resolution
+    }
   }
 
   activate() {
     this.videoSubject = {
       kind: 'camera',
       cameraId: this.camera.id,
-      resolution: CameraResolution.Sd,
+      resolution: this.resolution,
     };
     this.frameService = this.videoService.getObservable(this.videoSubject);
   }

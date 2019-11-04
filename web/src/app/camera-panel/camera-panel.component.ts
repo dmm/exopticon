@@ -4,6 +4,7 @@ import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Camera } from '../camera';
 import { CameraService } from '../camera.service';
 import { VideoService } from '../video.service';
+import { CameraResolution } from '../frame-message';
 
 @Component({
   selector: 'app-camera-panel',
@@ -21,6 +22,7 @@ export class CameraPanelComponent implements OnInit {
   private cameraVisibility: Map<number, boolean>;
   private columns: number;
   private rows: number;
+  private resolution: CameraResolution;
 
   constructor(private cameraService: CameraService,
     public videoService: VideoService,
@@ -33,6 +35,7 @@ export class CameraPanelComponent implements OnInit {
     this.cameraVisibility = new Map<number, boolean>();
     this.columns = 1;
     this.rows = -1;
+    this.resolution = CameraResolution.Sd;
   }
 
   getCameras(): void {
@@ -54,8 +57,8 @@ export class CameraPanelComponent implements OnInit {
     this.pageVisible = true;
 
     this.route.paramMap.subscribe(params => {
-      if (params.has('columns')) {
-        this.columns = parseInt(params.get('columns'), 10);
+      if (params.has('cols')) {
+        this.columns = parseInt(params.get('cols'), 10);
       } else {
         this.columns = 1;
       }
@@ -65,10 +68,18 @@ export class CameraPanelComponent implements OnInit {
         this.rows = -1;
       }
 
-      if (params.has('cameraOffset')) {
-        this.enabledCamerasOffset = parseInt(params.get('cameraOffset'), 10) || 0;
+      if (params.has('offset')) {
+        this.enabledCamerasOffset = parseInt(params.get('offset'), 10) || 0;
       } else {
         this.enabledCamerasOffset = 0;
+      }
+
+      if (params.has('res')) {
+        if (params.get('res').toLowerCase() === 'hd') {
+          this.resolution = CameraResolution.Hd;
+        } else {
+          this.resolution = CameraResolution.Sd;
+        }
       }
       this.enableCameras();
     });
@@ -93,7 +104,6 @@ export class CameraPanelComponent implements OnInit {
 
   @HostListener('window:keyup', ['$event'])
   KeyEvent(event: KeyboardEvent) {
-    console.log(event.keyCode);
     let offset = this.enabledCamerasOffset;
     if (event.keyCode === 37) {
       offset--;
@@ -102,7 +112,7 @@ export class CameraPanelComponent implements OnInit {
       offset++;
     }
 
-    this.router.navigate(['./', this.merge({ 'cameraOffset': offset }, this.route.snapshot.params)],
+    this.router.navigate(['./', this.merge({ 'offset': offset }, this.route.snapshot.params)],
       {
         queryParamsHandling: 'preserve',
         relativeTo: this.route
@@ -144,7 +154,7 @@ export class CameraPanelComponent implements OnInit {
   }
 
   enableCameras() {
-    let count = this.columns === -1 ? this.cameras.length : this.columns * this.rows;
+    let count = this.rows === -1 ? this.cameras.length : this.columns * this.rows;
     this.enabledCameras = this.rotateArray(this.cameras, this.enabledCamerasOffset).slice(0, count);
   }
 
