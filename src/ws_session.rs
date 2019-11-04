@@ -144,7 +144,7 @@ impl WsSession {
     /// Examines the current window state and adjusts window size.
     fn adjust_window(&mut self) {
         if self.live_frames == self.window_size {
-            self.window_size /= 2;
+            self.window_size -= 1;
         }
 
         if self.live_frames < self.window_size {
