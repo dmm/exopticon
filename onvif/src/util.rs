@@ -1,7 +1,6 @@
 //! Onvif api utilities
 
-use chrono::Duration;
-use chrono::Utc;
+use chrono::{Duration, SecondsFormat, Utc};
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use futures::future::Either;
@@ -26,7 +25,7 @@ struct PasswordDigest {
 /// offset. The current system time is used for the timestamp.
 fn generate_password_digest(password: &str, offset: Duration) -> Result<PasswordDigest, Error> {
     let timestamp = match Utc::now().checked_add_signed(offset) {
-        Some(datetime) => datetime.to_rfc3339(),
+        Some(datetime) => datetime.to_rfc3339_opts(SecondsFormat::Millis, true),
         None => return Err(Error::InvalidArgument),
     };
 
@@ -37,11 +36,13 @@ fn generate_password_digest(password: &str, offset: Duration) -> Result<Password
     hasher.input(&nonce);
     hasher.input(timestamp.as_bytes());
     hasher.input(password.as_bytes());
+    let mut hash_bytes = vec![0; hasher.output_bytes()];
+    hasher.result(&mut hash_bytes);
 
     Ok(PasswordDigest {
-        digest: base64::encode(&hasher.result_str()),
+        digest: base64::encode(hash_bytes.as_slice()),
         nonce: base64::encode(&nonce),
-        timestamp: base64::encode(&timestamp),
+        timestamp,
     })
 }
 
@@ -78,8 +79,7 @@ pub fn envelope_header(username: &str, password: &str) -> Result<String, Error> 
      <s:Envelope
       xmlns:s="http://www.w3.org/2003/05/soap-envelope"
       xmlns:a="http://www.w3.org/2005/08/addressing"
-      xmlns:tt="http://www.onvif.org/ver10/schema"
-      xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+     >
 
   <s:Header>{}</s:Header>
   <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">"#, security_block))
