@@ -5,6 +5,13 @@ import { catchError, map } from 'rxjs/operators';
 
 import { Camera } from './camera';
 
+export enum PtzDirection {
+  left,
+  right,
+  up,
+  down,
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -20,6 +27,15 @@ export class CameraService {
     return this.http
       .get<Camera[]>(this.cameraUrl)
       .pipe(map(data => data), catchError(this.handleError));
+  }
+
+  ptz(cameraId: number, direction: PtzDirection) {
+    let directionArg: string = PtzDirection[direction];
+    this.http.post(`${this.cameraUrl}/${cameraId}/ptz/${directionArg}`, null)
+      .pipe(map(data => data), catchError(this.handleError))
+      .subscribe(
+        () => { }, () => { }
+      );
   }
 
   private handleError(res: HttpErrorResponse | any) {

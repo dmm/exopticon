@@ -2,7 +2,7 @@ import { Component, ChangeDetectorRef, HostListener, OnInit, Input, NgZone } fro
 import { ActivatedRoute, Router, Params } from '@angular/router';
 import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
 import { Camera } from '../camera';
-import { CameraService } from '../camera.service';
+import { CameraService, PtzDirection } from '../camera.service';
 import { VideoService } from '../video.service';
 import { CameraResolution } from '../frame-message';
 
@@ -104,19 +104,48 @@ export class CameraPanelComponent implements OnInit {
 
   @HostListener('window:keyup', ['$event'])
   KeyEvent(event: KeyboardEvent) {
+    console.log('keycode: ' + event.keyCode);
     let offset = this.enabledCamerasOffset;
-    if (event.keyCode === 37) {
-      offset--;
-    }
-    if (event.keyCode === 39) {
-      offset++;
+    let cameraId = this.getKeyboardControlCameraId();
+    console.log('keyboard control camera id: ' + cameraId);
+    switch (event.keyCode) {
+      case 78:
+        // 'n'
+        offset++;
+        break;
+      case 80:
+        // 'p'
+        offset--;
+        break;
+      case 37:
+        // left-arrow
+        if (cameraId)
+          this.cameraService.ptz(cameraId, PtzDirection.left);
+        break;
+      case 39:
+        // right-arrow
+        if (cameraId)
+          this.cameraService.ptz(cameraId, PtzDirection.right);
+        break;
+      case 38:
+        // up-arrow
+        if (cameraId)
+          this.cameraService.ptz(cameraId, PtzDirection.up);
+        break;
+      case 40:
+        // down-arrow
+        if (cameraId)
+          this.cameraService.ptz(cameraId, PtzDirection.down);
+        break;
     }
 
-    this.router.navigate(['./', this.merge({ 'offset': offset }, this.route.snapshot.params)],
-      {
-        queryParamsHandling: 'preserve',
-        relativeTo: this.route
-      });
+    if (offset !== this.enabledCamerasOffset) {
+      this.router.navigate(['./', this.merge({ 'offset': offset }, this.route.snapshot.params)],
+        {
+          queryParamsHandling: 'preserve',
+          relativeTo: this.route
+        });
+    }
   }
 
   merge(newParams: any, oldParams: any): any {
@@ -180,6 +209,16 @@ export class CameraPanelComponent implements OnInit {
 
   updateCameraViewVisibility(cameraId: number, visible: boolean) {
     this.cameraVisibility.set(cameraId, visible);
+  }
+
+  getKeyboardControlCameraId(): number {
+    if (this.enabledCameras.length === 1) {
+      return this.enabledCameras[0].id;
+    } else if (this.selectedCameraId) {
+      return this.selectedCameraId;
+    }
+
+    return -1;
   }
 
 }
