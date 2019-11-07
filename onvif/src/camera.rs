@@ -515,4 +515,85 @@ impl Camera {
                 .map_err(|_err| Error::ConnectionFailed),
         )
     }
+
+    /// Helper that returns PanTilt and Zoom sections for ptz requests
+    fn generate_pan_tilt_vectors(&self, x: f32, y: f32, zoom: f32) -> String {
+        let xy_element = format!(
+            r#"<PanTilt x="{}" y="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
+            x, y
+        );
+        let zoom_element = if zoom == 0.0 {
+            String::from("")
+        } else {
+            format!(
+                r#"<Zoom x="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
+                zoom
+            )
+        };
+
+        format!("{} {}", xy_element, zoom_element)
+    }
+
+    /// performs relative ptz move request
+    pub fn request_relative_move(
+        &self,
+        profile_token: &str,
+        x: f32,
+        y: f32,
+        zoom: f32,
+    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+        let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
+        let body = format!(
+            r#"
+          <RelativeMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+            <ProfileToken>{}</ProfileToken>
+            <Translation>{}</Translation>
+          </RelativeMove>
+           "#,
+            profile_token, ptz_vectors
+        );
+
+        let header = match envelope_header(&self.username, &self.password) {
+            Ok(h) => h,
+            Err(err) => return Either::A(futures::future::err(err)),
+        };
+        let body = format!("{}{}{}", header, body, envelope_footer());
+        debug!("Relative Move: {} {}", &self.url(), body);
+        Either::B(soap_request(&self.url(), body))
+    }
+
+    /// parse result of relative ptz move request
+    pub fn parse_relative_move(body: Vec<u8>) -> Result<(), Error> {
+        let string_body = String::from_utf8(body)?;
+        debug!("RelativeMove Response: {}", string_body);
+        let doc = parser::parse(&string_body)?;
+        let doc = doc.as_document();
+
+        Ok(())
+    }
+
+    /// Requests a relative ptz move. Returns () on success.
+    ///
+    /// # Arguments
+    ///
+    /// * `profile_token` - ptz profile token to use for request
+    /// * `x` - amount to move, inclusively between -1.0 and 1.0, in x axis
+    /// * `y` - amount to move, inclusively between -1.0 and 1.0, in y axis
+    /// * `zoom` - amount to change zoom, inclusively between -1.0 and 1.0
+    pub fn relative_move(
+        &self,
+        profile_token: &str,
+        x: f32,
+        y: f32,
+        zoom: f32,
+    ) -> impl Future<Item = (), Error = Error> {
+        Box::new(
+            self.request_relative_move(profile_token, x, y, zoom)
+                .and_then(Self::parse_relative_move)
+                .map_err(|err| {
+                    error!("relative move error: {}", err);
+                    Error::ConnectionFailed
+                }),
+        )
+    }
 }
