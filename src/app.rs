@@ -13,8 +13,8 @@ use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
 };
 use crate::camera_routes::{
-    create_camera, discover, fetch_all_cameras, fetch_camera, fetch_ntp, fetch_time, set_ntp,
-    set_time, update_camera,
+    create_camera, discover, fetch_all_cameras, fetch_camera, fetch_ntp, fetch_time, ptz_direction,
+    ptz_relative, set_ntp, set_time, update_camera,
 };
 use crate::models::DbExecutor;
 use crate::observation_routes::fetch_observations_between;
@@ -52,7 +52,7 @@ pub fn new(db: Addr<DbExecutor>, secret: &str) -> App<RouteState> {
                 .name("id")
                 .path("/")
                 //                .domain(domain.as_str())
-                .max_age(Duration::days(1)) // just for testing
+                .max_age(Duration::days(7)) // just for testing
                 .secure(false),
         ))
         .resource("/login", |r| {
@@ -117,6 +117,12 @@ pub fn new(db: Addr<DbExecutor>, secret: &str) -> App<RouteState> {
                 .resource("/cameras/{id}/ntp", |r| {
                     r.method(Method::GET).with(fetch_ntp);
                     r.method(Method::POST).with(set_ntp);
+                })
+                .resource("/cameras/{id}/ptz/relative", |r| {
+                    r.method(Method::POST).with(ptz_relative)
+                })
+                .resource("/cameras/{id}/ptz/{direction}", |r| {
+                    r.method(Method::POST).with(ptz_direction);
                 })
                 .resource("/cameras/{camera_id}/video", |r| {
                     r.method(Method::GET).with_async(fetch_video_units_between);

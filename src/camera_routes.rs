@@ -210,3 +210,96 @@ pub fn set_ntp(
         })
         .responder()
 }
+
+/// Struct representing ptz movement parameters
+#[derive(Deserialize)]
+pub struct PtzMovement {
+    /// A value between -1.0 and 1.0 representing movement in the x
+    /// plane.
+    #[serde(default)]
+    pub x: f32,
+    /// A value between -1.0 and 1.0 representing movement in the y plane.
+    #[serde(default)]
+    pub y: f32,
+    /// A value betwwen -1.0 and 1.0 representing zoom.
+    #[serde(default)]
+    pub zoom: f32,
+}
+
+/// Api route helper to request a relative ptz move from camera
+///
+/// # Arguments
+///
+/// * `state` - route state struct
+/// * `camera_id` - id of camera to move
+/// * `x` - relative x move amount
+/// * `y` - relative y move amount
+/// * `zoom` - relative zoom amount
+///
+pub fn ptz_relative_move(
+    state: State<RouteState>,
+    camera_id: i32,
+    x: f32,
+    y: f32,
+    zoom: f32,
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+    state
+        .db
+        .send(FetchCamera { id: camera_id })
+        .map_err(actix_web::error::ErrorBadRequest)
+        .and_then(move |db_response| match db_response {
+            Ok(camera) => {
+                let onvif_cam = onvif::camera::Camera {
+                    host: camera.ip,
+                    port: camera.onvif_port,
+                    username: camera.username,
+                    password: camera.password,
+                };
+
+                Either::A(
+                    onvif_cam
+                        .relative_move(&camera.ptz_profile_token, x, y, zoom)
+                        .map_err(actix_web::error::ErrorBadRequest)
+                        .and_then(|_| Ok(HttpResponse::Ok().finish())),
+                )
+            }
+            Err(_err) => Either::B(future::done(Ok(HttpResponse::NotFound().finish()))),
+        })
+        .responder()
+}
+
+/// Api route to request relative ptz move
+///
+/// # Arguments
+///
+/// * `path` - id of camera to move
+/// * `movement` - requested movement
+/// * `state` - route state argument
+///
+pub fn ptz_relative(
+    (path, movement, state): (Path<i32>, Json<PtzMovement>, State<RouteState>),
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+    let ntp = movement.into_inner();
+    ptz_relative_move(state, path.into_inner(), ntp.x, ntp.y, ntp.zoom)
+}
+
+/// Api route to request standard ptz move in specified direction
+///
+/// # Arguments
+///
+/// * `path` - id of camera to move
+/// * `state` - one of 'left', 'right', 'up', 'down' indicaing which direction to move.
+///
+pub fn ptz_direction(
+    (path, state): (Path<(i32, String)>, State<RouteState>),
+) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
+    let (x, y) = match path.1.as_str() {
+        "left" => (-0.1, 0.0),
+        "right" => (0.1, 0.0),
+        "up" => (0.0, 0.1),
+        "down" => (0.0, -0.1),
+        _ => return Box::new(future::done(Ok(HttpResponse::BadRequest().finish()))),
+    };
+
+    ptz_relative_move(state, path.0, x, y, 0.0)
+}
