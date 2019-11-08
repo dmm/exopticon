@@ -160,11 +160,12 @@ impl WsSession {
         }
     }
 
+    /// handle frame, potentially sending it to client
     fn handle_frame(
         &mut self,
         msg: CameraFrame,
         observations: Vec<Observation>,
-        ctx: &mut <WsSession as Actor>::Context,
+        ctx: &mut <Self as Actor>::Context,
     ) {
         if !self.ready_to_send() {
             self.adjust_window();
@@ -185,7 +186,7 @@ impl WsSession {
             source: msg.source,
             video_unit_id: msg.video_unit_id,
             offset: msg.offset,
-            observations: observations,
+            observations,
         };
         match &self.serialization {
             WsSerialization::MsgPack => {

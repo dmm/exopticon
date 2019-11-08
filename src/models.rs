@@ -457,6 +457,7 @@ pub struct FetchObservations {
     pub end_time: DateTime<Utc>,
 }
 
+/// Represents a request to query `Observations` by video unit id
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FetchObservationsByVideoUnit {
     /// video unit id to fetch observations for

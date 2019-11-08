@@ -32,10 +32,13 @@ use crate::models::Observation;
 use crate::playback_supervisor::{PlaybackSupervisor, StopPlayback};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource};
 
-/// struct representing playback frame with list of observations
+/// struct representing playback frame with list of observations. It's
+/// used to send frame and observations to client.
 #[derive(Message, Serialize)]
 pub struct PlaybackFrame {
+    /// frame for client
     pub frame: CameraFrame,
+    /// list of observations associated with frame
     pub observations: Vec<Observation>,
 }
 
@@ -91,21 +94,23 @@ impl PlaybackActor {
             offset: 0,
         }
     }
+
+    /// Gather observations associated with selected frame
     pub fn slurp_observations(&self, offset: i64) -> Vec<Observation> {
         let mut current_obs = Vec::new();
-        let mut iter = self.observations.iter();
+        let iter = self.observations.iter();
 
-        while let Some(obs) = iter.next() {
-            if obs.frame_offset as i64 == offset {
+        for obs in iter {
+            if i64::from(obs.frame_offset) == offset {
                 current_obs.push((*obs).clone());
             }
         }
 
-        if current_obs.len() > 0 {
+        if !current_obs.is_empty() {
             debug!("Found {} observations", current_obs.len());
         }
 
-        return current_obs;
+        current_obs
     }
 }
 

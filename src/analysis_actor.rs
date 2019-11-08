@@ -18,15 +18,21 @@ use tokio_process::CommandExt;
 use crate::models::{CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
-/// Represents logging levels
+/// Represents logging levels from ffmpeg
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 enum LogLevel {
+    /// Critical log
     Critical = 50,
+    /// Error log
     Error = 40,
+    /// Warning log
     Warning = 30,
+    /// Info log
     Info = 20,
+    /// Debug log
     Debug = 10,
+    /// Not set? Interpreted as debug log
     NotSet = 0,
 }
 
@@ -36,8 +42,7 @@ impl From<Level> for LogLevel {
             Level::Error => Self::Error,
             Level::Warn => Self::Warning,
             Level::Info => Self::Info,
-            Level::Debug => Self::Debug,
-            Level::Trace => Self::Debug,
+            Level::Debug | Level::Trace => Self::Debug,
         }
     }
 }
@@ -45,12 +50,10 @@ impl From<Level> for LogLevel {
 impl From<LogLevel> for Level {
     fn from(item: LogLevel) -> Self {
         match item {
-            LogLevel::Critical => Level::Error,
-            LogLevel::Error => Level::Error,
-            LogLevel::Warning => Level::Warn,
-            LogLevel::Info => Level::Info,
-            LogLevel::Debug => Level::Debug,
-            LogLevel::NotSet => Level::Debug,
+            LogLevel::Critical | LogLevel::Error => Self::Error,
+            LogLevel::Warning => Self::Warn,
+            LogLevel::Info => Self::Info,
+            LogLevel::Debug | LogLevel::NotSet => Self::Debug,
         }
     }
 }

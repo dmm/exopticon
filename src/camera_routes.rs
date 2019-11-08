@@ -237,7 +237,7 @@ pub struct PtzMovement {
 /// * `zoom` - relative zoom amount
 ///
 pub fn ptz_relative_move(
-    state: State<RouteState>,
+    state: &State<RouteState>,
     camera_id: i32,
     x: f32,
     y: f32,
@@ -280,7 +280,7 @@ pub fn ptz_relative(
     (path, movement, state): (Path<i32>, Json<PtzMovement>, State<RouteState>),
 ) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
     let ntp = movement.into_inner();
-    ptz_relative_move(state, path.into_inner(), ntp.x, ntp.y, ntp.zoom)
+    ptz_relative_move(&state, path.into_inner(), ntp.x, ntp.y, ntp.zoom)
 }
 
 /// Api route to request standard ptz move in specified direction
@@ -290,6 +290,7 @@ pub fn ptz_relative(
 /// * `path` - id of camera to move
 /// * `state` - one of 'left', 'right', 'up', 'down' indicaing which direction to move.
 ///
+#[allow(clippy::float_arithmetic)]
 pub fn ptz_direction(
     (path, state): (Path<(i32, String)>, State<RouteState>),
 ) -> Box<dyn Future<Item = HttpResponse, Error = actix_web::error::Error>> {
@@ -301,5 +302,5 @@ pub fn ptz_direction(
         _ => return Box::new(future::done(Ok(HttpResponse::BadRequest().finish()))),
     };
 
-    ptz_relative_move(state, path.0, x, y, 0.0)
+    ptz_relative_move(&state, path.0, x, y, 0.0)
 }
