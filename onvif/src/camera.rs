@@ -596,4 +596,170 @@ impl Camera {
                 }),
         )
     }
+
+    /// performs continuous ptz move request
+    #[allow(clippy::float_arithmetic)]
+    pub fn request_continuous_move(
+        &self,
+        profile_token: &str,
+        x: f32,
+        y: f32,
+        zoom: f32,
+        timeout: f32,
+    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+        let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
+        let timeout_body = if timeout == 0.0 {
+            String::from("")
+        } else {
+            format!(r#"<Timeout>PT{}S</Timeout>"#, timeout / 1000.0)
+        };
+        let body = format!(
+            r#"
+          <ContinuousMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+            <ProfileToken>{}</ProfileToken>
+            <Velocity>{}</Velocity>
+            {}
+          </ContinuousMove>
+           "#,
+            profile_token, ptz_vectors, timeout_body
+        );
+
+        let header = match envelope_header(&self.username, &self.password) {
+            Ok(h) => h,
+            Err(err) => return Either::A(futures::future::err(err)),
+        };
+        let body = format!("{}{}{}", header, body, envelope_footer());
+        debug!("Relative Move: {} {}", &self.url(), body);
+        Either::B(soap_request(&self.url(), body))
+    }
+
+    /// parse result of continuous ptz move request
+    pub fn parse_continuous_move(body: Vec<u8>) -> Result<(), Error> {
+        let string_body = String::from_utf8(body)?;
+        debug!("ContinuousMove Response: {}", string_body);
+        let doc = parser::parse(&string_body)?;
+        let doc = doc.as_document();
+
+        Ok(())
+    }
+
+    /// Requests a continuous ptz move. Returns () on success.
+    ///
+    /// # Arguments
+    ///
+    /// * `profile_token` - ptz profile token to use for request
+    /// * `x` - speed to move, inclusively between 0.0 and 1.0, in x axis
+    /// * `y` - speed to move, inclusively between 0.0 and 1.0, in y axis
+    /// * `zoom` - speed to zoom, inclusively between 0.0 and 1.0
+    /// * `timeout` - timeout in milliseconds for move to last, or 0.0 for indefinite
+    ///
+    pub fn continuous_move(
+        &self,
+        profile_token: &str,
+        x: f32,
+        y: f32,
+        zoom: f32,
+        timeout: f32,
+    ) -> impl Future<Item = (), Error = Error> {
+        Box::new(
+            self.request_continuous_move(profile_token, x, y, zoom, timeout)
+                .and_then(Self::parse_continuous_move)
+                .map_err(|err| {
+                    error!("continuous move error: {}", err);
+                    Error::ConnectionFailed
+                }),
+        )
+    }
+
+    /// performs an absolute ptz move request
+    pub fn request_absolute_move(
+        &self,
+        profile_token: &str,
+        x: f32,
+        y: f32,
+        zoom: f32,
+    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+        let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
+
+        let body = format!(
+            r#"
+          <AbsoluteMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+            <ProfileToken>{}</ProfileToken>
+            <Position>{}</Position>
+          </AbsoluteMove>
+           "#,
+            profile_token, ptz_vectors,
+        );
+
+        let header = match envelope_header(&self.username, &self.password) {
+            Ok(h) => h,
+            Err(err) => return Either::A(futures::future::err(err)),
+        };
+        let body = format!("{}{}{}", header, body, envelope_footer());
+        debug!("Absolute Move: {} {}", &self.url(), body);
+        Either::B(soap_request(&self.url(), body))
+    }
+
+    /// Requests an absolute ptz move. Returns () on success.
+    ///
+    /// # Arguments
+    ///
+    /// * `profile_token` - ptz profile token to use for request
+    /// * `x` - speed to move, inclusively between -1.0 and 1.0, in x axis
+    /// * `y` - speed to move, inclusively between -1.0 and 1.0, in y axis
+    /// * `zoom` - speed to zoom, inclusively between 0.0 and 1.0
+    ///
+    pub fn absolute_move(
+        &self,
+        profile_token: &str,
+        x: f32,
+        y: f32,
+        zoom: f32,
+    ) -> impl Future<Item = (), Error = Error> {
+        Box::new(
+            self.request_absolute_move(profile_token, x, y, zoom)
+                .and_then(Self::parse_continuous_move)
+                .map_err(|err| {
+                    error!("absolute move error: {}", err);
+                    Error::ConnectionFailed
+                }),
+        )
+    }
+
+    /// performs a stop ptz move request
+    pub fn request_stop(&self, profile_token: &str) -> impl Future<Item = Vec<u8>, Error = Error> {
+        let body = format!(
+            r#"
+          <Stop xmlns="http://www.onvif.org/ver20/ptz/wsdl">
+            <ProfileToken>{}</ProfileToken>
+          </Stop>
+           "#,
+            profile_token,
+        );
+
+        let header = match envelope_header(&self.username, &self.password) {
+            Ok(h) => h,
+            Err(err) => return Either::A(futures::future::err(err)),
+        };
+        let body = format!("{}{}{}", header, body, envelope_footer());
+        debug!("Stop: {} {}", &self.url(), body);
+        Either::B(soap_request(&self.url(), body))
+    }
+
+    /// Requests a ptz stop. Returns () on success.
+    ///
+    /// # Arguments
+    ///
+    /// * `profile_token` - ptz profile token to use for request
+    ///
+    pub fn stop(&self, profile_token: &str) -> impl Future<Item = (), Error = Error> {
+        Box::new(
+            self.request_stop(profile_token)
+                .and_then(Self::parse_continuous_move)
+                .map_err(|err| {
+                    error!("stop error: {}", err);
+                    Error::ConnectionFailed
+                }),
+        )
+    }
 }
