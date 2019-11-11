@@ -2,7 +2,8 @@ use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, Path, Respon
 use futures::future;
 use futures::future::Either;
 use futures::future::Future;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
 
 use onvif;
 use onvif::camera::{DeviceDateAndTime, NtpSettings};
@@ -255,13 +256,32 @@ pub fn ptz_relative_move(
                     username: camera.username,
                     password: camera.password,
                 };
-
-                Either::A(
-                    onvif_cam
-                        .relative_move(&camera.ptz_profile_token, x, y, zoom)
+                Either::A(if camera.ptz_type == "onvif_continuous" {
+                    //camera.ptz_type == "onvif_continuous"
+                    // other cases??
+                    let stop_fut = onvif_cam
+                        .stop(&camera.ptz_profile_token)
+                        .map_err(actix_web::error::ErrorBadRequest);
+                    let delay_fut = Delay::new(Instant::now() + Duration::from_millis(500))
                         .map_err(actix_web::error::ErrorBadRequest)
-                        .and_then(|_| Ok(HttpResponse::Ok().finish())),
-                )
+                        .and_then(|_| stop_fut);
+
+                    Either::A(
+                        onvif_cam
+                            .continuous_move(&camera.ptz_profile_token, x, y, zoom, 500.0)
+                            .map_err(actix_web::error::ErrorBadRequest)
+                            .and_then(|_| delay_fut)
+                            .and_then(|_| Ok(HttpResponse::Ok().finish())),
+                    )
+                } else {
+                    // default to using a relative move
+                    Either::B(
+                        onvif_cam
+                            .relative_move(&camera.ptz_profile_token, x, y, zoom)
+                            .map_err(actix_web::error::ErrorBadRequest)
+                            .and_then(|_| Ok(HttpResponse::Ok().finish())),
+                    )
+                })
             }
             Err(_err) => Either::B(future::done(Ok(HttpResponse::NotFound().finish()))),
         })
