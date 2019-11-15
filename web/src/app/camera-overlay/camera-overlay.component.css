@@ -10,3 +10,47 @@
   background-color: rgba(0, 0, 0, 0.5);
   border-radius: 5px;
 }
+
+.overlay-button {
+  background:#000;
+  opacity:.8;
+  filter:alpha(opacity=80);
+  border:1px solid;
+  border-radius:10px;
+  display:inline-block;
+  text-decoration:none;
+  verical-align:middle;
+  white-space:nowrap;
+  text-align:center;
+  user-select:none;
+  padding:.376rem .76rem;
+}
+
+.ptz-overlay {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+}
+
+.ptz-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.ptz-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.ptz-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.ptz-down {
+  grid-column: 2;
+  grid-row: 3;
+}

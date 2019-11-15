@@ -1,6 +1,7 @@
 import { Component, OnInit, Input } from '@angular/core';
 
 import { Camera } from '../camera';
+import { CameraService, PtzDirection } from '../camera.service';
 
 @Component({
   selector: 'app-camera-overlay',
@@ -11,9 +12,15 @@ export class CameraOverlayComponent implements OnInit {
 
   @Input() camera: Camera;
 
-  constructor() { }
+  private directions = PtzDirection;
+
+  constructor(private cameraService: CameraService) { }
 
   ngOnInit() {
+  }
+
+  ptz(direction: PtzDirection) {
+    this.cameraService.ptz(this.camera.id, direction);
   }
 
 }
