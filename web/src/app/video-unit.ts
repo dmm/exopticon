@@ -1,4 +1,4 @@
-import { ZonedDateTime } from 'js-joda'
+import { ZonedDateTime } from '@js-joda/core'
 
 export class VideoUnit {
   id: number;

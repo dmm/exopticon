@@ -2,8 +2,8 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, Subscription } from 'rxjs';
 
-import { ZonedDateTime, ZoneId } from 'js-joda'
-import 'js-joda-timezone'
+import { ZonedDateTime, ZoneId } from '@js-joda/core'
+import '@js-joda/timezone'
 
 @Injectable({
   providedIn: 'root'
