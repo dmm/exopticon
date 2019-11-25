@@ -1,6 +1,5 @@
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, Query, State};
+use actix_web::{error::ResponseError, web::Data, web::Path, web::Query, Error, HttpResponse};
 use futures::future::Future;
-use actix_web::error::ResponseError;
 
 use crate::app::RouteState;
 use crate::models::FetchObservations;
@@ -14,11 +13,13 @@ use crate::video_unit_routes::DateRange;
 /// * `camera_id` - id of camera to fetch video for
 /// * `begin` - begin time in UTC
 /// * `end` - end time in UTC
-/// * `state` - `RouteState` struct
+/// * `req` - `HttpRequest`
 ///
 pub fn fetch_observations_between(
-    (camera_id, range, state): (Path<i32>, Query<DateRange>, State<RouteState>),
-) -> FutureResponse<HttpResponse> {
+    camera_id: Path<i32>,
+    range: Query<DateRange>,
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(FetchObservations {
@@ -29,7 +30,6 @@ pub fn fetch_observations_between(
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(video_units) => Ok(HttpResponse::Ok().json(video_units)),
-            Err(err) => Ok(err.error_response()),
+            Err(err) => Ok(err.render_response()),
         })
-        .responder()
 }

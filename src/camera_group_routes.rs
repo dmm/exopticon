@@ -1,4 +1,4 @@
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, Path, ResponseError, State};
+use actix_web::{error::ResponseError, web::Data, web::Json, web::Path, Error, HttpResponse};
 use futures::future::Future;
 
 use crate::app::RouteState;
@@ -6,23 +6,25 @@ use crate::models::{CreateCameraGroup, FetchAllCameraGroup, FetchCameraGroup, Up
 
 /// Route to create new camera group
 pub fn create_camera_group(
-    (camera_group_request, state): (Json<CreateCameraGroup>, State<RouteState>),
-) -> FutureResponse<HttpResponse> {
+    camera_group_request: Json<CreateCameraGroup>,
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(camera_group_request.into_inner())
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(camera_group) => Ok(HttpResponse::Ok().json(camera_group)),
-            Err(err) => Ok(err.error_response()),
+            Err(err) => Ok(err.render_response()),
         })
-        .responder()
 }
 
 /// Route to update existing camera group
 pub fn update_camera_group(
-    (path, camera_group_request, state): (Path<i32>, Json<UpdateCameraGroup>, State<RouteState>),
-) -> FutureResponse<HttpResponse> {
+    path: Path<i32>,
+    camera_group_request: Json<UpdateCameraGroup>,
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     let camera_group_update = UpdateCameraGroup {
         id: path.into_inner(),
         ..camera_group_request.into_inner()
@@ -33,15 +35,15 @@ pub fn update_camera_group(
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(camera_group) => Ok(HttpResponse::Ok().json(camera_group)),
-            Err(err) => Ok(err.error_response()),
+            Err(err) => Ok(err.render_response()),
         })
-        .responder()
 }
 
 /// Route to fetch camera group by id
 pub fn fetch_camera_group(
-    (path, state): (Path<i32>, State<RouteState>),
-) -> FutureResponse<HttpResponse> {
+    path: Path<i32>,
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(FetchCameraGroup {
@@ -50,20 +52,20 @@ pub fn fetch_camera_group(
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(camera_group) => Ok(HttpResponse::Ok().json(camera_group)),
-            Err(err) => Ok(err.error_response()),
+            Err(err) => Ok(err.render_response()),
         })
-        .responder()
 }
 
 /// Route to fetch all camera groups
-pub fn fetch_all_camera_groups((state,): (State<RouteState>,)) -> FutureResponse<HttpResponse> {
+pub fn fetch_all_camera_groups(
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(FetchAllCameraGroup {})
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(camera_groups) => Ok(HttpResponse::Ok().json(camera_groups)),
-            Err(err) => Ok(err.error_response()),
+            Err(err) => Ok(err.render_response()),
         })
-        .responder()
 }

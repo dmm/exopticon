@@ -1,7 +1,7 @@
 use std::time::Duration;
 
+use actix::fut::wrap_future;
 use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
-use actix_web::actix::fut::wrap_future;
 
 use crate::models::{
     Camera, DbExecutor, DeleteVideoUnitFiles, FetchCameraGroupFiles, VideoFile, VideoUnit,

@@ -5,14 +5,13 @@ use actix::{
     fut, Actor, ActorContext, ActorFuture, AsyncContext, Handler, StreamHandler, SystemService,
     WrapFuture,
 };
-use actix_web::ws;
+use actix_web_actors::ws;
 use futures::Future;
 use rmp_serde::Serializer;
 use serde;
 use serde::Serialize;
 use serde_json;
 
-use crate::app::RouteState;
 use crate::db_registry;
 use crate::models::{FetchObservationsByVideoUnit, FetchVideoUnit, Observation};
 use crate::playback_actor::PlaybackFrame;
@@ -172,10 +171,10 @@ impl WsSession {
             return;
         }
         // wait for buffer to drain before sending another
-        self.ready = false;
-        let fut = ctx.drain().map(|_status, actor, _ctx| {
-            actor.ready = true;
-        });
+        //        self.ready = false;
+        //        let fut = ctx.drain().map(|_status, actor, _ctx| {
+        //            actor.ready = true;
+        //        });
 
         let frame = RawCameraFrame {
             camera_id: msg.camera_id,
@@ -205,12 +204,12 @@ impl WsSession {
         self.live_frames += 1;
 
         // spawn drain future
-        ctx.spawn(fut);
+        //        ctx.spawn(fut);
     }
 }
 
 impl Actor for WsSession {
-    type Context = ws::WebsocketContext<Self, RouteState>;
+    type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
         debug!("Starting websocket!");
@@ -317,7 +316,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 debug!("Stopping WsSession.");
                 ctx.stop();
             }
-            ws::Message::Binary(_) | ws::Message::Ping(_) | ws::Message::Pong(_) => {}
+            ws::Message::Nop
+            | ws::Message::Binary(_)
+            | ws::Message::Ping(_)
+            | ws::Message::Pong(_) => {}
         }
     }
 }

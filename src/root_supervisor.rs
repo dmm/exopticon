@@ -1,4 +1,4 @@
-use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
+use actix::{fut, Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
 
 use crate::analysis_supervisor::AnalysisSupervisor;
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
@@ -7,7 +7,6 @@ use crate::models::{
     CameraGroup, CameraGroupAndCameras, DbExecutor, FetchAllCameraGroup,
     FetchAllCameraGroupAndCameras,
 };
-use actix_web::actix::fut;
 
 /// Enumeration of Exopticon run modes
 pub enum ExopticonMode {
@@ -37,9 +36,11 @@ impl Actor for RootSupervisor {
 
     /// Starts child works if mode is `Run`
     fn started(&mut self, ctx: &mut Self::Context) {
+        debug!("Starting root supervisor!");
         match self.mode {
             ExopticonMode::Standby => {}
             ExopticonMode::Run => {
+                debug!("Run mode!");
                 self.start_workers(ctx);
             }
         };
@@ -49,6 +50,7 @@ impl Actor for RootSupervisor {
 impl RootSupervisor {
     /// Starts all child workers for this supervisor
     fn start_workers(&self, ctx: &mut Context<Self>) {
+        debug!("starting workers!");
         let capture_future = self
             .db_worker
             .send(FetchAllCameraGroupAndCameras {})

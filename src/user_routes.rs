@@ -1,4 +1,4 @@
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Json, ResponseError, State};
+use actix_web::{error::ResponseError, web::Data, web::Json, Error, HttpResponse};
 use futures::future::Future;
 
 use crate::app::RouteState;
@@ -12,8 +12,9 @@ use crate::models::CreateUser;
 /// `state` - `RouteState` struct
 ///
 pub fn create_user(
-    (create_user, state): (Json<CreateUser>, State<RouteState>),
-) -> FutureResponse<HttpResponse> {
+    create_user: Json<CreateUser>,
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(CreateUser {
@@ -24,7 +25,6 @@ pub fn create_user(
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(slim_user) => Ok(HttpResponse::Ok().json(slim_user)),
-            Err(service_error) => Ok(service_error.error_response()),
+            Err(service_error) => Ok(service_error.render_response()),
         })
-        .responder()
 }

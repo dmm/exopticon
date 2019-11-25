@@ -4,17 +4,11 @@
 // implemented by actix-web.
 #![allow(clippy::needless_pass_by_value)]
 
-use std::path::PathBuf;
-
-use actix_web::dev::FromParam;
-use actix_web::{Body, HttpRequest, HttpResponse};
+use actix_web::{body::Body, web::Path, HttpRequest, HttpResponse};
 use askama::Template;
-use mime_guess;
-
-use crate::app::RouteState;
 
 /// Fetches static index file, returns `HttpResponse`
-pub fn index(_req: HttpRequest<RouteState>) -> HttpResponse {
+pub fn index(_req: HttpRequest) -> HttpResponse {
     match Asset::get("index.html") {
         Some(content) => HttpResponse::Ok()
             .content_type("text/html")
@@ -28,7 +22,7 @@ pub fn index(_req: HttpRequest<RouteState>) -> HttpResponse {
 struct Login;
 
 /// Fetches login page and returns `HttpResponse`
-pub fn login(_req: HttpRequest<RouteState>) -> HttpResponse {
+pub fn login(_req: HttpRequest) -> HttpResponse {
     let s = Login
         .render()
         .expect("unabled to file login page, build is broken?");
@@ -37,14 +31,9 @@ pub fn login(_req: HttpRequest<RouteState>) -> HttpResponse {
 }
 
 /// Fetches specified static js file and resturns `HttpResponse`
-pub fn get_js_file(req: HttpRequest<RouteState>) -> HttpResponse {
-    let filename: String = match req.match_info().query("script") {
-        Ok(t) => t,
-        Err(_e) => return HttpResponse::NotFound().body("js file not found"),
-    };
+pub fn get_js_file(script: Path<String>) -> HttpResponse {
+    let path = format!("{}.js", script);
 
-    info!("javascript filename: {}", filename);
-    let path = format!("{}.js", filename);
     info!("javascript path: {}", path);
     match Asset::get(&path) {
         Some(content) => HttpResponse::Ok()
@@ -55,13 +44,8 @@ pub fn get_js_file(req: HttpRequest<RouteState>) -> HttpResponse {
 }
 
 /// Fetches js map file and returns `HttpResponse`
-pub fn get_js_map_file(req: HttpRequest<RouteState>) -> HttpResponse {
-    let filename: String = match req.match_info().query("scriptmap") {
-        Ok(t) => t,
-        Err(_e) => return HttpResponse::NotFound().body("js map file not found"),
-    };
-
-    let path = format!("{}.js.map", filename);
+pub fn get_js_map_file(map: Path<String>) -> HttpResponse {
+    let path = format!("{}.js.map", map);
     match Asset::get(&path) {
         Some(content) => HttpResponse::Ok()
             .content_type("application/json")
@@ -71,13 +55,8 @@ pub fn get_js_map_file(req: HttpRequest<RouteState>) -> HttpResponse {
 }
 
 /// Returns static css file and returns `HttpResponse`
-pub fn get_css_file(req: HttpRequest<RouteState>) -> HttpResponse {
-    let filename: String = match req.match_info().query("stylesheet") {
-        Ok(t) => t,
-        Err(_e) => return HttpResponse::NotFound().body("css file not found"),
-    };
-
-    let path = format!("{}.css", filename);
+pub fn get_css_file(css: Path<String>) -> HttpResponse {
+    let path = format!("{}.css", css);
     match Asset::get(&path) {
         Some(content) => HttpResponse::Ok()
             .content_type("text/css")
@@ -89,13 +68,13 @@ pub fn get_css_file(req: HttpRequest<RouteState>) -> HttpResponse {
 #[derive(RustEmbed)]
 #[folder = "web/dist"]
 struct Asset;
-
+/*
 /// Returns `HttpResponse` with specified static file or error.
 ///
 /// # Arguments
 /// `req` - file request
 ///
-pub fn fetch_static_file(req: &HttpRequest<RouteState>) -> HttpResponse {
+pub fn fetch_static_file(req: HttpRequest) -> HttpResponse {
     let tail: String = match req.match_info().query("tail") {
         Ok(t) => t,
         Err(_e) => return HttpResponse::NotFound().body("404 Not Found"),
@@ -118,3 +97,4 @@ pub fn fetch_static_file(req: &HttpRequest<RouteState>) -> HttpResponse {
         None => HttpResponse::NotFound().body("404 Not Found"),
     }
 }
+*/

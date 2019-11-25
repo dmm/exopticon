@@ -24,8 +24,12 @@ panic = "abort"
 
 [dependencies]
 onvif = { path = "onvif" }
-actix = "0.7"
-actix-web = "0.7"
+actix = "0.8"
+actix-identity = "0.1"
+actix-rt = "0.2"
+actix-service = "0.4"
+actix-web = "1.0"
+actix-web-actors = "1.0"
 askama = "0.7"
 base64 = "0.10.1"
 base64-serde = "0.3"

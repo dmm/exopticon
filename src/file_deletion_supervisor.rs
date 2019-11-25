@@ -34,7 +34,7 @@ impl Handler<StartDeletionWorker> for FileDeletionSupervisor {
             msg.camera_group_id
         );
         let id = msg.camera_group_id;
-        let address = Arbiter::start(|_| FileDeletionActor::new(msg.camera_group_id, msg.db_addr));
+        let address = FileDeletionActor::new(msg.camera_group_id, msg.db_addr).start();
         self.workers.push((id, address));
     }
 }

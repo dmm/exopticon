@@ -1,5 +1,4 @@
-use actix_web::error::ResponseError;
-use actix_web::{AsyncResponder, FutureResponse, HttpResponse, Path, Query, State};
+use actix_web::{error::ResponseError, web::Data, web::Path, web::Query, Error, HttpResponse};
 use chrono::{DateTime, Utc};
 use futures::future::Future;
 
@@ -14,8 +13,9 @@ use crate::models::{FetchBetweenVideoUnit, FetchVideoUnit};
 /// * `state` - `RouteState` struct
 ///p
 pub fn fetch_video_unit(
-    (path, state): (Path<i32>, State<RouteState>),
-) -> FutureResponse<HttpResponse> {
+    path: Path<i32>,
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(FetchVideoUnit {
@@ -24,9 +24,8 @@ pub fn fetch_video_unit(
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(video_unit) => Ok(HttpResponse::Ok().json(video_unit)),
-            Err(err) => Ok(err.error_response()),
+            Err(err) => Ok(err.render_response()),
         })
-        .responder()
 }
 
 /// Struct used to match time parameters on api route
@@ -49,8 +48,10 @@ pub struct DateRange {
 /// * `state` - `RouteState` struct
 ///
 pub fn fetch_video_units_between(
-    (camera_id, range, state): (Path<i32>, Query<DateRange>, State<RouteState>),
-) -> FutureResponse<HttpResponse> {
+    camera_id: Path<i32>,
+    range: Query<DateRange>,
+    state: Data<RouteState>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
     state
         .db
         .send(FetchBetweenVideoUnit {
@@ -61,7 +62,6 @@ pub fn fetch_video_units_between(
         .from_err()
         .and_then(|db_response| match db_response {
             Ok(video_units) => Ok(HttpResponse::Ok().json(video_units)),
-            Err(err) => Ok(err.error_response()),
+            Err(err) => Ok(err.render_response()),
         })
-        .responder()
 }

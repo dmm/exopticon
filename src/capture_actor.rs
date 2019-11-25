@@ -4,9 +4,9 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, StreamHandler, SystemService,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message,
+    StreamHandler, SystemService,
 };
-use actix_web::actix::fut::wrap_future;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use rmp_serde::Deserializer;
