@@ -1,3 +1,6 @@
+// We have to pass by value to satisfy the actix route interface.
+#![allow(clippy::needless_pass_by_value)]
+
 use actix_web::{error::ResponseError, web::Data, web::Json, web::Path, Error, HttpResponse};
 use futures::future::Future;
 

@@ -138,7 +138,7 @@ use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware::Logger, App, HttpServer};
 use base64::encode;
 use chrono::Duration;
-//use dialoguer::{Input, PasswordInput};
+use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use rand::Rng;
@@ -146,7 +146,7 @@ use rand::Rng;
 use std::env;
 
 use crate::app::RouteState;
-//use crate::models::{CreateCameraGroup, CreateUser};
+use crate::models::{CreateCameraGroup, CreateUser};
 use crate::root_supervisor::{ExopticonMode, RootSupervisor};
 
 /// Interactively prompts the operator and adds a new user with the
@@ -158,8 +158,11 @@ use crate::root_supervisor::{ExopticonMode, RootSupervisor};
 /// * `sys` - The actix system runner
 /// * `address` - The address of the `DbExecutor`
 ///
-/*
-fn add_user(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
+
+fn add_user(
+    sys: &mut actix::SystemRunner,
+    address: &Addr<DbExecutor>,
+) -> Result<bool, std::io::Error> {
     let username = Input::new()
         .with_prompt("Enter username for initial user")
         .interact()?;
@@ -172,7 +175,6 @@ fn add_user(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
         username,
         password,
         timezone: String::from("UTC"),
-        Ar,
     });
 
     match sys.block_on(fut2) {
@@ -184,7 +186,7 @@ fn add_user(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
     info!("Created user!");
     Ok(true)
 }
-*/
+
 /// Adds a camera group. This is really only for setting up initial
 /// camera groups for boostrapping.. It should be run before the full
 /// system is started.
@@ -194,7 +196,7 @@ fn add_user(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
 /// * `sys` - The actix system runner
 /// * `address` - The address of the `DbExecutor`
 ///
-/*
+
 fn add_camera_group(
     sys: &mut actix::SystemRunner,
     address: &Addr<DbExecutor>,
@@ -222,15 +224,13 @@ fn add_camera_group(
     Ok(true)
 }
 
- */
-
 fn main() {
     env_logger::init();
 
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-    let sys = actix::System::new("Exopticon");
+    let mut sys = actix::System::new("Exopticon");
 
     // create db connection pool
     let manager = ConnectionManager::<PgConnection>::new(database_url);
@@ -244,7 +244,7 @@ fn main() {
 
     let db_address = address.clone();
     let route_db_address = address.clone();
-    //    let setup_address = address.clone();
+    let setup_address = address;
     // secret is a random 32 character long base 64 string
     let secret: String =
         env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 24]>()));
@@ -271,10 +271,8 @@ fn main() {
     .start();
 
     let mut mode = ExopticonMode::Run;
-    /*
-        let mut add_user_flag = false;
-        let mut add_camera_group_flag = false;
-    */
+    let mut add_user_flag = false;
+    let mut add_camera_group_flag = false;
     // Prints each argument on a separate line
     for argument in env::args() {
         match argument.as_ref() {
@@ -282,12 +280,12 @@ fn main() {
                 info!("Runtime mode is standby...");
                 mode = ExopticonMode::Standby;
             }
-            //          "--add-user" => {
-            //add_user_flag = true;
-            //            }
-            //          "--add-camera-group" => {
-            //            add_camera_group_flag = true;
-            //            }
+            "--add-user" => {
+                add_user_flag = true;
+            }
+            "--add-camera-group" => {
+                add_camera_group_flag = true;
+            }
             _ => (),
         }
     }
@@ -299,16 +297,15 @@ fn main() {
         move |_ctx: &mut Context<RootSupervisor>| root_supervisor,
     );
 
-    sys.run().expect("Unable to run actix system.");
-    /*
-            if add_user_flag && add_user(&mut sys, &setup_address).is_err() {
-                error!("Error creating user!");
-                return;
-            }
+    if add_user_flag && add_user(&mut sys, &setup_address).is_err() {
+        error!("Error creating user!");
+        return;
+    }
 
-            if add_camera_group_flag && add_camera_group(&mut sys, &setup_address).is_err() {
-                error!("Error creating camera group!");
-                return;
-            }
-    */
+    if add_camera_group_flag && add_camera_group(&mut sys, &setup_address).is_err() {
+        error!("Error creating camera group!");
+        return;
+    }
+
+    sys.run().expect("Unable to run actix system.");
 }

@@ -4,6 +4,8 @@ use futures::future::Future;
 use crate::app::RouteState;
 use crate::models::CreateUser;
 
+/// We have to pass by value to satisfy the actix route interface.
+#[allow(clippy::needless_pass_by_value)]
 /// Implements route to create user, returns future returning created
 /// user or error.
 ///

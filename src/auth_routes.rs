@@ -63,7 +63,9 @@ where
     }
 }
 
+/// struct representing authentication middleware for user facing routes
 pub struct WebAuthMiddleware<S> {
+    /// current service to check authentication for
     service: S,
 }
 
@@ -126,7 +128,9 @@ where
     }
 }
 
+/// Struct implementing authentication middleware for api routes
 pub struct AuthMiddleware<S> {
+    /// service to check authentication for
     service: S,
 }
 
