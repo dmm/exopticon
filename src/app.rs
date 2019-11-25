@@ -57,19 +57,14 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .route(web::get().to(index)),
         )
         .service(
-            web::resource("/{script}.js")
+            web::resource("/{file:[^/]+(.js|.js.map|.css)}")
                 .wrap(WebAuth)
-                .route(web::get().to_async(static_routes::get_js_file)),
+                .route(web::get().to_async(static_routes::fetch_static_file)),
         )
         .service(
-            web::resource("/{scriptmap}.js.map")
+            web::resource("/static/{tail:.*}")
                 .wrap(WebAuth)
-                .route(web::get().to_async(static_routes::get_js_map_file)),
-        )
-        .service(
-            web::resource("/{stylesheet}.css")
-                .wrap(WebAuth)
-                .route(web::get().to_async(static_routes::get_css_file)),
+                .route(web::get().to_async(static_routes::fetch_static_file)),
         )
         // v1 api scope
         .service(
