@@ -1,4 +1,17 @@
 image: dmattli/exopticonbuild:1
+
+cache:
+  key: "$CI_JOB_NAME"
+  untracked: true
+  paths:
+  - cargo/
+  - target/
+
+# Set any required environment variables here
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/cargo
+  RUST_BACKTRACE: FULL
+
 stages:
   - build
 

@@ -46,7 +46,7 @@ pub fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<HttpRespo
 
 /// helper function to create and returns the app after mounting all routes/resources
 pub fn generate_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/login").route(web::get().to_async(static_routes::login)))
+    cfg.service(web::resource("/login").route(web::get().to(static_routes::login)))
         // routes for authentication
         .service(
             web::resource("/auth")
