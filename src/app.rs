@@ -53,8 +53,6 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .route(web::post().to_async(login))
                 .route(web::delete().to_async(logout)),
         )
-        // routes for static files
-        //        .default_service(web::route(web::get().to_async(index)).wrap(WebAuth))
         .service(
             web::resource("/index.html")
                 .wrap(WebAuth)
