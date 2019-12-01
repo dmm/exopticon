@@ -19,8 +19,8 @@
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::multiple_crate_versions)]
 #![allow(clippy::implicit_return)]
+#![allow(clippy::print_stdout)]
 
-/// Exopticon is a free video surveillance system
 #[macro_use]
 extern crate base64_serde;
 #[macro_use]
@@ -183,7 +183,7 @@ fn add_user(
             error!("Error creating user! {}", err);
         }
     }
-    info!("Created user!");
+    println!("Created User!");
     Ok(true)
 }
 
@@ -220,7 +220,7 @@ fn add_camera_group(
             error!("Error creating camera group! {}", err);
         }
     }
-    info!("Created camera group!");
+    println!("Created camera group!");
     Ok(true)
 }
 
@@ -290,6 +290,10 @@ fn main() {
         }
     }
 
+    if add_user_flag || add_camera_group_flag {
+        mode = ExopticonMode::Standby;
+    }
+
     let root_supervisor = RootSupervisor::new(mode, db_address);
 
     RootSupervisor::start_in_arbiter(
@@ -304,6 +308,10 @@ fn main() {
 
     if add_camera_group_flag && add_camera_group(&mut sys, &setup_address).is_err() {
         error!("Error creating camera group!");
+        return;
+    }
+
+    if add_user_flag || add_camera_group_flag {
         return;
     }
 
