@@ -636,8 +636,7 @@ impl Camera {
     pub fn parse_continuous_move(body: Vec<u8>) -> Result<(), Error> {
         let string_body = String::from_utf8(body)?;
         debug!("ContinuousMove Response: {}", string_body);
-        let doc = parser::parse(&string_body)?;
-        let doc = doc.as_document();
+        let _doc = parser::parse(&string_body)?.as_document();
 
         Ok(())
     }
