@@ -3,36 +3,55 @@
 Video Surveillance
 
 ## Installation
+1. Fetch the sources
 
-1. Install dependencies
+    $ git clone https://gitlab.com/dmattli/exopticon.git
 
-Install Rust
+2. Grab the exopticon-build image
 
-    curl https://sh.rustup.rs -sSf | sh
+    $ docker pull dmattli/exopticon-build:latest
 
-Install system dependencies:
+3. Start the build
 
-    sudo apt install -y libavcodec-dev libavformat-dev libswscale-dev libavfilter-dev \
-               libavutil-dev libturbojpeg0-dev autoconf automake bzip2 \
-               dpkg-dev file g++ gcc imagemagick libbz2-dev libc6-dev \
-               libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
-               libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
-               libkrb5-dev liblzma-dev libmagickcore-dev libmagickwand-dev\
-               libncurses5-dev libncursesw5-dev libpng-dev libpq-dev \
-               libreadline-dev libsqlite3-dev libssl-dev libtool libwebp-dev \
-               libxml2-dev libxslt-dev libyaml-dev make patch xz-utils \
-               zlib1g-dev libmysqlclient-dev
+    $ cd exopticon && docker run -v "$(pwd)":/exopticon -w /exopticon dmattli/exopticon-build:latest sh -c 'cargo build --release'
 
-Install Node.js:
-
-    install node.js here
-
-Install diesel cli
-
-    cargo install diesel_cli
+4. Prepare database
 
 
-2. Build EXOPTICON
+    $ sudo -u postgres psql # Run psql as user that can create users and databases
 
-    cargo build --release
+    # Create the database
+    postgres=# CREATE DATABASE exopticon;
+
+    # Create the database user
+    postgres=# CREATE USER exopticon_user WITH PASSWORD 'change_this_password;
+
+    # Grant access to the database
+    postgres=# GRANT ALL PRIVILEGES ON DATABASE exopticon TO exopticon_user;
+
+    postgres=# \q
+
+    # Now run the diesel migrations
+    $  docker run -it --rm -v "$(pwd)":/exopticon \
+       -e DATABASE_URL=postgres://exopticon_user:'change_this_password'@10.0.0.2/exopticon \ # SET THIS DB CONNECTION STRING
+       -w /exopticon dmattli/exopticon-build:latest sh -c 'diesel setup'
+    Running migration 2018-10-22-125302_initial_schema
+    Running migration 2018-12-11-144804_users
+    Running migration 2019-06-28-192842_create_observations
+
+5. Create initial user and camera group
+
+    $ docker run -it --rm -v "$(pwd)":/exopticon \
+       -e DATABASE_URL=postgres://exopticon_user:'change_this_password'@10.0.0.2/exopticon \ # SET THIS DB CONNECTION STRING
+       -w /exopticon dmattli/exopticon-build:latest sh -c 'target/release/exopticon --add-user'
+    Enter username for initial user: user1
+    Enter password for initial user: [hidden]
+    Created User!
+
+    $ docker run -it --rm -v "$(pwd)":/exopticon \
+      -e DATABASE_URL=postgres://exopticon_user:'change_this_password'@10.0.0.2/exopticon \ # SET THIS DB CONNECTION STRING
+      -w /exopticon dmattli/exopticon-build:latest sh -c 'target/release/exopticon --add-camera-group'
+    Enter storage path for recorded video: /tank/video
+    Enter max space used at this path, in megabytes: 2000
+
 

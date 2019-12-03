@@ -25,8 +25,11 @@ RUN mkdir /node && cd /node \
     && rm -rf node-v12.10.0-linux-x64.tar.xz
 ENV PATH=$PATH:/node/node-v12.10.0-linux-x64/bin
 
+# Install diesel_cli
+RUN cargo install diesel_cli
+
 # configure environment
-ENV PATH=/root/.cargo/bin:/exopticon/workers:$PATH
+ENV PATH=/usr/local:/exopticon/workers:$PATH
 ENV CUDA_HOME=/usr/local/cuda-10.0
 ENV CUDA_PATH=/usr/local/cuda-10.0/bin
 
