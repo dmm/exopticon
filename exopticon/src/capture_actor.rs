@@ -7,17 +7,17 @@ use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message,
     StreamHandler, SystemService,
 };
+use bincode;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
-use rmp_serde::Deserializer;
-use serde::Deserialize;
-
+use exserial::models::CaptureMessage;
 use tokio::codec::length_delimited;
 use tokio_process::CommandExt;
 
 use crate::models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
+/*
 /// Holds messages from capture worker
 #[derive(Default, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CaptureMessage {
@@ -78,6 +78,7 @@ pub struct CaptureMessage {
     #[serde(default)]
     pub end_time: String,
 }
+*/
 
 /// Holds state of capture actor
 pub struct CaptureActor {
@@ -153,54 +154,65 @@ impl CaptureActor {
     /// performing the appropriate action.
     fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<Self>) {
         // Check if log
-        match msg.message_type.as_str() {
-            "log" => debug!(
-                "Capture worker {} log message: {}",
-                self.camera_id, msg.message
-            ),
-            "frame" => {
+        match msg {
+            CaptureMessage::Log { message } => {
+                debug!("Capture worker {} log message: {}", self.camera_id, message)
+            }
+            CaptureMessage::Frame {
+                jpeg,
+                offset,
+                unscaled_width,
+                unscaled_height,
+            } => {
                 if self.video_unit_id.is_none() {
                     error!("Video Unit id not set!");
                 }
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
-                    jpeg: msg.jpeg,
+                    jpeg,
                     resolution: FrameResolution::HD,
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
                     },
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
-                    offset: msg.offset,
-                    unscaled_width: msg.unscaled_width,
-                    unscaled_height: msg.unscaled_height,
+                    offset,
+                    unscaled_width,
+                    unscaled_height,
                 });
                 self.offset += 1;
             }
-            "frameScaled" => {
+            CaptureMessage::ScaledFrame {
+                jpeg,
+                offset,
+                unscaled_width,
+                unscaled_height,
+            } => {
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
-                    jpeg: msg.scaled_jpeg,
+                    jpeg,
                     resolution: FrameResolution::SD,
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
                     },
                     video_unit_id: self.video_unit_id.unwrap_or(-1),
-                    offset: msg.offset,
-                    unscaled_width: msg.unscaled_width,
-                    unscaled_height: msg.unscaled_height,
+                    offset,
+                    unscaled_width,
+                    unscaled_height,
                 });
                 self.offset += 1;
             }
-            "newFile" => {
+            CaptureMessage::NewFile {
+                filename,
+                begin_time,
+            } => {
                 // worker has created a new file. Write video_unit and
                 // file to database.
-                if let Ok(date) = msg.begin_time.parse::<DateTime<Utc>>() {
-                    let filename = msg.filename.clone();
+                if let Ok(date) = begin_time.parse::<DateTime<Utc>>() {
                     let fut = self.db_addr.send(CreateVideoUnitFile {
                         camera_id: self.camera_id,
                         monotonic_index: 0,
                         begin_time: date.naive_utc(),
-                        filename: msg.filename,
+                        filename: filename.clone(),
                     });
 
                     ctx.spawn(
@@ -218,16 +230,13 @@ impl CaptureActor {
                             }),
                     );
                 } else {
-                    error!(
-                        "CaptureWorker: unable to parse begin time: {}",
-                        msg.begin_time
-                    );
+                    error!("CaptureWorker: unable to parse begin time: {}", begin_time);
                 }
                 self.offset = 0;
             }
-            "endFile" => {
-                if let Ok(end_time) = msg.end_time.parse::<DateTime<Utc>>() {
-                    self.close_file(ctx, &msg.filename, end_time);
+            CaptureMessage::EndFile { filename, end_time } => {
+                if let Ok(end_time) = end_time.parse::<DateTime<Utc>>() {
+                    self.close_file(ctx, &filename, end_time);
                     self.video_unit_id = None;
                     self.video_file_id = None;
                     self.filename = None;
@@ -235,20 +244,13 @@ impl CaptureActor {
                     error!("CaptureActor: Error handling close file message.");
                 }
             }
-            _ => error!(
-                "CaptureActor {}: Invalid capture message type: {}",
-                self.camera_id, msg.message_type
-            ),
         }
     }
 }
 
 impl StreamHandler<BytesMut, std::io::Error> for CaptureActor {
     fn handle(&mut self, item: BytesMut, ctx: &mut Context<Self>) {
-        let mut de = Deserializer::new(&item[..]);
-
-        let frame: Result<CaptureMessage, rmp_serde::decode::Error> =
-            Deserialize::deserialize(&mut de);
+        let frame: Result<CaptureMessage, bincode::Error> = bincode::deserialize(&item[..]);
 
         match frame {
             Ok(f) => self.message_to_action(f, ctx),
@@ -278,7 +280,7 @@ impl Handler<StartWorker> for CaptureActor {
             // scenarios. If the directory already exists everything
             // is fine, otherwise we fail later.
         }
-        let mut cmd = Command::new("src/cworkers/captureworker");
+        let mut cmd = Command::new("exopticon/src/cworkers/captureworker");
         cmd.arg(&self.stream_url);
         cmd.arg("0");
         cmd.arg(&storage_path);

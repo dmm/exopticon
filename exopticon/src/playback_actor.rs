@@ -22,12 +22,12 @@ use actix::{
     StreamHandler, SystemService,
 };
 use bytes::BytesMut;
+use exserial::models::CaptureMessage;
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use tokio::codec::length_delimited;
 use tokio_process::CommandExt;
 
-use crate::capture_actor::CaptureMessage;
 use crate::models::Observation;
 use crate::playback_supervisor::{PlaybackSupervisor, StopPlayback};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource};
@@ -122,24 +122,28 @@ impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
             Deserialize::deserialize(&mut de);
 
         match frame {
-            Ok(f) => {
-                if f.message_type == "frame"
-                    && self
-                        .target_address
-                        .do_send(PlaybackFrame {
-                            frame: CameraFrame {
-                                camera_id: 0,
-                                jpeg: f.jpeg,
-                                resolution: FrameResolution::HD,
-                                source: FrameSource::Playback { id: self.id },
-                                video_unit_id: self.video_unit_id,
-                                offset: f.offset,
-                                unscaled_width: f.unscaled_width,
-                                unscaled_height: f.unscaled_height,
-                            },
-                            observations: self.slurp_observations(f.offset),
-                        })
-                        .is_err()
+            Ok(CaptureMessage::Frame {
+                jpeg,
+                offset,
+                unscaled_width,
+                unscaled_height,
+            }) => {
+                if self
+                    .target_address
+                    .do_send(PlaybackFrame {
+                        frame: CameraFrame {
+                            camera_id: 0,
+                            jpeg,
+                            resolution: FrameResolution::HD,
+                            source: FrameSource::Playback { id: self.id },
+                            video_unit_id: self.video_unit_id,
+                            offset,
+                            unscaled_width,
+                            unscaled_height,
+                        },
+                        observations: self.slurp_observations(offset),
+                    })
+                    .is_err()
                 {
                     debug!(
                         "Playback Actor: {} Unable to send message to recipient, dying..",
@@ -149,6 +153,10 @@ impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
                     PlaybackSupervisor::from_registry().do_send(StopPlayback { id: self.id });
                 }
                 self.offset += 1;
+            }
+
+            Ok(_) => {
+                error!("playback worker sent invalid message type");
             }
 
             Err(e) => error!("Error deserializing frame! {}", e),
