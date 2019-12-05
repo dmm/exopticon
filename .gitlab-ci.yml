@@ -20,6 +20,8 @@ app-build:
   before_script:
     - rustup component add clippy
   script:
-    - cargo clippy
     - cargo build --release
+    - cd exserial; cargo build
+    - cd /exopticon; cargo clippy
+
 
