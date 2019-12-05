@@ -1,10 +1,15 @@
 
 
 [workspace]
-members = ["exopticon", "onvif", "exserial"]
+members = [ "exserial", "onvif", "exopticon"]
 
 [profile.dev]
 opt-level = 2
 debug = true
+overflow-checks = true
 
-
+[profile.release]
+lto = true
+opt-level = 3
+panic = "abort"
+overflow-checks = true

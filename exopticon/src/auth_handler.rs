@@ -1,6 +1,7 @@
 use actix::{Handler, Message};
 use bcrypt::verify;
 use diesel::prelude::*;
+use serde::Deserialize;
 
 use crate::errors::ServiceError;
 use crate::models::{DbExecutor, SlimUser, User};

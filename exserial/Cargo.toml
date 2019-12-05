@@ -14,7 +14,7 @@ edition = "2018"
 
 [lib]
 name = "exserial"
-crate-type = ["lib", "staticlib", "cdylib"]
+crate-type = ["lib", "staticlib"]
 
 [dependencies]
 serde_bytes = "0.10"
