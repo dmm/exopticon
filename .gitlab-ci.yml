@@ -21,7 +21,7 @@ app-build:
     - rustup component add clippy
   script:
     - cargo build --release
-    - cd exserial; cargo build
-    - cd /exopticon; cargo clippy
+    - OPWD=`pwd`; cd exserial; cargo build; cd "$OPWD"
+    - cargo clippy
 
 
