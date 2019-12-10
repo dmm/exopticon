@@ -1,7 +1,7 @@
 use actix::*;
 
 use crate::file_deletion_actor::FileDeletionActor;
-use crate::models::DbExecutor;
+use crate::models::{DbExecutor, FileExecutor};
 
 /// Request supervisor to start file deletion actor
 pub struct StartDeletionWorker {
@@ -17,6 +17,9 @@ impl Message for StartDeletionWorker {
 
 /// File Deletion Supervisor actor state
 pub struct FileDeletionSupervisor {
+    /// address of sync arbiter for fs actor
+    pub fs_actor: Addr<FileExecutor>,
+
     /// tuple of camera group id and address of file deletion actor
     workers: Vec<(i32, Addr<FileDeletionActor>)>,
 }
@@ -34,7 +37,8 @@ impl Handler<StartDeletionWorker> for FileDeletionSupervisor {
             msg.camera_group_id
         );
         let id = msg.camera_group_id;
-        let address = FileDeletionActor::new(msg.camera_group_id, msg.db_addr).start();
+        let address =
+            FileDeletionActor::new(msg.camera_group_id, self.fs_actor.clone(), msg.db_addr).start();
         self.workers.push((id, address));
     }
 }
@@ -44,7 +48,10 @@ impl FileDeletionSupervisor {
 
     pub fn new() -> Self {
         #![allow(clippy::missing_const_for_fn)] // Vec::new not allowed in const_fn
+        let fs_actor = SyncArbiter::start(2, || FileExecutor {});
+
         Self {
+            fs_actor,
             workers: Vec::new(),
         }
     }

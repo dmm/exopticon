@@ -2,9 +2,11 @@ use std::time::Duration;
 
 use actix::fut::wrap_future;
 use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
+use futures::future::Future;
 
 use crate::models::{
-    Camera, DbExecutor, DeleteVideoUnitFiles, FetchCameraGroupFiles, VideoFile, VideoUnit,
+    Camera, DbExecutor, DeleteVideoUnitFiles, FetchCameraGroupFiles, FileExecutor, RemoveFile,
+    VideoFile, VideoUnit,
 };
 
 /// A video unit/video file pair with the corresponding camera
@@ -14,6 +16,8 @@ type VideoUnitPair = (Camera, (VideoUnit, VideoFile));
 pub struct FileDeletionActor {
     /// id of camera group this actor will deletion excess files for
     camera_group_id: i32,
+    /// Address of file actor
+    fs_actor: Addr<FileExecutor>,
     /// Address of database worker
     db_addr: Addr<DbExecutor>,
 }
@@ -32,9 +36,14 @@ impl Actor for FileDeletionActor {
 
 impl FileDeletionActor {
     /// Returns newly initialized `FileDeletionActor`
-    pub const fn new(camera_group_id: i32, db_addr: Addr<DbExecutor>) -> Self {
+    pub const fn new(
+        camera_group_id: i32,
+        fs_actor: Addr<FileExecutor>,
+        db_addr: Addr<DbExecutor>,
+    ) -> Self {
         Self {
             camera_group_id,
+            fs_actor,
             db_addr,
         }
     }
@@ -72,27 +81,38 @@ impl FileDeletionActor {
                 "file_deletion_actor({}): removing file: {}, size: {}",
                 self.camera_group_id, video_file.filename, video_file.size
             );
-            match std::fs::remove_file(video_file.filename) {
-                serde::export::Ok(_) | serde::export::Err(_) => {}
-            };
-        }
 
-        let fut = self.db_addr.send(DeleteVideoUnitFiles {
-            video_unit_ids,
-            video_file_ids,
-        });
-
-        ctx.spawn(
-            wrap_future(fut)
-                .map(|result, _actor, _ctx| {
-                    if let Err(e) = result {
-                        panic!("Failed to delete video unit/files: {}", e);
+            let fut_db = self.db_addr.clone();
+            let fut = self
+                .fs_actor
+                .send(RemoveFile {
+                    path: video_file.filename.clone(),
+                })
+                .then(|res| match res {
+                    Ok(Ok(())) => futures::future::ok(()),
+                    Ok(Err(err)) => {
+                        if err.kind() == std::io::ErrorKind::NotFound {
+                            info!("Attempted to delete non-existent file.",);
+                            futures::future::ok(())
+                        } else {
+                            panic!("Failed to delete file!");
+                        }
+                    }
+                    Err(err) => {
+                        panic!("Other error occured when deleting file! {}", err);
                     }
                 })
-                .map_err(|e, _actor, _ctx| {
-                    panic!("Failed to delete video unit/files: {}", e);
-                }),
-        );
+                .and_then(move |_| {
+                    fut_db
+                        .send(DeleteVideoUnitFiles {
+                            video_unit_ids: vec![video_unit.id],
+                            video_file_ids: vec![video_file.id],
+                        })
+                        .map(|_| ())
+                        .map_err(|_| ())
+                });
+            ctx.spawn(wrap_future(fut));
+        }
     }
 }
 

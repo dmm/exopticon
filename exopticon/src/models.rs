@@ -15,6 +15,19 @@ impl Actor for DbExecutor {
     type Context = SyncContext<Self>;
 }
 
+/// Sync actor to allow file io without blocking
+pub struct FileExecutor {}
+
+impl Actor for FileExecutor {
+    type Context = SyncContext<Self>;
+}
+
+/// Message requesting a file removal
+pub struct RemoveFile {
+    /// path to file to remove
+    pub path: String,
+}
+
 use crate::schema::{camera_groups, cameras, observations, users, video_files, video_units};
 
 /// Full camera group model. Represents a full row returned from the

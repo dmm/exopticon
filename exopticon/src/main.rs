@@ -81,6 +81,9 @@ mod file_deletion_actor;
 /// Actor that supervises files deletion workers
 mod file_deletion_supervisor;
 
+/// Implements handler for file io
+mod file_handler;
+
 /// Actor message structs
 mod models;
 
