@@ -23,8 +23,6 @@ use actix::{
 };
 use bytes::BytesMut;
 use exserial::models::CaptureMessage;
-use rmp_serde::Deserializer;
-use serde::Deserialize;
 use tokio::codec::length_delimited;
 use tokio_process::CommandExt;
 
@@ -116,11 +114,7 @@ impl PlaybackActor {
 
 impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
     fn handle(&mut self, item: BytesMut, _ctx: &mut Context<Self>) {
-        let mut de = Deserializer::new(&item[..]);
-
-        let frame: Result<CaptureMessage, rmp_serde::decode::Error> =
-            Deserialize::deserialize(&mut de);
-
+        let frame: Result<CaptureMessage, bincode::Error> = bincode::deserialize(&item[..]);
         match frame {
             Ok(CaptureMessage::Frame {
                 jpeg,
@@ -181,7 +175,7 @@ impl Handler<StartWorker> for PlaybackActor {
             "Launching playback worker for file: {}",
             self.video_file_path
         );
-        let mut cmd = Command::new("src/cworkers/playbackworker");
+        let mut cmd = Command::new("exopticon/src/cworkers/playbackworker");
         cmd.arg(&self.video_file_path);
         cmd.arg(self.initial_offset.to_string());
         cmd.stdout(Stdio::piped());
