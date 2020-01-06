@@ -33,12 +33,12 @@ MODEL_NAME = 'faster_rcnn_resnet101_fgvc_2018_07_19'
 MODEL_FILE = MODEL_NAME + '.tar.gz'
 
 # Path to frozen detection graph. This is the actual model that is used for the object detection.
-PATH_TO_FROZEN_GRAPH = '/exopticon/workers/' + MODEL_NAME + '/frozen_inference_graph.pb'
+PATH_TO_FROZEN_GRAPH = '/exopticon/exopticon/workers/' + MODEL_NAME + '/frozen_inference_graph.pb'
 
 # List of the strings that is used to add correct label for each box.
 #PATH_TO_LABELS = os.path.join('data', 'mscoco_label_map.pbtxt')
 #PATH_TO_LABELS = '/exopticon/workers/' + 'mscoco_label_map.pbtxt'
-PATH_TO_LABELS = '/exopticon/workers/' + 'fgvc_2854_classes_label_map.pbtxt'
+PATH_TO_LABELS = '/exopticon/exopticon/workers/' + 'fgvc_2854_classes_label_map.pbtxt'
 
 class TensorflowWorker(ExopticonWorker):
   def __init__(self):

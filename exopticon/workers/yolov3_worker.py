@@ -34,7 +34,7 @@ class Yolo3Worker(ExopticonWorker):
 
     def setup(self):
         self.logger.info('starting yolov3 worker!')
-        os.chdir('workers/yolov3')
+        os.chdir('exopticon/workers/yolov3')
         self.logger.info('cwd: ' + os.getcwd())
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

@@ -51,13 +51,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends libopenblas-dev
     && apt-get build-dep -y --no-install-recommends opencv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
-    && git clone --depth 1 --branch 4.1.0 https://github.com/opencv/opencv.git /root/opencv \
-    && git clone --depth 1 --branch 4.1.0 https://github.com/opencv/opencv_contrib.git  /root/opencv-contrib \
+    && git clone --depth 1 --branch master https://github.com/opencv/opencv.git /root/opencv \
+    && git clone --depth 1 --branch master https://github.com/opencv/opencv_contrib.git  /root/opencv-contrib \
     && cd /root/opencv \
     && mkdir build && cd build \
     && cmake \
     -DOPENCV_EXTRA_MODULES_PATH=/root/opencv-contrib/modules \
     -DWITH_CUDA=ON \
+    -DCUDA_GENERATION="Pascal" \
+    -DOPENCV_DNN_CUDA=ON \
     -DENABLE_FAST_MATH=1 \
     -DCUDA_FAST_MATH=1 \
     -DWITH_CUBLAS=1 \
@@ -117,8 +119,8 @@ RUN pip3 install --system torch torchvision tqdm pillow terminaltables
 #  && cd && rm -rf ~/lightnet
 
 # configure environment
-ENV PYTHONPATH=$PYTHONPATH:/exopticon/workers/yolov3
-ENV PATH=/root/.cargo/bin:/exopticon/workers:$PATH
+ENV PYTHONPATH=$PYTHONPATH:/exopticon/exopticon/workers/yolov3
+ENV PATH=/root/.cargo/bin:/exopticon/exopticon/workers:$PATH
 ENV CUDA_HOME=/usr/local/cuda-10.0
 ENV CUDA_PATH=/usr/local/cuda-10.0/bin
 
