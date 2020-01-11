@@ -1,6 +1,5 @@
 import { Component, ChangeDetectorRef, HostListener, OnInit, Input, NgZone } from '@angular/core';
 import { ActivatedRoute, Router, Params } from '@angular/router';
-import { OnPageVisible, OnPageHidden } from 'angular-page-visibilityx';
 import { Camera } from '../camera';
 import { CameraService, PtzDirection } from '../camera.service';
 import { VideoService } from '../video.service';
@@ -88,17 +87,10 @@ export class CameraPanelComponent implements OnInit {
     this.videoService.connect();
   }
 
-  @OnPageVisible()
-  onPageVisible() {
+  @HostListener('document:visibilitychange', ['$event'])
+  onVisibilityChange() {
     this.ngZone.run(() => {
-      this.pageVisible = true;
-    });
-  }
-
-  @OnPageHidden()
-  onPageHidden() {
-    this.ngZone.run(() => {
-      this.pageVisible = false;
+      this.pageVisible = !document['hidden'];
     });
   }
 

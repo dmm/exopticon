@@ -1,4 +1,3 @@
-import { AngularPageVisibilityModule } from 'angular-page-visibilityx';
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
 import { HttpClientModule } from '@angular/common/http';
@@ -27,7 +26,6 @@ import { PlaybackViewComponent } from './playback-view/playback-view.component';
     PlaybackViewComponent,
   ],
   imports: [
-    AngularPageVisibilityModule,
     BrowserModule,
     AppRoutingModule,
     InViewportModule,

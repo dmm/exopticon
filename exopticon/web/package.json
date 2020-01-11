@@ -22,7 +22,6 @@
     "@js-joda/core": "^1.12.0",
     "@js-joda/timezone": "^2.2",
     "@thisissoon/angular-inviewport": "^4.2.0",
-    "angular-page-visibilityx": "^6.1.4",
     "core-js": "^3.1.4",
     "rxjs": "^6.5.3",
     "rxjs-compat": "^6.5.2",
