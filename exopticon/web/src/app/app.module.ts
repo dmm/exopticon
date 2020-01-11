@@ -1,4 +1,4 @@
-import { AngularPageVisibilityModule } from 'angular-page-visibility';
+import { AngularPageVisibilityModule } from 'angular-page-visibilityx';
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
 import { HttpClientModule } from '@angular/common/http';

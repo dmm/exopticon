@@ -1,6 +1,6 @@
 import { Component, ChangeDetectorRef, HostListener, OnInit, Input, NgZone } from '@angular/core';
 import { ActivatedRoute, Router, Params } from '@angular/router';
-import { OnPageVisible, OnPageHidden } from 'angular-page-visibility';
+import { OnPageVisible, OnPageHidden } from 'angular-page-visibilityx';
 import { Camera } from '../camera';
 import { CameraService, PtzDirection } from '../camera.service';
 import { VideoService } from '../video.service';
@@ -117,23 +117,23 @@ export class CameraPanelComponent implements OnInit {
         // 'p'
         offset--;
         break;
-      case 37:
-        // left-arrow
+      case 65:
+        // 'a'
         if (cameraId)
           this.cameraService.ptz(cameraId, PtzDirection.left);
         break;
-      case 39:
-        // right-arrow
+      case 68:
+        // 'd'
         if (cameraId)
           this.cameraService.ptz(cameraId, PtzDirection.right);
         break;
-      case 38:
-        // up-arrow
+      case 87:
+        // 'w'
         if (cameraId)
           this.cameraService.ptz(cameraId, PtzDirection.up);
         break;
-      case 40:
-        // down-arrow
+      case 83:
+        // 's'
         if (cameraId)
           this.cameraService.ptz(cameraId, PtzDirection.down);
         break;
