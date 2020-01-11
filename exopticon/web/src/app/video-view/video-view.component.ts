@@ -1,5 +1,4 @@
 import { SimpleChanges, ViewChild, Component, ChangeDetectorRef, ElementRef, EventEmitter, OnInit, Input, Output, NgZone } from '@angular/core';
-import { OnPageVisible, OnPageHidden } from 'angular-page-visibilityx';
 import { Observable, Subscription } from 'rxjs';
 
 import { Camera } from '../camera';
