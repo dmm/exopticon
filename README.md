@@ -55,3 +55,16 @@ Video Surveillance
     Enter max space used at this path, in megabytes: 2000
 
 
+6. Run EXOPTICON
+    docker run -it --rm \
+               $(ls /dev/nvidia* | xargs -I{} echo '--device={}') \
+               $(ls /usr/lib/x86_64-linux-gnu/{libcuda,libnvidia}* | xargs -I{} echo '-v {}:{}:ro') \
+               -v "$(pwd)":/exopticon -v "$HOME/.cargo/registry":/root/.cargo/registry \
+               -v "/var/run/postgresql":/var/run/postgresql \
+               -v "/mnt/videotest:/mnt/videotest"  \
+               -v "$HOME/.cargo:/home/exopticon/.cargo" \
+               -w /exopticon -e RUST_LOG='exopticon=debug' \
+               -e RUST_BACKTRACE=1  \
+               --network=host --user=exopticon \
+               dmattli/exopticon-cuda-dev:10.2 \
+               sh -c '~/.cargo/bin/cargo build'
