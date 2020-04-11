@@ -1,10 +1,9 @@
 //! Onvif device discovery
-
-use futures::{Async, Future, Poll};
 use std::io;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
+use tokio::time::timeout;
 use uuid::Uuid;
 
 /// Struct representing onvif discover probe
@@ -37,15 +36,15 @@ impl ProbeServer {
             Err(_err) => (),
         }
     }
-}
 
-impl Future for ProbeServer {
-    type Item = usize;
-    type Error = io::Error;
+    fn time_left(&self) -> Option<Duration> {
+        let start = self.start.expect("Start time must be set!");
+        self.timeout
+            .checked_sub(Instant::now().duration_since(start))
+    }
 
-    fn poll(&mut self) -> Poll<usize, io::Error> {
-        let request_body =
-            format!(
+    pub async fn probe(&mut self) -> Result<usize, io::Error> {
+        let request_body = format!(
             r#"
             <Envelope xmlns="http://www.w3.org/2003/05/soap-envelope"
                       xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
@@ -63,63 +62,53 @@ impl Future for ProbeServer {
                 </Probe>
               </Body>
             </Envelope>"#,
-                Uuid::new_v4());
+            Uuid::new_v4()
+        );
 
         let remote_addr = "239.255.255.250:3702"
             .parse::<SocketAddr>()
             .expect("Invalid probe address");
-        match self.start {
-            None => {
-                match self
-                    .socket
-                    .poll_send_to(request_body.as_bytes(), &remote_addr)
-                {
-                    Ok(Async::Ready(_)) => {
-                        self.start = Some(Instant::now());
-                    }
-                    Ok(Async::NotReady) => {}
-                    Err(err) => {
-                        return Err(err);
-                    }
-                }
 
-                Ok(Async::NotReady)
-            }
-            Some(start) => {
-                debug!("polling...");
-                let since = Instant::now().duration_since(start);
-                debug!(
-                    "timeout: {}, Duration since: {}",
-                    self.timeout.as_secs(),
-                    since.as_secs()
-                );
-                if self.timeout <= since {
-                    return Ok(Async::Ready(self.results.len()));
-                }
+        // Send discovery request
+        match self
+            .socket
+            .send_to(request_body.as_bytes(), &remote_addr)
+            .await
+        {
+            Ok(_) => (),
+            Err(err) => return Err(err),
+        };
 
-                match self.socket.poll_recv_from(&mut self.buf) {
-                    Ok(Async::Ready((size, addr))) => {
-                        self.interpret_probe(size, addr);
-                        Ok(Async::NotReady)
-                    }
-                    Ok(Async::NotReady) => Ok(Async::NotReady),
-                    Err(err) => Err(err),
-                }
+        self.start = Some(Instant::now());
+
+        // Receive responses
+        while let Some(time_left) = self.time_left() {
+            let rec = self.socket.recv_from(&mut self.buf);
+            match timeout(time_left, rec).await {
+                Ok(Ok((size, addr))) => self.interpret_probe(size, addr),
+                Ok(Err(err)) => return Err(err),
+                Err(_) => (), // timeout, leave loop and return from fn
             }
         }
+
+        return Ok(self.results.len());
     }
 }
 
 /// Returns number of discovered devices
-pub fn probe(timeout: Duration) -> impl Future<Item = usize, Error = io::Error> {
+pub async fn probe(timeout: Duration) -> Result<usize, io::Error> {
     let local_addr: SocketAddr = "0.0.0.0:0".parse().expect("Invalid local address");
-    let socket = UdpSocket::bind(&local_addr).expect("Create socket failed");
+    let socket = UdpSocket::bind(&local_addr)
+        .await
+        .expect("Create socket failed");
 
-    ProbeServer {
+    let mut p = ProbeServer {
         socket,
         timeout,
         buf: vec![0; 0xFFFF],
         results: Vec::new(),
         start: None,
-    }
+    };
+
+    p.probe().await
 }

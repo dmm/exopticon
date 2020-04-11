@@ -271,7 +271,7 @@ fn main() {
     })
     .bind("0.0.0.0:3000")
     .expect("Can not bind to '0.0.0.0:3000'")
-    .start();
+    .run();
 
     let mut mode = ExopticonMode::Run;
     let mut add_user_flag = false;

@@ -2,8 +2,6 @@
 
 use chrono::offset::TimeZone;
 use chrono::{DateTime, Datelike, Timelike, Utc};
-use futures::future::Either;
-use futures::Future;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 use sxd_document::parser;
@@ -161,7 +159,7 @@ impl Camera {
     /// Perform request for date and time information from
     /// camera. Returns xml response body.
     ///
-    pub fn request_get_date_and_time(&self) -> impl Future<Item = Vec<u8>, Error = Error> {
+    pub async fn request_get_date_and_time(&self) -> Result<Vec<u8>, Error> {
         let request_body = r#"
   <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
     <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -170,7 +168,7 @@ impl Camera {
     </s:Body>
   </s:Envelope>
   "#;
-        soap_request(&self.url(), request_body.to_string())
+        soap_request(&self.url(), request_body.to_string()).await
     }
 
     /// Returns parsed date and time body.
@@ -249,12 +247,9 @@ impl Camera {
     }
 
     /// Requests date and time settings from camera
-    pub fn get_date_and_time(&self) -> impl Future<Item = DeviceDateAndTime, Error = Error> {
-        Box::new(
-            self.request_get_date_and_time()
-                .and_then(Self::parse_get_date_and_time)
-                .map_err(|_err| Error::ConnectionFailed),
-        )
+    pub async fn get_date_and_time(&self) -> Result<DeviceDateAndTime, Error> {
+        let res = self.request_get_date_and_time().await?;
+        Self::parse_get_date_and_time(res)
     }
 
     /// Submits set_date_and_time call and returns the raw result as a Future.
@@ -263,10 +258,10 @@ impl Camera {
     ///
     /// * `datetime` - date and time configuration to send to camera
     ///
-    pub fn request_set_date_and_time(
+    pub async fn request_set_date_and_time(
         &self,
         datetime: &DeviceDateAndTime,
-    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+    ) -> Result<Vec<u8>, Error> {
         let utc_body = match datetime.utc_datetime {
             None => String::new(),
             Some(utc) => format!(
@@ -308,11 +303,11 @@ impl Camera {
         );
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
-            Err(err) => return Either::A(futures::future::err(err)),
+            Err(err) => return Err(err),
         };
         let body = format!("{}{}{}", header, body, envelope_footer());
 
-        Either::B(soap_request(&self.url(), body))
+        soap_request(&self.url(), body).await
     }
 
     /// Returns nothing if the parsed body represents a successful
@@ -358,20 +353,14 @@ impl Camera {
     ///
     /// * `datetime` - date and time settings to assign camera
     ///
-    pub fn set_date_and_time(
-        &self,
-        datetime: &DeviceDateAndTime,
-    ) -> impl Future<Item = (), Error = Error> {
-        Box::new(
-            self.request_set_date_and_time(datetime)
-                .and_then(Self::parse_set_date_and_time)
-                .map_err(|_err| Error::ConnectionFailed),
-        )
+    pub async fn set_date_and_time(&self, datetime: &DeviceDateAndTime) -> Result<(), Error> {
+        let res = self.request_set_date_and_time(datetime).await?;
+        Self::parse_set_date_and_time(res)
     }
 
     /// Performs request to get ntp configuration and returns response
     /// text on success.
-    pub fn request_get_ntp(&self) -> impl Future<Item = Vec<u8>, Error = Error> {
+    pub async fn request_get_ntp(&self) -> Result<Vec<u8>, Error> {
         {
             let body = r#"
           <GetNTP
@@ -381,11 +370,11 @@ impl Camera {
 
             let header = match envelope_header(&self.username, &self.password) {
                 Ok(h) => h,
-                Err(err) => return Either::A(futures::future::err(err)),
+                Err(err) => return Err(err),
             };
             let body = format!("{}{}{}", header, body, envelope_footer());
 
-            Either::B(soap_request(&self.url(), body))
+            soap_request(&self.url(), body).await
         }
     }
 
@@ -439,12 +428,9 @@ impl Camera {
     }
 
     /// Fetch camera's ntp settings
-    pub fn get_ntp(&self) -> impl Future<Item = NtpSettings, Error = Error> {
-        Box::new(
-            self.request_get_ntp()
-                .and_then(Self::parse_get_ntp)
-                .map_err(|_err| Error::ConnectionFailed),
-        )
+    pub async fn get_ntp(&self) -> Result<NtpSettings, Error> {
+        let res = self.request_get_ntp().await?;
+        Camera::parse_get_ntp(res)
     }
 
     /// Performs a request to set camera's ntp settings. Returns
@@ -454,10 +440,7 @@ impl Camera {
     ///
     /// * `ntp_settings` - new settings for camera
     ///
-    pub fn request_set_ntp(
-        &self,
-        ntp_settings: &NtpSettings,
-    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+    pub async fn request_set_ntp(&self, ntp_settings: &NtpSettings) -> Result<Vec<u8>, Error> {
         let manual_body = format!(
             r#"
                 <NTPManual>
@@ -479,11 +462,11 @@ impl Camera {
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
-            Err(err) => return Either::A(futures::future::err(err)),
+            Err(err) => return Err(err),
         };
         let body = format!("{}{}{}", header, body, envelope_footer());
         debug!("SetNTP: {}", body);
-        Either::B(soap_request(&self.url(), body))
+        soap_request(&self.url(), body).await
     }
 
     /// Parse set ntp response body. Returns () on success.
@@ -508,12 +491,9 @@ impl Camera {
     ///
     /// * `ntp_settings` - new ntp settings
     ///
-    pub fn set_ntp(&self, ntp_settings: &NtpSettings) -> impl Future<Item = (), Error = Error> {
-        Box::new(
-            self.request_set_ntp(ntp_settings)
-                .and_then(Self::parse_set_ntp)
-                .map_err(|_err| Error::ConnectionFailed),
-        )
+    pub async fn set_ntp(&self, ntp_settings: &NtpSettings) -> Result<(), Error> {
+        let res = self.request_set_ntp(ntp_settings).await?;
+        return Self::parse_set_ntp(res);
     }
 
     /// Helper that returns PanTilt and Zoom sections for ptz requests
@@ -535,13 +515,13 @@ impl Camera {
     }
 
     /// performs relative ptz move request
-    pub fn request_relative_move(
+    pub async fn request_relative_move(
         &self,
         profile_token: &str,
         x: f32,
         y: f32,
         zoom: f32,
-    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+    ) -> Result<Vec<u8>, Error> {
         let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
         let body = format!(
             r#"
@@ -555,11 +535,11 @@ impl Camera {
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
-            Err(err) => return Either::A(futures::future::err(err)),
+            Err(err) => return Err(err),
         };
         let body = format!("{}{}{}", header, body, envelope_footer());
         debug!("Relative Move: {} {}", &self.url(), body);
-        Either::B(soap_request(&self.url(), body))
+        soap_request(&self.url(), body).await
     }
 
     /// parse result of relative ptz move request
@@ -579,33 +559,29 @@ impl Camera {
     /// * `x` - amount to move, inclusively between -1.0 and 1.0, in x axis
     /// * `y` - amount to move, inclusively between -1.0 and 1.0, in y axis
     /// * `zoom` - amount to change zoom, inclusively between -1.0 and 1.0
-    pub fn relative_move(
+    pub async fn relative_move(
         &self,
         profile_token: &str,
         x: f32,
         y: f32,
         zoom: f32,
-    ) -> impl Future<Item = (), Error = Error> {
-        Box::new(
-            self.request_relative_move(profile_token, x, y, zoom)
-                .and_then(Self::parse_relative_move)
-                .map_err(|err| {
-                    error!("relative move error: {}", err);
-                    Error::ConnectionFailed
-                }),
-        )
+    ) -> Result<(), Error> {
+        let res = self
+            .request_relative_move(profile_token, x, y, zoom)
+            .await?;
+        Self::parse_relative_move(res)
     }
 
     /// performs continuous ptz move request
     #[allow(clippy::float_arithmetic)]
-    pub fn request_continuous_move(
+    pub async fn request_continuous_move(
         &self,
         profile_token: &str,
         x: f32,
         y: f32,
         zoom: f32,
         timeout: f32,
-    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+    ) -> Result<Vec<u8>, Error> {
         let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
         let timeout_body = if timeout == 0.0 {
             String::from("")
@@ -625,11 +601,11 @@ impl Camera {
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
-            Err(err) => return Either::A(futures::future::err(err)),
+            Err(err) => return Err(err),
         };
         let body = format!("{}{}{}", header, body, envelope_footer());
         debug!("Relative Move: {} {}", &self.url(), body);
-        Either::B(soap_request(&self.url(), body))
+        soap_request(&self.url(), body).await
     }
 
     /// parse result of continuous ptz move request
@@ -651,32 +627,28 @@ impl Camera {
     /// * `zoom` - speed to zoom, inclusively between 0.0 and 1.0
     /// * `timeout` - timeout in milliseconds for move to last, or 0.0 for indefinite
     ///
-    pub fn continuous_move(
+    pub async fn continuous_move(
         &self,
         profile_token: &str,
         x: f32,
         y: f32,
         zoom: f32,
         timeout: f32,
-    ) -> impl Future<Item = (), Error = Error> {
-        Box::new(
-            self.request_continuous_move(profile_token, x, y, zoom, timeout)
-                .and_then(Self::parse_continuous_move)
-                .map_err(|err| {
-                    error!("continuous move error: {}", err);
-                    Error::ConnectionFailed
-                }),
-        )
+    ) -> Result<(), Error> {
+        let res = self
+            .request_continuous_move(profile_token, x, y, zoom, timeout)
+            .await?;
+        Self::parse_continuous_move(res)
     }
 
     /// performs an absolute ptz move request
-    pub fn request_absolute_move(
+    pub async fn request_absolute_move(
         &self,
         profile_token: &str,
         x: f32,
         y: f32,
         zoom: f32,
-    ) -> impl Future<Item = Vec<u8>, Error = Error> {
+    ) -> Result<Vec<u8>, Error> {
         let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
 
         let body = format!(
@@ -691,11 +663,11 @@ impl Camera {
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
-            Err(err) => return Either::A(futures::future::err(err)),
+            Err(err) => return Err(err),
         };
         let body = format!("{}{}{}", header, body, envelope_footer());
         debug!("Absolute Move: {} {}", &self.url(), body);
-        Either::B(soap_request(&self.url(), body))
+        soap_request(&self.url(), body).await
     }
 
     /// Requests an absolute ptz move. Returns () on success.
@@ -707,25 +679,21 @@ impl Camera {
     /// * `y` - speed to move, inclusively between -1.0 and 1.0, in y axis
     /// * `zoom` - speed to zoom, inclusively between 0.0 and 1.0
     ///
-    pub fn absolute_move(
+    pub async fn absolute_move(
         &self,
         profile_token: &str,
         x: f32,
         y: f32,
         zoom: f32,
-    ) -> impl Future<Item = (), Error = Error> {
-        Box::new(
-            self.request_absolute_move(profile_token, x, y, zoom)
-                .and_then(Self::parse_continuous_move)
-                .map_err(|err| {
-                    error!("absolute move error: {}", err);
-                    Error::ConnectionFailed
-                }),
-        )
+    ) -> Result<(), Error> {
+        let res = self
+            .request_absolute_move(profile_token, x, y, zoom)
+            .await?;
+        Self::parse_continuous_move(res)
     }
 
     /// performs a stop ptz move request
-    pub fn request_stop(&self, profile_token: &str) -> impl Future<Item = Vec<u8>, Error = Error> {
+    pub async fn request_stop(&self, profile_token: &str) -> Result<Vec<u8>, Error> {
         let body = format!(
             r#"
           <Stop xmlns="http://www.onvif.org/ver20/ptz/wsdl">
@@ -737,11 +705,11 @@ impl Camera {
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
-            Err(err) => return Either::A(futures::future::err(err)),
+            Err(err) => return Err(err),
         };
         let body = format!("{}{}{}", header, body, envelope_footer());
         debug!("Stop: {} {}", &self.url(), body);
-        Either::B(soap_request(&self.url(), body))
+        soap_request(&self.url(), body).await
     }
 
     /// Requests a ptz stop. Returns () on success.
@@ -750,14 +718,8 @@ impl Camera {
     ///
     /// * `profile_token` - ptz profile token to use for request
     ///
-    pub fn stop(&self, profile_token: &str) -> impl Future<Item = (), Error = Error> {
-        Box::new(
-            self.request_stop(profile_token)
-                .and_then(Self::parse_continuous_move)
-                .map_err(|err| {
-                    error!("stop error: {}", err);
-                    Error::ConnectionFailed
-                }),
-        )
+    pub async fn stop(&self, profile_token: &str) -> Result<(), Error> {
+        let res = self.request_stop(profile_token).await?;
+        Self::parse_continuous_move(res)
     }
 }

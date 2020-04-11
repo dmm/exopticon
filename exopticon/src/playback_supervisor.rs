@@ -27,6 +27,7 @@ use crate::ws_session::WsSession;
 
 /// Start playback message
 #[derive(Message)]
+#[rtype(result = "()")]
 pub struct StartPlayback {
     /// id of playback session
     pub id: u64,
@@ -44,6 +45,7 @@ pub struct StartPlayback {
 
 /// Stop playback message
 #[derive(Clone, Message)]
+#[rtype(result = "()")]
 pub struct StopPlayback {
     /// id of playback session
     pub id: u64,

@@ -1,19 +1,19 @@
 use std::error::Error;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use actix::fut::wrap_future;
 use actix::prelude::*;
-
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
 use log::Level;
 use rmp_serde::to_vec_named;
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use tokio::codec::length_delimited;
-use tokio::prelude::Sink;
-use tokio_process::CommandExt;
+use tokio::process::Command;
+use tokio_util::codec::length_delimited;
 
 use crate::models::{CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
@@ -106,7 +106,10 @@ pub struct AnalysisActor {
     pub arguments: Vec<String>,
     /// stdin of worker process
     pub worker_stdin: Option<
-        tokio_codec::FramedWrite<tokio_process::ChildStdin, tokio::codec::LengthDelimitedCodec>,
+        tokio_util::codec::FramedWrite<
+            tokio::process::ChildStdin,
+            tokio_util::codec::LengthDelimitedCodec,
+        >,
     >,
     /// number of frames requested by worker process
     pub frames_requested: u8,
@@ -147,16 +150,10 @@ impl AnalysisActor {
             AnalysisWorkerMessage::Observation(observations) => {
                 debug!("Analysis observations: {}", observations.len());
                 let fut = self.db_address.send(CreateObservations { observations });
-                ctx.spawn(
-                    wrap_future(fut)
-                        .map(|result, _actor, _ctx| match result {
-                            Ok(count) => debug!("Inserted {} observations.", count),
-                            Err(err) => error!("Error inserting observations: {}", err),
-                        })
-                        .map_err(|_e, _actor, _ctx| {
-                            error!("AnalysisActor: Unable to save aobservation.");
-                        }),
-                );
+                ctx.spawn(wrap_future(fut).map(|result, _actor, _ctx| match result {
+                    Ok(Ok(count)) => debug!("Inserted {} observations.", count),
+                    _ => error!("Error inserting observations!"),
+                }));
             }
             AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
                 WsCameraServer::from_registry().do_send(CameraFrame {
@@ -200,8 +197,15 @@ impl Actor for AnalysisActor {
     }
 }
 
-impl StreamHandler<BytesMut, std::io::Error> for AnalysisActor {
-    fn handle(&mut self, item: BytesMut, ctx: &mut Context<Self>) {
+impl StreamHandler<Result<BytesMut, std::io::Error>> for AnalysisActor {
+    fn handle(&mut self, item: Result<BytesMut, std::io::Error>, ctx: &mut Context<Self>) {
+        let item = match item {
+            Ok(b) => b,
+            Err(err) => {
+                error!("Caught error! {}", err);
+                return;
+            }
+        };
         let mut de = Deserializer::new(&item[..]);
 
         let frame: Result<AnalysisWorkerMessage, rmp_serde::decode::Error> =
@@ -217,11 +221,9 @@ impl StreamHandler<BytesMut, std::io::Error> for AnalysisActor {
 }
 
 /// Message actor sends self to start the analysis worker
+#[derive(Message)]
+#[rtype(result = "()")]
 struct StartWorker;
-
-impl Message for StartWorker {
-    type Result = ();
-}
 
 impl Handler<StartWorker> for AnalysisActor {
     type Result = ();
@@ -238,7 +240,7 @@ impl Handler<StartWorker> for AnalysisActor {
         }
         cmd.stdout(Stdio::piped());
         cmd.stdin(Stdio::piped());
-        let mut worker = match cmd.spawn_async() {
+        let mut worker = match cmd.spawn() {
             Ok(w) => w,
             Err(err) => {
                 error!("Error starting analysis worker: {}", err);
@@ -248,7 +250,7 @@ impl Handler<StartWorker> for AnalysisActor {
         };
 
         let stdout = worker
-            .stdout()
+            .stdout
             .take()
             .expect("Failed to open stdout on worker child.");
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
@@ -256,23 +258,16 @@ impl Handler<StartWorker> for AnalysisActor {
 
         // Frame worker stdin
         let stdin = worker
-            .stdin()
+            .stdin
             .take()
             .expect("Failed to open stdin on worker child.");
         let framed_stdin = length_delimited::Builder::new().new_write(stdin);
         self.worker_stdin = Some(framed_stdin);
-        let fut = wrap_future::<_, Self>(worker)
-            .map(|_status, actor, ctx| {
-                info!("Analysis actor {}: analysis worker died...", actor.id);
-                // Restart worker in five seconds
-                ctx.notify_later(StartWorker {}, Duration::new(5, 0));
-            })
-            .map_err(|err, act, _ctx| {
-                error!(
-                    "Anaysis actor {}: Error launching child process: {}",
-                    act.id, err
-                )
-            }); // Do something on error?
+        let fut = wrap_future::<_, Self>(worker).map(|_status, actor, ctx| {
+            info!("Analysis actor {}: analysis worker died...", actor.id);
+            // Restart worker in five seconds
+            ctx.notify_later(StartWorker {}, Duration::new(5, 0));
+        });
 
         ctx.spawn(fut);
     }
@@ -294,18 +289,15 @@ impl Handler<CameraFrame> for AnalysisActor {
             return;
         }
 
-        if let Some(framed_stdin) = self.worker_stdin.take() {
-            let worker_message = AnalysisWorkerCommand::Frame(msg);
+        let worker_message = AnalysisWorkerCommand::Frame(msg);
+        if let Some(framed_stdin) = self.worker_stdin {
             if let Ok(serialized) = to_vec_named(&worker_message) {
                 self.frames_requested -= 1;
-                let fut = wrap_future(framed_stdin.send(Bytes::from(serialized)))
-                    .map(|sink, actor: &mut Self, _ctx| {
-                        actor.worker_stdin = Some(sink);
-                    })
-                    .map_err(|err, _actor, _ctx| {
-                        error!("Error sending on sink {}", err);
-                    });
-                ctx.spawn(fut);
+
+                let fut = framed_stdin
+                    .send(bytes::Bytes::from(serialized))
+                    .map(|_| ());
+                ctx.spawn(wrap_future(fut));
             }
         }
     }

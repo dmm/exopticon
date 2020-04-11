@@ -28,13 +28,13 @@ pub struct RouteState {
     pub db: Addr<DbExecutor>,
 }
 
-/// We have to pass by value to satisfy the actix route interface.
-#[allow(clippy::needless_pass_by_value)]
-/// Route to return a websocket session using messagepack serialization
-pub fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
-    debug!("Starting websocket session...");
-    ws::start(WsSession::new(WsSerialization::MsgPack), &req, stream)
-}
+// /// We have to pass by value to satisfy the actix route interface.
+// #[allow(clippy::needless_pass_by_value)]
+// /// Route to return a websocket session using messagepack serialization
+// pub fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
+//     debug!("Starting websocket session...");
+//     ws::start(WsSession::new(WsSerialization::MsgPack), &req, stream)
+// }
 
 /// We have to pass by value to satisfy the actix route interface.
 #[allow(clippy::needless_pass_by_value)]
@@ -50,8 +50,8 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
         // routes for authentication
         .service(
             web::resource("/auth")
-                .route(web::post().to_async(login))
-                .route(web::delete().to_async(logout)),
+                .route(web::post().to(login))
+                .route(web::delete().to(logout)),
         )
         .service(
             web::resource("/index.html")
@@ -61,80 +61,77 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
         .service(
             web::resource("/{file:[^/]+(.js|.js.map|.css)}")
                 .wrap(WebAuth)
-                .route(web::get().to_async(static_routes::fetch_static_file)),
+                .route(web::get().to(static_routes::fetch_static_file)),
         )
         .service(
             web::resource("/static/{tail:.*}")
                 .wrap(WebAuth)
-                .route(web::get().to_async(static_routes::fetch_static_file)),
+                .route(web::get().to(static_routes::fetch_static_file)),
         )
         // v1 api scope
         .service(
             web::scope("/v1")
                 .wrap(Auth)
-                .service(web::resource("/ws").to(ws_route))
-                .service(web::resource("/ws_json").to(ws_json_route))
+                //                .service(web::resource("/ws").route(web::get()).to(ws_route))
+                .service(web::resource("/ws_json").route(web::get().to(ws_json_route)))
                 // routes to camera_group
                 .service(
                     web::resource("/camera_groups")
-                        .route(web::post().to_async(create_camera_group))
-                        .route(web::get().to_async(fetch_all_camera_groups)),
+                        .route(web::post().to(create_camera_group))
+                        .route(web::get().to(fetch_all_camera_groups)),
                 )
                 .service(
                     web::resource("/camera_groups/{id}")
-                        .route(web::post().to_async(update_camera_group))
-                        .route(web::get().to_async(fetch_camera_group)),
+                        .route(web::post().to(update_camera_group))
+                        .route(web::get().to(fetch_camera_group)),
                 )
                 // routes to camera
                 .service(
                     web::resource("/cameras")
-                        .route(web::post().to_async(create_camera))
-                        .route(web::get().to_async(fetch_all_cameras)),
+                        .route(web::post().to(create_camera))
+                        .route(web::get().to(fetch_all_cameras)),
                 )
-                .service(web::resource("/cameras/discover").route(web::get().to_async(discover)))
+                .service(web::resource("/cameras/discover").route(web::get().to(discover)))
                 .service(
                     web::resource("/cameras{id}")
-                        .route(web::post().to_async(update_camera))
-                        .route(web::get().to_async(fetch_camera)),
+                        .route(web::post().to(update_camera))
+                        .route(web::get().to(fetch_camera)),
                 )
                 .service(
                     web::resource("/cameras/{id}/time")
-                        .route(web::post().to_async(fetch_time))
-                        .route(web::get().to_async(set_time)),
+                        .route(web::post().to(fetch_time))
+                        .route(web::get().to(set_time)),
                 )
                 .service(
                     web::resource("/cameras/{id}/ntp")
                         .route(web::get())
-                        .to_async(fetch_ntp)
+                        .to(fetch_ntp)
                         .route(web::post())
-                        .to_async(set_ntp),
+                        .to(set_ntp),
                 )
                 .service(
-                    web::resource("/cameras/{id}/ptz/relative")
-                        .route(web::post().to_async(ptz_relative)),
+                    web::resource("/cameras/{id}/ptz/relative").route(web::post().to(ptz_relative)),
                 )
                 .service(
                     web::resource("/cameras/{id}/ptz/{direction}")
-                        .route(web::post().to_async(ptz_direction)),
+                        .route(web::post().to(ptz_direction)),
                 )
                 .service(
                     web::resource("/cameras/{camera_id}/video")
-                        .route(web::get().to_async(fetch_video_units_between)),
+                        .route(web::get().to(fetch_video_units_between)),
                 )
                 .service(
                     web::resource("/cameras/{camera_id}/observations")
-                        .route(web::get().to_async(fetch_observations_between)),
+                        .route(web::get().to(fetch_observations_between)),
                 )
                 // routes to video_unit
-                .service(
-                    web::resource("/video_units/{id}").route(web::get().to_async(fetch_video_unit)),
-                )
+                .service(web::resource("/video_units/{id}").route(web::get().to(fetch_video_unit)))
                 // routes to user
-                .service(web::resource("/users").route(web::post().to_async(create_user)))
+                .service(web::resource("/users").route(web::post().to(create_user)))
                 // routes to analysis_engine
                 .service(
                     web::resource("/analysis_engines")
-                        .route(web::post().to_async(create_analysis_engine)),
+                        .route(web::post().to(create_analysis_engine)),
                 ),
         )
         // Create default route

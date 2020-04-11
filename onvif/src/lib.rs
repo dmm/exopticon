@@ -15,7 +15,6 @@
 #[macro_use]
 extern crate log;
 extern crate serde;
-extern crate serde_derive;
 extern crate serde_json;
 
 /// module implementing the onvif camera api

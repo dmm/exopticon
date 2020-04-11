@@ -1,8 +1,7 @@
 // We have to pass by value to satisfy the actix route interface.
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::{error::ResponseError, web::Data, web::Path, web::Query, Error, HttpResponse};
-use futures::future::Future;
+use actix_web::{web::Data, web::Path, web::Query, Error, HttpResponse};
 
 use crate::app::RouteState;
 use crate::models::FetchObservations;
@@ -18,21 +17,22 @@ use crate::video_unit_routes::DateRange;
 /// * `end` - end time in UTC
 /// * `req` - `HttpRequest`
 ///
-pub fn fetch_observations_between(
+pub async fn fetch_observations_between(
     camera_id: Path<i32>,
     range: Query<DateRange>,
     state: Data<RouteState>,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    state
+) -> Result<HttpResponse, Error> {
+    let db_response = state
         .db
         .send(FetchObservations {
             camera_id: camera_id.into_inner(),
             begin_time: range.begin_time,
             end_time: range.end_time,
         })
-        .from_err()
-        .and_then(|db_response| match db_response {
-            Ok(video_units) => Ok(HttpResponse::Ok().json(video_units)),
-            Err(err) => Ok(err.render_response()),
-        })
+        .await?;
+
+    match db_response {
+        Ok(video_units) => Ok(HttpResponse::Ok().json(video_units)),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
 }

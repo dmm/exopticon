@@ -2,11 +2,11 @@
 #![allow(clippy::empty_enum)]
 
 use actix::{
-    fut, Actor, ActorContext, ActorFuture, AsyncContext, Handler, StreamHandler, SystemService,
+    Actor, ActorContext, ActorFuture, AsyncContext, Handler, StreamHandler, SystemService,
     WrapFuture,
 };
 use actix_web_actors::ws;
-use futures::Future;
+use futures::future;
 use rmp_serde::Serializer;
 use serde;
 use serde::Serialize;
@@ -236,8 +236,15 @@ impl Handler<PlaybackFrame> for WsSession {
     }
 }
 
-impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
-    fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+        let msg = match msg {
+            Ok(m) => m,
+            Err(e) => {
+                error!("WsSession Stream error! {}", e);
+                return;
+            }
+        };
         match msg {
             ws::Message::Text(text) => {
                 let cmd: Result<WsCommand, serde_json::Error> = serde_json::from_str(&text);
@@ -272,12 +279,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         let fetch_observations = db_registry::get_db()
                             .send(FetchObservationsByVideoUnit { video_unit_id });
 
-                        let create_actor = db_registry::get_db()
-                            .send(FetchVideoUnit { id: video_unit_id })
-                            .join(fetch_observations)
+                        let fetch_video_unit =
+                            db_registry::get_db().send(FetchVideoUnit { id: video_unit_id });
+
+                        let create_actor = future::join(fetch_video_unit, fetch_observations)
                             .into_actor(self)
-                            .then(move |res, _act, ctx| {
-                                if let Ok((Ok(video_unit), Ok(observations))) = res {
+                            .map(move |res, _act, ctx| {
+                                if let (Ok(Ok(video_unit)), Ok(Ok(observations))) = res {
                                     info!("Fetched {} observations.", observations.len());
                                     if let Some(video_file) = video_unit.files.first() {
                                         PlaybackSupervisor::from_registry().do_send(
@@ -292,7 +300,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                                         );
                                     }
                                 }
-                                fut::ok(())
                             });
                         ctx.spawn(create_actor);
 

@@ -1,4 +1,4 @@
-use actix::{fut, Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
+use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
 
 use crate::analysis_supervisor::AnalysisSupervisor;
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
@@ -55,12 +55,10 @@ impl RootSupervisor {
             .db_worker
             .send(FetchAllCameraGroupAndCameras {})
             .into_actor(self)
-            .then(|res, act, _ctx| {
+            .map(|res, act, _ctx| {
                 if let Ok(Ok(r)) = res {
                     act.start_capture_workers(r);
                 }
-
-                fut::ok(())
             });
 
         ctx.spawn(capture_future);
@@ -69,13 +67,12 @@ impl RootSupervisor {
             .db_worker
             .send(FetchAllCameraGroup {})
             .into_actor(self)
-            .then(|res, act, _ctx| {
+            .map(|res, act, _ctx| {
                 if let Ok(Ok(r)) = res {
                     act.start_deletion_workers(r);
                 }
-
-                fut::ok(())
             });
+
         ctx.spawn(fut);
     }
 

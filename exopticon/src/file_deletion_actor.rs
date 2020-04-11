@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use actix::fut::wrap_future;
 use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
-use futures::future::Future;
+use futures::future::FutureExt;
 
 use crate::models::{
     Camera, DbExecutor, DeleteVideoUnitFiles, FetchCameraGroupFiles, FileExecutor, RemoveFile,
@@ -83,35 +83,34 @@ impl FileDeletionActor {
             );
 
             let fut_db = self.db_addr.clone();
-            let fut = self
-                .fs_actor
-                .send(RemoveFile {
-                    path: video_file.filename.clone(),
-                })
-                .then(|res| match res {
-                    Ok(Ok(())) => futures::future::ok(()),
-                    Ok(Err(err)) => {
-                        if err.kind() == std::io::ErrorKind::NotFound {
-                            info!("Attempted to delete non-existent file.",);
-                            futures::future::ok(())
-                        } else {
-                            panic!("Failed to delete file!");
+            let fut = self.fs_actor.send(RemoveFile {
+                path: video_file.filename.clone(),
+            });
+            let actor_fut =
+                wrap_future(fut).map(move |res, _actor: &mut Self, ctx: &mut Context<Self>| {
+                    match res {
+                        Ok(Ok(())) => {
+                            let fut2 = fut_db
+                                .send(DeleteVideoUnitFiles {
+                                    video_unit_ids: vec![video_unit.id],
+                                    video_file_ids: vec![video_file.id],
+                                })
+                                .map(|_| ());
+                            ctx.spawn(wrap_future(fut2));
+                        }
+                        Ok(Err(err)) => {
+                            if err.kind() == std::io::ErrorKind::NotFound {
+                                info!("Attempted to delete non-existent file.",);
+                            } else {
+                                panic!("Failed to delete file!");
+                            }
+                        }
+                        Err(err) => {
+                            panic!("Other error occured when deleting file! {}", err);
                         }
                     }
-                    Err(err) => {
-                        panic!("Other error occured when deleting file! {}", err);
-                    }
-                })
-                .and_then(move |_| {
-                    fut_db
-                        .send(DeleteVideoUnitFiles {
-                            video_unit_ids: vec![video_unit.id],
-                            video_file_ids: vec![video_file.id],
-                        })
-                        .map(|_| ())
-                        .map_err(|_| ())
                 });
-            ctx.spawn(wrap_future(fut));
+            ctx.spawn(actor_fut);
         }
     }
 }
@@ -136,20 +135,17 @@ impl Handler<StartWork> for FileDeletionActor {
             })
             .into_actor(self)
             .map(|result, actor: &mut Self, ctx| {
-                if let Ok(r) = result {
+                if let Ok(Ok(r)) = result {
                     actor.handle_files(r, ctx);
                 } else {
-                    error!("Error fetching camera group files.");
+                    error!(
+                        "Error fetching camera group files for id: {}.",
+                        actor.camera_group_id
+                    );
                 }
                 ctx.notify_later(StartWork {}, Duration::from_millis(5000));
-            })
-            .map_err(|_e, actor, ctx| {
-                error!(
-                    "Error fetching camera group files for id: {}",
-                    actor.camera_group_id
-                );
-                ctx.notify_later(StartWork {}, Duration::from_millis(5000));
             });
+
         ctx.spawn(fut);
     }
 }

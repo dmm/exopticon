@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::Duration;
 
 use actix::{
@@ -11,8 +11,8 @@ use bincode;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use exserial::models::CaptureMessage;
-use tokio::codec::length_delimited;
-use tokio_process::CommandExt;
+use tokio::process::Command;
+use tokio_util::codec::length_delimited;
 
 use crate::models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
@@ -136,14 +136,11 @@ impl CaptureActor {
                 size: metadata.len() as i32,
             });
             ctx.spawn(
-                wrap_future::<_, Self>(fut)
-                    .map(|result, _actor, _ctx| match result {
-                        Ok((_video_unit, _video_file)) => {}
-                        Err(e) => panic!("CaptureWorker: Error updating video unit: {}", e),
-                    })
-                    .map_err(|_e, _actor, _ctx| {
-                        error!("CaptureWorker: Error calling UpdateVideoUnitFile");
-                    }),
+                wrap_future::<_, Self>(fut).map(|result, _actor, _ctx| match result {
+                    Ok(Ok((_video_unit, _video_file))) => {}
+                    Ok(Err(e)) => panic!("CaptureWorker: Error updating video unit: {}", e),
+                    Err(e) => panic!("CaptureWorker: Error updating video unit: {}", e),
+                }),
             );
         } else {
             error!("Error closing file!");
@@ -215,20 +212,16 @@ impl CaptureActor {
                         filename: filename.clone(),
                     });
 
-                    ctx.spawn(
-                        wrap_future::<_, Self>(fut)
-                            .map(|result, actor, _ctx| match result {
-                                Ok((video_unit, video_file)) => {
-                                    actor.video_unit_id = Some(video_unit.id);
-                                    actor.video_file_id = Some(video_file.id);
-                                    actor.filename = Some(filename)
-                                }
-                                Err(e) => panic!("Error inserting video unit: {}", e),
-                            })
-                            .map_err(|e, _actor, _ctx| {
-                                error!("Captureworker: Error sending new file message: {}", e);
-                            }),
-                    );
+                    ctx.spawn(wrap_future::<_, Self>(fut).map(
+                        |result, actor, _ctx| match result {
+                            Ok(Ok((video_unit, video_file))) => {
+                                actor.video_unit_id = Some(video_unit.id);
+                                actor.video_file_id = Some(video_file.id);
+                                actor.filename = Some(filename)
+                            }
+                            Err(e) => panic!("Error inserting video unit: {}", e),
+                        },
+                    ));
                 } else {
                     error!("CaptureWorker: unable to parse begin time: {}", begin_time);
                 }
@@ -248,8 +241,15 @@ impl CaptureActor {
     }
 }
 
-impl StreamHandler<BytesMut, std::io::Error> for CaptureActor {
-    fn handle(&mut self, item: BytesMut, ctx: &mut Context<Self>) {
+impl StreamHandler<Result<BytesMut, std::io::Error>> for CaptureActor {
+    fn handle(&mut self, item: Result<BytesMut, std::io::Error>, ctx: &mut Context<Self>) {
+        let item = match item {
+            Ok(b) => b,
+            Err(e) => {
+                error!("CaptureActor: stream handle error! {}", e);
+                return;
+            }
+        };
         let frame: Result<CaptureMessage, bincode::Error> = bincode::deserialize(&item[..]);
 
         match frame {
@@ -262,11 +262,9 @@ impl StreamHandler<BytesMut, std::io::Error> for CaptureActor {
 }
 
 /// Message for capture actor to start worker
+#[derive(Message)]
+#[rtype(result = "()")]
 struct StartWorker;
-
-impl Message for StartWorker {
-    type Result = ();
-}
 
 impl Handler<StartWorker> for CaptureActor {
     type Result = ();
@@ -287,37 +285,30 @@ impl Handler<StartWorker> for CaptureActor {
         cmd.arg("/dev/null");
         cmd.stdout(Stdio::piped());
 
-        let mut child = cmd.spawn_async().expect("Failed to launch");
+        let mut child = cmd.spawn().expect("Failed to launch");
         let stdout = child
-            .stdout()
+            .stdout
             .take()
             .expect("Failed to open stdout on worker child");
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
         Self::add_stream(framed_stream, ctx);
-        let fut = wrap_future::<_, Self>(child)
-            .map(|_status, actor, ctx| {
-                // Change this to an error when we can't distinguish
-                // between intentional and unintentional exits.
-                debug!("CaptureWorker {}: capture process died...", actor.camera_id);
+        let fut = wrap_future::<_, Self>(child).map(|_status, actor, ctx| {
+            // Change this to an error when we can't distinguish
+            // between intentional and unintentional exits.
+            debug!("CaptureWorker {}: capture process died...", actor.camera_id);
 
-                // Close file if open
-                if let Some(filename) = &actor.filename {
-                    debug!(
-                        "CaptureActor {}: capture process died, closing file: {}",
-                        actor.camera_id, &filename
-                    );
-                    actor.close_file(ctx, filename, Utc::now());
-                    actor.filename = None;
-                }
+            // Close file if open
+            if let Some(filename) = &actor.filename {
+                debug!(
+                    "CaptureActor {}: capture process died, closing file: {}",
+                    actor.camera_id, &filename
+                );
+                actor.close_file(ctx, filename, Utc::now());
+                actor.filename = None;
+            }
 
-                ctx.notify_later(StartWorker {}, Duration::new(5, 0));
-            })
-            .map_err(|err, act, _ctx| {
-                error!(
-                    "CaptureActor {}: Error launching child process: {}",
-                    act.camera_id, err
-                )
-            }); // Do something on error?
+            ctx.notify_later(StartWorker {}, Duration::new(5, 0));
+        });
         ctx.spawn(fut);
     }
 }

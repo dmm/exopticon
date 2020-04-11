@@ -43,6 +43,7 @@ type Client = Recipient<CameraFrame>;
 // MESSAGES
 /// Represents a frame of video
 #[derive(Clone, Message, Serialize, Deserialize)]
+#[rtype(result = "()")]
 pub struct CameraFrame {
     /// id of camera that produced frame
     pub camera_id: i32,
@@ -76,6 +77,7 @@ pub enum SubscriptionSubject {
 
 /// subscribe message
 #[derive(Clone, Message)]
+#[rtype(result = "()")]
 pub struct Subscribe {
     /// subscription subject
     pub subject: SubscriptionSubject,
@@ -85,6 +87,7 @@ pub struct Subscribe {
 
 /// Unsubscribe message
 #[derive(Clone, Message)]
+#[rtype(result = "()")]
 pub struct Unsubscribe {
     /// unsubscription subject
     pub subject: SubscriptionSubject,

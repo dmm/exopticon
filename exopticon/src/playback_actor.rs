@@ -14,7 +14,7 @@
 // GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
-use std::process::{Command, Stdio};
+//use std::process::{Command, Stdio};
 
 use actix::fut::wrap_future;
 use actix::{
@@ -23,8 +23,9 @@ use actix::{
 };
 use bytes::BytesMut;
 use exserial::models::CaptureMessage;
-use tokio::codec::length_delimited;
-use tokio_process::CommandExt;
+use std::process::Stdio;
+use tokio::process::Command;
+use tokio_util::codec::length_delimited;
 
 use crate::models::Observation;
 use crate::playback_supervisor::{PlaybackSupervisor, StopPlayback};
@@ -33,6 +34,7 @@ use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource};
 /// struct representing playback frame with list of observations. It's
 /// used to send frame and observations to client.
 #[derive(Message, Serialize)]
+#[rtype(result = "()")]
 pub struct PlaybackFrame {
     /// frame for client
     pub frame: CameraFrame,
@@ -112,8 +114,15 @@ impl PlaybackActor {
     }
 }
 
-impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
-    fn handle(&mut self, item: BytesMut, _ctx: &mut Context<Self>) {
+impl StreamHandler<Result<BytesMut, std::io::Error>> for PlaybackActor {
+    fn handle(&mut self, item: Result<bytes::BytesMut, std::io::Error>, _ctx: &mut Context<Self>) {
+        let item = match item {
+            Ok(b) => b,
+            Err(e) => {
+                error!("PlaybackActor: stream handler error! {}", e);
+                return;
+            }
+        };
         let frame: Result<CaptureMessage, bincode::Error> = bincode::deserialize(&item[..]);
         match frame {
             Ok(CaptureMessage::Frame {
@@ -161,11 +170,9 @@ impl StreamHandler<BytesMut, std::io::Error> for PlaybackActor {
 }
 
 /// Message to actor to begin playback
+#[derive(Message)]
+#[rtype(result = "()")]
 struct StartWorker;
-
-impl Message for StartWorker {
-    type Result = ();
-}
 
 impl Handler<StartWorker> for PlaybackActor {
     type Result = ();
@@ -180,26 +187,19 @@ impl Handler<StartWorker> for PlaybackActor {
         cmd.arg(self.initial_offset.to_string());
         cmd.stdout(Stdio::piped());
 
-        let mut child = cmd.spawn_async().expect("Failed to spawn playback worker.");
+        let mut child = cmd.spawn().expect("Failed to spawn playback worker.");
         let stdout = child
-            .stdout()
+            .stdout
             .take()
             .expect("Failed to open stdout of playback worker.");
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
         Self::add_stream(framed_stream, ctx);
-        let fut = wrap_future(child)
-            .map(|_status, actor: &mut Self, _ctx| {
-                debug!("Playback Worker for {} died!", actor.video_file_path);
+        let fut = wrap_future(child).map(|_status, actor: &mut Self, _ctx| {
+            debug!("Playback Worker for {} died!", actor.video_file_path);
 
-                // Notify supervisor that we are done.
-                PlaybackSupervisor::from_registry().do_send(StopPlayback { id: actor.id });
-            })
-            .map_err(|err, act, _ctx| {
-                error!(
-                    "Playback Worker: {} error launching child process {}",
-                    act.video_file_path, err
-                );
-            });
+            // Notify supervisor that we are done.
+            PlaybackSupervisor::from_registry().do_send(StopPlayback { id: actor.id });
+        });
 
         ctx.spawn(fut);
     }
