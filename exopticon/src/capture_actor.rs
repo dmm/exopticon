@@ -220,6 +220,7 @@ impl CaptureActor {
                                 actor.filename = Some(filename)
                             }
                             Err(e) => panic!("Error inserting video unit: {}", e),
+                            _ => panic!("Error inserting video unit.",),
                         },
                     ));
                 } else {

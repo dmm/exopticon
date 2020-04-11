@@ -32,7 +32,7 @@ impl std::fmt::Display for CameraError {
 
 impl actix_web::error::ResponseError for CameraError {
     fn error_response(&self) -> HttpResponse {
-        ResponseBuilder::new(self.status_code()).body(self.msg)
+        ResponseBuilder::new(self.status_code()).body(self.msg.clone())
     }
 
     fn status_code(&self) -> StatusCode {
@@ -118,7 +118,7 @@ pub async fn fetch_time(path: Path<i32>, state: Data<RouteState>) -> Result<Http
     };
     match onvif_cam.get_date_and_time().await {
         Ok(datetime) => Ok(HttpResponse::Ok().json(datetime)),
-        Err(err) => Ok(HttpResponse::InternalServerError().finish()),
+        Err(_err) => Ok(HttpResponse::InternalServerError().finish()),
     }
 }
 
@@ -262,7 +262,7 @@ pub async fn ptz_relative_move(
             .continuous_move(&camera.ptz_profile_token, x, y, zoom, 500.0)
             .await;
 
-        if let Err(err) = con {
+        if let Err(_err) = con {
             return Ok(HttpResponse::InternalServerError().finish());
         }
 
@@ -272,12 +272,12 @@ pub async fn ptz_relative_move(
         // stop continuous move
         let con = onvif_cam.stop(&camera.ptz_profile_token).await;
 
-        if let Err(err) = con {
+        if let Err(_err) = con {
             return Ok(HttpResponse::InternalServerError().finish());
         }
     } else {
         // default to using a relative move
-        if let Err(err) = onvif_cam
+        if let Err(_err) = onvif_cam
             .relative_move(&camera.ptz_profile_token, x, y, zoom)
             .await
         {

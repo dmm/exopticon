@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use actix::fut::wrap_future;
 use actix::prelude::*;
 use bytes::BytesMut;
-use futures::future::FutureExt;
 use futures::sink::SinkExt;
 use log::Level;
 use rmp_serde::to_vec_named;
@@ -290,14 +289,21 @@ impl Handler<CameraFrame> for AnalysisActor {
         }
 
         let worker_message = AnalysisWorkerCommand::Frame(msg);
-        if let Some(framed_stdin) = self.worker_stdin {
+        if let Some(mut framed_stdin) = self.worker_stdin.take() {
             if let Ok(serialized) = to_vec_named(&worker_message) {
                 self.frames_requested -= 1;
 
-                let fut = framed_stdin
-                    .send(bytes::Bytes::from(serialized))
-                    .map(|_| ());
-                ctx.spawn(wrap_future(fut));
+                let task = async move {
+                    match framed_stdin.send(bytes::Bytes::from(serialized)).await {
+                        Err(err) => error!("Analysis Worker: Failed to write frame: {}", err),
+                        _ => (),
+                    };
+                    framed_stdin
+                };
+                let fut = wrap_future(task).map(|sink, actor: &mut Self, _ctx| {
+                    actor.worker_stdin = Some(sink);
+                });
+                ctx.spawn(fut);
             }
         }
     }

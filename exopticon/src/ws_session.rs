@@ -324,6 +324,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 ctx.stop();
             }
             ws::Message::Nop
+            | ws::Message::Continuation(_)
             | ws::Message::Binary(_)
             | ws::Message::Ping(_)
             | ws::Message::Pong(_) => {}
