@@ -2,18 +2,18 @@
 
 // to avoid the warning from diesel macros
 #![allow(proc_macro_derive_resolution_fallback)]
-// #![deny(
-//     nonstandard_style,
-//     warnings,
-//     rust_2018_idioms,
-//     unused,
-//     future_incompatible,
-//     clippy::all,
-//     clippy::restriction,
-//     clippy::pedantic,
-//     clippy::nursery,
-//     clippy::cargo
-// )]
+#![deny(
+    nonstandard_style,
+    warnings,
+    rust_2018_idioms,
+    unused,
+    future_incompatible,
+    clippy::all,
+    clippy::restriction,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo
+)]
 #![allow(clippy::integer_arithmetic)]
 #![allow(clippy::integer_division)]
 #![allow(clippy::missing_inline_in_public_items)]
