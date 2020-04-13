@@ -29,17 +29,17 @@ pub struct RouteState {
 }
 
 // /// We have to pass by value to satisfy the actix route interface.
-// #[allow(clippy::needless_pass_by_value)]
-// /// Route to return a websocket session using messagepack serialization
-// pub fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
-//     debug!("Starting websocket session...");
-//     ws::start(WsSession::new(WsSerialization::MsgPack), &req, stream)
-// }
+#[allow(clippy::needless_pass_by_value)]
+/// Route to return a websocket session using messagepack serialization
+pub async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
+    debug!("Starting websocket session...");
+    ws::start(WsSession::new(WsSerialization::MsgPack), &req, stream)
+}
 
 /// We have to pass by value to satisfy the actix route interface.
 #[allow(clippy::needless_pass_by_value)]
 /// Route to return a websocket session using json serialization
-pub fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
+pub async fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
     debug!("Starting json websocket session...");
     ws::start(WsSession::new(WsSerialization::Json), &req, stream)
 }
@@ -72,7 +72,7 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
         .service(
             web::scope("/v1")
                 .wrap(Auth)
-                //                .service(web::resource("/ws").route(web::get()).to(ws_route))
+                .service(web::resource("/ws").route(web::get()).to(ws_route))
                 .service(web::resource("/ws_json").route(web::get().to(ws_json_route)))
                 // routes to camera_group
                 .service(
