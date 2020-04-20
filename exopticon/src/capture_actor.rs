@@ -4,8 +4,8 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message,
-    StreamHandler, SystemService,
+    fut::wrap_future, registry::SystemService, Actor, ActorContext, ActorFuture, AsyncContext,
+    Context, Handler, Message, StreamHandler,
 };
 use bincode;
 use bytes::BytesMut;
@@ -14,7 +14,9 @@ use exserial::models::CaptureMessage;
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 
-use crate::models::{CreateVideoUnitFile, DbExecutor, UpdateVideoUnitFile};
+use crate::capture_supervisor::{CaptureSupervisor, RestartCaptureWorker};
+use crate::db_registry;
+use crate::models::{CreateVideoUnitFile, UpdateVideoUnitFile};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
 /*
@@ -88,8 +90,6 @@ pub struct CaptureActor {
     pub stream_url: String,
     /// absolute path to video storage
     pub storage_path: String,
-    /// address of database worker
-    pub db_addr: Addr<DbExecutor>,
     /// id of currently open video unit
     pub video_unit_id: Option<i32>,
     /// id of currently open video file
@@ -102,17 +102,11 @@ pub struct CaptureActor {
 
 impl CaptureActor {
     /// Returns new initialized CaptureActor
-    pub const fn new(
-        db_addr: Addr<DbExecutor>,
-        camera_id: i32,
-        stream_url: String,
-        storage_path: String,
-    ) -> Self {
+    pub const fn new(camera_id: i32, stream_url: String, storage_path: String) -> Self {
         Self {
             camera_id,
             stream_url,
             storage_path,
-            db_addr,
             video_unit_id: None,
             video_file_id: None,
             offset: 0,
@@ -129,7 +123,7 @@ impl CaptureActor {
             self.video_file_id,
             fs::metadata(filename),
         ) {
-            let fut = self.db_addr.send(UpdateVideoUnitFile {
+            let fut = db_registry::get_db().send(UpdateVideoUnitFile {
                 video_unit_id,
                 end_time: end_time.naive_utc(),
                 video_file_id,
@@ -205,7 +199,7 @@ impl CaptureActor {
                 // worker has created a new file. Write video_unit and
                 // file to database.
                 if let Ok(date) = begin_time.parse::<DateTime<Utc>>() {
-                    let fut = self.db_addr.send(CreateVideoUnitFile {
+                    let fut = db_registry::get_db().send(CreateVideoUnitFile {
                         camera_id: self.camera_id,
                         monotonic_index: 0,
                         begin_time: date.naive_utc(),
@@ -248,6 +242,12 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for CaptureActor {
             Ok(b) => b,
             Err(e) => {
                 error!("CaptureActor: stream handle error! {}", e);
+                CaptureSupervisor::from_registry().do_send(RestartCaptureWorker {
+                    id: self.camera_id,
+                    stream_url: self.stream_url.clone(),
+                    storage_path: self.storage_path.clone(),
+                });
+                ctx.terminate();
                 return;
             }
         };
@@ -259,7 +259,9 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for CaptureActor {
         }
     }
 
-    fn finished(&mut self, _ctx: &mut Self::Context) {}
+    fn finished(&mut self, _ctx: &mut Self::Context) {
+        info!("Stream handler finished!");
+    }
 }
 
 /// Message for capture actor to start worker
@@ -318,6 +320,11 @@ impl Actor for CaptureActor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        info!("Starting CaptureActor for camera id: {}", self.camera_id);
         ctx.address().do_send(StartWorker {});
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        info!("Capture Actor for camera id {} is stopped!", self.camera_id);
     }
 }

@@ -1,4 +1,4 @@
-use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
+use actix::{registry::SystemService, Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
 
 use crate::analysis_supervisor::AnalysisSupervisor;
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
@@ -82,7 +82,6 @@ impl RootSupervisor {
             for c in g.1 {
                 if c.enabled {
                     self.capture_supervisor.do_send(StartCaptureWorker {
-                        db_addr: self.db_worker.clone(),
                         id: c.id,
                         stream_url: c.rtsp_url,
                         storage_path: g.0.storage_path.clone(),
@@ -111,12 +110,11 @@ impl RootSupervisor {
     ///
     pub fn new(start_mode: ExopticonMode, db_worker: Addr<DbExecutor>) -> Self {
         let analysis_supervisor = AnalysisSupervisor::new().start();
-        let capture_supervisor = CaptureSupervisor::new().start();
         let deletion_supervisor = FileDeletionSupervisor::new().start();
 
         Self {
             analysis_supervisor,
-            capture_supervisor,
+            capture_supervisor: CaptureSupervisor::from_registry(),
             deletion_supervisor,
             db_worker,
             mode: start_mode,

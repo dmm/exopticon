@@ -100,7 +100,14 @@ impl FileDeletionActor {
                         }
                         Ok(Err(err)) => {
                             if err.kind() == std::io::ErrorKind::NotFound {
-                                info!("Attempted to delete non-existent file.",);
+                                info!("Attempted to delete non-existent file: {}", &video_file.id);
+                                let fut2 = fut_db
+                                    .send(DeleteVideoUnitFiles {
+                                        video_unit_ids: vec![video_unit.id],
+                                        video_file_ids: vec![video_file.id],
+                                    })
+                                    .map(|_| ());
+                                ctx.spawn(wrap_future(fut2));
                             } else {
                                 panic!("Failed to delete file!");
                             }
