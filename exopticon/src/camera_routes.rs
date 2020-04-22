@@ -13,12 +13,15 @@ use crate::app::RouteState;
 use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
 
 #[derive(Debug)]
+/// Represents an error for camera routes
 struct CameraError {
+    /// error message
     msg: String,
 }
 impl CameraError {
-    fn new(msg: &str) -> CameraError {
-        CameraError {
+    /// Create a new `CameraError`
+    fn new(msg: &str) -> Self {
+        Self {
             msg: msg.to_string(),
         }
     }
@@ -41,12 +44,12 @@ impl actix_web::error::ResponseError for CameraError {
 }
 
 impl From<onvif::error::Error> for CameraError {
-    fn from(err: onvif::error::Error) -> CameraError {
+    fn from(err: onvif::error::Error) -> Self {
         match err {
-            onvif::error::Error::ConnectionFailed => CameraError::new("Failed to connect to camera. It's down or its host/port is misconfigured."),
-            onvif::error::Error::Unauthorized => CameraError::new("Camera access unauthorized. Check camera username/password."),
-            onvif::error::Error::InvalidResponse => CameraError::new("Camera returned an invalid response. This is a bug in the onvif library or the camera."),
-            onvif::error::Error::InvalidArgument => CameraError::new("An invalid argument was provided. This is an exopticon bug.."),
+            onvif::error::Error::ConnectionFailed => Self::new("Failed to connect to camera. It's down or its host/port is misconfigured."),
+            onvif::error::Error::Unauthorized => Self::new("Camera access unauthorized. Check camera username/password."),
+            onvif::error::Error::InvalidResponse => Self::new("Camera returned an invalid response. This is a bug in the onvif library or the camera."),
+            onvif::error::Error::InvalidArgument => Self::new("An invalid argument was provided. This is an exopticon bug.."),
         }
     }
 }

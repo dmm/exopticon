@@ -29,6 +29,12 @@ pub fn print_message(message: CaptureMessage) {
         .expect("unable to write frame!");
 }
 
+/// Take FrameMessage struct and write a framed message to stdout
+///
+/// # Safety
+///
+/// frame pointer must be to a valid, aligned FrameMessage.
+///
 #[no_mangle]
 pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
     let frame = {
@@ -49,6 +55,12 @@ pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
     print_message(frame);
 }
 
+/// Take FrameMessage struct and write a framed scaled, message to stdout
+///
+/// # Safety
+///
+/// frame pointer must be to a valid, aligned FrameMessage.
+///
 #[no_mangle]
 pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _height: i32) {
     let frame = {
@@ -70,6 +82,12 @@ pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _
     print_message(frame);
 }
 
+/// Send a message signaling a new file was created.
+///
+/// # Safety
+///
+/// filename and iso_begin_time must be null-terminated character arrays.
+///
 #[no_mangle]
 pub unsafe extern "C" fn send_new_file_message(
     filename: *const c_char,
@@ -97,6 +115,12 @@ pub unsafe extern "C" fn send_new_file_message(
     print_message(message);
 }
 
+/// Send a message signaling the closing of a file.
+///
+/// # Safety
+///
+/// filename and iso_end_time must be null-terminated character arrays.
+///
 #[no_mangle]
 pub unsafe extern "C" fn send_end_file_message(
     filename: *const c_char,
@@ -122,6 +146,12 @@ pub unsafe extern "C" fn send_end_file_message(
     print_message(message);
 }
 
+/// Send a log message
+///
+/// # Safety
+///
+/// message must be a null-terminated character arrays.
+///
 #[no_mangle]
 pub unsafe extern "C" fn send_log_message(_level: i32, message: *const c_char) {
     let message = {

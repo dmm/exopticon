@@ -36,6 +36,7 @@ enum LogLevel {
 }
 
 impl From<Level> for LogLevel {
+    #[must_use]
     fn from(item: Level) -> Self {
         match item {
             Level::Error => Self::Error,
@@ -47,6 +48,7 @@ impl From<Level> for LogLevel {
 }
 
 impl From<LogLevel> for Level {
+    #[must_use]
     fn from(item: LogLevel) -> Self {
         match item {
             LogLevel::Critical | LogLevel::Error => Self::Error,
@@ -149,9 +151,12 @@ impl AnalysisActor {
             AnalysisWorkerMessage::Observation(observations) => {
                 debug!("Analysis observations: {}", observations.len());
                 let fut = self.db_address.send(CreateObservations { observations });
-                ctx.spawn(wrap_future(fut).map(|result, _actor, _ctx| match result {
-                    Ok(Ok(count)) => debug!("Inserted {} observations.", count),
-                    _ => error!("Error inserting observations!"),
+                ctx.spawn(wrap_future(fut).map(|result, _actor, _ctx| {
+                    if let Ok(Ok(count)) = result {
+                        debug!("Inserted {} observations.", count)
+                    } else {
+                        error!("Error inserting observations!")
+                    }
                 }));
             }
             AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
@@ -294,9 +299,8 @@ impl Handler<CameraFrame> for AnalysisActor {
                 self.frames_requested -= 1;
 
                 let task = async move {
-                    match framed_stdin.send(bytes::Bytes::from(serialized)).await {
-                        Err(err) => error!("Analysis Worker: Failed to write frame: {}", err),
-                        _ => (),
+                    if let Err(err) = framed_stdin.send(bytes::Bytes::from(serialized)).await {
+                        error!("Analysis Worker: Failed to write frame: {}", err)
                     };
                     framed_stdin
                 };

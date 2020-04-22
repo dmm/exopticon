@@ -104,12 +104,12 @@ pub struct WsSession {
 }
 
 impl WsSession {
-    /// Returns new WsSession struct initialized with default values
+    /// Returns new `WsSession` struct initialized with default values
     /// and specified serialization type
     ///
     /// # Arguments
     ///
-    /// * `serialization` - Type of serialization to use MsgPack or Json
+    /// * `serialization` - Type of serialization to use `MsgPack` or `Json`
     ///
     pub const fn new(serialization: WsSerialization) -> Self {
         Self {

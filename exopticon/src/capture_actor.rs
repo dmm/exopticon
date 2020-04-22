@@ -101,7 +101,7 @@ pub struct CaptureActor {
 }
 
 impl CaptureActor {
-    /// Returns new initialized CaptureActor
+    /// Returns new initialized `CaptureActor`
     pub const fn new(camera_id: i32, stream_url: String, storage_path: String) -> Self {
         Self {
             camera_id,
@@ -143,6 +143,7 @@ impl CaptureActor {
 
     /// Processes a `CaptureMessage` from the capture worker,
     /// performing the appropriate action.
+    #[allow(clippy::panic)]
     fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<Self>) {
         // Check if log
         match msg {

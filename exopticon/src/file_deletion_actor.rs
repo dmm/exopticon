@@ -49,6 +49,7 @@ impl FileDeletionActor {
     }
 
     /// Processes a group of files and deletes excess
+    #[allow(clippy::panic)]
     fn handle_files(
         &self,
         (max_size, current_size, files): (i64, i64, Vec<VideoUnitPair>),

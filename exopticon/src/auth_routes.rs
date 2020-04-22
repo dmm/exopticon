@@ -28,7 +28,7 @@ pub async fn login(
             id.remember(slim_user.id.to_string());
             Ok(HttpResponse::Ok().into())
         }
-        _ => Ok(HttpResponse::InternalServerError().finish()),
+        Ok(Err(_)) | Err(_) => Ok(HttpResponse::InternalServerError().finish()),
     }
 }
 
@@ -68,6 +68,7 @@ pub struct WebAuthMiddleware<S> {
     service: S,
 }
 
+#[allow(clippy::type_complexity)]
 impl<S, B> Service for WebAuthMiddleware<S>
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
@@ -135,6 +136,7 @@ pub struct AuthMiddleware<S> {
     service: S,
 }
 
+#[allow(clippy::type_complexity)]
 impl<S, B> Service for AuthMiddleware<S>
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
@@ -158,9 +160,9 @@ where
             info!("authenticated user id: {}", user_id);
             let fut = self.service.call(req);
             Box::pin(async move {
-                let res = fut.await?;
+                let result = fut.await?;
 
-                Ok(res)
+                Ok(result)
             })
         } else {
             Box::pin(async move {

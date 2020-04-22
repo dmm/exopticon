@@ -36,7 +36,7 @@ pub enum TimeType {
 }
 
 impl std::fmt::Display for TimeType {
-    /// Implementing display format for the TimeType enum
+    /// Implementing display format for the `TimeType` enum
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Manual => write!(f, "Manual"),
@@ -90,7 +90,8 @@ pub struct DeviceDateAndTime {
 }
 
 impl Default for DeviceDateAndTime {
-    /// Returns new DeviceDateAndTime struct
+    /// Returns new `DeviceDateAndTime` struct
+    #[must_use]
     fn default() -> Self {
         Self {
             time_type: TimeType::Manual,
@@ -113,7 +114,7 @@ pub enum NtpType {
 }
 
 impl std::fmt::Display for NtpType {
-    /// Implementing display format for the TimeType enum
+    /// Implementing display format for the `TimeType` enum
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Ipv4 => write!(f, "IPv4"),
@@ -145,8 +146,28 @@ pub struct NtpSettings {
     ntp_server_hostnames: Option<Vec<String>>,
 }
 
+/// Helper that returns Pan-Tilt and Zoom sections for ptz requests
+#[must_use]
+fn generate_pan_tilt_vectors(x: f32, y: f32, zoom: f32) -> String {
+    let xy_element = format!(
+        r#"<PanTilt x="{}" y="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
+        x, y
+    );
+    let zoom_element = if zoom == 0.0 {
+        String::from("")
+    } else {
+        format!(
+            r#"<Zoom x="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
+            zoom
+        )
+    };
+
+    format!("{} {}", xy_element, zoom_element)
+}
+
 impl Camera {
     /// Returns url for camera
+    #[must_use]
     pub fn url(&self) -> String {
         format!(
             "http://{}:{}{}",
@@ -252,7 +273,7 @@ impl Camera {
         Self::parse_get_date_and_time(res)
     }
 
-    /// Submits set_date_and_time call and returns the raw result as a Future.
+    /// Submits `set_date_and_time` call and returns the raw result as a Future.
     ///
     /// # Arguments
     ///
@@ -315,7 +336,7 @@ impl Camera {
     ///
     /// # Arguments
     ///
-    /// * `body` - result of set_date_and_time request
+    /// * `body` - result of `set_date_and_time` request
     ///
     pub fn parse_set_date_and_time(body: Vec<u8>) -> Result<(), Error> {
         let string_body = String::from_utf8(body)?;
@@ -430,7 +451,7 @@ impl Camera {
     /// Fetch camera's ntp settings
     pub async fn get_ntp(&self) -> Result<NtpSettings, Error> {
         let res = self.request_get_ntp().await?;
-        Camera::parse_get_ntp(res)
+        Self::parse_get_ntp(res)
     }
 
     /// Performs a request to set camera's ntp settings. Returns
@@ -493,25 +514,7 @@ impl Camera {
     ///
     pub async fn set_ntp(&self, ntp_settings: &NtpSettings) -> Result<(), Error> {
         let res = self.request_set_ntp(ntp_settings).await?;
-        return Self::parse_set_ntp(res);
-    }
-
-    /// Helper that returns PanTilt and Zoom sections for ptz requests
-    fn generate_pan_tilt_vectors(&self, x: f32, y: f32, zoom: f32) -> String {
-        let xy_element = format!(
-            r#"<PanTilt x="{}" y="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
-            x, y
-        );
-        let zoom_element = if zoom == 0.0 {
-            String::from("")
-        } else {
-            format!(
-                r#"<Zoom x="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
-                zoom
-            )
-        };
-
-        format!("{} {}", xy_element, zoom_element)
+        Self::parse_set_ntp(res)
     }
 
     /// performs relative ptz move request
@@ -522,7 +525,7 @@ impl Camera {
         y: f32,
         zoom: f32,
     ) -> Result<Vec<u8>, Error> {
-        let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
+        let ptz_vectors = generate_pan_tilt_vectors(x, y, zoom);
         let body = format!(
             r#"
           <RelativeMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
@@ -582,7 +585,7 @@ impl Camera {
         zoom: f32,
         timeout: f32,
     ) -> Result<Vec<u8>, Error> {
-        let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
+        let ptz_vectors = generate_pan_tilt_vectors(x, y, zoom);
         let timeout_body = if timeout == 0.0 {
             String::from("")
         } else {
@@ -649,7 +652,7 @@ impl Camera {
         y: f32,
         zoom: f32,
     ) -> Result<Vec<u8>, Error> {
-        let ptz_vectors = self.generate_pan_tilt_vectors(x, y, zoom);
+        let ptz_vectors = generate_pan_tilt_vectors(x, y, zoom);
 
         let body = format!(
             r#"

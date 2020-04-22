@@ -11,6 +11,7 @@
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::multiple_crate_versions)]
 #![allow(clippy::implicit_return)]
+#![allow(clippy::result_expect_used)]
 
 #[macro_use]
 extern crate log;

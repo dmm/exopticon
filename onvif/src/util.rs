@@ -118,8 +118,8 @@ pub async fn soap_request(url: &str, body: String) -> Result<Vec<u8>, Error> {
         Err(_) => return Err(Error::InvalidArgument),
     };
 
-    let mut res = client.request(req).await?;
-    let body = res.body_mut();
+    let mut response = client.request(req).await?;
+    let body = response.body_mut();
     let mut output = Vec::new();
 
     while let Some(chunk) = body.next().await {

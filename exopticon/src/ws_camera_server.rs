@@ -114,7 +114,7 @@ pub struct WsCameraServer {
 }
 
 impl WsCameraServer {
-    /// Add WsSession subscriber
+    /// Add `WsSession` subscriber
     fn add_subscriber(&mut self, subject: &SubscriptionSubject, client: Client) -> bool {
         if let Some(subscription) = self.subscriptions.get_mut(subject) {
             subscription.insert(client)
@@ -127,7 +127,7 @@ impl WsCameraServer {
         }
     }
 
-    /// Removes WsSession as subscriber
+    /// Removes `WsSession` as subscriber
     fn remove_subscriber(&mut self, subject: &SubscriptionSubject, client: &Client) {
         if let Some(subscription) = self.subscriptions.get_mut(subject) {
             if subscription.remove(client) {
@@ -138,12 +138,12 @@ impl WsCameraServer {
         }
     }
 
-    /// Sends frame to subscribed WsSessions
+    /// Sends frame to subscribed `WsSession`s
     ///
     /// # Arguments
     ///
-    /// * `frame` - CameraFrame to send
-    /// * `ctx` - WsCameraServer Context
+    /// * `frame` - `CameraFram` to send
+    /// * `ctx` - `WsCameraServer` Context
     ///
     fn send_frame(&mut self, frame: &CameraFrame, ctx: &<Self as Actor>::Context) {
         let subject = match &frame.source {

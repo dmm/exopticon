@@ -29,6 +29,7 @@ impl Message for StopCaptureWorker {
     type Result = ();
 }
 
+/// Message requesting a `CaptureWorker` restart
 pub struct RestartCaptureWorker {
     /// id of camera to restart capture worker for
     pub id: i32,

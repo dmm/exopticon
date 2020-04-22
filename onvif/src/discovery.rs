@@ -37,12 +37,18 @@ impl ProbeServer {
         }
     }
 
+    /// Calculates time left in probe interval
     fn time_left(&self) -> Option<Duration> {
-        let start = self.start.expect("Start time must be set!");
+        let start = match self.start {
+            None => {
+                return None;
+            }
+            Some(time) => time,
+        };
         self.timeout
             .checked_sub(Instant::now().duration_since(start))
     }
-
+    /// Sends a probe request and returns detected cameras
     pub async fn probe(&mut self) -> Result<usize, io::Error> {
         let request_body = format!(
             r#"
@@ -91,7 +97,7 @@ impl ProbeServer {
             }
         }
 
-        return Ok(self.results.len());
+        Ok(self.results.len())
     }
 }
 
