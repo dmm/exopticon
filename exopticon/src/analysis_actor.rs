@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::error::Error;
 use std::process::Stdio;
 use std::time::{Duration, Instant};
@@ -10,7 +11,6 @@ use log::Level;
 use rmp_serde::to_vec_named;
 use rmp_serde::Deserializer;
 use serde::Deserialize;
-use serde_repr::{Deserialize_repr, Serialize_repr};
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 
@@ -18,8 +18,7 @@ use crate::models::{CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
 /// Represents logging levels from ffmpeg
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
-#[repr(u8)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 enum LogLevel {
     /// Critical log
     Critical = 50,
@@ -330,7 +329,11 @@ fn calculate_statistics(timings: &[u64]) -> (u64, u64, u64) {
         avg += *t;
     }
 
-    avg /= timings.len() as u64;
+    let len: u64 = timings
+        .len()
+        .try_into()
+        .expect("u64 overflow in calculate_timings!");
 
+    avg /= len;
     (avg, min, max)
 }

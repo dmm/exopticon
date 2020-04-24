@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::fs;
 use std::path::Path;
 use std::process::Stdio;
@@ -127,7 +128,10 @@ impl CaptureActor {
                 video_unit_id,
                 end_time: end_time.naive_utc(),
                 video_file_id,
-                size: metadata.len() as i32,
+                size: metadata
+                    .len()
+                    .try_into()
+                    .expect("Unexpected i32 overflow in metadata.len()"),
             });
             ctx.spawn(
                 wrap_future::<_, Self>(fut).map(|result, _actor, _ctx| match result {

@@ -12,6 +12,7 @@
 #![allow(clippy::multiple_crate_versions)]
 #![allow(clippy::implicit_return)]
 #![allow(clippy::result_expect_used)]
+#![allow(clippy::missing_errors_doc)] // TODO: Fix this one
 
 #[macro_use]
 extern crate log;

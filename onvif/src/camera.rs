@@ -338,6 +338,11 @@ impl Camera {
     ///
     /// * `body` - result of `set_date_and_time` request
     ///
+    /// # Errors
+    ///
+    /// If this function encounters a parsing error it will return
+    /// `Error::InvalidArgument`.
+    ///
     pub fn parse_set_date_and_time(body: Vec<u8>) -> Result<(), Error> {
         let string_body = String::from_utf8(body)?;
         let doc = parser::parse(&string_body)?;
@@ -404,6 +409,11 @@ impl Camera {
     /// # Arguments
     ///
     /// * `body` - utf8 encoded xml response body
+    ///
+    /// # Errors
+    ///
+    /// If this function encounters a parsing error it will return an
+    /// `Error::InvalidResponse`.
     ///
     pub fn parse_get_ntp(body: Vec<u8>) -> Result<NtpSettings, Error> {
         let string_body = String::from_utf8(body)?;
@@ -612,6 +622,11 @@ impl Camera {
     }
 
     /// parse result of continuous ptz move request
+    ///
+    /// # Error
+    ///
+    /// Returns Err when the body is fails to parse as xml.
+    ///
     pub fn parse_continuous_move(body: Vec<u8>) -> Result<(), Error> {
         let string_body = String::from_utf8(body)?;
         debug!("ContinuousMove Response: {}", string_body);
@@ -629,6 +644,11 @@ impl Camera {
     /// * `y` - speed to move, inclusively between 0.0 and 1.0, in y axis
     /// * `zoom` - speed to zoom, inclusively between 0.0 and 1.0
     /// * `timeout` - timeout in milliseconds for move to last, or 0.0 for indefinite
+    ///
+    /// # Error
+    ///
+    /// Returns Err when we cannot connect to the camera, the camera
+    /// signals an error, or we cannot parse the response.
     ///
     pub async fn continuous_move(
         &self,
