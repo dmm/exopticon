@@ -1,5 +1,5 @@
 #FROM gw000/debian-cuda:9.1_7.0
-FROM gw000/debian-cuda:10.1
+FROM gw000/debian-cuda:10.3
 
 ENV CC=gcc-7
 ENV CXX=g++-7
@@ -66,6 +66,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libopenblas-dev
     -DBUILD_opencv_python3=yes \
     -DBUILD_opencv_java=off \
     -DCMAKE_BUILD_TYPE=RELEASE \
+    -DCMAKE_INSTALL_PREFIX=/opt/opencv \
     -D BUILD_EXAMPLES=OFF \
     -D BUILD_DOCS=OFF \
     -D BUILD_PERF_TESTS=OFF \
@@ -83,10 +84,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends libopenblas-dev
 
 # install node.js and npm
 RUN mkdir /node && cd /node \
-    && wget https://nodejs.org/dist/v12.10.0/node-v12.10.0-linux-x64.tar.xz  \
-    && tar xf node-v12.10.0-linux-x64.tar.xz \
-    && rm -rf node-v12.10.0-linux-x64.tar.xz
-ENV PATH=$PATH:/node/node-v12.10.0-linux-x64/bin
+    && wget https://nodejs.org/dist/v12.16.2/node-v12.16.2-linux-x64.tar.xz -O node.tar.xz \
+    && tar xf node.tar.xz \
+    && rm -rf node.tar.xz
+ENV PATH=$PATH:/node/node-*/bin
 
 # install tensorflow
 RUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler  \
@@ -107,16 +108,6 @@ USER exopticon:exopticon
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && ~/.cargo/bin/rustup component add clippy \
     && ~/.cargo/bin/rustup update
-
-RUN pip3 install msgpack imutils
-
-# install yolov3 dependencies
-USER root:root
-RUN pip3 install --system torch torchvision tqdm pillow terminaltables
-
-#RUN git clone https://gitlab.com/EAVISE/lightnet.git ~/lightnet \
-#  && cd ~/lightnet && git checkout tags/v1.0.0 && pip3 install -r develop.txt \
-#  && cd && rm -rf ~/lightnet
 
 # configure environment
 ENV PYTHONPATH=$PYTHONPATH:/exopticon/exopticon/workers/yolov3
