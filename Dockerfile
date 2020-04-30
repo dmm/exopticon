@@ -101,6 +101,11 @@ RUN cd /root/tensorflow-models/research \
     && cp -r /root/tensorflow-models /tensorflow-models
 ENV PYTHONPATH=$PYTHONPATH:.:/tensorflow-models/research:/tensorflow-models/research/slim
 
+# configure gcc-7 as default
+RUN rm /usr/bin/gcc /usr/bin/g++ \
+    && ln -s /usr/bin/gcc-7 /usr/bin/gcc \
+    && ln -s /usr/bin/g++-7 /usr/bin/g++
+
 # configure run user
 RUN groupadd -r exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
 USER exopticon:exopticon
