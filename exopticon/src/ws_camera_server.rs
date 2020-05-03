@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{Actor, AsyncContext, Context, Handler, Message, Recipient, Supervised, SystemService};
+use base64::STANDARD;
+
+base64_serde_type!(Base64Standard, STANDARD);
 
 /// Available frame types
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
@@ -48,7 +51,7 @@ pub struct CameraFrame {
     /// id of camera that produced frame
     pub camera_id: i32,
     /// jpeg image data
-    #[serde(with = "serde_bytes")]
+    #[serde(with = "Base64Standard")]
     pub jpeg: Vec<u8>,
     /// resolution of frame
     pub resolution: FrameResolution,

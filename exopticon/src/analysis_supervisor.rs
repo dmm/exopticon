@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
+use actix::fut::wrap_future;
 use actix::prelude::*;
 
 use crate::analysis_actor::AnalysisActor;
@@ -30,6 +32,22 @@ pub struct StopAnalysisActor {
 }
 
 impl Message for StopAnalysisActor {
+    type Result = ();
+}
+
+/// Message requesting an `AnalysisWorker` restart
+pub struct RestartAnalysisActor {
+    /// id of analysis actor
+    pub id: i32,
+    /// name of executable implementing analysis worker
+    pub executable_name: String,
+    /// arguments to provide analysis worker on startup
+    pub arguments: Vec<String>,
+    /// camera ids to
+    pub subscribed_camera_ids: Vec<i32>,
+}
+
+impl Message for RestartAnalysisActor {
     type Result = ();
 }
 
@@ -68,6 +86,7 @@ impl Handler<StartAnalysisActor> for AnalysisSupervisor {
             id,
             msg.executable_name,
             msg.arguments,
+            msg.subscribed_camera_ids.clone(),
             db_registry::get_db(),
         );
         let address = actor.start();
@@ -91,6 +110,28 @@ impl Handler<StopAnalysisActor> for AnalysisSupervisor {
     fn handle(&mut self, msg: StopAnalysisActor, _ctx: &mut Context<Self>) -> Self::Result {
         info!("Stopping analysis actor id: {}", &msg.id);
         self.actors.remove(&msg.id);
+    }
+}
+
+impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
+    type Result = ();
+
+    fn handle(&mut self, msg: RestartAnalysisActor, ctx: &mut Context<Self>) -> Self::Result {
+        info!("Restarting analysis actor id: {}", msg.id);
+        let fut = wrap_future(ctx.address().send(StopAnalysisActor { id: msg.id })).map(
+            |_res, _act: &mut Self, ctx: &mut Context<Self>| {
+                ctx.notify_later(
+                    StartAnalysisActor {
+                        id: msg.id,
+                        executable_name: msg.executable_name,
+                        arguments: msg.arguments,
+                        subscribed_camera_ids: msg.subscribed_camera_ids,
+                    },
+                    Duration::new(5, 0),
+                );
+            },
+        );
+        ctx.spawn(fut);
     }
 }
 
