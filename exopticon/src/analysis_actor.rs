@@ -1,37 +1,39 @@
 use std::convert::TryInto;
-use std::error::Error;
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use actix::fut::wrap_future;
 use actix::prelude::*;
+use base64::STANDARD_NO_PAD;
 use bytes::BytesMut;
 use futures::sink::SinkExt;
 use log::Level;
-use rmp_serde::to_vec_named;
-use rmp_serde::Deserializer;
 use serde::Deserialize;
+use serde_json;
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 
+use crate::analysis_supervisor::{AnalysisSupervisor, RestartAnalysisActor};
 use crate::models::{CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
+
+base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
 
 /// Represents logging levels from ffmpeg
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 enum LogLevel {
     /// Critical log
-    Critical = 50,
+    Critical,
     /// Error log
-    Error = 40,
+    Error,
     /// Warning log
-    Warning = 30,
+    Warning,
     /// Info log
-    Info = 20,
+    Info,
     /// Debug log
-    Debug = 10,
+    Debug,
     /// Not set? Interpreted as debug log
-    NotSet = 0,
+    NotSet,
 }
 
 impl From<Level> for LogLevel {
@@ -77,7 +79,7 @@ enum AnalysisWorkerMessage {
         /// tag identifying frame report
         tag: String,
         /// image data
-        #[serde(with = "serde_bytes")]
+        #[serde(with = "Base64Standard")]
         jpeg: Vec<u8>,
     },
     /// Timing report
@@ -104,6 +106,8 @@ pub struct AnalysisActor {
     pub executable_name: String,
     /// arguments to provide to executable
     pub arguments: Vec<String>,
+    /// ids of subscribed cameras
+    pub subscribed_camera_ids: Vec<i32>,
     /// stdin of worker process
     pub worker_stdin: Option<
         tokio_util::codec::FramedWrite<
@@ -125,12 +129,14 @@ impl AnalysisActor {
         id: i32,
         executable_name: String,
         arguments: Vec<String>,
+        subscribed_camera_ids: Vec<i32>,
         db_address: Addr<DbExecutor>,
     ) -> Self {
         Self {
             id,
             executable_name,
             arguments,
+            subscribed_camera_ids,
             worker_stdin: None,
             frames_requested: 0,
             last_frame_time: None,
@@ -206,17 +212,22 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for AnalysisActor {
             Ok(b) => b,
             Err(err) => {
                 error!("Caught error! {}", err);
+                AnalysisSupervisor::from_registry().do_send(RestartAnalysisActor {
+                    id: self.id,
+                    executable_name: self.executable_name.clone(),
+                    arguments: self.arguments.clone(),
+                    subscribed_camera_ids: self.subscribed_camera_ids.clone(),
+                });
+                ctx.terminate();
                 return;
             }
         };
-        let mut de = Deserializer::new(&item[..]);
-
-        let frame: Result<AnalysisWorkerMessage, rmp_serde::decode::Error> =
-            Deserialize::deserialize(&mut de);
+        let frame: Result<AnalysisWorkerMessage, serde_json::error::Error> =
+            serde_json::from_slice(&item);
 
         match frame {
             Ok(f) => self.message_to_action(f, ctx),
-            Err(e) => error!("Error deserializing worker message! {:?}", e.source()),
+            Err(e) => error!("Error deserializing worker message! {:?}", e),
         }
     }
 
@@ -294,7 +305,7 @@ impl Handler<CameraFrame> for AnalysisActor {
 
         let worker_message = AnalysisWorkerCommand::Frame(msg);
         if let Some(mut framed_stdin) = self.worker_stdin.take() {
-            if let Ok(serialized) = to_vec_named(&worker_message) {
+            if let Ok(serialized) = serde_json::to_string(&worker_message) {
                 self.frames_requested -= 1;
 
                 let task = async move {

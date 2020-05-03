@@ -6,6 +6,7 @@ use actix::{
     WrapFuture,
 };
 use actix_web_actors::ws;
+use base64::STANDARD_NO_PAD;
 use futures::future;
 use rmp_serde::Serializer;
 use serde;
@@ -21,8 +22,6 @@ use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, Subscribe, SubscriptionSubject, Unsubscribe,
     WsCameraServer,
 };
-
-use base64::STANDARD_NO_PAD;
 
 /// Represents different serializations available for communicating
 /// over websockets.
