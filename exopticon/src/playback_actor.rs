@@ -115,11 +115,12 @@ impl PlaybackActor {
 }
 
 impl StreamHandler<Result<BytesMut, std::io::Error>> for PlaybackActor {
-    fn handle(&mut self, item: Result<bytes::BytesMut, std::io::Error>, _ctx: &mut Context<Self>) {
+    fn handle(&mut self, item: Result<bytes::BytesMut, std::io::Error>, ctx: &mut Context<Self>) {
         let item = match item {
             Ok(b) => b,
             Err(e) => {
                 error!("PlaybackActor: stream handler error! {}", e);
+                ctx.stop();
                 return;
             }
         };
