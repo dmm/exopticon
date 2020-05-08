@@ -1,4 +1,6 @@
 use std::convert::TryInto;
+use std::env;
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
@@ -248,7 +250,9 @@ impl Handler<StartWorker> for AnalysisActor {
         // Initialize frames request to zero
         self.frames_requested = 0;
 
-        let mut cmd = Command::new(self.executable_name.clone());
+        let worker_path = env::var("EXOPTICONWORKERS").unwrap_or("/".to_string());
+        let executable_path: PathBuf = [worker_path, self.executable_name.clone()].iter().collect();
+        let mut cmd = Command::new(executable_path);
         for c in &self.arguments {
             cmd.arg(c);
         }

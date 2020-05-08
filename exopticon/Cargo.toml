@@ -9,6 +9,7 @@ license = "AGPL-3.0"
 keywords = ["camera", "cctv", "onvif", "surveillance"]
 categories = ["web-programming"]
 edition = "2018"
+default-run = "exopticon"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

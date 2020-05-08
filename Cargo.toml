@@ -1,7 +1,7 @@
 
 
 [workspace]
-members = [ "exserial", "onvif", "exopticon"]
+members = [ "exserial", "onvif", "exopticon", "workers" ]
 
 [profile.dev]
 opt-level = 2
