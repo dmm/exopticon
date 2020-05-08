@@ -71,7 +71,7 @@ class ExopticonWorker(object):
         msg_buf = base64.standard_b64decode(self.__current_frame["jpeg"])
         msg_buf = numpy.frombuffer(msg_buf, dtype=numpy.uint8)
 
-        img = cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
+        img = cv2.imdecode(msg_buf, cv2.IMREAD_COLOR)
         height, width, channels = img.shape
 
         return dict(camera_id=self.__current_frame["camera_id"],
@@ -98,7 +98,7 @@ class ExopticonWorker(object):
 
     def write_observations(self, observations):
         self.logger.info('observations: ' + str(observations))
-        observation_dict = {'Observation': observations}
+        observations_dict = {'Observation': observations}
         serialized = json.dumps(observations_dict)
         self.__write_framed_message(serialized)
 
@@ -119,6 +119,9 @@ class ExopticonWorker(object):
             self.__frame_times = []
         #self.log_info('Ran for :' + str(duration * 1000) + ' ms')
 
+    @staticmethod
+    def get_data_dir():
+        return os.path.join(sys.path[0], "data")
 
     # Implement extendable methods
     def setup(self):

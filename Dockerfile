@@ -89,18 +89,6 @@ RUN mkdir /node && cd /node \
     && rm -rf node.tar.xz
 ENV PATH=$PATH:/node/node-*/bin
 
-# install tensorflow
-RUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler  \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-RUN pip3 install tensorflow-gpu==1.14.0 Cython contextlib2 matplotlib pillow \
-                 lxml
-RUN git clone https://github.com/tensorflow/models.git /root/tensorflow-models
-RUN cd /root/tensorflow-models/research \
-    && protoc object_detection/protos/*.proto --python_out=. \
-    && cp -r /root/tensorflow-models /tensorflow-models
-ENV PYTHONPATH=$PYTHONPATH:.:/tensorflow-models/research:/tensorflow-models/research/slim
-
 # configure gcc-7 as default
 RUN rm /usr/bin/gcc /usr/bin/g++ \
     && ln -s /usr/bin/gcc-7 /usr/bin/gcc \
@@ -114,10 +102,15 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && ~/.cargo/bin/rustup component add clippy \
     && ~/.cargo/bin/rustup update
 
+RUN pip3 install msgpack
+
 # configure environment
-ENV PYTHONPATH=$PYTHONPATH:/exopticon/exopticon/workers/yolov3
+ENV PYTHONPATH=/exopticon/workers/:/opt/opencv/lib/python3.7/dist-packages
+ENV EXOPTICONWORKERS=/exopticon/workers
 ENV PATH=/root/.cargo/bin:/exopticon/exopticon/workers:$PATH
 ENV CUDA_HOME=/usr/local/cuda-10.0
 ENV CUDA_PATH=/usr/local/cuda-10.0/bin
+ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-10.0
+ENV CUDACXX=/usr/local/cuda-10.0/bin/nvcc
 
 WORKDIR /exopticon
