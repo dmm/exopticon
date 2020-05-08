@@ -1,0 +1,6 @@
+README.md
+diagram.png
+.gitignore
+debug
+config/
+*.pyc
