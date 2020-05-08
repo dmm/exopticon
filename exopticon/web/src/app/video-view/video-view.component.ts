@@ -98,7 +98,8 @@ export class VideoViewComponent implements OnInit {
       let width = o.lrX - o.ulX;
       let height = o.lrY - o.ulY;
       this.ctx.strokeRect(o.ulX, o.ulY, width, height);
-      this.ctx.strokeText(o.details, o.ulX, o.ulY);
+      this.ctx.fillText(o.details, o.ulX, o.ulY);
+      this.ctx.fillText(o.score.toString(), o.lrX, o.lrY + 40);
       console.log(`Drawing ${o.ulX}, ${o.ulY}, ${width}, ${height}`);
     });
   }
