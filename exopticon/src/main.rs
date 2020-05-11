@@ -78,6 +78,9 @@ mod db_registry;
 /// Error type
 mod errors;
 
+/// `FairQueue` implementation
+mod fair_queue;
+
 /// Actor that deletes excess files for a camera group
 mod file_deletion_actor;
 
