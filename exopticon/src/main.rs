@@ -23,6 +23,7 @@
 #![allow(clippy::result_expect_used)]
 #![allow(clippy::option_expect_used)]
 #![allow(clippy::missing_errors_doc)] // TODO: Fix this one
+#![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
 
 #[macro_use]
 extern crate base64_serde;

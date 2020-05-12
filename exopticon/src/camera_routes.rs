@@ -6,7 +6,6 @@ use actix_web::{http::StatusCode, web::Data, web::Json, web::Path, Error, HttpRe
 use std::time::Duration;
 use tokio::time::delay_for;
 
-use onvif;
 use onvif::camera::{DeviceDateAndTime, NtpSettings};
 
 use crate::app::RouteState;
