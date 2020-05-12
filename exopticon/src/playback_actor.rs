@@ -138,6 +138,7 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for PlaybackActor {
                         frame: CameraFrame {
                             camera_id: 0,
                             jpeg,
+                            observations: self.slurp_observations(offset),
                             resolution: FrameResolution::HD,
                             source: FrameSource::Playback { id: self.id },
                             video_unit_id: self.video_unit_id,
@@ -145,7 +146,7 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for PlaybackActor {
                             unscaled_width,
                             unscaled_height,
                         },
-                        observations: self.slurp_observations(offset),
+                        observations: Vec::new(),
                     })
                     .is_err()
                 {

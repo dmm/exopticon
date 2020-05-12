@@ -396,7 +396,7 @@ pub struct DeleteVideoUnitFiles {
 pub struct FetchEmptyVideoFile;
 
 /// Represents an observation derived from a frame of video
-#[derive(Clone, Queryable, Associations, Identifiable, Serialize)]
+#[derive(Clone, Queryable, Associations, Identifiable, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "observations"]
 #[belongs_to(VideoUnit)]

@@ -1,7 +1,10 @@
+#![allow(clippy::empty_enum)]
 use std::collections::{HashMap, HashSet};
 
 use actix::{Actor, AsyncContext, Context, Handler, Message, Recipient, Supervised, SystemService};
 use base64::STANDARD;
+
+use crate::models::Observation;
 
 base64_serde_type!(Base64Standard, STANDARD);
 
@@ -40,12 +43,25 @@ pub enum FrameSource {
     },
 }
 
+impl From<SubscriptionSubject> for FrameSource {
+    fn from(item: SubscriptionSubject) -> Self {
+        match item {
+            SubscriptionSubject::Camera(camera_id, _resolution) => Self::Camera { camera_id },
+            SubscriptionSubject::AnalysisEngine(analysis_engine_id) => Self::AnalysisEngine {
+                analysis_engine_id,
+                tag: "".to_string(),
+            },
+            SubscriptionSubject::Playback(id, _, _) => Self::Playback { id },
+        }
+    }
+}
+
 /// An actor address that can receive `CameraFrame` messages
 type Client = Recipient<CameraFrame>;
 
 // MESSAGES
 /// Represents a frame of video
-#[derive(Clone, Message, Serialize, Deserialize)]
+#[derive(Clone, Message, Serialize, Deserialize, PartialEq)]
 #[rtype(result = "()")]
 pub struct CameraFrame {
     /// id of camera that produced frame
@@ -53,6 +69,8 @@ pub struct CameraFrame {
     /// jpeg image data
     #[serde(with = "Base64Standard")]
     pub jpeg: Vec<u8>,
+    /// observations
+    pub observations: Vec<Observation>,
     /// resolution of frame
     pub resolution: FrameResolution,
     /// source of frame

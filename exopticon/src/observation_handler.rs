@@ -7,11 +7,11 @@ use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 
 impl Message for CreateObservations {
-    type Result = Result<usize, ServiceError>;
+    type Result = Result<Vec<Observation>, ServiceError>;
 }
 
 impl Handler<CreateObservations> for DbExecutor {
-    type Result = Result<usize, ServiceError>;
+    type Result = Result<Vec<Observation>, ServiceError>;
 
     fn handle(&mut self, msg: CreateObservations, _: &mut Self::Context) -> Self::Result {
         use crate::schema::observations::dsl::*;
@@ -19,7 +19,7 @@ impl Handler<CreateObservations> for DbExecutor {
 
         diesel::insert_into(observations)
             .values(&msg.observations)
-            .execute(conn)
+            .get_results(conn)
             .map_err(|error| {
                 error!("CreateObservations error: {}", error);
                 ServiceError::InternalServerError

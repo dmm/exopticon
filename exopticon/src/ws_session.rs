@@ -9,11 +9,10 @@ use actix_web_actors::ws;
 use base64::STANDARD_NO_PAD;
 use futures::future;
 use rmp_serde::Serializer;
-use serde;
 use serde::Serialize;
-use serde_json;
 
 use crate::db_registry;
+use crate::fair_queue::FairQueue;
 use crate::models::{FetchObservationsByVideoUnit, FetchVideoUnit, Observation};
 use crate::playback_actor::PlaybackFrame;
 use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback, StopPlayback};
@@ -100,6 +99,9 @@ pub struct WsSession {
 
     /// Current number of frames in flight
     pub live_frames: u32,
+
+    /// Queue of frames awaiting delivery
+    pub frame_queue: FairQueue<FrameSource, CameraFrame>,
 }
 
 impl WsSession {
@@ -110,12 +112,13 @@ impl WsSession {
     ///
     /// * `serialization` - Type of serialization to use `MsgPack` or `Json`
     ///
-    pub const fn new(serialization: WsSerialization) -> Self {
+    pub fn new(serialization: WsSerialization) -> Self {
         Self {
             ready: true,
             serialization,
             window_size: 1,
             live_frames: 0,
+            frame_queue: FairQueue::new(),
         }
     }
 
@@ -126,7 +129,7 @@ impl WsSession {
 
     /// Modifies send window, intended to be called when acking a
     /// frame.
-    fn ack(&mut self) {
+    fn ack(&mut self, ctx: &mut <Self as Actor>::Context) {
         if self.live_frames == 0 {
             error!("live frame count should never be zero when acking!");
             return;
@@ -137,6 +140,7 @@ impl WsSession {
         if self.live_frames < self.window_size && self.window_size < 10 {
             self.window_size += 1;
         }
+        self.push_frame_if_ready(ctx);
     }
 
     /// Examines the current window state and adjusts window size.
@@ -158,52 +162,50 @@ impl WsSession {
         }
     }
 
-    /// handle frame, potentially sending it to client
-    fn handle_frame(
-        &mut self,
-        msg: CameraFrame,
-        observations: Vec<Observation>,
-        ctx: &mut <Self as Actor>::Context,
-    ) {
+    /// send a frame if one is ready and client is ready
+    fn push_frame_if_ready(&mut self, ctx: &mut <Self as Actor>::Context) {
         if !self.ready_to_send() {
             self.adjust_window();
             return;
         }
-        // wait for buffer to drain before sending another
-        //        self.ready = false;
-        //        let fut = ctx.drain().map(|_status, actor, _ctx| {
-        //            actor.ready = true;
-        //        });
 
-        let frame = RawCameraFrame {
-            camera_id: msg.camera_id,
-            jpeg: msg.jpeg,
-            resolution: msg.resolution,
-            unscaled_width: msg.unscaled_width,
-            unscaled_height: msg.unscaled_height,
-            source: msg.source,
-            video_unit_id: msg.video_unit_id,
-            offset: msg.offset,
-            observations,
-        };
-        match &self.serialization {
-            WsSerialization::MsgPack => {
-                let mut se = Serializer::with(Vec::new(), StructMapWriter);
-                frame
-                    .serialize(&mut se)
-                    .expect("Messagepack camera frame serialization failed!");
-                ctx.binary(se.into_inner());
-            }
-            WsSerialization::Json => ctx.text(
-                serde_json::to_string(&frame).expect("Json camera frame serialization failed!"),
-            ),
-        };
+        if let Some(msg) = self.frame_queue.pop_front() {
+            let frame = RawCameraFrame {
+                camera_id: msg.camera_id,
+                jpeg: msg.jpeg,
+                resolution: msg.resolution,
+                unscaled_width: msg.unscaled_width,
+                unscaled_height: msg.unscaled_height,
+                source: msg.source,
+                video_unit_id: msg.video_unit_id,
+                offset: msg.offset,
+                observations: msg.observations,
+            };
+            match &self.serialization {
+                WsSerialization::MsgPack => {
+                    let mut se = Serializer::with(Vec::new(), StructMapWriter);
+                    frame
+                        .serialize(&mut se)
+                        .expect("Messagepack camera frame serialization failed!");
+                    ctx.binary(se.into_inner());
+                }
+                WsSerialization::Json => ctx.text(
+                    serde_json::to_string(&frame).expect("Json camera frame serialization failed!"),
+                ),
+            };
 
-        // add live frame
-        self.live_frames += 1;
+            // add live frame
+            self.live_frames += 1;
 
-        // spawn drain future
-        //        ctx.spawn(fut);
+            // spawn drain future
+            //        ctx.spawn(fut);
+        }
+    }
+
+    /// handle frame, potentially sending it to client
+    fn handle_frame(&mut self, msg: CameraFrame, ctx: &mut <Self as Actor>::Context) {
+        self.frame_queue.push_back(msg.source.clone(), msg);
+        self.push_frame_if_ready(ctx);
     }
 }
 
@@ -223,7 +225,7 @@ impl Actor for WsSession {
 impl Handler<CameraFrame> for WsSession {
     type Result = ();
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
-        self.handle_frame(msg, Vec::new(), ctx);
+        self.handle_frame(msg, ctx);
     }
 }
 
@@ -231,7 +233,7 @@ impl Handler<PlaybackFrame> for WsSession {
     type Result = ();
 
     fn handle(&mut self, msg: PlaybackFrame, ctx: &mut Self::Context) -> Self::Result {
-        self.handle_frame(msg.frame, msg.observations, ctx);
+        self.handle_frame(msg.frame, ctx);
     }
 }
 
@@ -257,9 +259,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
 
                     Ok(WsCommand::Unsubscribe(subject)) => {
                         WsCameraServer::from_registry().do_send(Unsubscribe {
-                            subject,
+                            subject: subject.clone(),
                             client: ctx.address().recipient(),
                         });
+                        self.frame_queue.remove(&FrameSource::from(subject));
                     }
 
                     Ok(WsCommand::StartPlayback {
@@ -311,7 +314,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                     }
 
                     Ok(WsCommand::Ack) => {
-                        self.ack();
+                        self.ack(ctx);
                     }
                     Err(e) => {
                         error!("Error deserializing message {}. Ignoring...", e);

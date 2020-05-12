@@ -8,7 +8,6 @@ use actix::{
     fut::wrap_future, registry::SystemService, Actor, ActorContext, ActorFuture, AsyncContext,
     Context, Handler, Message, StreamHandler,
 };
-use bincode;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use exserial::models::CaptureMessage;
@@ -166,6 +165,7 @@ impl CaptureActor {
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
                     jpeg,
+                    observations: Vec::new(),
                     resolution: FrameResolution::HD,
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
@@ -186,6 +186,7 @@ impl CaptureActor {
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
                     jpeg,
+                    observations: Vec::new(),
                     resolution: FrameResolution::SD,
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
