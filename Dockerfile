@@ -102,7 +102,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && ~/.cargo/bin/rustup component add clippy \
     && ~/.cargo/bin/rustup update
 
-RUN pip3 install msgpack
+RUN pip3 install msgpack imutils
 
 # configure environment
 ENV PYTHONPATH=/exopticon/workers/:/opt/opencv/lib/python3.7/dist-packages
