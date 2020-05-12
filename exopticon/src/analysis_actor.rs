@@ -1,3 +1,6 @@
+// clippy doesn't like the base64_serde_type macro
+#![allow(clippy::empty_enum)]
+
 use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
@@ -11,11 +14,11 @@ use bytes::BytesMut;
 use futures::sink::SinkExt;
 use log::Level;
 use serde::Deserialize;
-use serde_json;
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 
 use crate::analysis_supervisor::{AnalysisSupervisor, RestartAnalysisActor};
+use crate::fair_queue::FairQueue;
 use crate::models::{CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
@@ -119,15 +122,19 @@ pub struct AnalysisActor {
     >,
     /// number of frames requested by worker process
     pub frames_requested: u8,
+    /// last frame sent to worker
+    pub last_frame: Option<CameraFrame>,
     /// represents the previous time a frame was sent to worker
     pub last_frame_time: Option<Instant>,
+    /// Queue of frames to feed analysis worker
+    pub frame_queue: FairQueue<FrameSource, CameraFrame>,
     /// Address of database actor
     pub db_address: Addr<DbExecutor>,
 }
 
 impl AnalysisActor {
     /// Returns initialized `AnalysisActor`
-    pub const fn new(
+    pub fn new(
         id: i32,
         executable_name: String,
         arguments: Vec<String>,
@@ -141,7 +148,9 @@ impl AnalysisActor {
             subscribed_camera_ids,
             worker_stdin: None,
             frames_requested: 0,
+            last_frame: None,
             last_frame_time: None,
+            frame_queue: FairQueue::new(),
             db_address,
         }
     }
@@ -150,17 +159,25 @@ impl AnalysisActor {
     fn message_to_action(&mut self, msg: AnalysisWorkerMessage, ctx: &mut Context<Self>) {
         match msg {
             AnalysisWorkerMessage::Log { level, message } => {
-                log!(level.into(), "Analysis Worker log: {}", message)
+                debug!("Analysis Worker log: {:?} {}", level, message)
             }
             AnalysisWorkerMessage::FrameRequest(count) => {
                 self.frames_requested = count;
+                self.push_frame(ctx);
             }
             AnalysisWorkerMessage::Observation(observations) => {
-                debug!("Analysis observations: {}", observations.len());
                 let fut = self.db_address.send(CreateObservations { observations });
-                ctx.spawn(wrap_future(fut).map(|result, _actor, _ctx| {
-                    if let Ok(Ok(count)) = result {
-                        debug!("Inserted {} observations.", count)
+                ctx.spawn(wrap_future(fut).map(|result, actor: &mut Self, _ctx| {
+                    if let Ok(Ok(new_observations)) = result {
+                        if let Some(mut frame) = actor.last_frame.take() {
+                            frame.source = FrameSource::AnalysisEngine {
+                                analysis_engine_id: actor.id,
+                                tag: "".to_string(),
+                            };
+
+                            frame.observations = new_observations;
+                            WsCameraServer::from_registry().do_send(frame);
+                        }
                     } else {
                         error!("Error inserting observations!")
                     }
@@ -170,6 +187,7 @@ impl AnalysisActor {
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: 0,
                     jpeg,
+                    observations: Vec::new(),
                     resolution: FrameResolution::SD,
                     source: FrameSource::AnalysisEngine {
                         analysis_engine_id: self.id,
@@ -183,13 +201,47 @@ impl AnalysisActor {
             }
             AnalysisWorkerMessage::TimingReport { tag, times } => {
                 let (avg, min, max) = calculate_statistics(&times);
-                info!(
+                debug!(
                     "Analysis Actor got {} time report! {:.2} avg, {:.2} min, {:.2} max",
                     tag,
                     avg / 1000,
                     min / 1000,
                     max / 1000
                 )
+            }
+        }
+    }
+
+    /// Push a frame to the worker if the worker is ready to receive a frame
+    fn push_frame(&mut self, ctx: &mut Context<Self>) {
+        // If no frames requested or no frames to send, do nothing.
+        if self.frames_requested == 0 || self.frame_queue.len() == 0 {
+            return;
+        }
+
+        // Take ownership of the worker's stdin. If any of the below
+        // conditionals fail this will be dropped, closing stdin. That
+        // will make the worker fail so it shouldn't happen.
+        if let Some(mut framed_stdin) = self.worker_stdin.take() {
+            // we know there is a frame to send because of the initial
+            // check. Is there a better way?
+            if let Some(frame) = self.frame_queue.pop_front() {
+                let worker_message = AnalysisWorkerCommand::Frame(frame.clone());
+                if let Ok(serialized) = serde_json::to_string(&worker_message) {
+                    self.frames_requested -= 1;
+                    self.last_frame = Some(frame);
+
+                    let task = async move {
+                        if let Err(err) = framed_stdin.send(bytes::Bytes::from(serialized)).await {
+                            error!("Analysis Worker: Failed to write frame: {}", err)
+                        };
+                        framed_stdin
+                    };
+                    let fut = wrap_future(task).map(|sink, actor: &mut Self, _ctx| {
+                        actor.worker_stdin = Some(sink);
+                    });
+                    ctx.spawn(fut);
+                }
             }
         }
     }
@@ -250,7 +302,7 @@ impl Handler<StartWorker> for AnalysisActor {
         // Initialize frames request to zero
         self.frames_requested = 0;
 
-        let worker_path = env::var("EXOPTICONWORKERS").unwrap_or("/".to_string());
+        let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
         let executable_path: PathBuf = [worker_path, self.executable_name.clone()].iter().collect();
         let mut cmd = Command::new(executable_path);
         for c in &self.arguments {
@@ -283,6 +335,7 @@ impl Handler<StartWorker> for AnalysisActor {
         self.worker_stdin = Some(framed_stdin);
         let fut = wrap_future::<_, Self>(worker).map(|_status, actor, ctx| {
             info!("Analysis actor {}: analysis worker died...", actor.id);
+
             // Restart worker in five seconds
             ctx.notify_later(StartWorker {}, Duration::new(5, 0));
         });
@@ -295,35 +348,10 @@ impl Handler<CameraFrame> for AnalysisActor {
     type Result = ();
 
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Context<Self>) -> Self::Result {
-        let rate_ready = match self.last_frame_time {
-            None => true,
-            Some(last_frame_time) => {
-                let now = Instant::now();
-                let min_duration = Duration::from_millis(0); // FIXME
-                now.duration_since(last_frame_time) > min_duration
-            }
-        };
-        if self.frames_requested == 0 && rate_ready {
-            return;
-        }
+        // Enqueue received frame
+        self.frame_queue.push_back(msg.source.clone(), msg);
 
-        let worker_message = AnalysisWorkerCommand::Frame(msg);
-        if let Some(mut framed_stdin) = self.worker_stdin.take() {
-            if let Ok(serialized) = serde_json::to_string(&worker_message) {
-                self.frames_requested -= 1;
-
-                let task = async move {
-                    if let Err(err) = framed_stdin.send(bytes::Bytes::from(serialized)).await {
-                        error!("Analysis Worker: Failed to write frame: {}", err)
-                    };
-                    framed_stdin
-                };
-                let fut = wrap_future(task).map(|sink, actor: &mut Self, _ctx| {
-                    actor.worker_stdin = Some(sink);
-                });
-                ctx.spawn(fut);
-            }
-        }
+        self.push_frame(ctx);
     }
 }
 
