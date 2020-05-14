@@ -30,3 +30,9 @@ impl ResponseError for ServiceError {
         }
     }
 }
+
+impl From<diesel::result::Error> for ServiceError {
+    fn from(_err: diesel::result::Error) -> Self {
+        Self::InternalServerError
+    }
+}
