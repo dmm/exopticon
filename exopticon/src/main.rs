@@ -50,6 +50,9 @@ mod auth_routes;
 /// Implements analysis actor
 mod analysis_actor;
 
+/// Implements db handlers for analysis
+mod analysis_handler;
+
 /// Implements analysis routes
 mod analysis_routes;
 

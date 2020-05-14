@@ -6,19 +6,24 @@ use actix::prelude::*;
 
 use crate::analysis_actor::AnalysisActor;
 use crate::db_registry;
-use crate::ws_camera_server::{FrameResolution, Subscribe, SubscriptionSubject, WsCameraServer};
+use crate::models::{AnalysisSubscriptionModel, FetchAllAnalysisModel};
+use crate::ws_camera_server::{
+    FrameResolution, FrameSource, Subscribe, SubscriptionSubject, WsCameraServer,
+};
 
 /// Message telling supervisor to start new analysis actor
 #[derive(Serialize, Deserialize)]
 pub struct StartAnalysisActor {
-    /// id of analysis actor
+    /// id of analysis instance
     pub id: i32,
     /// name of executable implementing analysis worker
     pub executable_name: String,
     /// arguments to provide analysis worker on startup
     pub arguments: Vec<String>,
-    /// camera ids to
-    pub subscribed_camera_ids: Vec<i32>,
+    /// max frames-per-second to send to worker
+    pub max_fps: i32,
+    /// frame source subscriptions for actor
+    pub subscriptions: Vec<AnalysisSubscriptionModel>,
 }
 
 impl Message for StartAnalysisActor {
@@ -37,17 +42,27 @@ impl Message for StopAnalysisActor {
 
 /// Message requesting an `AnalysisWorker` restart
 pub struct RestartAnalysisActor {
-    /// id of analysis actor
+    /// id of analysis instance
     pub id: i32,
     /// name of executable implementing analysis worker
     pub executable_name: String,
     /// arguments to provide analysis worker on startup
     pub arguments: Vec<String>,
-    /// camera ids to
-    pub subscribed_camera_ids: Vec<i32>,
+    /// max frames-per-second to send to worker
+    pub max_fps: i32,
+    /// frame source subscriptions
+    pub subscriptions: Vec<AnalysisSubscriptionModel>,
 }
 
 impl Message for RestartAnalysisActor {
+    type Result = ();
+}
+
+/// A `Message` requesting the `AnalysisSupervisor` restart
+/// `AnalysisActor`s to accomodate changesh
+pub struct SyncAnalysisActors {}
+
+impl Message for SyncAnalysisActors {
     type Result = ();
 }
 
@@ -55,19 +70,20 @@ impl Message for RestartAnalysisActor {
 pub struct AnalysisSupervisor {
     /// supervised actors
     actors: HashMap<i32, Addr<AnalysisActor>>,
-    /// tracks last actor id, only need this until we implement the database
-    last_actor_id: i32,
 }
 
 impl Actor for AnalysisSupervisor {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        ctx.notify(SyncAnalysisActors {});
+    }
 }
 
 impl Default for AnalysisSupervisor {
     fn default() -> Self {
         Self {
             actors: HashMap::new(),
-            last_actor_id: 1,
         }
     }
 }
@@ -79,28 +95,36 @@ impl Handler<StartAnalysisActor> for AnalysisSupervisor {
     type Result = i32;
 
     fn handle(&mut self, msg: StartAnalysisActor, _ctx: &mut Context<Self>) -> Self::Result {
-        let id = self.last_actor_id;
-        self.last_actor_id += 1;
-        info!("Starting analysis actor id: {}", id);
+        info!("Starting analysis actor id: {}", msg.id);
         let actor = AnalysisActor::new(
-            id,
+            msg.id,
             msg.executable_name,
             msg.arguments,
-            msg.subscribed_camera_ids.clone(),
+            msg.max_fps,
+            msg.subscriptions.clone(),
             db_registry::get_db(),
         );
         let address = actor.start();
-        self.actors.insert(id, address.clone());
+        self.actors.insert(msg.id, address.clone());
 
-        for camera_id in msg.subscribed_camera_ids {
+        for sub in msg.subscriptions {
             // setup camera subscriptions
+            let subject = match sub.source {
+                FrameSource::Camera { camera_id } => {
+                    SubscriptionSubject::Camera(camera_id, FrameResolution::SD)
+                }
+                FrameSource::AnalysisEngine {
+                    analysis_engine_id, ..
+                } => SubscriptionSubject::AnalysisEngine(analysis_engine_id),
+                FrameSource::Playback { id } => SubscriptionSubject::Playback(id, 0, 0),
+            };
             WsCameraServer::from_registry().do_send(Subscribe {
-                subject: SubscriptionSubject::Camera(camera_id, FrameResolution::SD),
+                subject,
                 client: address.clone().recipient(),
             });
         }
 
-        id
+        msg.id
     }
 }
 
@@ -125,7 +149,8 @@ impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
                         id: msg.id,
                         executable_name: msg.executable_name,
                         arguments: msg.arguments,
-                        subscribed_camera_ids: msg.subscribed_camera_ids,
+                        max_fps: msg.max_fps,
+                        subscriptions: msg.subscriptions.clone(),
                     },
                     Duration::new(5, 0),
                 );
@@ -135,12 +160,40 @@ impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
     }
 }
 
+// Right now this handler only restarts actors, eventually it should
+// restart them only when changed.
+impl Handler<SyncAnalysisActors> for AnalysisSupervisor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: SyncAnalysisActors, ctx: &mut Context<Self>) -> Self::Result {
+        // fetch analysis engines
+        let fut = wrap_future(db_registry::get_db().send(FetchAllAnalysisModel {})).map(
+            |res, _act, inner_ctx: &mut Context<Self>| {
+                if let Ok(Ok(res)) = res {
+                    for engine in res {
+                        for a in engine.1 {
+                            inner_ctx.notify(RestartAnalysisActor {
+                                id: a.id,
+                                executable_name: engine.0.entry_point.clone(),
+                                arguments: Vec::new(),
+                                max_fps: a.max_fps,
+                                subscriptions: a.subscriptions,
+                            });
+                        }
+                    }
+                }
+            },
+        );
+
+        ctx.spawn(fut);
+    }
+}
+
 impl AnalysisSupervisor {
     /// Returns new `AnalysisSupervisor`
     pub fn new() -> Self {
         Self {
             actors: HashMap::new(),
-            last_actor_id: 1,
         }
     }
 }

@@ -4,6 +4,8 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 
+use crate::ws_camera_server::FrameSource;
+
 /// This is db executor actor. can be run in parallel
 pub struct DbExecutor(pub Pool<ConnectionManager<PgConnection>>);
 
@@ -28,7 +30,10 @@ pub struct RemoveFile {
     pub path: String,
 }
 
-use crate::schema::{camera_groups, cameras, observations, users, video_files, video_units};
+use crate::schema::{
+    analysis_engines, analysis_instances, camera_groups, cameras, observations, users, video_files,
+    video_units,
+};
 
 /// Full camera group model. Represents a full row returned from the
 /// database.
@@ -529,4 +534,169 @@ pub struct CreateUser {
     pub password: String,
     /// Olson database timezone, e.g. America/Chicago
     pub timezone: String,
+}
+
+/// Analysis Engine database value
+#[derive(Queryable, Associations, Identifiable, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "analysis_engines"]
+pub struct AnalysisEngine {
+    /// analysis engine id
+    pub id: i32,
+    /// Name of analysis engine
+    pub name: String,
+    /// Version of Analysis engine
+    pub version: String,
+    /// Entry point, or executable name of engine
+    pub entry_point: String,
+    /// Inserted date time
+    pub inserted_at: NaiveDateTime,
+    /// modified date time
+    pub updated_at: NaiveDateTime,
+}
+
+/// Represents a request to create an `AnalysisEngine`
+#[derive(AsChangeset, Debug, Serialize, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "analysis_engines"]
+pub struct CreateAnalysisEngine {
+    /// Name of analysis engine
+    pub name: String,
+    /// Version of Analysis engine
+    pub version: String,
+    /// Entry point, or executable name of engine
+    pub entry_point: String,
+}
+
+/// Represents request to fetch an `AnalysisEngine`
+pub struct FetchAnalysisEngine {
+    /// id of `AnalysisEngine` to delete
+    pub id: i32,
+}
+
+/// Represents request to update an `AnalysisEngine`
+#[derive(AsChangeset, Debug, Deserialize, Insertable)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "analysis_engines"]
+pub struct UpdateAnalysisEngine {
+    /// analysis engine id
+    pub id: i32,
+    /// Name of analysis engine
+    pub name: Option<String>,
+    /// Version of Analysis engine
+    pub version: Option<String>,
+    /// Entry point, or executable name of engine
+    pub entry_point: Option<String>,
+}
+
+/// Represents a request to delete an `AnalysisEngine`
+pub struct DeleteAnalysisEngine {
+    /// id of `AnalysisEngine` to delete
+    pub id: i32,
+}
+
+/// Request to create `AnalysisInstanceModel`
+#[derive(Deserialize, Serialize)]
+pub struct CreateAnalysisInstanceModel {
+    /// id of owner, an analysis engine
+    pub analysis_engine_id: i32,
+    /// name of analysis instance
+    pub name: String,
+    /// max frames-per-second
+    pub max_fps: i32,
+    /// whether instance is enabled
+    pub enabled: bool,
+    /// Frame sources this instance subscribes to
+    pub subscriptions: Vec<AnalysisSubscriptionModel>,
+}
+
+/// Request to fetch `AnalysisInstanceModel`
+#[derive(Deserialize, Serialize)]
+pub struct FetchAnalysisInstanceModel {
+    /// id of `AnalysisInstanceModel` to fetch
+    pub id: i32,
+}
+
+/// Request to fetch all `AnalysisEngine` and `AnalysisInstanceModel`
+#[derive(Deserialize, Serialize)]
+pub struct FetchAllAnalysisModel {}
+
+/// Request to update `AnalysisInstanceModel`
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAnalysisInstanceModel {
+    /// analysis instance id
+    pub id: i32,
+    /// id of owner, an analysis engine
+    pub analysis_engine_id: Option<i32>,
+    /// name of analysis instance
+    pub name: Option<String>,
+    /// max frames-per-second
+    pub max_fps: Option<i32>,
+    /// whether instance is enabled
+    pub enabled: Option<bool>,
+    /// Frame sources this instance subscribes to
+    pub subscriptions: Option<Vec<AnalysisSubscriptionModel>>,
+}
+
+/// Represents a diesel changeset to update `AnalysisInstanceModel`
+#[derive(AsChangeset, Debug, Insertable)]
+#[table_name = "analysis_instances"]
+pub struct AnalysisInstanceChangeset {
+    /// analysis instance id
+    pub id: i32,
+    /// id of owner, an analysis engine
+    pub analysis_engine_id: Option<i32>,
+    /// name of analysis instance
+    pub name: Option<String>,
+    /// max frames-per-second
+    pub max_fps: Option<i32>,
+    /// whether instance is enabled
+    pub enabled: Option<bool>,
+}
+
+/// Request to delete `AnalysisInstanceModel`
+#[derive(Deserialize, Serialize)]
+pub struct DeleteAnalysisInstanceModel {
+    /// id of `AnalysisInstanceModel` to delete
+    pub id: i32,
+}
+
+/// Represents the analysis instance domain model
+#[derive(Deserialize, Serialize)]
+pub struct AnalysisInstanceModel {
+    /// analysis instance id
+    pub id: i32,
+    /// id of owner, an analysis engine
+    pub analysis_engine_id: i32,
+    /// name of analysis instance
+    pub name: String,
+    /// max frames-per-second
+    pub max_fps: i32,
+    /// whether instance is enabled
+    pub enabled: bool,
+    /// Frame sources this instance subscribes to
+    pub subscriptions: Vec<AnalysisSubscriptionModel>,
+}
+
+/// Domain model for analysis subscriptions
+#[derive(Clone, Deserialize, Serialize)]
+pub struct AnalysisSubscriptionModel {
+    /// source of frames
+    pub source: FrameSource,
+    /// masks that apply to this subscription
+    pub masks: Vec<SubscriptionMask>,
+}
+
+/// Represents an instance of an analysis subscription mask
+#[derive(Clone, Deserialize, Serialize)]
+pub struct SubscriptionMask {
+    /// upper-left x
+    pub ul_x: i16,
+    /// upper-left y
+    pub ul_y: i16,
+    /// lower-right x
+    pub lr_x: i16,
+    /// lower-right y
+    pub lr_y: i16,
 }

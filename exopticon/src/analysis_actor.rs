@@ -19,7 +19,7 @@ use tokio_util::codec::length_delimited;
 
 use crate::analysis_supervisor::{AnalysisSupervisor, RestartAnalysisActor};
 use crate::fair_queue::FairQueue;
-use crate::models::{CreateObservation, CreateObservations, DbExecutor};
+use crate::models::{AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
 base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
@@ -105,14 +105,14 @@ enum AnalysisWorkerCommand {
 
 /// Analysis Actor context
 pub struct AnalysisActor {
-    /// actor id
+    /// id of analysis instance
     pub id: i32,
     /// executable to run
     pub executable_name: String,
     /// arguments to provide to executable
     pub arguments: Vec<String>,
-    /// ids of subscribed cameras
-    pub subscribed_camera_ids: Vec<i32>,
+    /// frame sources
+    pub subscriptions: Vec<AnalysisSubscriptionModel>,
     /// stdin of worker process
     pub worker_stdin: Option<
         tokio_util::codec::FramedWrite<
@@ -124,6 +124,8 @@ pub struct AnalysisActor {
     pub frames_requested: u8,
     /// last frame sent to worker
     pub last_frame: Option<CameraFrame>,
+    /// max frames-per-second to send to worker
+    pub max_fps: i32,
     /// represents the previous time a frame was sent to worker
     pub last_frame_time: Option<Instant>,
     /// Queue of frames to feed analysis worker
@@ -138,17 +140,19 @@ impl AnalysisActor {
         id: i32,
         executable_name: String,
         arguments: Vec<String>,
-        subscribed_camera_ids: Vec<i32>,
+        max_fps: i32,
+        subscriptions: Vec<AnalysisSubscriptionModel>,
         db_address: Addr<DbExecutor>,
     ) -> Self {
         Self {
             id,
             executable_name,
             arguments,
-            subscribed_camera_ids,
+            subscriptions,
             worker_stdin: None,
             frames_requested: 0,
             last_frame: None,
+            max_fps,
             last_frame_time: None,
             frame_queue: FairQueue::new(),
             db_address,
@@ -219,6 +223,17 @@ impl AnalysisActor {
             return;
         }
 
+        if self.max_fps != 0 {
+            if let Some(last_frame_time) = self.last_frame_time {
+                let interval_millis: u64 = (1000 / self.max_fps).try_into().unwrap_or(0);
+                let frame_interval = Duration::from_millis(interval_millis);
+                let time_since_last_frame = Instant::now().duration_since(last_frame_time);
+                if time_since_last_frame < frame_interval {
+                    return;
+                }
+            }
+        }
+
         // Take ownership of the worker's stdin. If any of the below
         // conditionals fail this will be dropped, closing stdin. That
         // will make the worker fail so it shouldn't happen.
@@ -239,6 +254,7 @@ impl AnalysisActor {
                     };
                     let fut = wrap_future(task).map(|sink, actor: &mut Self, _ctx| {
                         actor.worker_stdin = Some(sink);
+                        actor.last_frame_time = Some(Instant::now());
                     });
                     ctx.spawn(fut);
                 }
@@ -270,7 +286,8 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for AnalysisActor {
                     id: self.id,
                     executable_name: self.executable_name.clone(),
                     arguments: self.arguments.clone(),
-                    subscribed_camera_ids: self.subscribed_camera_ids.clone(),
+                    max_fps: self.max_fps,
+                    subscriptions: self.subscriptions.clone(),
                 });
                 ctx.terminate();
                 return;

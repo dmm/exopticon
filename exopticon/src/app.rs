@@ -5,7 +5,11 @@ use actix::Addr;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 
-use crate::analysis_routes::create_analysis_engine;
+use crate::analysis_routes::{
+    create_analysis_engine, create_analysis_instance, delete_analysis_engine,
+    delete_analysis_instance, fetch_analysis_engine, fetch_analysis_instance,
+    update_analysis_engine, update_analysis_instance,
+};
 use crate::auth_routes::{login, logout, Auth, WebAuth};
 use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
@@ -45,6 +49,7 @@ pub async fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<Htt
 }
 
 /// helper function to create and returns the app after mounting all routes/resources
+#[allow(clippy::too_many_lines)]
 pub fn generate_config(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/login").route(web::get().to(static_routes::login)))
         // routes for authentication
@@ -132,6 +137,22 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .service(
                     web::resource("/analysis_engines")
                         .route(web::post().to(create_analysis_engine)),
+                )
+                .service(
+                    web::resource("/analysis_engines/{id}")
+                        .route(web::get().to(fetch_analysis_engine))
+                        .route(web::post().to(update_analysis_engine))
+                        .route(web::delete().to(delete_analysis_engine)),
+                )
+                .service(
+                    web::resource("/analysis_instances")
+                        .route(web::post().to(create_analysis_instance)),
+                )
+                .service(
+                    web::resource("/analysis_instances/{id}")
+                        .route(web::get().to(fetch_analysis_instance))
+                        .route(web::post().to(update_analysis_instance))
+                        .route(web::delete().to(delete_analysis_instance)),
                 ),
         )
         // Create default route

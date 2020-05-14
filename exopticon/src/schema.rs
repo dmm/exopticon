@@ -1,4 +1,38 @@
 table! {
+    analysis_engines (id) {
+        id -> Int4,
+        name -> Text,
+        version -> Text,
+        entry_point -> Text,
+        inserted_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+table! {
+    analysis_instances (id) {
+        id -> Int4,
+        analysis_engine_id -> Int4,
+        name -> Text,
+        max_fps -> Int4,
+        enabled -> Bool,
+        inserted_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+table! {
+    analysis_subscriptions (id) {
+        id -> Int4,
+        analysis_instance_id -> Int4,
+        camera_id -> Nullable<Int4>,
+        source_analysis_instance_id -> Nullable<Int4>,
+        inserted_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+table! {
     camera_groups (id) {
         id -> Int4,
         name -> Varchar,
@@ -45,6 +79,19 @@ table! {
 }
 
 table! {
+    subscription_masks (id) {
+        id -> Int4,
+        analysis_subscription_id -> Int4,
+        ul_x -> Int2,
+        ul_y -> Int2,
+        lr_x -> Int2,
+        lr_y -> Int2,
+        inserted_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+table! {
     users (id) {
         id -> Int4,
         username -> Varchar,
@@ -78,15 +125,22 @@ table! {
     }
 }
 
+joinable!(analysis_instances -> analysis_engines (analysis_engine_id));
+joinable!(analysis_subscriptions -> cameras (camera_id));
 joinable!(cameras -> camera_groups (camera_group_id));
 joinable!(observations -> video_units (video_unit_id));
+joinable!(subscription_masks -> analysis_subscriptions (analysis_subscription_id));
 joinable!(video_files -> video_units (video_unit_id));
 joinable!(video_units -> cameras (camera_id));
 
 allow_tables_to_appear_in_same_query!(
+    analysis_engines,
+    analysis_instances,
+    analysis_subscriptions,
     camera_groups,
     cameras,
     observations,
+    subscription_masks,
     users,
     video_files,
     video_units,
