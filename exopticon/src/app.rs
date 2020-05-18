@@ -49,7 +49,7 @@ pub async fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<Htt
 }
 
 /// helper function to create and returns the app after mounting all routes/resources
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_line)]
 pub fn generate_config(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/login").route(web::get().to(static_routes::login)))
         // routes for authentication
