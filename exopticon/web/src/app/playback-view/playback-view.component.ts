@@ -37,6 +37,8 @@ export class PlaybackViewComponent implements OnInit {
   private obCtx: CanvasRenderingContext2D;
   private units: VideoUnit[];
   private observations: any[];
+  private playbackProgress: number;
+  private currentVideoUnit: VideoUnit | null;
   private readonly playerDuration: Duration = Duration.ofHours(2);
 
 
@@ -45,6 +47,14 @@ export class PlaybackViewComponent implements OnInit {
     public observationService: ObservationService,
     public videoUnitService: VideoUnitService) {
     this.units = [];
+    this.playbackProgress = -1;
+  }
+
+  progress(newOffset: number) {
+    let currentPlaybackOffset = Duration.between(this.viewStartTime,
+      this.currentVideoUnit.beginTime.plusNanos(newOffset * 1000000)).toMillis();
+    this.playbackProgress = currentPlaybackOffset / this.playerDuration.toMillis();
+    this.drawProgressBar();
   }
 
   drawProgressBar() {
@@ -65,8 +75,10 @@ export class PlaybackViewComponent implements OnInit {
       this.ctx.fillStyle = '#0F0';
       this.ctx.fillRect(pos, 0, size, 20);
     });
-    this.ctx.fillStyle = '#F00';
-    this.ctx.fillRect(500, 0, 1, 20);
+    if (this.playbackProgress > 0) {
+      this.ctx.fillStyle = '#F00';
+      this.ctx.fillRect(1000 * this.playbackProgress - 2, 0, 4, 20);
+    }
   }
 
   drawObservations() {
@@ -83,12 +95,14 @@ export class PlaybackViewComponent implements OnInit {
 
   handleProgressClick(event: MouseEvent) {
     let progress = event.clientX / this.canvas.nativeElement.clientWidth;
-    let offsetMillis = this.playerDuration.toMillis() * progress;
+    let offsetMillis = Math.floor(this.playerDuration.toMillis() * progress);
     let selectedTime = this.viewStartTime.plus(offsetMillis, ChronoUnit.MILLIS);
     let selectedUnit = this.findVideoUnitForTime(selectedTime);
+
     if (selectedUnit) {
-      console.log(`SelectedUnit: ${selectedUnit.id}`);
-      this.play(selectedUnit, 0);
+      let fileOffsetMillis = Duration.between(selectedUnit.beginTime, selectedTime).toMillis();
+      this.currentVideoUnit = selectedUnit;
+      this.play(selectedUnit, fileOffsetMillis);
     }
   }
 
@@ -116,6 +130,7 @@ export class PlaybackViewComponent implements OnInit {
     this.playbackEnabled = false;
     this.playbackSubject = null;
     this.currentVideoService = null;
+    this.playbackProgress = -1;
   }
 
   getRandomInt(max: number) {

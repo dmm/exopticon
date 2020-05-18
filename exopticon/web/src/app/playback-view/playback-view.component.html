@@ -1,5 +1,6 @@
 <app-video-view
   [frameService]="currentVideoService"
+  (frameOffset)="progress($event)"
   class="video-view">
   </app-video-view>
 <div class="control-bar">

@@ -14,6 +14,7 @@ import { Observation } from '../observation';
 export class VideoViewComponent implements OnInit {
   @Input() frameService?: Observable<FrameMessage>;
   @Output() status = new EventEmitter<string>();
+  @Output() frameOffset = new EventEmitter<number>();
 
   @ViewChild('obsCanvas', { static: true })
   canvas: ElementRef<HTMLCanvasElement>;
@@ -65,6 +66,7 @@ export class VideoViewComponent implements OnInit {
         if (this.img.complete) {
           this.img.onerror = () => { console.log("error!"); };
           this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
+          this.frameOffset.emit(message.offset);
           this.drawObservations(message.unscaledWidth, message.unscaledHeight, message.observations);
         }
       },
@@ -93,14 +95,11 @@ export class VideoViewComponent implements OnInit {
     this.ctx.font = '32pt sans';
 
     observations.forEach((o) => {
-      console.log("Rendering: " + o);
-
       let width = o.lrX - o.ulX;
       let height = o.lrY - o.ulY;
       this.ctx.strokeRect(o.ulX, o.ulY, width, height);
       this.ctx.fillText(o.details, o.ulX, o.ulY);
       this.ctx.fillText(o.score.toString(), o.lrX, o.lrY + 40);
-      console.log(`Drawing ${o.ulX}, ${o.ulY}, ${width}, ${height}`);
     });
   }
 
