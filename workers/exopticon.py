@@ -12,6 +12,43 @@ import logging
 import json
 import base64
 
+class AnalysisMask(object):
+    def __init__(self, ul_x, ul_y, lr_x, lr_y):
+        self.ul_x = ul_x
+        self.ul_y = ul_y
+        self.lr_x = lr_x
+        self.lr_y = lr_y
+
+class AnalysisFrame(object):
+    def __init__(self, m):
+        f = m["frame"]
+
+        self.camera_id = f["camera_id"]
+        self.video_unit_id = f["video_unit_id"]
+        self.unscaled_height = f["unscaled_height"]
+        self.unscaled_width = f["unscaled_width"]
+        self.offset = f["offset"]
+        self.__load_image(f["jpeg"])
+        self.__load_masks(m["masks"])
+
+    def __load_image(self, image_str):
+        msg_buf = base64.standard_b64decode(image_str)
+        msg_buf = numpy.frombuffer(msg_buf, dtype=numpy.uint8)
+
+        self.image = cv2.imdecode(msg_buf, cv2.IMREAD_COLOR)
+        self.height, self.width, self.channels = self.image.shape
+
+    def __load_masks(self, raw_masks):
+        y_scale = self.height / self.unscaled_height
+        x_scale = self.width / self.unscaled_width
+        self.masks = []
+
+        for m in raw_masks:
+            self.masks.append(AnalysisMask(int(m["ul_x"] * x_scale),
+                                           int(m["ul_y"] * y_scale),
+                                           int(m["lr_x"] * x_scale),
+                                           int(m["lr_y"] * y_scale)))
+
 class WorkerHandler(logging.Handler):
     def __init__(self, worker):
         super().__init__()
@@ -67,25 +104,19 @@ class ExopticonWorker(object):
         msg_len = struct.unpack('>L', len_buf)[0]
         msg_buf = sys.stdin.buffer.read(msg_len)
         msg = json.loads(msg_buf)
-        self.__current_frame = msg["Frame"]
-        msg_buf = base64.standard_b64decode(self.__current_frame["jpeg"])
-        msg_buf = numpy.frombuffer(msg_buf, dtype=numpy.uint8)
+        self.__current_frame = AnalysisFrame(msg["Frame"])
 
-        img = cv2.imdecode(msg_buf, cv2.IMREAD_COLOR)
-        height, width, channels = img.shape
+        return self.__current_frame
 
-        return dict(camera_id=self.__current_frame["camera_id"],
-                    image=img,
-                    unscaled_height=self.__current_frame["unscaled_height"],
-                    unscaled_width=self.__current_frame["unscaled_width"],
-                    video_unit_id=self.__current_frame["video_unit_id"],
-                    offset=self.__current_frame["offset"])
-#        return cv2.imdecode(msg_buf, cv2.IMREAD_UNCHANGED)
+    def __apply_masks(self, frame):
+        c = (255,255,255)
+        for m in self.__current_frame.masks:
+            cv2.rectangle(frame.image, (m.ul_x, m.ul_y), (m.lr_x, m.lr_y), c, -1)
 
     def write_frame(self, tag, image):
         if not self.__current_frame:
             return
-        frame = copy.copy(self.__current_frame)
+
         jpeg = cv2.imencode('.jpg', image)[1].tobytes()
         frame_dict = {'FrameReport': { 'tag': tag, 'jpeg': jpeg }}
         serialized = json.dumps(frame_dict)
@@ -137,6 +168,7 @@ class ExopticonWorker(object):
             while True:
                 self.__request_frame()
                 frame = self.__read_frame()
+                self.__apply_masks(frame)
                 self.__handle_frame(frame)
         except EOFError:
             sys.exit(0)

@@ -475,11 +475,11 @@ class Yolo4Worker(ExopticonWorker):
 
     def handle_frame(self, frame):
 #        detections = def detect_image(net, meta, im, thresh=.5, hier_thresh=.5, nms=.45, debug= False):
-        detections = detect_image(self.netMain, self.metaMain, frame['image'])
+        detections = detect_image(self.netMain, self.metaMain, frame.image)
         count = len(detections)
         observations = []
-        x_scale = frame["unscaled_width"] / lib.network_width(self.netMain)
-        y_scale = frame["unscaled_height"] / lib.network_height(self.netMain)
+        x_scale = frame.unscaled_width / lib.network_width(self.netMain)
+        y_scale = frame.unscaled_height / lib.network_height(self.netMain)
 
         for det in detections:
             bounds = det[2]
@@ -488,8 +488,8 @@ class Yolo4Worker(ExopticonWorker):
             lr_x = int(bounds[0] + bounds[2]/2)
             lr_y = int(bounds[1] + bounds[2]/2)
             observations.append({
-                "videoUnitId": frame["video_unit_id"],
-                "frameOffset": frame["offset"],
+                "videoUnitId": frame.video_unit_id,
+                "frameOffset": frame.offset,
                 "tag": "object",
                 "details": det[0].decode("utf-8"),
                 "score": int(det[1] * 100),

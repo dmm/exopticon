@@ -15,7 +15,7 @@ class MotionWorker(ExopticonWorker):
         self.setup = False
 
     def config(self, frame):
-        frame_shape = frame["image"].shape[:2]
+        frame_shape = frame.image.shape[:2]
         mask = np.zeros((frame_shape[0], frame_shape[1], 1), np.uint8)
         mask[:] = 255
         self.motion = MotionDetector(frame_shape, mask, 2)
@@ -26,15 +26,15 @@ class MotionWorker(ExopticonWorker):
             self.config(frame)
 
         observations = []
-        motion_boxes = self.motion.detect(frame["image"])
-        x_scale = frame["unscaled_width"] / frame["image"].shape[1]
-        y_scale = frame["unscaled_height"] / frame["image"].shape[0]
+        motion_boxes = self.motion.detect(frame.image)
+        x_scale = frame.unscaled_width / frame.width
+        y_scale = frame.unscaled_height / frame.height
 
         for box in motion_boxes:
 
             observations.append({
-                "videoUnitId": frame["video_unit_id"],
-                "frameOffset": frame["offset"],
+                "videoUnitId": frame.video_unit_id,
+                "frameOffset": frame.offset,
                 "tag": "motion",
                 "details": "motion",
                 "score": 100,

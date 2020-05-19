@@ -1,6 +1,7 @@
 // clippy doesn't like the base64_serde_type macro
 #![allow(clippy::empty_enum)]
 
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
@@ -19,7 +20,9 @@ use tokio_util::codec::length_delimited;
 
 use crate::analysis_supervisor::{AnalysisSupervisor, RestartAnalysisActor};
 use crate::fair_queue::FairQueue;
-use crate::models::{AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor};
+use crate::models::{
+    AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor, SubscriptionMask,
+};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
 
 base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
@@ -100,7 +103,10 @@ enum AnalysisWorkerMessage {
 #[derive(Serialize, Deserialize)]
 enum AnalysisWorkerCommand {
     /// A frame of video send for analysis
-    Frame(CameraFrame),
+    Frame {
+        frame: CameraFrame,
+        masks: Vec<SubscriptionMask>,
+    },
 }
 
 /// Analysis Actor context
@@ -112,7 +118,7 @@ pub struct AnalysisActor {
     /// arguments to provide to executable
     pub arguments: Vec<String>,
     /// frame sources
-    pub subscriptions: Vec<AnalysisSubscriptionModel>,
+    pub subscriptions: HashMap<FrameSource, AnalysisSubscriptionModel>,
     /// stdin of worker process
     pub worker_stdin: Option<
         tokio_util::codec::FramedWrite<
@@ -144,11 +150,16 @@ impl AnalysisActor {
         subscriptions: Vec<AnalysisSubscriptionModel>,
         db_address: Addr<DbExecutor>,
     ) -> Self {
+        let mut sub_map = HashMap::new();
+        for s in subscriptions {
+            sub_map.insert(s.source.clone(), s);
+        }
+
         Self {
             id,
             executable_name,
             arguments,
-            subscriptions,
+            subscriptions: sub_map,
             worker_stdin: None,
             frames_requested: 0,
             last_frame: None,
@@ -241,7 +252,15 @@ impl AnalysisActor {
             // we know there is a frame to send because of the initial
             // check. Is there a better way?
             if let Some(frame) = self.frame_queue.pop_front() {
-                let worker_message = AnalysisWorkerCommand::Frame(frame.clone());
+                let masks = match self.subscriptions.get(&frame.source) {
+                    None => Vec::new(),
+                    Some(source) => source.masks.clone(),
+                };
+                let worker_message = AnalysisWorkerCommand::Frame {
+                    frame: frame.clone(),
+                    masks,
+                };
+
                 if let Ok(serialized) = serde_json::to_string(&worker_message) {
                     self.frames_requested -= 1;
                     self.last_frame = Some(frame);
@@ -287,7 +306,7 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for AnalysisActor {
                     executable_name: self.executable_name.clone(),
                     arguments: self.arguments.clone(),
                     max_fps: self.max_fps,
-                    subscriptions: self.subscriptions.clone(),
+                    subscriptions: self.subscriptions.drain().map(|(_k, v)| v).collect(),
                 });
                 ctx.terminate();
                 return;
