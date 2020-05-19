@@ -113,6 +113,10 @@ pub async fn update_analysis_instance(
         })
         .await??;
 
+    AnalysisSupervisor::from_registry()
+        .send(SyncAnalysisActors {})
+        .await?;
+
     Ok(HttpResponse::Ok().json(updated_instance))
 }
 
@@ -127,6 +131,10 @@ pub async fn delete_analysis_instance(
             id: path.into_inner(),
         })
         .await??;
+
+    AnalysisSupervisor::from_registry()
+        .send(SyncAnalysisActors {})
+        .await?;
 
     Ok(HttpResponse::Ok().finish())
 }
