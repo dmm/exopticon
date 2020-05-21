@@ -49,7 +49,7 @@ pub struct PlaybackActor {
     /// id of video unit to play
     pub video_unit_id: i32,
     /// initial frame offset to play
-    pub initial_offset: i32,
+    pub initial_offset: i64,
     /// path to video file to play
     pub video_file_path: String,
     /// observations included in this video unit
@@ -79,7 +79,7 @@ impl PlaybackActor {
     pub const fn new(
         id: u64, // stream id provided by client
         video_unit_id: i32,
-        initial_offset: i32,
+        initial_offset: i64,
         video_file_path: String,
         observations: Vec<Observation>,
         target_address: Recipient<PlaybackFrame>,
@@ -101,7 +101,7 @@ impl PlaybackActor {
         let iter = self.observations.iter();
 
         for obs in iter {
-            if i64::from(obs.frame_offset) == offset {
+            if obs.frame_offset == offset {
                 current_obs.push((*obs).clone());
             }
         }

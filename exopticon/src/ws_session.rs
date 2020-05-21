@@ -51,7 +51,7 @@ pub enum WsCommand {
         /// id of video unit id to play
         video_unit_id: i32,
         /// initial offset to begin playback
-        offset: i32,
+        offset: i64,
     },
     /// Stop playback request
     StopPlayback {

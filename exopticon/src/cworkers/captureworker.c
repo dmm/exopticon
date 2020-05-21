@@ -101,6 +101,12 @@ struct CapturePerformance {
         struct FrameTime avg;
 };
 
+static const AVRational microsecond =
+  {
+   .num = 1,
+   .den = 1E6,
+  };
+
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void my_av_log_callback(__attribute__((unused)) void *avcl, int level, const char *fmt,
@@ -425,7 +431,7 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
         return resizedFrame;
 }
 
-int send_scaled_frame(AVFrame *frame, const int offset, const int width, const int height)
+int send_scaled_frame(AVFrame *frame, const int64_t offset, const int width, const int height)
 {
         struct FrameMessage message;
         message.unscaled_height = frame->height;
@@ -451,7 +457,7 @@ int send_scaled_frame(AVFrame *frame, const int offset, const int width, const i
         return 0;
 }
 
-int send_full_frame(AVFrame *frame, const int offset)
+int send_full_frame(AVFrame *frame, const int64_t offset)
 {
         struct FrameMessage message;
 
@@ -542,19 +548,14 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                 av_log(NULL, AV_LOG_FATAL, "Error receiving frame: %s", errbuf);
                 goto cleanup;
         }
-        AVRational nsec = av_make_q(1, 1E9); // one billion
-        struct timespec pts_ts;
-        pts_ts.tv_sec = ((frame->pts - out->first_pts) * in->st->time_base.num) / in->st->time_base.den;
-        int64_t frac_sec =
-          (frame->pts - out->first_pts) - ((pts_ts.tv_sec * in->st->time_base.den) / in->st->time_base.num);
-        pts_ts.tv_nsec =
-          av_rescale_q(frac_sec, in->st->time_base, nsec);
+        // Calculate microsecond offset from frame->pts
 
-        // calculate offset in milliseconds
-        const int offset_ms = (pts_ts.tv_sec * 1000) + (pts_ts.tv_nsec / 1000000);
+        const int64_t offset_microseconds = av_rescale_q(frame->pts - out->first_pts,
+                                                         in->st->time_base,
+                                                         microsecond);
 
-        send_full_frame(frame, offset_ms);
-        send_scaled_frame(frame, offset_ms, 640, 360);
+        send_full_frame(frame, offset_microseconds);
+        send_scaled_frame(frame, offset_microseconds, 640, 360);
 
 cleanup:
         av_frame_free(&frame);

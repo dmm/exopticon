@@ -52,7 +52,7 @@ export class PlaybackViewComponent implements OnInit {
 
   progress(newOffset: number) {
     let currentPlaybackOffset = Duration.between(this.viewStartTime,
-      this.currentVideoUnit.beginTime.plusNanos(newOffset * 1000000)).toMillis();
+      this.currentVideoUnit.beginTime.plusNanos(newOffset * 1000)).toMillis();
     this.playbackProgress = currentPlaybackOffset / this.playerDuration.toMillis();
     this.drawProgressBar();
   }
@@ -100,7 +100,7 @@ export class PlaybackViewComponent implements OnInit {
     let selectedUnit = this.findVideoUnitForTime(selectedTime);
 
     if (selectedUnit) {
-      let fileOffsetMillis = Duration.between(selectedUnit.beginTime, selectedTime).toMillis();
+      let fileOffsetMillis = Duration.between(selectedUnit.beginTime, selectedTime).toMillis() * 1000;
       this.currentVideoUnit = selectedUnit;
       this.play(selectedUnit, fileOffsetMillis);
     }
@@ -137,14 +137,14 @@ export class PlaybackViewComponent implements OnInit {
     return Math.floor(Math.random() * Math.floor(max));
   }
 
-  calculateProgressPosition(time: ZonedDateTime, offsetMs: number = 0): number {
+  calculateProgressPosition(time: ZonedDateTime, offset_micros: number = 0): number {
     let viewEndTime = this.viewStartTime.plusMinutes(this.playerDuration.toMinutes());
     if (time.isBefore(this.viewStartTime) || time.isAfter(viewEndTime)) {
       return -1;
     }
 
     let displayDuration = Duration.between(this.viewStartTime, viewEndTime).toMillis();
-    let offsetDuration = Duration.between(this.viewStartTime, time).toMillis() + offsetMs;
+    let offsetDuration = Duration.between(this.viewStartTime, time).toMillis() + (offset_micros / 1000);
 
     return (offsetDuration / displayDuration) * 1000;
   }

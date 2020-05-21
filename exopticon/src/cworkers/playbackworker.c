@@ -41,6 +41,7 @@
 #include "mpack_frame.h"
 
 #define BILLION 1E9
+#define MILLION 1E6
 
 struct PlayerState {
         AVFormatContext *fcx;
@@ -61,13 +62,11 @@ struct PlayerState {
         int64_t frame_count;
 };
 
-static AVRational millisecond()
-{
-        AVRational millisecond;
-        millisecond.num = 1;
-        millisecond.den = 1000;
-        return millisecond;
-}
+static const AVRational microsecond =
+  {
+   .num = 1,
+   .den = MILLION,
+  };
 
 static struct timespec time_diff(struct timespec old_time, struct timespec time)
 {
@@ -231,7 +230,7 @@ cleanup:
 int seek_to_offset(struct PlayerState *state, int64_t ms_offset)
 {
         int64_t offset = av_rescale_q(ms_offset,
-                                      millisecond(),
+                                      microsecond,
                                       state->fcx->streams[state->i_index]->time_base);
 
         int flags = AVSEEK_FLAG_FRAME | AVSEEK_FLAG_BACKWARD;
@@ -254,9 +253,12 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, int64_t first_p
         //        message.pts = frame->pts;
         int64_t pts = frame->pts - first_pts;
 
-        // Calculate offset
-        AVRational msec = av_make_q(1, 1000);
-        message.offset = av_rescale_q(frame->pts, time_base, msec);
+        // Calculate offset, in microseconds
+        const AVRational microsecond = {
+                                        .num = 1,
+                                        .den = 1E6,
+        };
+        message.offset = av_rescale_q(frame->pts, time_base, microsecond);
 
         do {
                 AVRational nsec = av_make_q(1, BILLION);
@@ -352,7 +354,7 @@ int handle_packet(struct PlayerState *state, int64_t ms_offset, int playback_rat
                 // should have done most of the work, putting us on
                 // the proceeding I frame.
                 int64_t offset = av_rescale_q(ms_offset,
-                                              millisecond(),
+                                              microsecond,
                                               state->fcx->streams[state->i_index]->time_base);
                 if (state->frame->pts < offset) {
                         continue;
@@ -428,7 +430,7 @@ int main(int argc, char *argv[])
 
         const char *program_name = argv[0];
         if (argc < 3) {
-          fprintf(stderr, "USAGE: ./%s <input filename> <offset in ms> (<playback rate>)\n", program_name);
+          fprintf(stderr, "USAGE: ./%s <input filename> <offset in microseconds> (<playback rate>)\n", program_name);
         }
 
         int playback_rate = 1;
@@ -453,8 +455,8 @@ int main(int argc, char *argv[])
         player.frame_count = 0;
 
         // Determine offset
-        long long ms_offset = 0;
-        sscanf(argv[2], "%lld", &ms_offset);
+        int64_t ms_offset = 0;
+        sscanf(argv[2], "%ld", &ms_offset);
 
         if (avformat_open_input(&player.fcx, argv[1], NULL, NULL) != 0) {
                 bs_log("Could not open input!");

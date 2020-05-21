@@ -104,7 +104,9 @@ enum AnalysisWorkerMessage {
 enum AnalysisWorkerCommand {
     /// A frame of video send for analysis
     Frame {
+        /// Camera frame
         frame: CameraFrame,
+        /// regions in frame to mask out
         masks: Vec<SubscriptionMask>,
     },
 }

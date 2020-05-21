@@ -48,7 +48,7 @@ pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
 
     let frame = CaptureMessage::Frame {
         jpeg: jpeg.to_vec(),
-        offset: i64::from(frame.offset),
+        offset: frame.offset,
         unscaled_height: frame.unscaled_height,
         unscaled_width: frame.unscaled_width,
     };
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _
 
     let frame = CaptureMessage::ScaledFrame {
         jpeg: jpeg.to_vec(),
-        offset: i64::from(frame.offset),
+        offset: frame.offset,
         unscaled_height: frame.unscaled_height,
         unscaled_width: frame.unscaled_width,
     };

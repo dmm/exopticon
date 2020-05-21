@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct FrameMessage {
     pub jpeg: *const u8,
     pub jpeg_size: i32,
-    pub offset: i32,
+    pub offset: i64,
     pub unscaled_height: i32,
     pub unscaled_width: i32,
 }

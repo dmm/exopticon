@@ -411,7 +411,7 @@ pub struct Observation {
     /// id of owning video unit
     pub video_unit_id: i32,
     /// offset from beginning of video unit, starts at 0
-    pub frame_offset: i32,
+    pub frame_offset: i64,
     /// Identifies the type of observation, eg Person, Motion, Deer
     pub tag: String,
     /// Details associated with observation, eg John, Male, whatever
@@ -439,7 +439,7 @@ pub struct CreateObservation {
     /// id of owning video unit
     pub video_unit_id: i32,
     /// offset from beginning of video unit, starts at 0
-    pub frame_offset: i32,
+    pub frame_offset: i64,
     /// Identifies the type of observation, eg Person, Motion, Deer
     pub tag: String,
     /// Details associated with observation, eg John, Male, whatever

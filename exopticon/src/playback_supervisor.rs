@@ -36,7 +36,7 @@ pub struct StartPlayback {
     /// initial video unit id
     pub video_unit_id: i32,
     /// initial offset
-    pub offset: i32,
+    pub offset: i64,
     /// filename
     pub video_filename: String,
     /// observations

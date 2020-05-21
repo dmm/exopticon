@@ -66,7 +66,7 @@ table! {
     observations (id) {
         id -> Int8,
         video_unit_id -> Int4,
-        frame_offset -> Int4,
+        frame_offset -> Int8,
         tag -> Text,
         details -> Text,
         score -> Int2,
