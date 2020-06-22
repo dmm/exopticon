@@ -101,7 +101,8 @@ impl PlaybackActor {
         let iter = self.observations.iter();
 
         for obs in iter {
-            if obs.frame_offset == offset {
+            // if within 1 millisecond
+            if (obs.frame_offset - offset).abs() < 1000 {
                 current_obs.push((*obs).clone());
             }
         }
