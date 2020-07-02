@@ -11,9 +11,11 @@ use actix_web::{
     dev::ServiceRequest, dev::ServiceResponse, http, web::Data, web::Json, Error, HttpResponse,
 };
 use futures::future::{ok, Future, Ready};
+use qstring::QString;
 
 use crate::app::RouteState;
 use crate::auth_handler::AuthData;
+
 
 /// Route to make login attempt
 pub async fn login(
@@ -95,9 +97,12 @@ where
             Box::pin(self.service.call(req))
         } else {
             Box::pin(async {
+                let rpath = req.path().to_string();
+                let qs = QString::from(req.query_string());
+                let path = qs.get("redirect_uri").unwrap_or(&rpath);
                 Ok(req.into_response(
                     HttpResponse::Found()
-                        .header(http::header::LOCATION, "/login")
+                        .header(http::header::LOCATION, format!("/login?redirect_path={}", path))
                         .finish()
                         .into_body(),
                 ))

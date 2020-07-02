@@ -54,7 +54,8 @@
   function attemptLogin() {
     const username = document.querySelector("#username").value;
     const password = document.querySelector("#password").value;
-    fetch(window.location.href + '/../auth', {
+      const basePath =  window.location.protocol + '//' + window.location.host;
+    fetch(basePath + '/auth', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -65,7 +66,9 @@
         'password': password
       })
     }).then(()=> {
-      window.location.href += '/../';
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectPath = urlParams.has("redirect_path") ? urlParams.get("redirect_path") : "";
+      window.location.href = basePath + redirectPath;
     });
 
     return false;
