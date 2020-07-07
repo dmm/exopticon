@@ -4,7 +4,7 @@ import numpy as np
 
 from exopticon import ExopticonWorker
 
-from frigate.frigate.frigate.motion import MotionDetector
+from frigate.data.motion import MotionDetector
 
 class MotionWorker(ExopticonWorker):
     def __init__(self):

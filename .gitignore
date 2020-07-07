@@ -3,13 +3,10 @@
 Cargo.lock
 /public
 *.dat
-exopticon/src/cworkers/captureworker
-exopticon/src/cworkers/playbackworker
 **/.#*
 **/core
 
 workers/__pycache__
-workers/*weights
-workers/faster_rcnn_inception_v2_coco_2018_01_28/
-workers/ssd_mobilenet_v2_coco_2018_03_29/
-workers/mscoco_label_map.pbtxt
+workers/cworkers/captureworker
+workers/cworkers/playbackworker
+workers/dist/

@@ -1,6 +1,8 @@
 use std::convert::TryInto;
+use std::env;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -287,7 +289,12 @@ impl Handler<StartWorker> for CaptureActor {
             // scenarios. If the directory already exists everything
             // is fine, otherwise we fail later.
         }
-        let mut cmd = Command::new("exopticon/src/cworkers/captureworker");
+        let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
+        let executable_path: PathBuf = [worker_path, "cworkers/captureworker".to_string()]
+            .iter()
+            .collect();
+
+        let mut cmd = Command::new(executable_path);
         cmd.arg(&self.stream_url);
         cmd.arg("0");
         cmd.arg(&storage_path);

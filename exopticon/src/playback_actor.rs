@@ -16,6 +16,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //use std::process::{Command, Stdio};
 
+use std::env;
+use std::path::PathBuf;
+use std::process::Stdio;
+
 use actix::fut::wrap_future;
 use actix::{
     Actor, ActorContext, ActorFuture, AsyncContext, Context, Handler, Message, Recipient,
@@ -23,7 +27,6 @@ use actix::{
 };
 use bytes::BytesMut;
 use exserial::models::CaptureMessage;
-use std::process::Stdio;
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 
@@ -185,7 +188,12 @@ impl Handler<StartWorker> for PlaybackActor {
             "Launching playback worker for file: {}",
             self.video_file_path
         );
-        let mut cmd = Command::new("exopticon/src/cworkers/playbackworker");
+        let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
+        let executable_path: PathBuf = [worker_path, "cworkers/playbackworker".to_string()]
+            .iter()
+            .collect();
+
+        let mut cmd = Command::new(executable_path);
         cmd.arg(&self.video_file_path);
         cmd.arg(self.initial_offset.to_string());
         cmd.stdout(Stdio::piped());

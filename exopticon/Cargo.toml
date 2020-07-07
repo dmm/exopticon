@@ -58,4 +58,3 @@ uuid = { version = "0.6", features = ["serde", "v4"] }
 
 [build-dependencies]
 askama = "0.7"
-exserial = { path = "../exserial" }
