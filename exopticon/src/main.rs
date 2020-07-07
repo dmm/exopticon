@@ -149,7 +149,7 @@ use crate::models::DbExecutor;
 use actix::prelude::*;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware::Logger, App, HttpServer};
-use base64::encode;
+use base64::{decode, encode};
 use chrono::Duration;
 use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
@@ -259,8 +259,10 @@ fn main() {
     let route_db_address = address.clone();
     let setup_address = address;
     // secret is a random 32 character long base 64 string
-    let secret: String =
-        env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 24]>()));
+    let secret_string: String =
+        env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 32]>()));
+    let secret = decode(&secret_string)
+        .expect("Invalid SECRET_KEY env var provided. Must be 32bytes encoded as base64");
 
     HttpServer::new(move || {
         App::new()
@@ -268,7 +270,7 @@ fn main() {
                 db: route_db_address.clone(),
             })
             .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(secret.as_bytes())
+                CookieIdentityPolicy::new(&secret)
                     .name("id")
                     .path("/")
                     //                .domain(domain.as_str())
