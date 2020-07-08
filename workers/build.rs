@@ -3,6 +3,13 @@ use std::process::Command;
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
+    assert!(Command::new("mkdir")
+        .arg("-p")
+        .arg("dist")
+        .status()
+        .expect("Failed to create \"dist\" directory.")
+        .success());
+
     println!("cargo:rerun-if-changed=exopticon.py");
     assert!(Command::new("cp")
         .arg("-r")
