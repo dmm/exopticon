@@ -1,0 +1,6 @@
+[submodule "workers/yolov4/darknet"]
+	path = workers/yolov4/darknet
+	url = https://github.com/AlexeyAB/darknet.git
+[submodule "workers/frigate/frigate"]
+	path = workers/frigate/frigate
+	url = https://github.com/blakeblackshear/frigate.git
