@@ -1,7 +1,7 @@
-use actix::{Handler, Message};
-use diesel::{self, prelude::*};
 use crate::errors::ServiceError;
 use crate::models::{CreateVideoFile, DbExecutor, FetchEmptyVideoFile, UpdateVideoFile, VideoFile};
+use actix::{Handler, Message};
+use diesel::{self, prelude::*};
 
 impl Message for CreateVideoFile {
     type Result = Result<VideoFile, ServiceError>;

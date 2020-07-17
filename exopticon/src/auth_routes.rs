@@ -16,7 +16,6 @@ use qstring::QString;
 use crate::app::RouteState;
 use crate::auth_handler::AuthData;
 
-
 /// Route to make login attempt
 pub async fn login(
     auth_data: Json<AuthData>,
@@ -102,7 +101,10 @@ where
                 let path = qs.get("redirect_uri").unwrap_or(&rpath);
                 Ok(req.into_response(
                     HttpResponse::Found()
-                        .header(http::header::LOCATION, format!("/login?redirect_path={}", path))
+                        .header(
+                            http::header::LOCATION,
+                            format!("/login?redirect_path={}", path),
+                        )
                         .finish()
                         .into_body(),
                 ))

@@ -1,7 +1,7 @@
-use actix::{Handler, Message};
-use diesel::*;
 use crate::errors::ServiceError;
 use crate::models::{Camera, CreateCamera, DbExecutor, FetchAllCamera, FetchCamera, UpdateCamera};
+use actix::{Handler, Message};
+use diesel::*;
 
 impl Message for CreateCamera {
     type Result = Result<Camera, ServiceError>;
