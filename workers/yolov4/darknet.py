@@ -197,11 +197,7 @@ def array_to_image(arr):
 
 def detect_image(net, meta, im, thresh=.5, hier_thresh=.5, nms=.45, debug= False):
     import cv2
-    #custom_image_bgr = cv2.imread(im) # use: detect(,,imagePath,)
-    custom_image = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-    custom_image = cv2.resize(custom_image,(lib.network_width(net), lib.network_height(net)), interpolation = cv2.INTER_LINEAR)
-    #import scipy.misc
-    #custom_image = scipy.misc.imread(image)
+    custom_image = im
     im, arr = array_to_image(custom_image)		# you should comment line below: free_image(im)
     num = c_int(0)
     if debug: print("Assigned num")
@@ -466,25 +462,23 @@ class Yolo4Worker(ExopticonWorker):
     def __init__(self):
         super().__init__("Yolo4Worker")
         dd = ExopticonWorker.get_data_dir()
-        self.configPath = os.path.join(dd, "yolov4.cfg")
+        self.configPath = os.path.join(dd, "yolov4-tiny.cfg")
         self.metaPath = os.path.join(dd, "coco.data")
-        self.weightPath = os.path.join(dd, "yolov4.weights")
+        self.weightPath = os.path.join(dd, "yolov4-tiny.weights")
         self.thresh = 0.25
 
-    def setup(self):
         self.netMain = load_net_custom(self.configPath.encode("ascii"), self.weightPath.encode("ascii"), 0, 1)  # batch size = 1
         self.metaMain = load_meta(self.metaPath.encode("ascii"))
         dd = ExopticonWorker.get_data_dir()
-        self.logger.info("Exopticon dir " + dd)
-        []
+
+        super().set_frame_size(lib.network_width(self.netMain),
+                               lib.network_height(self.netMain))
 
     def handle_frame(self, frame):
 #        detections = def detect_image(net, meta, im, thresh=.5, hier_thresh=.5, nms=.45, debug= False):
         detections = detect_image(self.netMain, self.metaMain, frame.image)
         count = len(detections)
         observations = []
-        x_scale = frame.unscaled_width / lib.network_width(self.netMain)
-        y_scale = frame.unscaled_height / lib.network_height(self.netMain)
 
         for det in detections:
             bounds = det[2]
@@ -498,14 +492,14 @@ class Yolo4Worker(ExopticonWorker):
                 "tag": "object",
                 "details": det[0].decode("utf-8"),
                 "score": int(det[1] * 100),
-                "ulX": max(int(ul_x * x_scale), 0),
-                "ulY": max(int(ul_y * y_scale), 0),
-                "lrX": int(lr_x * x_scale),
-                "lrY": int(lr_y * y_scale)
+                "ulX": max(int(ul_x), 0),
+                "ulY": max(int(ul_y), 0),
+                "lrX": int(lr_x),
+                "lrY": int(lr_y)
             })
             self.logger.info("Found a " + str(det))
         if len(observations) > 0:
-            self.write_observations(observations)
+            self.write_observations(frame, observations)
         []
 
 if __name__ == "__main__":

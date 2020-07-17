@@ -19,8 +19,34 @@ class AnalysisMask(object):
         self.lr_x = lr_x
         self.lr_y = lr_y
 
+class Observation(object):
+    def __init__(self, id, tag, details, score, ul_x, ul_y, lr_x, lr_y):
+        self.id = id
+        self.tag = tag
+        self.details = details
+        self.score = score
+        self.ul_x = ul_x
+        self.ul_y = ul_y
+        self.lr_x = lr_x
+        self.lr_y = lr_y
+
+def scale_observations(x_scale, y_scale, observations):
+    scaled_observations = []
+    for o in observations:
+        scaled_observations.append(Observation(o.id,
+                                               o.tag,
+                                               o.details,
+                                               o.score,
+                                               int(o.ul_x * x_scale),
+                                               int(o.ul_y * y_scale),
+                                               int(o.lr_x * x_scale),
+                                               int(o.lr_y * y_scale)))
+    return scaled_observations
+
 class AnalysisFrame(object):
-    def __init__(self, m):
+    def __init__(self, m, scaled_width, scaled_height):
+        self.__scaled_width = scaled_width
+        self.__scaled_height = scaled_height
         f = m["frame"]
 
         self.camera_id = f["camera_id"]
@@ -29,14 +55,39 @@ class AnalysisFrame(object):
         self.unscaled_width = f["unscaled_width"]
         self.offset = f["offset"]
         self.__load_image(f["jpeg"])
+        self.__load_observations(f["observations"])
         self.__load_masks(m["masks"])
 
     def __load_image(self, image_str):
         msg_buf = base64.standard_b64decode(image_str)
         msg_buf = numpy.frombuffer(msg_buf, dtype=numpy.uint8)
 
-        self.image = cv2.imdecode(msg_buf, cv2.IMREAD_COLOR)
+        image = cv2.imdecode(msg_buf, cv2.IMREAD_COLOR)
+
+        if (self.__scaled_width == 0 or self.__scaled_height == 0):
+            self.image = image
+        else:
+            self.image = cv2.resize(image, (self.__scaled_width, self.__scaled_height))
+
+        self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
         self.height, self.width, self.channels = self.image.shape
+
+    def __load_observations(self, raw_observations):
+        y_scale = self.height / self.unscaled_height
+        x_scale = self.width / self.unscaled_width
+
+        self.observations = []
+
+        for o in raw_observations:
+            self.observations.append(Observation(o["id"],
+                                                 o["tag"],
+                                                 o["details"],
+                                                 int(o["score"]),
+                                                 o["ulX"],
+                                                 int(o["ulY"]),
+                                                 int(o["lrX"]),
+                                                 int(o["lrY"])))
+        self.observations = scale_observations(x_scale, y_scale, self.observations)
 
     def __load_masks(self, raw_masks):
         y_scale = self.height / self.unscaled_height
@@ -49,6 +100,25 @@ class AnalysisFrame(object):
                                            int(m["lr_x"] * x_scale),
                                            int(m["lr_y"] * y_scale)))
 
+    def get_observation_bounding_box(self):
+        ul_x = 999999999999
+        ul_y = 999999999999
+        lr_x = -1
+        lr_y = -1
+
+        for o in self.observation:
+            if o.ul_x < ul_x:
+                ul_x = o.ul_x
+            if o.ul_y < ul_y:
+                ul_y = o.ul_y
+            if lr_x > o.lr_x:
+                lr_x = o.lr_x
+            if lr_y > o.lr_y:
+                lr_y = o.lr_y
+
+        return [ul_x, ul_y, lr_x, lr_y]
+
+
 class WorkerHandler(logging.Handler):
     def __init__(self, worker):
         super().__init__()
@@ -58,14 +128,14 @@ class WorkerHandler(logging.Handler):
         self.worker.raw_log(20, log_entry)
 
 class ExopticonWorker(object):
-    # Implement private methods
     def __init__(self, worker_name):
         self.__worker_name = worker_name
+        self.__frame_width = 0
+        self.__frame_height = 0
         self.__current_frame = None
         self.__frame_times = []
         self.__stdout = sys.stdout
 
-    def __setup(self):
         # configure logging
         self.logger = logging.getLogger(self.__worker_name)
         self.logger.setLevel(logging.DEBUG)
@@ -82,10 +152,13 @@ class ExopticonWorker(object):
         # newfd.
         os.dup2(2, 1)
 
-        # call subclass setup
         self.logger.info("Starting worker...")
-        self.setup()
 
+    def set_frame_size(self, frame_width, frame_height):
+        self.__frame_width = frame_width
+        self.__frame_height = frame_height
+
+    # Implement private methods
     def __cleanup(self):
         self.cleanup()
 
@@ -104,7 +177,7 @@ class ExopticonWorker(object):
         msg_len = struct.unpack('>L', len_buf)[0]
         msg_buf = sys.stdin.buffer.read(msg_len)
         msg = json.loads(msg_buf)
-        self.__current_frame = AnalysisFrame(msg["Frame"])
+        self.__current_frame = AnalysisFrame(msg["Frame"], self.__frame_width, self.__frame_height)
 
         return self.__current_frame
 
@@ -127,7 +200,14 @@ class ExopticonWorker(object):
         serialized = json.dumps(timing_dict)
         self.__write_framed_message(serialized)
 
-    def write_observations(self, observations):
+    def write_observations(self, frame, observations):
+        y_scale = frame.unscaled_height / frame.height
+        x_scale = frame.unscaled_width / frame.width
+        for o in observations:
+            o["ulX"] = int(o["ulX"] * x_scale)
+            o["ulY"] = int(o["ulY"] * y_scale)
+            o["lrX"] = int(o["lrX"] * x_scale)
+            o["lrY"] = int(o["lrY"] * y_scale)
         self.logger.info('observations: ' + str(observations))
         observations_dict = {'Observation': observations}
         serialized = json.dumps(observations_dict)
@@ -155,15 +235,12 @@ class ExopticonWorker(object):
         return os.path.join(sys.path[0], "data")
 
     # Implement extendable methods
-    def setup(self):
-        []
     def cleanup(self):
         []
     def handle_frame(self, frame):
         []
 
     def run(self):
-        self.__setup()
         try:
             while True:
                 self.__request_frame()
