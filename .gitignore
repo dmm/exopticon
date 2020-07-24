@@ -6,7 +6,3 @@ Cargo.lock
 **/.#*
 **/core
 
-workers/__pycache__
-workers/cworkers/captureworker
-workers/cworkers/playbackworker
-workers/dist/

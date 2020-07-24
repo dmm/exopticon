@@ -112,12 +112,13 @@ ENV RUST_HOME=/rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && /cargo/bin/rustup component add clippy \
   && /cargo/bin/rustup update \
-  && /cargo/bin/rustup default stable
+  && /cargo/bin/rustup default stable \
+  && /cargo/bin/cargo install --force cargo-make
 
 RUN pip3 install msgpack imutils numpy
 
 # configure environment
-ENV EXOPTICONWORKERS=/exopticon/workers/dist
+ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV PATH=$CARGO_HOME/bin:/exopticon/exopticon/workers:$PATH
 ENV CUDA_HOME=/usr/local/cuda-10.0

@@ -1,0 +1,85 @@
+[tasks.build]
+dependencies = [
+    "cworkers",
+    "exopticon",
+    "yolov4",
+    "frigate"
+]
+
+[tasks.cworkers]
+script_runner = "@duckscript"
+script = [
+'''
+worker_dir = concat ${CARGO_MAKE_WORKING_DIRECTORY} "/cworkers/"
+asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers/cworkers"
+
+exec mkdir -p ${asset_dir}
+
+set_env EXWORKER_BINDIR ${asset_dir}
+set_env CARGO_TARGET_DIR ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/debug
+
+cd ${worker_dir}
+exec make
+'''
+]
+
+[tasks.exopticon]
+script_runner = "@duckscript"
+script = [
+'''
+asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers"
+
+exec cp ${CARGO_MAKE_WORKING_DIRECTORY}/exopticon.py ${asset_dir}
+'''
+]
+
+
+[tasks.yolov4_darknet]
+script_runner = "@duckscript"
+script = [
+'''
+build_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/darknet"
+asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers/yolov4/data"
+echo build dir isss ${build_dir}
+mkdir ${build_dir}
+cd ${build_dir}
+exec cmake ${CARGO_MAKE_WORKING_DIRECTORY}/yolov4/darknet
+exec make -j4
+exec mkdir -p ${asset_dir}
+exec cp ${build_dir}/libdark.so ${asset_dir}
+
+'''
+]
+
+[tasks.yolov4]
+script_runner = "@duckscript"
+script = [
+'''
+bins = array "darknet.py"
+worker_dir = concat ${CARGO_MAKE_WORKING_DIRECTORY} "/yolov4/"
+asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers/yolov4/"
+
+
+exec mkdir -p ${asset_dir}
+exec cp -a ${worker_dir}/data/. ${asset_dir}/data/
+
+for b in ${bins}
+    exec cp ${worker_dir}/${b} ${asset_dir}
+end
+'''
+]
+dependencies = ["yolov4_darknet"]
+
+[tasks.frigate]
+script_runner = "@duckscript"
+script = [
+'''
+worker_dir = concat ${CARGO_MAKE_WORKING_DIRECTORY} "/frigate/"
+asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers/frigate/"
+
+exec mkdir -p ${asset_dir}/data
+
+exec cp -r ${worker_dir}/frigate/frigate/motion.py ${asset_dir}/data
+exec cp -r ${worker_dir}/motion.py ${asset_dir}
+'''
+]

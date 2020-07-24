@@ -1,45 +1,47 @@
-FROM rust:slim
+FROM rust:latest
 
 # Install system packages
+RUN echo 'deb-src http://http.debian.net/debian buster main contrib non-free' > /etc/apt/sources.list.d/src.list
 RUN apt-get update && apt-get install --no-install-recommends -y \
-# Exopticon Dependencies
-           libavcodec-dev libavformat-dev libswscale-dev libavfilter-dev \
-           libavutil-dev libturbojpeg0-dev autoconf automake bzip2 \
-           dpkg-dev file g++ gcc imagemagick libbz2-dev libc6-dev \
-           libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
-           libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
-           libkrb5-dev liblzma-dev libmagickcore-dev libmagickwand-dev\
-           libncurses5-dev libncursesw5-dev libpng-dev libpq-dev \
-           libreadline-dev libsqlite3-dev libssl-dev libtool libwebp-dev \
-           libxml2-dev libxslt-dev libyaml-dev make patch xz-utils \
-           zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
-           curl python3-pil python3-lxml \
-           python3 python3-pip python3-setuptools python3-wheel \
-&& apt-get clean \
-&& rm -rf /var/lib/apt/lists/*
+  # Exopticon Build Dependencies
+  libavcodec-dev libavformat-dev libswscale-dev libavfilter-dev \
+  libavutil-dev libturbojpeg0-dev autoconf automake bzip2 \
+  dpkg-dev file g++ gcc imagemagick libbz2-dev libc6-dev \
+  libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
+  libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
+  libkrb5-dev liblzma-dev libmagickcore-dev libmagickwand-dev\
+  libncurses5-dev libncursesw5-dev libpng-dev libpq-dev \
+  libreadline-dev libsqlite3-dev libssl-dev libtool libwebp-dev \
+  libxml2-dev libxslt-dev libyaml-dev make patch xz-utils \
+  zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
+  curl python3-pil python3-lxml \
+  python3 python3-pip python3-setuptools python3-wheel \
+  git libopencv-dev python3-opencv cmake \
+  wget \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
 # install node.js and npm
 RUN mkdir /node && cd /node \
-    && curl https://nodejs.org/dist/v12.10.0/node-v12.10.0-linux-x64.tar.xz  > node-v12.10.0-linux-x64.tar.xz \
-    && tar xf node-v12.10.0-linux-x64.tar.xz \
-    && rm -rf node-v12.10.0-linux-x64.tar.xz
-ENV PATH=$PATH:/node/node-v12.10.0-linux-x64/bin
+    && wget https://nodejs.org/dist/v12.16.2/node-v12.16.2-linux-x64.tar.xz -O node.tar.xz \
+    && tar xf node.tar.xz \
+    && mv node*/* . \
+    && rm -rf node.tar.xz
+ENV PATH=$PATH:/node/bin
 
-# Install diesel_cli
-RUN cargo install diesel_cli
+RUN rustup component add clippy \
+  && cargo install --force cargo-make
+
+RUN pip3 install msgpack imutils numpy
 
 # configure environment
-ENV PATH=/usr/local:/exopticon/workers:$PATH
+ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
+ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
+ENV PATH=$CARGO_HOME/bin:/exopticon/exopticon/workers:$PATH
 ENV CUDA_HOME=/usr/local/cuda-10.0
 ENV CUDA_PATH=/usr/local/cuda-10.0/bin
-
-# configure run user
-RUN groupadd -r exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
-USER exopticon:exopticon
-
-USER root:root
-
-USER exopticon:exopticon
+ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-10.0
+ENV CUDACXX=/usr/local/cuda-10.0/bin/nvcc
 
 
 

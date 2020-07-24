@@ -1,4 +1,4 @@
-image: dmattli/exopticonbuild:3
+image: dmattli/exopticonbuild:4
 
 cache:
   key: "$CI_JOB_NAME"
@@ -9,7 +9,6 @@ cache:
 
 # Set any required environment variables here
 variables:
-  CARGO_HOME: $CI_PROJECT_DIR/cargo
   RUST_BACKTRACE: FULL
 
 stages:
@@ -17,11 +16,8 @@ stages:
 
 app-build:
   stage: build
-  before_script:
-    - rustup component add clippy
   script:
-    - cargo build --release
-    - OPWD=`pwd`; cd exserial; cargo build; cd "$OPWD"
+    - cargo make
     - cargo clippy
     - cargo test
 
