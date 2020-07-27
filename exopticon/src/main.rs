@@ -20,8 +20,7 @@
 #![allow(clippy::multiple_crate_versions)]
 #![allow(clippy::implicit_return)]
 #![allow(clippy::print_stdout)]
-#![allow(clippy::result_expect_used)]
-#![allow(clippy::option_expect_used)]
+#![allow(clippy::expect_used)]
 #![allow(clippy::missing_errors_doc)] // TODO: Fix this one
 #![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
 
