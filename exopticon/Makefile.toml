@@ -1,0 +1,33 @@
+
+[tasks.ci-flow]
+description = "CI task will run cargo build and cargo test with verbose output"
+category = "CI"
+dependencies = [
+    "pre-ci-flow",
+    "print-env-flow",
+    "pre-build",
+    "check-format-ci-flow",
+    "clippy-ci-flow",
+    "build-release",
+    "post-build",
+    "test-flow",
+    "examples-ci-flow",
+    "bench-ci-flow",
+    "outdated-ci-flow",
+    "ci-coverage-flow",
+    "post-ci-flow"
+]
+
+[tasks.run]
+description = "Runs the debug executable."
+category = "Development"
+command = "cargo"
+args = ["run"]
+dependencies = [ "build" ]
+
+[tasks.run-release]
+description = "Runs the release executable."
+category = "Development"
+command = "cargo"
+args = ["run", "--release"]
+dependencies = [ "build-release" ]

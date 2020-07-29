@@ -7,7 +7,8 @@ LIBRARIES= -lavformat -lavutil -lavcodec -lswscale -lturbojpeg
 CC ?= clang
 
 # so we can run make outside of Cargo
-OUTDIR ?= ../../target/debug
+CARGO_PROFILE ?= debug
+OUTDIR ?= ../../target/$(CARGO_PROFILE)
 CARGO_TARGET_DIR ?= $(OUT_DIR)/../../..
 EXSERIAL_LIB= $(CARGO_TARGET_DIR)/libexserial.a
 EXSERIAL_FLAGS= -L$(CARGO_TARGET_DIR) -ldl -lpthread $(EXSERIAL_LIB)

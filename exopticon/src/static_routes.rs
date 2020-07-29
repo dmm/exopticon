@@ -31,7 +31,7 @@ pub fn login(_req: HttpRequest) -> HttpResponse {
 }
 
 #[derive(RustEmbed)]
-#[folder = "$CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY/exopticon/web/dist"]
+#[folder = "web/dist"]
 struct Asset;
 
 /// Returns `HttpResponse` with specified static file or error.

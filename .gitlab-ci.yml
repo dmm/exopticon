@@ -17,9 +17,7 @@ stages:
 app-build:
   stage: build
   script:
-    - cargo make
-    - cargo clippy
-    - cargo test
+    - cargo make ci-flow
 
 
 

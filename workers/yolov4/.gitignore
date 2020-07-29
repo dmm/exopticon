@@ -1,5 +1,0 @@
-
-*.so
-build/
-__pycache__
-data

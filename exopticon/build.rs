@@ -3,10 +3,7 @@ extern crate askama;
 use std::process::Command;
 
 fn main() {
-    askama::rerun_if_templates_changed();
-
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=web");
 
     if !cfg!(debug_assertions) {
         assert!(Command::new("npm")

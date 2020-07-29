@@ -1,25 +1,63 @@
+[tasks.build-deps]
+category = "Build"
+command = "cargo"
+args = ["build"]
+
+[tasks.build-deps-release]
+category = "Build"
+command = "cargo"
+args = ["build", "--release"]
+
+[tasks.build-workers]
+script_runner = "@duckscript"
+script = [
+'''
+cm_run_task cworkers
+cm_run_task exopticon
+cm_run_task yolov4
+cm_run_task frigate
+'''
+]
+
 [tasks.build]
-dependencies = [
-    "cworkers",
-    "exopticon",
-    "yolov4",
-    "frigate"
+clear = true
+env = { "CARGO_PROFILE" = "debug" }
+script_runner = "@duckscript"
+script = [
+'''
+cm_run_task build-deps
+cm_run_task build-workers
+'''
+]
+
+[tasks.build-release]
+clear = true
+env = { "CARGO_PROFILE" = "release" }
+script_runner = "@duckscript"
+script = [
+'''
+cm_run_task build-deps-release
+cm_run_task build-workers
+'''
 ]
 
 [tasks.cworkers]
 script_runner = "@duckscript"
 script = [
 '''
+exit_on_error true
 worker_dir = concat ${CARGO_MAKE_WORKING_DIRECTORY} "/cworkers/"
 asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers/cworkers"
 
 exec mkdir -p ${asset_dir}
 
 set_env EXWORKER_BINDIR ${asset_dir}
-set_env CARGO_TARGET_DIR ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/debug
+set_env CARGO_TARGET_DIR ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/${CARGO_PROFILE}
 
 cd ${worker_dir}
-exec make
+output = exec make
+echo make output ${output.stdout}
+
 '''
 ]
 
@@ -27,6 +65,7 @@ exec make
 script_runner = "@duckscript"
 script = [
 '''
+exit_on_error true
 asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers"
 
 exec cp ${CARGO_MAKE_WORKING_DIRECTORY}/exopticon.py ${asset_dir}
@@ -38,6 +77,7 @@ exec cp ${CARGO_MAKE_WORKING_DIRECTORY}/exopticon.py ${asset_dir}
 script_runner = "@duckscript"
 script = [
 '''
+exit_on_error true
 build_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/darknet"
 asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers/yolov4/data"
 echo build dir isss ${build_dir}
@@ -55,6 +95,8 @@ exec cp ${build_dir}/libdark.so ${asset_dir}
 script_runner = "@duckscript"
 script = [
 '''
+cm_run_task yolov4_darknet
+
 bins = array "darknet.py"
 worker_dir = concat ${CARGO_MAKE_WORKING_DIRECTORY} "/yolov4/"
 asset_dir = concat ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY} "/target/assets/workers/yolov4/"
@@ -68,7 +110,6 @@ for b in ${bins}
 end
 '''
 ]
-dependencies = ["yolov4_darknet"]
 
 [tasks.frigate]
 script_runner = "@duckscript"
