@@ -1,22 +1,28 @@
 
-[tasks.ci-flow]
-description = "CI task will run cargo build and cargo test with verbose output"
-category = "CI"
-dependencies = [
-    "pre-ci-flow",
-    "print-env-flow",
-    "pre-build",
-    "check-format-ci-flow",
-    "clippy-ci-flow",
-    "build-release",
-    "post-build",
-    "test-flow",
-    "examples-ci-flow",
-    "bench-ci-flow",
-    "outdated-ci-flow",
-    "ci-coverage-flow",
-    "post-ci-flow"
+
+[tasks.build-web]
+category = "Build"
+script = [
+'''
+cd web/
+npm install
+npm run ng build -- --prod
+'''
 ]
+
+[tasks.watch-web]
+description = "Watch the web/ dir for changes and build."
+category = "Development"
+script = [
+'''
+cd web/
+npm run build -- --watch
+'''
+]
+
+[tasks.pre-build]
+category = "Build"
+dependencies = [ "build-web" ]
 
 [tasks.run]
 description = "Runs the debug executable."
@@ -31,3 +37,4 @@ category = "Development"
 command = "cargo"
 args = ["run", "--release"]
 dependencies = [ "build-release" ]
+
