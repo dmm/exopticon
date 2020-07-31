@@ -81,7 +81,7 @@ cp ${build_dir}/libdark.so ${asset_dir}
 '''
 ]
 
-[tasks.yolov4]
+[tasks.yolov4_python]
 script = [
 '''
 worker_dir=${CARGO_MAKE_WORKING_DIRECTORY}"/yolov4/"
@@ -95,7 +95,9 @@ cp -a ${worker_dir}/data/. ${asset_dir}/data/
 cp ${worker_dir}/darknet.py ${asset_dir}
 '''
 ]
-dependencies = [ "yolov4_darknet" ]
+
+[tasks.yolov4]
+run_task = { name = ["yolov4_python", "yolov4_darknet"] }
 
 [tasks.frigate]
 script = [
