@@ -2,7 +2,7 @@ use crate::errors::ServiceError;
 use crate::models::{
     Camera, CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor,
     DeleteVideoUnitFiles, FetchBetweenVideoUnit, FetchOldVideoUnitFile, FetchVideoUnit,
-    OutputVideoUnit, UpdateVideoFile, UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
+    Observation, UpdateVideoFile, UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
 };
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
@@ -123,13 +123,15 @@ impl Handler<UpdateVideoUnitFile> for DbExecutor {
         Ok((video_unit, video_file))
     }
 }
+/// Type Alias for video unit handler return type
+type VideoUnitTuple = (VideoUnit, Vec<VideoFile>, Vec<Observation>);
 
 impl Message for FetchVideoUnit {
-    type Result = Result<OutputVideoUnit, ServiceError>;
+    type Result = Result<VideoUnitTuple, ServiceError>;
 }
 
 impl Handler<FetchVideoUnit> for DbExecutor {
-    type Result = Result<OutputVideoUnit, ServiceError>;
+    type Result = Result<VideoUnitTuple, ServiceError>;
 
     fn handle(&mut self, msg: FetchVideoUnit, _: &mut Self::Context) -> Self::Result {
         //        use schema::{video_files, video_units};
@@ -145,31 +147,26 @@ impl Handler<FetchVideoUnit> for DbExecutor {
             .load::<VideoFile>(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
-        Ok(OutputVideoUnit {
-            id: vu.id,
-            camera_id: vu.camera_id,
-            monotonic_index: vu.monotonic_index,
-            begin_time: vu.begin_time,
-            end_time: vu.end_time,
-            files,
-            inserted_at: vu.inserted_at,
-            updated_at: vu.updated_at,
-        })
+        let observations = crate::models::Observation::belonging_to(&vu)
+            .load::<Observation>(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        Ok((vu, files, observations))
     }
 }
 
 impl Message for FetchBetweenVideoUnit {
-    type Result = Result<Vec<VideoUnit>, ServiceError>;
+    type Result = Result<Vec<VideoUnitTuple>, ServiceError>;
 }
 
 impl Handler<FetchBetweenVideoUnit> for DbExecutor {
-    type Result = Result<Vec<VideoUnit>, ServiceError>;
+    type Result = Result<Vec<VideoUnitTuple>, ServiceError>;
 
     fn handle(&mut self, msg: FetchBetweenVideoUnit, _: &mut Self::Context) -> Self::Result {
         use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
-        video_units
+        let vus: Vec<VideoUnit> = video_units
             .filter(camera_id.eq(msg.camera_id))
             .filter(begin_time.le(msg.end_time.naive_utc()))
             .filter(end_time.ge(msg.begin_time.naive_utc()))
@@ -177,7 +174,28 @@ impl Handler<FetchBetweenVideoUnit> for DbExecutor {
             .order(begin_time.asc())
             .limit(1000)
             .load(conn)
-            .map_err(|_error| ServiceError::InternalServerError)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        let files = crate::models::VideoFile::belonging_to(&vus)
+            .load::<VideoFile>(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        let grouped_files = files.grouped_by(&vus);
+
+        let observations = crate::models::Observation::belonging_to(&vus)
+            .load::<Observation>(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        let grouped_observations = observations.grouped_by(&vus);
+
+        let grouped_units = vus
+            .into_iter()
+            .zip(grouped_files)
+            .zip(grouped_observations)
+            .map(|((vu, file_group), obs_group)| (vu, file_group, obs_group))
+            .collect();
+
+        Ok(grouped_units)
     }
 }
 

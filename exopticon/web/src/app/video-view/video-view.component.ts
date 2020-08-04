@@ -95,6 +95,7 @@ export class VideoViewComponent implements OnInit {
     this.ctx.font = '32pt sans';
 
     observations.forEach((o) => {
+      if (o.tag == 'motion') return;
       let width = o.lrX - o.ulX;
       let height = o.lrY - o.ulY;
       this.ctx.strokeRect(o.ulX, o.ulY, width, height);

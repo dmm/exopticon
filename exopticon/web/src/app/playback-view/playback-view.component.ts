@@ -8,6 +8,7 @@ import '@js-joda/timezone'
 
 import { FrameMessage } from '../frame-message';
 import { ObservationService } from '../observation.service';
+import { Observation } from '../observation';
 import { VideoUnit } from '../video-unit';
 import { VideoUnitService } from '../video-unit.service';
 import { VideoService, SubscriptionSubject } from '../video.service';
@@ -35,11 +36,10 @@ export class PlaybackViewComponent implements OnInit {
 
   private ctx: CanvasRenderingContext2D;
   private obCtx: CanvasRenderingContext2D;
-  private units: VideoUnit[];
-  private observations: any[];
+  private units: [VideoUnit, any[], Observation[]][];
   private playbackProgress: number;
-  private currentVideoUnit: VideoUnit | null;
-  private readonly playerDuration: Duration = Duration.ofHours(2);
+  private currentVideoUnit: [VideoUnit, any[], Observation[]] | null;
+  private readonly playerDuration: Duration = Duration.ofHours(1);
 
 
   constructor(public route: ActivatedRoute,
@@ -52,7 +52,7 @@ export class PlaybackViewComponent implements OnInit {
 
   progress(newOffset: number) {
     let currentPlaybackOffset = Duration.between(this.viewStartTime,
-      this.currentVideoUnit.beginTime.plusNanos(newOffset * 1000)).toMillis();
+      this.currentVideoUnit[0].beginTime.plusNanos(newOffset * 1000)).toMillis();
     this.playbackProgress = currentPlaybackOffset / this.playerDuration.toMillis();
     this.drawProgressBar();
   }
@@ -63,8 +63,8 @@ export class PlaybackViewComponent implements OnInit {
     this.ctx.fillRect(0, 0, 1000, 20);
 
     this.units.forEach((u) => {
-      let pos = Math.floor(this.calculateProgressPosition(u.beginTime));
-      let end = Math.ceil(this.calculateProgressPosition(u.endTime));
+      let pos = Math.floor(this.calculateProgressPosition(u[0].beginTime));
+      let end = Math.ceil(this.calculateProgressPosition(u[0].endTime));
 
       if (pos == -1 && end == -1) return;
       if (pos == -1) pos = 0;
@@ -82,14 +82,17 @@ export class PlaybackViewComponent implements OnInit {
   }
 
   drawObservations() {
-    return;
+    // clear out canvas
+    this.obCtx.clearRect(0, 0, this.obCtx.canvas.width, this.obCtx.canvas.height);
+
     let canvasWidth = 1000;
-    this.observations.forEach((o) => {
-      let pos = this.calculateProgressPosition(o[1].beginTime, o[0].frameOffset)
-      console.log('calculated pos: ' + pos);
-      let x = canvasWidth * pos;
-      this.obCtx.fillStyle = '#F00';
-      this.obCtx.fillRect(x, 0, 1, 20);
+    this.units.forEach((u) => {
+      u[2].forEach(o => {
+        let pos = this.calculateProgressPosition(u[0].beginTime, o.frameOffset)
+        if (o.tag == 'motion') return;
+        this.obCtx.fillStyle = '#F0F';
+        this.obCtx.fillRect(pos, 0, 1, 20);
+      });
     });
   }
 
@@ -100,14 +103,14 @@ export class PlaybackViewComponent implements OnInit {
     let selectedUnit = this.findVideoUnitForTime(selectedTime);
 
     if (selectedUnit) {
-      let fileOffsetMillis = Duration.between(selectedUnit.beginTime, selectedTime).toMillis() * 1000;
+      let fileOffsetMillis = Duration.between(selectedUnit[0].beginTime, selectedTime).toMillis() * 1000;
       this.currentVideoUnit = selectedUnit;
-      this.play(selectedUnit, fileOffsetMillis);
+      this.play(selectedUnit[0], fileOffsetMillis);
     }
   }
 
-  findVideoUnitForTime(time: ZonedDateTime): VideoUnit | null {
-    return this.units.find((videoUnit) => {
+  findVideoUnitForTime(time: ZonedDateTime): [VideoUnit, any[], Observation[]] | null {
+    return this.units.find(([videoUnit, files, obs]) => {
       return videoUnit.beginTime.isBefore(time) && videoUnit.endTime.isAfter(time);
     });
   }
@@ -143,10 +146,11 @@ export class PlaybackViewComponent implements OnInit {
       return -1;
     }
 
-    let displayDuration = Duration.between(this.viewStartTime, viewEndTime).toMillis();
-    let offsetDuration = Duration.between(this.viewStartTime, time).toMillis() + (offset_micros / 1000);
+    let offsetDuration = Duration.ofNanos(offset_micros * 1000);
+    let displayMillis = Duration.between(this.viewStartTime, viewEndTime).toMillis();
+    let displayOffsetMillis = Duration.between(this.viewStartTime, time).plusDuration(offsetDuration).toMillis();
 
-    return (offsetDuration / displayDuration) * 1000;
+    return (displayOffsetMillis / displayMillis) * 1000;
   }
 
   setViewStartTime(time: ZonedDateTime) {
@@ -165,12 +169,9 @@ export class PlaybackViewComponent implements OnInit {
     let viewEndTime = this.viewStartTime.plusMinutes(this.playerDuration.toMinutes());
     this.videoUnitService.getVideoUnits(this.cameraId, this.viewStartTime, viewEndTime
     ).subscribe((units) => {
-      this.units = units.map((u) => {
-        u.beginTime = ZonedDateTime.parse(u.beginTime + 'Z');
-        u.endTime = ZonedDateTime.parse(u.endTime + 'Z');
-        return u;
-      });
+      this.units = units;
       this.drawProgressBar();
+      this.drawObservations();
     });
 
   }
@@ -188,16 +189,8 @@ export class PlaybackViewComponent implements OnInit {
     this.drawProgressBar();
     this.videoUnitService.getVideoUnits(this.cameraId, this.viewStartTime, viewEndTime
     ).subscribe((units) => {
-      this.units = units.map((u) => {
-        u.beginTime = ZonedDateTime.parse(u.beginTime + 'Z');
-        u.endTime = ZonedDateTime.parse(u.endTime + 'Z');
-        return u;
-      });
+      this.units = units;
       this.drawProgressBar();
-    });
-    return;
-    this.observationService.getObservations(this.cameraId, this.viewStartTime, viewEndTime).subscribe((obs) => {
-      this.observations = obs;
       this.drawObservations();
     });
   }

@@ -7,13 +7,12 @@ use actix::{
 };
 use actix_web_actors::ws;
 use base64::STANDARD_NO_PAD;
-use futures::future;
 use rmp_serde::Serializer;
 use serde::Serialize;
 
 use crate::db_registry;
 use crate::fair_queue::FairQueue;
-use crate::models::{FetchObservationsByVideoUnit, FetchVideoUnit, Observation};
+use crate::models::{FetchVideoUnit, Observation};
 use crate::playback_actor::PlaybackFrame;
 use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback, StopPlayback};
 use crate::struct_map_writer::StructMapWriter;
@@ -278,31 +277,29 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         // generated ids.
 
                         // Ask playback supervisor to begin playback
-                        let fetch_observations = db_registry::get_db()
-                            .send(FetchObservationsByVideoUnit { video_unit_id });
-
                         let fetch_video_unit =
                             db_registry::get_db().send(FetchVideoUnit { id: video_unit_id });
 
-                        let create_actor = future::join(fetch_video_unit, fetch_observations)
-                            .into_actor(self)
-                            .map(move |res, _act, ctx| {
-                                if let (Ok(Ok(video_unit)), Ok(Ok(observations))) = res {
-                                    info!("Fetched {} observations.", observations.len());
-                                    if let Some(video_file) = video_unit.files.first() {
-                                        PlaybackSupervisor::from_registry().do_send(
-                                            StartPlayback {
-                                                id,
-                                                video_unit_id,
-                                                offset,
-                                                video_filename: video_file.filename.clone(),
-                                                observations,
-                                                address: ctx.address(),
-                                            },
-                                        );
+                        let create_actor =
+                            fetch_video_unit
+                                .into_actor(self)
+                                .map(move |res, _act, ctx| {
+                                    if let Ok(Ok((_video_unit, files, observations))) = res {
+                                        info!("Fetched {} observations.", observations.len());
+                                        if let Some(video_file) = files.first() {
+                                            PlaybackSupervisor::from_registry().do_send(
+                                                StartPlayback {
+                                                    id,
+                                                    video_unit_id,
+                                                    offset,
+                                                    video_filename: video_file.filename.clone(),
+                                                    observations,
+                                                    address: ctx.address(),
+                                                },
+                                            );
+                                        }
                                     }
-                                }
-                            });
+                                });
                         ctx.spawn(create_actor);
 
                         // subscribe to playback subject

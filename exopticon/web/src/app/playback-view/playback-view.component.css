@@ -3,7 +3,7 @@
   height: 100%;
   width: 100%;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 20px 50px;
+  grid-template-rows: minmax(0, 1fr) 20px 30px;
 }
 
 .button {
@@ -16,15 +16,20 @@
   grid-template-rows: 1fr;
 }
 .progress-bar {
-  height: 40px;
+  height: 20px;
+  position: relative;
 }
 
-.observations {
+canvas.observations {
   height: 20px;
+  position: absolute;
+  top: 0;
 }
 
-.video-availability {
+canvas.video-availability {
   height: 20px;
+  position: absolute;
+  top: 0;
 }
 
 .video-view {
@@ -35,3 +40,4 @@ canvas {
   width: 100%;
   height: 20px;
 }
+

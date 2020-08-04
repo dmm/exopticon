@@ -230,8 +230,6 @@ pub struct OutputVideoUnit {
     pub begin_time: NaiveDateTime,
     /// end time in UTC
     pub end_time: NaiveDateTime,
-    /// video files associated with this video unit
-    pub files: Vec<VideoFile>,
     /// insertion time
     pub inserted_at: NaiveDateTime,
     /// update time
