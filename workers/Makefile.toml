@@ -47,7 +47,7 @@ script = [
 worker_dir=${CARGO_MAKE_WORKING_DIRECTORY}"/cworkers/"
 asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}"/target/assets/workers/cworkers"
 
-mkdir -p ${asset_dir}
+mkdir -p ${asset_dir} || true
 
 export EXWORKER_BINDIR=${asset_dir}
 export CARGO_TARGET_DIR=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/${CARGO_PROFILE}
@@ -72,11 +72,11 @@ script = [
 '''
 build_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/darknet
 asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/assets/workers/yolov4/data
-mkdir ${build_dir}
+mkdir ${build_dir} || true
 cd ${build_dir}
 cmake ${CARGO_MAKE_WORKING_DIRECTORY}/yolov4/darknet
 make -j4
-mkdir -p ${asset_dir}
+mkdir -p ${asset_dir} || true
 cp ${build_dir}/libdark.so ${asset_dir}
 '''
 ]
@@ -88,7 +88,7 @@ worker_dir=${CARGO_MAKE_WORKING_DIRECTORY}"/yolov4/"
 asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}"/target/assets/workers/yolov4/"
 
 
-mkdir -p ${asset_dir}
+mkdir -p ${asset_dir} || true
 cp -a ${worker_dir}/data/. ${asset_dir}/data/
 
 # Deploy darknet.py
@@ -105,7 +105,7 @@ script = [
 worker_dir=${CARGO_MAKE_WORKING_DIRECTORY}"/frigate/"
 asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}"/target/assets/workers/frigate/"
 
-mkdir -p ${asset_dir}/data
+mkdir -p ${asset_dir}/data || true
 
 cp -r ${worker_dir}/frigate/frigate/motion.py ${asset_dir}/data
 cp -r ${worker_dir}/motion.py ${asset_dir}
