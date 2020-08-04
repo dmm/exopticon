@@ -150,7 +150,7 @@ impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
                         executable_name: msg.executable_name,
                         arguments: msg.arguments,
                         max_fps: msg.max_fps,
-                        subscriptions: msg.subscriptions.clone(),
+                        subscriptions: msg.subscriptions,
                     },
                     Duration::new(5, 0),
                 );
