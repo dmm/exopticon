@@ -221,8 +221,10 @@ impl CaptureActor {
                                 actor.video_file_id = Some(video_file.id);
                                 actor.filename = Some(filename)
                             }
-                            Err(e) => panic!("Error inserting video unit: {}", e),
-                            _ => panic!("Error inserting video unit.",),
+                            Ok(Err(e)) => {
+                                panic!("Error inserting video unit: db handler error {}", e)
+                            }
+                            Err(e) => panic!("Error inserting video unit: message error {}", e),
                         },
                     ));
                 } else {
