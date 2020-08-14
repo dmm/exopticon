@@ -2,9 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
-import { FrameMessage, CameraResolution } from './frame-message';
-
-
+import { WsMessage, FrameMessage, CameraResolution } from './frame-message';
 
 export interface CameraSubject {
   kind: 'camera';
@@ -63,8 +61,10 @@ export class VideoService {
   private setupAcker() {
     if (this.subscription === null) {
       this.subscription = this.subject.subscribe(
-        () => {
-          this.subject.next('Ack');
+        (frame: FrameMessage) => {
+          if (frame.kind === 'frame') {
+            this.subject.next('Ack');
+          }
         },
         () => { },
         () => { }
@@ -84,8 +84,8 @@ export class VideoService {
     }
   }
 
-  public getObservable(subject: SubscriptionSubject): Observable<FrameMessage> {
-    let frameSub: WebSocketSubject<FrameMessage> = this.subject as unknown as WebSocketSubject<FrameMessage>;
+  public getObservable(subject: SubscriptionSubject): Observable<WsMessage> {
+    let frameSub: WebSocketSubject<WsMessage> = this.subject as unknown as WebSocketSubject<WsMessage>;
 
     return frameSub.multiplex(
       () => {
@@ -139,21 +139,30 @@ export class VideoService {
 
         }
       },
-      (m: FrameMessage): boolean => {
-        switch (m.source.kind) {
-          case 'camera':
-            return subject.kind === 'camera'
-              && subject.cameraId === m.source.cameraId
-              && subject.resolution === m.resolution;
-          case 'analysisEngine':
-            return subject.kind === 'analysisEngine'
-              && subject.analysisEngineId === m.source.analysisEngineId;
-          case 'playback':
-            return subject.kind === 'playback'
-              && subject.id === m.source.id;
+      (m: WsMessage): boolean => {
+
+        if (m.kind === 'frame') {
+          switch (m.source.kind) {
+            case 'camera':
+              return subject.kind === 'camera'
+                && subject.cameraId === m.source.cameraId
+                && subject.resolution === m.resolution;
+            case 'analysisEngine':
+              return subject.kind === 'analysisEngine'
+                && subject.analysisEngineId === m.source.analysisEngineId;
+            case 'playback':
+              return subject.kind === 'playback'
+                && subject.id === m.source.id;
+              }
+        } else if (m.kind === 'playbackEnd') {
+          return subject.kind === 'playback'
+            && subject.id == m.id;
+        } else {
+          // invalid kind
         }
       });
   }
+
 
   public getWriteSubject(): Subject<Object> {
     return this.subject;

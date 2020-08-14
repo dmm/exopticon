@@ -33,6 +33,7 @@ use tokio_util::codec::length_delimited;
 use crate::models::Observation;
 use crate::playback_supervisor::{PlaybackSupervisor, StopPlayback};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource};
+use crate::ws_session::{RawCameraFrame, WsMessage};
 
 /// struct representing playback frame with list of observations. It's
 /// used to send frame and observations to client.
@@ -58,7 +59,7 @@ pub struct PlaybackActor {
     /// observations included in this video unit
     pub observations: Vec<Observation>,
     /// address to send playback frames
-    pub target_address: Recipient<PlaybackFrame>,
+    pub target_address: Recipient<WsMessage>,
     /// current frame count offset, not really used yet
     pub offset: i64,
 }
@@ -85,7 +86,7 @@ impl PlaybackActor {
         initial_offset: i64,
         video_file_path: String,
         observations: Vec<Observation>,
-        target_address: Recipient<PlaybackFrame>,
+        target_address: Recipient<WsMessage>,
     ) -> Self {
         Self {
             id,
@@ -124,6 +125,17 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for PlaybackActor {
             Ok(b) => b,
             Err(e) => {
                 error!("PlaybackActor: stream handler error! {}", e);
+                // Notify WsSession that we are done
+                if self
+                    .target_address
+                    .try_send(WsMessage::PlaybackEnd { id: self.id })
+                    .is_err()
+                {
+                    error!("Error sending PlaybackEnd");
+                }
+                // Notify supervisor that we are done.
+                PlaybackSupervisor::from_registry().do_send(StopPlayback { id: self.id });
+
                 ctx.stop();
                 return;
             }
@@ -136,28 +148,34 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for PlaybackActor {
                 unscaled_width,
                 unscaled_height,
             }) => {
+                let frame = RawCameraFrame {
+                    camera_id: 0,
+                    resolution: FrameResolution::HD,
+                    unscaled_width,
+                    unscaled_height,
+                    source: FrameSource::Playback { id: self.id },
+                    video_unit_id: self.video_unit_id,
+                    offset,
+                    observations: self.slurp_observations(offset),
+                    jpeg,
+                };
                 if self
                     .target_address
-                    .do_send(PlaybackFrame {
-                        frame: CameraFrame {
-                            camera_id: 0,
-                            jpeg,
-                            observations: self.slurp_observations(offset),
-                            resolution: FrameResolution::HD,
-                            source: FrameSource::Playback { id: self.id },
-                            video_unit_id: self.video_unit_id,
-                            offset,
-                            unscaled_width,
-                            unscaled_height,
-                        },
-                        observations: Vec::new(),
-                    })
+                    .do_send(WsMessage::Frame(frame))
                     .is_err()
                 {
                     debug!(
                         "Playback Actor: {} Unable to send message to recipient, dying..",
                         self.id
                     );
+                    // Notify WsSession that we are done
+                    if self
+                        .target_address
+                        .try_send(WsMessage::PlaybackEnd { id: self.id })
+                        .is_err()
+                    {
+                        error!("Error sending PlaybackEnd");
+                    }
                     // Notify supervisor that we are done.
                     PlaybackSupervisor::from_registry().do_send(StopPlayback { id: self.id });
                 }
@@ -207,6 +225,15 @@ impl Handler<StartWorker> for PlaybackActor {
         Self::add_stream(framed_stream, ctx);
         let fut = wrap_future(child).map(|_status, actor: &mut Self, _ctx| {
             debug!("Playback Worker for {} died!", actor.video_file_path);
+
+            // Notify WsSession that we are done
+            if actor
+                .target_address
+                .try_send(WsMessage::PlaybackEnd { id: actor.id })
+                .is_err()
+            {
+                error!("Error sending PlaybackEnd");
+            }
 
             // Notify supervisor that we are done.
             PlaybackSupervisor::from_registry().do_send(StopPlayback { id: actor.id });

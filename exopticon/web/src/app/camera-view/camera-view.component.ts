@@ -3,7 +3,7 @@ import { Observable, Subscription } from 'rxjs';
 
 import { Camera } from '../camera';
 import { SubscriptionSubject, VideoService } from '../video.service';
-import { CameraResolution, FrameMessage } from '../frame-message';
+import { CameraResolution, WsMessage } from '../frame-message';
 
 @Component({
   selector: 'app-camera-view',
@@ -22,7 +22,7 @@ export class CameraViewComponent implements OnInit {
   public status: string;
 
   private videoSubject: SubscriptionSubject;
-  public frameService?: Observable<FrameMessage>;
+  public frameService?: Observable<WsMessage>;
 
   constructor(private changeRef: ChangeDetectorRef) {
   }

@@ -6,7 +6,7 @@ import { ChronoUnit, DateTimeFormatter, Duration, ZonedDateTime, ZoneId, ZoneOff
 import '@js-joda/timezone'
 
 
-import { FrameMessage } from '../frame-message';
+import { WsMessage } from '../frame-message';
 import { ObservationService } from '../observation.service';
 import { Observation } from '../observation';
 import { VideoUnit } from '../video-unit';
@@ -32,7 +32,7 @@ export class PlaybackViewComponent implements OnInit {
   public playbackEnabled: boolean = false;
   public playbackSubject: SubscriptionSubject | null;
   public cameraId: number;
-  public currentVideoService?: Observable<FrameMessage>;
+  public currentVideoService?: Observable<WsMessage>;
 
   private ctx: CanvasRenderingContext2D;
   private obCtx: CanvasRenderingContext2D;
@@ -43,9 +43,10 @@ export class PlaybackViewComponent implements OnInit {
 
 
   constructor(public route: ActivatedRoute,
-    public videoService: VideoService,
-    public observationService: ObservationService,
-    public videoUnitService: VideoUnitService) {
+              public videoService: VideoService,
+              public observationService: ObservationService,
+              public videoUnitService: VideoUnitService,
+             ) {
     this.units = [];
     this.playbackProgress = -1;
   }
@@ -55,6 +56,31 @@ export class PlaybackViewComponent implements OnInit {
       this.currentVideoUnit[0].beginTime.plusNanos(newOffset * 1000)).toMillis();
     this.playbackProgress = currentPlaybackOffset / this.playerDuration.toMillis();
     this.drawProgressBar();
+  }
+
+  handleVideoStatus(newStatus: string) {
+    if (newStatus === 'eof') {
+      console.log('playback view: got eof');
+      let unit = this.findNextVideoUnit(this.currentVideoUnit);
+      console.log(' Next unit: ' + unit);
+      if (unit) {
+        this.currentVideoUnit = unit;
+        this.play(unit[0], 0);
+      }
+    }
+  }
+
+  findNextVideoUnit(current: [VideoUnit, any[], Observation[]]): [VideoUnit, any[], Observation[]] | null {
+    let next = null
+    this.units.forEach((u, i, arr) => {
+      if (u[0].id === current[0].id) {
+        console.log("Found current!");
+        if (arr.length - 1 > i) {
+          next = arr[i + 1];
+        }
+      }
+    });
+    return next;
   }
 
   drawProgressBar() {

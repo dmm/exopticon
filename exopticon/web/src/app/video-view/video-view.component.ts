@@ -2,7 +2,7 @@ import { SimpleChanges, ViewChild, Component, ChangeDetectorRef, ElementRef, Eve
 import { Observable, Subscription } from 'rxjs';
 
 import { Camera } from '../camera';
-import { CameraResolution, FrameMessage } from '../frame-message';
+import { CameraResolution, WsMessage } from '../frame-message';
 import { SubscriptionSubject, VideoService } from '../video.service';
 import { Observation } from '../observation';
 
@@ -12,7 +12,7 @@ import { Observation } from '../observation';
   styleUrls: ['./video-view.component.css']
 })
 export class VideoViewComponent implements OnInit {
-  @Input() frameService?: Observable<FrameMessage>;
+  @Input() frameService?: Observable<WsMessage>;
   @Output() status = new EventEmitter<string>();
   @Output() frameOffset = new EventEmitter<number>();
 
@@ -55,19 +55,26 @@ export class VideoViewComponent implements OnInit {
     this.isActive = false;
     this.status.emit('loading');
 
-    let oldSubscription = this.subscription;
-
+    let oldSubscription = undefined; //this.subscription;
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
     this.subscription = this.frameService.subscribe(
-      (message) => {
-        if (!this.isActive) {
-          this.isActive = true;
-          this.status.emit('active');
-        }
-        if (this.img.complete) {
-          this.img.onerror = () => { console.log("error!"); };
-          this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
-          this.frameOffset.emit(message.offset);
-          this.drawObservations(message.unscaledWidth, message.unscaledHeight, message.observations);
+      (message: WsMessage) => {
+        if (message.kind === 'playbackEnd') {
+          console.log('VideoView: playback End: ' + message.id);
+          this.status.emit('eof');
+        } else if (message.kind = 'frame') {
+          if (!this.isActive) {
+            this.isActive = true;
+            this.status.emit('active');
+          }
+          if (this.img.complete) {
+            this.img.onerror = () => { console.log("error!"); };
+            this.img.src = `data:image/jpeg;base64, ${message.jpeg}`;
+            this.frameOffset.emit(message.offset);
+            this.drawObservations(message.unscaledWidth, message.unscaledHeight, message.observations);
+          }
         }
       },
       (error) => {

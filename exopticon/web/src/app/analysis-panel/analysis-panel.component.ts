@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { Router, ActivatedRoute, ParamMap } from '@angular/router';
 
-import { FrameMessage } from '../frame-message';
+import { WsMessage } from '../frame-message';
 import { SubscriptionSubject, VideoService } from '../video.service';
 
 @Component({
@@ -16,7 +16,7 @@ export class AnalysisPanelComponent implements OnInit {
   @Input() analysisEngineId: number;
 
   public videoSubject: SubscriptionSubject;
-  public frameService?: Observable<FrameMessage>;
+  public frameService?: Observable<WsMessage>;
 
   constructor(public route: ActivatedRoute,
     public videoService: VideoService) { }

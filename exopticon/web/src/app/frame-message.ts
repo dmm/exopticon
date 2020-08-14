@@ -24,6 +24,7 @@ export interface PlaybackSource {
 export type FrameSource = AnalysisSource | CameraSource | PlaybackSource;
 
 export class FrameMessage {
+  kind: 'frame';
   source: FrameSource;
   resolution: CameraResolution;
   jpeg: string;
@@ -33,3 +34,10 @@ export class FrameMessage {
   unscaledHeight: number;
   observations: Observation[];
 }
+
+export class PlaybackEnd {
+  kind: 'playbackEnd';
+  id: number;
+}
+
+export type WsMessage = FrameMessage | PlaybackEnd;

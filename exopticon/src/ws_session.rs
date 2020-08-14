@@ -2,7 +2,7 @@
 #![allow(clippy::empty_enum)]
 
 use actix::{
-    Actor, ActorContext, ActorFuture, AsyncContext, Handler, StreamHandler, SystemService,
+    Actor, ActorContext, ActorFuture, AsyncContext, Handler, Message, StreamHandler, SystemService,
     WrapFuture,
 };
 use actix_web_actors::ws;
@@ -13,7 +13,6 @@ use serde::Serialize;
 use crate::db_registry;
 use crate::fair_queue::FairQueue;
 use crate::models::{FetchVideoUnit, Observation};
-use crate::playback_actor::PlaybackFrame;
 use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback, StopPlayback};
 use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
@@ -37,7 +36,7 @@ base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
 /// connection
 #[derive(Serialize, Deserialize)]
 pub enum WsCommand {
-    /// Subscription request
+    /// Subscription request<<
     Subscribe(SubscriptionSubject),
     /// Unsubscription request
     Unsubscribe(SubscriptionSubject),
@@ -59,11 +58,23 @@ pub enum WsCommand {
     },
 }
 
+/// A message sent from the server to the client
+#[derive(Message, Serialize)]
+#[rtype(result = "()")]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum WsMessage {
+    /// A frame of video
+    Frame(RawCameraFrame),
+    /// Message indicating the end of playback
+    PlaybackEnd { id: u64 },
+}
+
 /// A frame of video from a camera stream. This struct is used to
 /// deliver a frame to the browser over the websocket connection.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct RawCameraFrame {
+pub struct RawCameraFrame {
     /// id of camera that produced frame
     pub camera_id: i32,
     /// resolution of frame
@@ -100,7 +111,7 @@ pub struct WsSession {
     pub live_frames: u32,
 
     /// Queue of frames awaiting delivery
-    pub frame_queue: FairQueue<FrameSource, CameraFrame>,
+    pub frame_queue: FairQueue<FrameSource, RawCameraFrame>,
 }
 
 impl WsSession {
@@ -161,6 +172,23 @@ impl WsSession {
         }
     }
 
+    /// send a message signally playback end of current video unit
+    fn signal_playback_end(&mut self, ctx: &mut <Self as Actor>::Context, id: u64) {
+        let message = WsMessage::PlaybackEnd { id };
+        match &self.serialization {
+            WsSerialization::MsgPack => {
+                let mut se = Serializer::with(Vec::new(), StructMapWriter);
+                message
+                    .serialize(&mut se)
+                    .expect("Messagepack playback end serialization failed!");
+                ctx.binary(se.into_inner());
+            }
+            WsSerialization::Json => ctx.text(
+                serde_json::to_string(&message).expect("Json playback end serialization failed!"),
+            ),
+        }
+    }
+
     /// send a frame if one is ready and client is ready
     fn push_frame_if_ready(&mut self, ctx: &mut <Self as Actor>::Context) {
         if !self.ready_to_send() {
@@ -168,28 +196,20 @@ impl WsSession {
             return;
         }
 
-        if let Some(msg) = self.frame_queue.pop_front() {
-            let frame = RawCameraFrame {
-                camera_id: msg.camera_id,
-                jpeg: msg.jpeg,
-                resolution: msg.resolution,
-                unscaled_width: msg.unscaled_width,
-                unscaled_height: msg.unscaled_height,
-                source: msg.source,
-                video_unit_id: msg.video_unit_id,
-                offset: msg.offset,
-                observations: msg.observations,
-            };
+        if let Some(frame) = self.frame_queue.pop_front() {
+            let message = WsMessage::Frame(frame);
+
             match &self.serialization {
                 WsSerialization::MsgPack => {
                     let mut se = Serializer::with(Vec::new(), StructMapWriter);
-                    frame
+                    message
                         .serialize(&mut se)
                         .expect("Messagepack camera frame serialization failed!");
                     ctx.binary(se.into_inner());
                 }
                 WsSerialization::Json => ctx.text(
-                    serde_json::to_string(&frame).expect("Json camera frame serialization failed!"),
+                    serde_json::to_string(&message)
+                        .expect("Json camera frame serialization failed!"),
                 ),
             };
 
@@ -202,7 +222,7 @@ impl WsSession {
     }
 
     /// handle frame, potentially sending it to client
-    fn handle_frame(&mut self, msg: CameraFrame, ctx: &mut <Self as Actor>::Context) {
+    fn handle_frame(&mut self, msg: RawCameraFrame, ctx: &mut <Self as Actor>::Context) {
         self.frame_queue.push_back(msg.source.clone(), msg);
         self.push_frame_if_ready(ctx);
     }
@@ -221,18 +241,37 @@ impl Actor for WsSession {
     }
 }
 
-impl Handler<CameraFrame> for WsSession {
+/// Handle WsMessages from PlaybackActors
+impl Handler<WsMessage> for WsSession {
     type Result = ();
-    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
-        self.handle_frame(msg, ctx);
+    fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            WsMessage::Frame(frame) => {
+                self.handle_frame(frame, ctx);
+            }
+            WsMessage::PlaybackEnd { id } => {
+                self.signal_playback_end(ctx, id);
+            }
+        }
     }
 }
 
-impl Handler<PlaybackFrame> for WsSession {
+impl Handler<CameraFrame> for WsSession {
     type Result = ();
 
-    fn handle(&mut self, msg: PlaybackFrame, ctx: &mut Self::Context) -> Self::Result {
-        self.handle_frame(msg.frame, ctx);
+    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
+        let frame = RawCameraFrame {
+            camera_id: msg.camera_id,
+            jpeg: msg.jpeg,
+            resolution: msg.resolution,
+            unscaled_width: msg.unscaled_width,
+            unscaled_height: msg.unscaled_height,
+            source: msg.source,
+            video_unit_id: msg.video_unit_id,
+            offset: msg.offset,
+            observations: msg.observations,
+        };
+        self.handle_frame(frame, ctx);
     }
 }
 
