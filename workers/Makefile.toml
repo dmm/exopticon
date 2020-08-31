@@ -88,7 +88,7 @@ worker_dir=${CARGO_MAKE_WORKING_DIRECTORY}"/yolov4/"
 asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}"/target/assets/workers/yolov4/"
 
 
-mkdir -p ${asset_dir} || true
+mkdir -p ${asset_dir}/data/ || true
 cp -a ${worker_dir}/data/. ${asset_dir}/data/
 
 # Deploy darknet.py
