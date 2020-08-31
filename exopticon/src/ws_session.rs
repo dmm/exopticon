@@ -67,7 +67,10 @@ pub enum WsMessage {
     /// A frame of video
     Frame(RawCameraFrame),
     /// Message indicating the end of playback
-    PlaybackEnd { id: u64 },
+    PlaybackEnd {
+        /// if of playback session to end
+        id: u64,
+    },
 }
 
 /// A frame of video from a camera stream. This struct is used to
@@ -241,7 +244,7 @@ impl Actor for WsSession {
     }
 }
 
-/// Handle WsMessages from PlaybackActors
+/// Handle `WsMessages` from `PlaybackActors`
 impl Handler<WsMessage> for WsSession {
     type Result = ();
     fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) -> Self::Result {

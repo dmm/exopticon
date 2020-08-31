@@ -1,4 +1,29 @@
 table! {
+    alert_rules (id) {
+        id -> Int4,
+        name -> Varchar,
+        analysis_instance_id -> Int4,
+        tag -> Varchar,
+        details -> Varchar,
+        min_score -> Int2,
+        min_cluster_size -> Int2,
+        cool_down_time -> Int8,
+        notifier_id -> Int4,
+        inserted_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+table! {
+    alerts (id) {
+        id -> Int4,
+        alert_rule_id -> Int4,
+        time -> Timestamptz,
+        inserted_at -> Timestamptz,
+    }
+}
+
+table! {
     analysis_engines (id) {
         id -> Int4,
         name -> Text,
@@ -59,6 +84,19 @@ table! {
         enabled -> Bool,
         inserted_at -> Timestamp,
         updated_at -> Timestamp,
+    }
+}
+
+table! {
+    notifiers (id) {
+        id -> Int4,
+        name -> Varchar,
+        hostname -> Varchar,
+        port -> Int4,
+        username -> Nullable<Varchar>,
+        password -> Nullable<Varchar>,
+        inserted_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
@@ -125,6 +163,9 @@ table! {
     }
 }
 
+joinable!(alert_rules -> analysis_instances (analysis_instance_id));
+joinable!(alert_rules -> notifiers (notifier_id));
+joinable!(alerts -> alert_rules (alert_rule_id));
 joinable!(analysis_instances -> analysis_engines (analysis_engine_id));
 joinable!(analysis_subscriptions -> cameras (camera_id));
 joinable!(cameras -> camera_groups (camera_group_id));
@@ -134,11 +175,14 @@ joinable!(video_files -> video_units (video_unit_id));
 joinable!(video_units -> cameras (camera_id));
 
 allow_tables_to_appear_in_same_query!(
+    alert_rules,
+    alerts,
     analysis_engines,
     analysis_instances,
     analysis_subscriptions,
     camera_groups,
     cameras,
+    notifiers,
     observations,
     subscription_masks,
     users,

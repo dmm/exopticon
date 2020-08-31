@@ -1,5 +1,6 @@
 use actix::{registry::SystemService, Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
 
+use crate::alert_actor::AlertActor;
 use crate::analysis_supervisor::AnalysisSupervisor;
 use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
 use crate::file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
@@ -7,6 +8,7 @@ use crate::models::{
     CameraGroup, CameraGroupAndCameras, DbExecutor, FetchAllCameraGroup,
     FetchAllCameraGroupAndCameras,
 };
+use crate::notifier_supervisor::NotifierSupervisor;
 
 /// Enumeration of Exopticon run modes
 pub enum ExopticonMode {
@@ -25,6 +27,10 @@ pub struct RootSupervisor {
     pub capture_supervisor: Addr<CaptureSupervisor>,
     /// Supervisor for deletion actors
     pub deletion_supervisor: Addr<FileDeletionSupervisor>,
+    /// Notifier Supervisor
+    pub notifier_supervisor: Addr<NotifierSupervisor>,
+    /// Alert Worker
+    pub alert_actor: Addr<AlertActor>,
     /// Database actor
     pub db_worker: Addr<DbExecutor>,
     /// exopticon runtime mode
@@ -116,6 +122,8 @@ impl RootSupervisor {
             analysis_supervisor,
             capture_supervisor: CaptureSupervisor::from_registry(),
             deletion_supervisor,
+            notifier_supervisor: NotifierSupervisor::from_registry(),
+            alert_actor: AlertActor::from_registry(),
             db_worker,
             mode: start_mode,
         }

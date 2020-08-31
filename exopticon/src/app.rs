@@ -5,6 +5,7 @@ use actix::Addr;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 
+use crate::alert_rule_routes::{create_alert_rule, fetch_all_alert_rules};
 use crate::analysis_routes::{
     create_analysis_engine, create_analysis_instance, delete_analysis_engine,
     delete_analysis_instance, fetch_analysis_engine, fetch_analysis_instance,
@@ -153,6 +154,12 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                         .route(web::get().to(fetch_analysis_instance))
                         .route(web::post().to(update_analysis_instance))
                         .route(web::delete().to(delete_analysis_instance)),
+                )
+                // routes to alert rules
+                .service(
+                    web::resource("/alert_rule")
+                        .route(web::get().to(fetch_all_alert_rules))
+                        .route(web::post().to(create_alert_rule)),
                 ),
         )
         // Create default route

@@ -31,8 +31,8 @@ pub struct RemoveFile {
 }
 
 use crate::schema::{
-    analysis_engines, analysis_instances, camera_groups, cameras, observations, users, video_files,
-    video_units,
+    alert_rules, analysis_engines, analysis_instances, camera_groups, cameras, notifiers,
+    observations, users, video_files, video_units,
 };
 
 /// Full camera group model. Represents a full row returned from the
@@ -698,3 +698,115 @@ pub struct SubscriptionMask {
     /// lower-right y
     pub lr_y: i16,
 }
+
+/// Represents Alert Rule
+#[derive(Clone, Deserialize, Serialize, Debug, Queryable, Insertable, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "alert_rules"]
+pub struct AlertRule {
+    /// alert id
+    pub id: i32,
+    /// name of rule
+    pub name: String,
+    /// analysis instance to listen to observations from
+    pub analysis_instance_id: i32,
+    /// tag to alert on
+    pub tag: String,
+    /// detail to alert on
+    pub details: String,
+    /// minimum triggering score, 0-100
+    pub min_score: i16,
+    /// Minimum number of events necessary to create alert
+    pub min_cluster_size: i16,
+    /// Minimum time in between alerts, in microseconds
+    pub cool_down_time: i64,
+    /// id of notifier to use
+    pub notifier_id: i32,
+    /// inserted date time
+    pub inserted_at: DateTime<Utc>,
+    /// modified date time
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Represents a request to create an Alert Rule
+#[derive(Insertable, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "alert_rules"]
+pub struct CreateAlertRule {
+    /// rule name
+    pub name: String,
+    /// analysis instance to listen to observations from
+    pub analysis_instance_id: i32,
+    /// tag to alert on
+    pub tag: String,
+    /// detail to alert on
+    pub details: String,
+    /// Minimum number of events necessary to create alert
+    pub min_cluster_size: i16,
+    /// Minimum time in between alerts, in microseconds
+    pub cool_down_time: i64,
+    /// id of notifier to use
+    pub notifier_id: i32,
+}
+
+/// Represents a request to delete an Alert Rule
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteAlertRule {
+    /// id of alert rule to delete
+    pub id: i32,
+}
+
+/// Represents a request to fetch all `AlertRules`
+pub struct FetchAllAlertRule {}
+
+/// Represents a notifier instance (mqtt for now)
+#[derive(Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "notifiers"]
+pub struct Notifier {
+    /// notifier id
+    pub id: i32,
+    /// name of notifier
+    pub name: String,
+    /// hostname of notifier
+    pub hostname: String,
+    /// port of notifier
+    pub port: i32,
+    /// service account username
+    pub username: Option<String>,
+    /// service account password
+    pub password: Option<String>,
+    /// inserted date time
+    pub inserted_at: DateTime<Utc>,
+    /// modified date time
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Represents a request to create a notifier instance
+#[derive(Insertable, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "notifiers"]
+pub struct CreateNotifier {
+    /// name of notifier
+    pub name: String,
+    /// hostname of notifier
+    pub hostname: String,
+    /// port of notifier
+    pub port: i32,
+    /// service account username
+    pub username: Option<String>,
+    /// service account password
+    pub password: Option<String>,
+}
+
+/// Represents a request to delete a notifier
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteNotifier {
+    /// id of notifier to delete
+    pub id: i32,
+}
+
+/// Represents a request to fetch all Notifiers
+pub struct FetchAllNotifier {}

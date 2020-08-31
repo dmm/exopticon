@@ -38,6 +38,15 @@ extern crate log;
 #[macro_use]
 extern crate rust_embed;
 
+/// Alert rule actor
+mod alert_actor;
+
+/// Alert rule db handlers
+mod alert_rule_handler;
+
+/// Alert rule routes
+mod alert_rule_routes;
+
 /// Actix route specification
 mod app;
 
@@ -96,6 +105,15 @@ mod file_handler;
 
 /// Actor message structs
 mod models;
+
+/// Notifier db handlers
+mod notifier_handler;
+
+/// Notifier supervisor
+mod notifier_supervisor;
+
+/// mqtt client actor
+mod mqtt_actor;
 
 /// Implemenents `DbExecutor` handler for creating and querying observations.
 mod observation_handler;
