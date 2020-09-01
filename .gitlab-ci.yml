@@ -10,7 +10,7 @@ cache:
 # Set any required environment variables here
 variables:
   RUST_BACKTRACE: FULL
-
+  GIT_SUBMODULE_STRATEGY: recursive
 stages:
   - build
 
@@ -18,6 +18,3 @@ app-build:
   stage: build
   script:
     - cargo make ci-flow
-
-
-
