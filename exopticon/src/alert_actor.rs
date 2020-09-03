@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
+use url::Url;
 
 use crate::db_registry;
 use crate::models::{AlertRule, FetchAllAlertRule, Observation};
@@ -83,6 +84,26 @@ impl AlertActor {
             self.alert_rules.insert(id, set);
         }
     }
+
+    fn generate_observation_url(obs: &Observation) -> Option<Url> {
+        let base_url =
+            match Url::parse(&dotenv::var("ROOT_URL").unwrap_or("http://localhost/".to_string())) {
+                Ok(url) => url,
+                Err(err) => {
+                    error!("Error parsing base url: {}", err);
+                    return None;
+                }
+            };
+        let path = format!("/alerts/{}", obs.id);
+        let url = match base_url.join(&path) {
+            Ok(url) => url,
+            Err(err) => {
+                error!("Error joining url: {}", err);
+                return None;
+            }
+        };
+        Some(url)
+    }
 }
 
 impl Handler<CameraFrame> for AlertActor {
@@ -127,10 +148,14 @@ impl Handler<CameraFrame> for AlertActor {
                         if Self::rule_matches(r, o) {
                             new_fire_times.insert(r.id, Instant::now());
                             debug!("Alert! Alert!");
+                            let url = match Self::generate_observation_url(o) {
+                                Some(url) => url.to_string(),
+                                None => "".to_string(),
+                            };
                             NotifierSupervisor::from_registry().do_send(SendNotification {
                                 notifier_id: r.notifier_id,
                                 topic: "/home/exopticon/alert".to_string(),
-                                payload: format!("{} {} {}", o.tag, o.details, o.score),
+                                payload: format!("{} {} {} {}", o.tag, o.details, o.score, url),
                             });
                         }
                     }

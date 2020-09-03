@@ -16,6 +16,7 @@ default-run = "exopticon"
 [dependencies]
 onvif = { path = "../onvif" }
 exserial = { path = "../exserial" }
+exsnap = { path = "../exsnap" }
 actix = "0.9.0"
 actix-http = "^1.0.1"
 actix-identity = "0.2"
@@ -56,6 +57,7 @@ serde_derive="1.0"
 serde_repr = "0.1"
 serde_json="1.0"
 serde = { version = "1.0", features = ["derive"] }
+url = "^2.1"
 uuid = { version = "0.6", features = ["serde", "v4"] }
 
 [build-dependencies]

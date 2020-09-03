@@ -22,6 +22,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   curl python3-pil python3-lxml \
   python3 python3-pip python3-setuptools python3-wheel \
   git libopencv-dev python3-opencv cmake \
+ # gstreamer dependencies
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+  gstreamer1.0-libav libgstrtspserver-1.0-dev libges-1.0-dev \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -120,7 +125,7 @@ RUN pip3 install msgpack imutils numpy
 # configure environment
 ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
-ENV PATH=$CARGO_HOME/bin:/exopticon/exopticon/workers:$PATH
+ENV PATH=/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:$PATH
 ENV CUDA_HOME=/usr/local/cuda-10.0
 ENV CUDA_PATH=/usr/local/cuda-10.0/bin
 ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-10.0
@@ -160,9 +165,11 @@ RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid
 RUN chown exopticon:exopticon /exopticon
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
+COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exsnap .
 
 ENV EXOPTICONWORKERS=/exopticon/workers/
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
+ENV PATH=/exopticon:$PATH
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/workers/dist ./workers
 

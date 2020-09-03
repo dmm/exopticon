@@ -480,6 +480,13 @@ pub struct FetchObservationsByVideoUnit {
     pub video_unit_id: i32,
 }
 
+/// Represents a request fetch an `Observation` by observation id
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FetchObservation {
+    /// observation id to fetch
+    pub id: i64,
+}
+
 /// Full user model struct, represents full value from database.
 #[derive(Queryable, Associations, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]

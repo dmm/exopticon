@@ -1,4 +1,12 @@
 table! {
+    alert_rule_cameras (id) {
+        id -> Int4,
+        alert_rule_id -> Int4,
+        camera_id -> Int4,
+    }
+}
+
+table! {
     alert_rules (id) {
         id -> Int4,
         name -> Varchar,
@@ -163,6 +171,8 @@ table! {
     }
 }
 
+joinable!(alert_rule_cameras -> alert_rules (alert_rule_id));
+joinable!(alert_rule_cameras -> cameras (camera_id));
 joinable!(alert_rules -> analysis_instances (analysis_instance_id));
 joinable!(alert_rules -> notifiers (notifier_id));
 joinable!(alerts -> alert_rules (alert_rule_id));
@@ -175,6 +185,7 @@ joinable!(video_files -> video_units (video_unit_id));
 joinable!(video_units -> cameras (camera_id));
 
 allow_tables_to_appear_in_same_query!(
+    alert_rule_cameras,
     alert_rules,
     alerts,
     analysis_engines,

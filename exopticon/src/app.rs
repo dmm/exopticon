@@ -20,7 +20,7 @@ use crate::camera_routes::{
     ptz_relative, set_ntp, set_time, update_camera,
 };
 use crate::models::DbExecutor;
-use crate::observation_routes::fetch_observations_between;
+use crate::observation_routes::{fetch_observation_snapshot, fetch_observations_between};
 use crate::static_routes;
 use crate::static_routes::index;
 use crate::user_routes::create_user;
@@ -154,6 +154,11 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                         .route(web::get().to(fetch_analysis_instance))
                         .route(web::post().to(update_analysis_instance))
                         .route(web::delete().to(delete_analysis_instance)),
+                )
+                // Observation routes
+                .service(
+                    web::resource("/observations/{id}/snapshot")
+                        .route(web::get().to(fetch_observation_snapshot)),
                 )
                 // routes to alert rules
                 .service(
