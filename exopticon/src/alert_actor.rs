@@ -85,15 +85,17 @@ impl AlertActor {
         }
     }
 
+    /// generates the url to view the observation
     fn generate_observation_url(obs: &Observation) -> Option<Url> {
-        let base_url =
-            match Url::parse(&dotenv::var("ROOT_URL").unwrap_or("http://localhost/".to_string())) {
-                Ok(url) => url,
-                Err(err) => {
-                    error!("Error parsing base url: {}", err);
-                    return None;
-                }
-            };
+        let base_url = match Url::parse(
+            &dotenv::var("ROOT_URL").unwrap_or_else(|_| "http://localhost/".to_string()),
+        ) {
+            Ok(url) => url,
+            Err(err) => {
+                error!("Error parsing base url: {}", err);
+                return None;
+            }
+        };
         let path = format!("/alerts/{}", obs.id);
         let url = match base_url.join(&path) {
             Ok(url) => url,

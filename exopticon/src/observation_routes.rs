@@ -40,6 +40,7 @@ pub async fn fetch_observations_between(
     }
 }
 
+/// Async fetch the image corresponding to an observation
 async fn fetch_observation_image(filename: &str, frame_offset: i64) -> Result<Vec<u8>, ()> {
     let uri = format!("file://{}", filename);
     match web::block(move || get_snapshot(&uri, frame_offset)).await {
@@ -48,6 +49,7 @@ async fn fetch_observation_image(filename: &str, frame_offset: i64) -> Result<Ve
     }
 }
 
+/// returns snapshot for given video file path and offset
 pub fn get_snapshot(path: &str, microsecond_offset: i64) -> Result<Vec<u8>, ()> {
     let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
     debug!("WORKER PATH: {}", worker_path);

@@ -136,7 +136,7 @@ impl WsSession {
     }
 
     /// Returns true if session can send another frame.
-    fn ready_to_send(&self) -> bool {
+    const fn ready_to_send(&self) -> bool {
         self.live_frames < self.window_size && self.ready
     }
 
