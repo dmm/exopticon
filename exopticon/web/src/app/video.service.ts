@@ -148,12 +148,16 @@ export class VideoService {
                 && subject.cameraId === m.source.cameraId
                 && subject.resolution === m.resolution;
             case 'analysisEngine':
-              return subject.kind === 'analysisEngine'
-                && subject.analysisEngineId === m.source.analysisEngineId;
+              return subject.kind === 'analysisEngine' && subject.analysisEngineId === m.source.analysisEngineId;
+
+
+
+
+
             case 'playback':
               return subject.kind === 'playback'
                 && subject.id === m.source.id;
-              }
+          }
         } else if (m.kind === 'playbackEnd') {
           return subject.kind === 'playback'
             && subject.id == m.id;
@@ -162,6 +166,9 @@ export class VideoService {
         }
       });
   }
+
+
+
 
 
   public getWriteSubject(): Subject<Object> {

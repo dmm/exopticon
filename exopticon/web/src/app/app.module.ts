@@ -13,6 +13,7 @@ import { CameraStatusOverlayComponent } from './camera-status-overlay/camera-sta
 import { AnalysisPanelComponent } from './analysis-panel/analysis-panel.component';
 import { VideoViewComponent } from './video-view/video-view.component';
 import { PlaybackViewComponent } from './playback-view/playback-view.component';
+import { AlertViewComponent } from './alert-view/alert-view.component';
 
 @NgModule({
   declarations: [
@@ -24,6 +25,7 @@ import { PlaybackViewComponent } from './playback-view/playback-view.component';
     AnalysisPanelComponent,
     VideoViewComponent,
     PlaybackViewComponent,
+    AlertViewComponent,
   ],
   imports: [
     BrowserModule,
