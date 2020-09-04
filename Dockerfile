@@ -120,12 +120,13 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && /cargo/bin/rustup default stable \
   && /cargo/bin/cargo install --force cargo-make
 
-RUN pip3 install msgpack imutils numpy
+RUN pip3 install msgpack imutils numpy dvc[ssh]
+RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
 
 # configure environment
 ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
-ENV PATH=/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:$PATH
+ENV PATH=/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:/home/exopticon/.local/bin/:$PATH
 ENV CUDA_HOME=/usr/local/cuda-10.0
 ENV CUDA_PATH=/usr/local/cuda-10.0/bin
 ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-10.0
