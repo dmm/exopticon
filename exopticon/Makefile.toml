@@ -1,4 +1,26 @@
 
+[env]
+CARGO_MAKE_RUN_CLIPPY = true
+CARGO_MAKE_CLIPPY_ALLOW_FAIL = true
+
+[tasks.ci-flow]
+description = "CI task will run cargo build and cargo test with verbose output"
+category = "CI"
+dependencies = [
+    "pre-ci-flow",
+    "print-env-flow",
+    "pre-build",
+    "check-format-ci-flow",
+    "clippy",
+    "build-release",
+    "post-build",
+    "test-flow",
+    "examples-ci-flow",
+    "bench-ci-flow",
+    "outdated-ci-flow",
+    "ci-coverage-flow",
+    "post-ci-flow"
+]
 
 [tasks.build-web]
 category = "Build"
@@ -20,8 +42,8 @@ npm run build -- --watch
 '''
 ]
 
-[tasks.pre-build]
-category = "Build"
+[tasks.pre-ci-flow]
+category = "CI"
 dependencies = [ "build-web" ]
 
 [tasks.run]
