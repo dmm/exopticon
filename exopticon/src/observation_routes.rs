@@ -1,9 +1,8 @@
 // We have to pass by value to satisfy the actix route interface.
 #![allow(clippy::needless_pass_by_value)]
 
-use std::env;
+use std::convert::TryFrom;
 use std::fs;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -67,8 +66,8 @@ pub async fn fetch_observations_between(
 }
 
 /// Async fetch the image corresponding to an observation
-async fn fetch_observation_image(filename: &str, frame_offset: i64) -> Result<Vec<u8>, ()> {
-    let uri = format!("file://{}", filename);
+async fn fetch_observation_image(filename: &str, frame_offset: u64) -> Result<Vec<u8>, ()> {
+    let uri = filename.to_string();
     match web::block(move || get_snapshot(&uri, frame_offset)).await {
         Ok(jpg) => Ok(jpg),
         Err(_) => Err(()),
@@ -76,26 +75,32 @@ async fn fetch_observation_image(filename: &str, frame_offset: i64) -> Result<Ve
 }
 
 /// returns snapshot for given video file path and offset
-pub fn get_snapshot(path: &str, microsecond_offset: i64) -> Result<Vec<u8>, ()> {
-    let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
-    debug!("WORKER PATH: {}", worker_path);
-    let _executable_path: PathBuf = [
-        worker_path,
-        "../../debug".to_string(),
-        "snapshot_worker".to_string(),
-    ]
-    .iter()
-    .collect();
-
+pub fn get_snapshot(path: &str, microsecond_offset: u64) -> Result<Vec<u8>, ()> {
+    let offset = Duration::from_micros(microsecond_offset);
     debug!("Capturing snapshot: {} {}", &path, microsecond_offset);
-    let child = Command::new("exsnap")
+    let child = Command::new("ffmpeg")
+        .arg("-ss")
+        .arg(format!("{}.{}", offset.as_secs(), offset.subsec_millis()))
+        .arg("-i")
         .arg(path)
-        .arg(microsecond_offset.to_string())
+        .arg("-vframes")
+        .arg("1")
+        .arg("-vcodec")
+        .arg("mjpeg")
+        .arg("-q:v")
+        .arg("2")
+        .arg("-f")
+        .arg("mjpeg")
+        .arg("-")
         .stdout(Stdio::piped())
         .spawn()
-        .expect("failed to launch");
+        .map_err(|_| {
+            error!("failed to launch");
+        })?;
 
-    let output = child.wait_with_output().expect("failed to wait on child");
+    let output = child.wait_with_output().map_err(|_| {
+        error!("failed to wait on child");
+    })?;
 
     Ok(output.stdout)
 }
@@ -122,8 +127,13 @@ pub async fn fetch_observation_snapshot(
                 .await??;
             let file = unit_response.1.pop();
             if let Some(file) = file {
-                let snap =
-                    fetch_observation_image(&file.filename, observation.frame_offset).await?;
+                let offset = u64::try_from(observation.frame_offset).map_err(|_| {
+                    HttpResponse::InternalServerError().body(format!(
+                        "Invalid offset in observation: {}",
+                        observation.frame_offset,
+                    ))
+                })?;
+                let snap = fetch_observation_image(&file.filename, offset).await?;
                 Ok(HttpResponse::Ok().content_type("image/jpeg").body(snap))
             } else {
                 Ok(HttpResponse::InternalServerError().body("video unit db failed"))
@@ -134,7 +144,7 @@ pub async fn fetch_observation_snapshot(
 }
 
 /// returns clip for given video file path, offset and time
-pub fn get_clip(path: &str, microsecond_offset: i64, length: Duration) -> Result<Vec<u8>, ()> {
+pub fn get_clip(path: &str, microsecond_offset: u64, length: Duration) -> Result<Vec<u8>, ()> {
     debug!(
         "Capturing clip: {} {} {}",
         &path,
@@ -144,11 +154,10 @@ pub fn get_clip(path: &str, microsecond_offset: i64, length: Duration) -> Result
     // mp4 must be written to a file so create a temp dir
     let dir = tempdir().map_err(|_| {
         error!("failed to make tempdir");
-        ()
     })?;
     let file_path = dir.path().join("output.mp4");
     debug!("File Path: {:?}", file_path);
-    let offset = Duration::from_micros(microsecond_offset as u64);
+    let offset = Duration::from_micros(microsecond_offset);
     let child = Command::new("ffmpeg")
         .arg("-noaccurate_seek")
         .arg("-ss")
@@ -168,12 +177,10 @@ pub fn get_clip(path: &str, microsecond_offset: i64, length: Duration) -> Result
 
     child.wait_with_output().map_err(|_| {
         error!("failed to wait on child");
-        ()
     })?;
 
     let contents = fs::read(file_path).map_err(|_| {
         error!("Failed to read clip file.");
-        ()
     })?;
     Ok(contents)
 }
@@ -181,7 +188,7 @@ pub fn get_clip(path: &str, microsecond_offset: i64, length: Duration) -> Result
 /// Async fetch the clip corresponding to an observation
 async fn get_observation_clip(
     filename: String,
-    frame_offset: i64,
+    frame_offset: u64,
     length: Duration,
 ) -> Result<Vec<u8>, ()> {
     match web::block(move || get_clip(&filename, frame_offset, length)).await {
@@ -211,12 +218,14 @@ pub async fn fetch_observation_clip(
                 .await??;
             let file = unit_response.1.pop();
             if let Some(file) = file {
-                let snap = get_observation_clip(
-                    file.filename,
-                    observation.frame_offset,
-                    Duration::from_secs(5),
-                )
-                .await?;
+                let offset = u64::try_from(observation.frame_offset).map_err(|_| {
+                    HttpResponse::InternalServerError().body(format!(
+                        "Invalid offset in observation: {}",
+                        observation.frame_offset,
+                    ))
+                })?;
+                let snap =
+                    get_observation_clip(file.filename, offset, Duration::from_secs(5)).await?;
                 Ok(HttpResponse::Ok().content_type("video/webm").body(snap))
             } else {
                 Ok(HttpResponse::InternalServerError().body("video unit db failed"))

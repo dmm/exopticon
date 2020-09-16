@@ -762,12 +762,14 @@ pub struct AlertRuleModel(
 );
 
 impl AlertRuleModel {
-    pub fn rule(&self) -> &AlertRule {
-        return &self.0;
+    /// Returns rule portion of `AlertRuleModel`
+    pub const fn rule(&self) -> &AlertRule {
+        &self.0
     }
 
+    /// Returns whether rules matches given camera id
     pub fn matches_camera_id(&self, camera_id: i32) -> bool {
-        self.1.is_empty() || self.1.iter().find(|&&x| x == camera_id).is_some()
+        self.1.is_empty() || self.1.iter().any(|&x| x == camera_id)
     }
     //    pub fn matching_camera_ids(&self) -> &[i32] {
     //        &self.1
