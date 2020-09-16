@@ -133,6 +133,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         AVDictionary *opts = 0;
         av_dict_set(&opts, "buffer_size", "26214400", 0);
         av_dict_set(&opts, "rtsp_transport", "udp", 0);
+        // default reorder queue size is 500
         av_dict_set(&opts, "reorder_queue_size", "2500", 0);
         c->fcx->max_delay = 500000; // 500ms
         clock_gettime(CLOCK_MONOTONIC, &(c->last_frame_time));
@@ -442,7 +443,7 @@ cleanup:
                 fprintf(stderr, "%s, %d\n", errbuf, return_value);
 
         }
-
+        return_value = av_interleaved_write_frame(c->fcx, NULL);
 
         return return_value;
 }
