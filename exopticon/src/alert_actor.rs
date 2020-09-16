@@ -7,7 +7,7 @@ use actix_interop::{critical_section, with_ctx, FutureInterop};
 use url::Url;
 
 use crate::db_registry;
-use crate::models::{AlertRule, FetchAllAlertRule, Observation};
+use crate::models::{AlertRuleModel, FetchAllAlertRule, Observation};
 use crate::notifier_supervisor::{NotifierSupervisor, SendNotification};
 use crate::ws_camera_server::{
     CameraFrame, FrameSource, Subscribe, SubscriptionSubject, WsCameraServer,
@@ -16,7 +16,7 @@ use crate::ws_camera_server::{
 /// Actor that implements observation alerts
 pub struct AlertActor {
     /// Alert Rules with analysis_instance_id as key
-    pub alert_rules: HashMap<i32, HashSet<AlertRule>>,
+    pub alert_rules: HashMap<i32, HashSet<AlertRuleModel>>,
     /// fire times with rule_id as key
     pub fire_times: HashMap<i32, Instant>,
 }
@@ -47,25 +47,30 @@ impl SystemService for AlertActor {
 
 impl AlertActor {
     /// returns true if an alert rule matches the given observation
-    fn rule_matches(rule: &AlertRule, obs: &Observation) -> bool {
-        obs.tag == rule.tag && obs.details == rule.details && obs.score >= rule.min_score
+    fn rule_matches(rule: &AlertRuleModel, camera_id: i32, obs: &Observation) -> bool {
+        rule.matches_camera_id(camera_id)
+            && obs.tag == rule.rule().tag
+            && obs.details == rule.rule().details
+            && obs.score >= rule.rule().min_score
     }
 
     /// returns true if the given alert rule is active and ready to fire
-    fn rule_active(&self, rule: &AlertRule, new_times: &HashMap<i32, Instant>) -> bool {
+    fn rule_active(&self, rule: &AlertRuleModel, new_times: &HashMap<i32, Instant>) -> bool {
         //          !! IMPLEMENT CLUSTERING !!!
         let cluster_present = true;
-        let new_ready = match new_times.get(&rule.id) {
+        let new_ready = match new_times.get(&rule.rule().id) {
             Some(instant) => {
                 let micros_since = Instant::now().duration_since(*instant).as_micros();
-                micros_since >= u128::try_from(rule.cool_down_time).expect("i64 to u128 failed")
+                micros_since
+                    >= u128::try_from(rule.rule().cool_down_time).expect("i64 to u128 failed")
             }
             None => true,
         };
-        let ready = match self.fire_times.get(&rule.id) {
+        let ready = match self.fire_times.get(&rule.rule().id) {
             Some(instant) => {
                 let micros_since = Instant::now().duration_since(*instant).as_micros();
-                micros_since >= u128::try_from(rule.cool_down_time).expect("i64 to u128 failed")
+                micros_since
+                    >= u128::try_from(rule.rule().cool_down_time).expect("i64 to u128 failed")
             }
             None => true,
         };
@@ -74,12 +79,12 @@ impl AlertActor {
     }
 
     /// Adds a rule to the `AlertActor`
-    fn add_rule(&mut self, rule: AlertRule) {
-        if let Some(set) = self.alert_rules.get_mut(&rule.id) {
+    fn add_rule(&mut self, rule: AlertRuleModel) {
+        if let Some(set) = self.alert_rules.get_mut(&rule.rule().analysis_instance_id) {
             set.insert(rule);
         } else {
             let mut set = HashSet::new();
-            let id = rule.analysis_instance_id;
+            let id = rule.rule().analysis_instance_id;
             set.insert(rule);
             self.alert_rules.insert(id, set);
         }
@@ -142,22 +147,25 @@ impl Handler<CameraFrame> for AlertActor {
         let mut new_fire_times = HashMap::new();
         if let Some(rules) = self.alert_rules.get(&analysis_instance_id) {
             for r in rules.iter() {
-                debug!("Checking if rule {} is active", r.id);
+                debug!("Checking if rule {} is active", r.rule().id);
                 if self.rule_active(r, &new_fire_times) {
                     debug!("rule is active!");
                     for o in &msg.observations {
                         debug!("Checking if {} {} {} matches...", o.tag, o.details, o.score);
-                        if Self::rule_matches(r, o) {
-                            new_fire_times.insert(r.id, Instant::now());
+                        if Self::rule_matches(r, msg.camera_id, o) {
+                            new_fire_times.insert(r.rule().id, Instant::now());
                             debug!("Alert! Alert!");
                             let url = match Self::generate_observation_url(o) {
                                 Some(url) => url.to_string(),
                                 None => "".to_string(),
                             };
                             NotifierSupervisor::from_registry().do_send(SendNotification {
-                                notifier_id: r.notifier_id,
-                                topic: "/home/exopticon/alert".to_string(),
-                                payload: format!("{} {} {} {}", o.tag, o.details, o.score, url),
+                                notifier_id: r.rule().notifier_id,
+                                topic: r.rule().notification_topic.clone(),
+                                payload: format!(
+                                    "{{\"tag\": \"{}\", \"details\": \"{}\", \"score\": {}, \"url\": \"{}\"}}",
+                                    o.tag, o.details, o.score, url
+                                ),
                             });
                         }
                     }
@@ -208,12 +216,13 @@ impl Handler<SyncAlertRules> for AlertActor {
 
                 for r in alert_rules {
                     with_ctx(|actor: &mut Self, ctx: &mut Context<Self>| {
-                        let subject = SubscriptionSubject::AnalysisEngine(r.analysis_instance_id);
+                        let subject =
+                            SubscriptionSubject::AnalysisEngine(r.rule().analysis_instance_id);
                         WsCameraServer::from_registry().do_send(Subscribe {
                             subject,
                             client: ctx.address().recipient(),
                         });
-                        debug!("Adding alert rule: {}", r.id);
+                        debug!("Adding alert rule: {}", r.rule().id);
                         actor.add_rule(r);
                     });
                 }

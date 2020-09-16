@@ -17,6 +17,7 @@ extern crate gstreamer_video as gst_video;
 extern crate image;
 #[macro_use]
 extern crate log;
+extern crate env_logger;
 
 use anyhow::Error;
 use byte_slice_cast::*;
@@ -66,8 +67,12 @@ fn create_pipeline(uri: String) -> Result<gst::Pipeline, Error> {
         gst_app::AppSinkCallbacks::builder()
             // Add a handler to the "new-sample" signal.
             .new_sample(move |appsink| {
+                debug!("Starting appsink new_sample callback");
                 // Pull the sample in question out of the appsink's buffer.
-                let sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
+                let sample = appsink.pull_sample().map_err(|_| {
+                    error!("Failed to get the sample!");
+                    gst::FlowError::Eos
+                })?;
                 let buffer = sample.get_buffer().ok_or_else(|| {
                     gst_element_error!(
                         appsink,
@@ -141,7 +146,8 @@ fn main_loop(pipeline: gst::Pipeline, position: u64) -> Result<(), Error> {
         use gst::MessageView;
 
         match msg.view() {
-            MessageView::AsyncDone(..) => {
+            MessageView::AsyncDone(msg) => {
+                debug!("Async done, running time: {}", msg.get_running_time());
                 if !seeked {
                     // AsyncDone means that the pipeline has started now and that we can seek
                     info!(
@@ -205,10 +211,10 @@ pub fn get_snapshot(uri: String, microsecond_offset: u64) -> Result<Vec<u8>, Sna
 }
 
 fn main() {
+    env_logger::init();
     use std::env;
 
     let mut args = env::args();
-
     // Parse commandline arguments: input URI, position in seconds, output path
     let _arg0 = args.next().unwrap();
     let uri = args

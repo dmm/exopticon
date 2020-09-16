@@ -2,13 +2,39 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::time::Duration;
+
+use actix_web::{web, web::Data, web::Path, web::Query, Error, HttpResponse};
+use tempfile::tempdir;
 
 use crate::app::RouteState;
 use crate::models::{FetchObservation, FetchObservations, FetchVideoUnit};
 use crate::video_unit_routes::DateRange;
-use actix_web::{web, web::Data, web::Path, web::Query, Error, HttpResponse};
+
+/// Implements route the fetchs `Observation`s from the database
+/// by the observation id specified.
+///
+/// # Arguments
+/// * `observation_id` - id of observation to fetch
+pub async fn fetch_observation(
+    observation_id: Path<i64>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, Error> {
+    let db_response = state
+        .db
+        .send(FetchObservation {
+            id: observation_id.into_inner(),
+        })
+        .await?;
+
+    match db_response {
+        Ok(observation) => Ok(HttpResponse::Ok().json(observation)),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
 
 /// Implements route that fetches `VideoUnit`s from the database
 /// between the specified times, inclusively.
@@ -61,7 +87,8 @@ pub fn get_snapshot(path: &str, microsecond_offset: i64) -> Result<Vec<u8>, ()> 
     .iter()
     .collect();
 
-    let child = Command::new("/exopticon/target/debug/exsnap")
+    debug!("Capturing snapshot: {} {}", &path, microsecond_offset);
+    let child = Command::new("exsnap")
         .arg(path)
         .arg(microsecond_offset.to_string())
         .stdout(Stdio::piped())
@@ -98,6 +125,99 @@ pub async fn fetch_observation_snapshot(
                 let snap =
                     fetch_observation_image(&file.filename, observation.frame_offset).await?;
                 Ok(HttpResponse::Ok().content_type("image/jpeg").body(snap))
+            } else {
+                Ok(HttpResponse::InternalServerError().body("video unit db failed"))
+            }
+        }
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+/// returns clip for given video file path, offset and time
+pub fn get_clip(path: &str, microsecond_offset: i64, length: Duration) -> Result<Vec<u8>, ()> {
+    debug!(
+        "Capturing clip: {} {} {}",
+        &path,
+        microsecond_offset,
+        length.as_secs()
+    );
+    // mp4 must be written to a file so create a temp dir
+    let dir = tempdir().map_err(|_| {
+        error!("failed to make tempdir");
+        ()
+    })?;
+    let file_path = dir.path().join("output.mp4");
+    debug!("File Path: {:?}", file_path);
+    let offset = Duration::from_micros(microsecond_offset as u64);
+    let child = Command::new("ffmpeg")
+        .arg("-noaccurate_seek")
+        .arg("-ss")
+        .arg(format!("{}.{}", offset.as_secs(), offset.subsec_millis()))
+        .arg("-i")
+        .arg(path)
+        .arg("-vcodec")
+        .arg("copy")
+        .arg("-t")
+        .arg(format!("{}.{}", length.as_secs(), length.subsec_millis()))
+        .arg("-avoid_negative_ts")
+        .arg("make_zero")
+        .arg(&file_path)
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to launch");
+
+    child.wait_with_output().map_err(|_| {
+        error!("failed to wait on child");
+        ()
+    })?;
+
+    let contents = fs::read(file_path).map_err(|_| {
+        error!("Failed to read clip file.");
+        ()
+    })?;
+    Ok(contents)
+}
+
+/// Async fetch the clip corresponding to an observation
+async fn get_observation_clip(
+    filename: String,
+    frame_offset: i64,
+    length: Duration,
+) -> Result<Vec<u8>, ()> {
+    match web::block(move || get_clip(&filename, frame_offset, length)).await {
+        Ok(mp4) => Ok(mp4),
+        Err(_) => Err(()),
+    }
+}
+/// Route to fetch video clip for observation
+pub async fn fetch_observation_clip(
+    observation_id: Path<i64>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, Error> {
+    let obs_response = state
+        .db
+        .send(FetchObservation {
+            id: observation_id.into_inner(),
+        })
+        .await?;
+
+    match obs_response {
+        Ok(observation) => {
+            let mut unit_response = state
+                .db
+                .send(FetchVideoUnit {
+                    id: observation.video_unit_id,
+                })
+                .await??;
+            let file = unit_response.1.pop();
+            if let Some(file) = file {
+                let snap = get_observation_clip(
+                    file.filename,
+                    observation.frame_offset,
+                    Duration::from_secs(5),
+                )
+                .await?;
+                Ok(HttpResponse::Ok().content_type("video/webm").body(snap))
             } else {
                 Ok(HttpResponse::InternalServerError().body("video unit db failed"))
             }

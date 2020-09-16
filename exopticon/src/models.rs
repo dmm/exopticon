@@ -31,8 +31,8 @@ pub struct RemoveFile {
 }
 
 use crate::schema::{
-    alert_rules, analysis_engines, analysis_instances, camera_groups, cameras, notifiers,
-    observations, users, video_files, video_units,
+    alert_rule_cameras, alert_rules, analysis_engines, analysis_instances, camera_groups, cameras,
+    notifiers, observations, users, video_files, video_units,
 };
 
 /// Full camera group model. Represents a full row returned from the
@@ -706,8 +706,10 @@ pub struct SubscriptionMask {
     pub lr_y: i16,
 }
 
-/// Represents Alert Rule
-#[derive(Clone, Deserialize, Serialize, Debug, Queryable, Insertable, PartialEq, Eq, Hash)]
+/// Represents Alert Rule database entry
+#[derive(
+    Clone, Deserialize, Serialize, Debug, Queryable, Insertable, Identifiable, PartialEq, Eq, Hash,
+)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "alert_rules"]
 pub struct AlertRule {
@@ -733,17 +735,55 @@ pub struct AlertRule {
     pub inserted_at: DateTime<Utc>,
     /// modified date time
     pub updated_at: DateTime<Utc>,
+    /// topic to send notification with
+    pub notification_topic: String,
+}
+
+#[derive(Clone, Identifiable, Associations, Debug, Queryable, PartialEq, Eq, Hash)]
+#[belongs_to(AlertRule)]
+#[table_name = "alert_rule_cameras"]
+pub struct AlertRuleCamera {
+    /// Alert rule camera id
+    pub id: i32,
+    /// alert rule id
+    pub alert_rule_id: i32,
+    /// camera id
+    pub camera_id: i32,
+}
+
+/// Represents Alert Rule domain model
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertRuleModel(
+    /// alert rule parent
+    pub AlertRule,
+    /// child camera ids
+    pub Vec<i32>,
+);
+
+impl AlertRuleModel {
+    pub fn rule(&self) -> &AlertRule {
+        return &self.0;
+    }
+
+    pub fn matches_camera_id(&self, camera_id: i32) -> bool {
+        self.1.is_empty() || self.1.iter().find(|&&x| x == camera_id).is_some()
+    }
+    //    pub fn matching_camera_ids(&self) -> &[i32] {
+    //        &self.1
+    //    }
 }
 
 /// Represents a request to create an Alert Rule
-#[derive(Insertable, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "alert_rules"]
 pub struct CreateAlertRule {
     /// rule name
     pub name: String,
     /// analysis instance to listen to observations from
     pub analysis_instance_id: i32,
+    /// cameras ids to match
+    pub camera_ids: Vec<i32>,
     /// tag to alert on
     pub tag: String,
     /// detail to alert on
@@ -754,6 +794,8 @@ pub struct CreateAlertRule {
     pub cool_down_time: i64,
     /// id of notifier to use
     pub notifier_id: i32,
+    /// topic to send notification with
+    pub notification_topic: String,
 }
 
 /// Represents a request to delete an Alert Rule

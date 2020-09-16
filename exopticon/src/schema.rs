@@ -19,6 +19,7 @@ table! {
         notifier_id -> Int4,
         inserted_at -> Timestamptz,
         updated_at -> Timestamptz,
+        notification_topic -> Varchar,
     }
 }
 

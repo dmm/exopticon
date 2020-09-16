@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
   curl python3-pil python3-lxml \
   python3 python3-pip python3-setuptools python3-wheel \
-  git libopencv-dev python3-opencv cmake \
+  git libopencv-dev python3-opencv cmake ffmpeg \
  # gstreamer dependencies
   libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
@@ -155,7 +155,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libreadline5 libsqlite3-0 libssl1.1 libwebp6 \
   libxml2 libxslt1.1 libyaml-0-2 \
   zlib1g libturbojpeg0 \
-  python-setuptools python3-pip python3-opencv \
+  python-setuptools python3-pip python3-opencv ffmpeg \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 

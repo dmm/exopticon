@@ -49,6 +49,7 @@ rmp-serde = "0.13"
 futures = "0.3"
 r2d2 = "0.8"
 rust-embed = { version = "5.6.0", features = ["interpolate-folder-path"] }
+tempfile = "3.1.0"
 tokio = { version = "0.2", features = ["full"] }
 tokio-util = { version = "0.3", features = ["codec"] }
 tokio-process = "0.2"
