@@ -80,6 +80,11 @@ export class VideoViewComponent implements OnInit {
       (error) => {
         console.log(`Caught websocket error! ${error}`);
       },
+      () => {
+        // complete
+        console.log('VideoView: playback End subscription complete');
+        this.status.emit('eof');
+      }
     );
 
     console.log(`old subscription: ${oldSubscription}`);

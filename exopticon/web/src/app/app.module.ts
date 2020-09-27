@@ -14,6 +14,7 @@ import { AnalysisPanelComponent } from './analysis-panel/analysis-panel.componen
 import { VideoViewComponent } from './video-view/video-view.component';
 import { PlaybackViewComponent } from './playback-view/playback-view.component';
 import { AlertViewComponent } from './alert-view/alert-view.component';
+import { VideoClipService } from './video-clip.service';
 
 @NgModule({
   declarations: [

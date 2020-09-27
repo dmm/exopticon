@@ -11,7 +11,8 @@
 }
 
 div.main-content {
-
+  grid-column: span 1;
+  grid-row: span 2;
 }
 
 div.logo {

@@ -17,6 +17,10 @@ export class VideoUnitService {
 
   constructor(private http: HttpClient) { }
 
+  getVideoUnit(videoUnitId: number): Observable<VideoUnit> {
+    return this.http.get<VideoUnit>(`/v1/video_units/${videoUnitId}`);
+  }
+
   /// Fetch video units for the specified duration.
   getVideoUnits(cameraId: number,
     beginTime: ZonedDateTime,
