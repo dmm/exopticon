@@ -10,6 +10,7 @@ use actix_web::{web, web::Data, web::Path, web::Query, Error, HttpResponse};
 use tempfile::tempdir;
 
 use crate::app::RouteState;
+use crate::db_registry;
 use crate::models::{FetchObservation, FetchObservations, FetchVideoUnit};
 use crate::video_unit_routes::DateRange;
 
@@ -66,11 +67,50 @@ pub async fn fetch_observations_between(
 }
 
 /// Async fetch the image corresponding to an observation
-async fn fetch_observation_image(filename: &str, frame_offset: u64) -> Result<Vec<u8>, ()> {
-    let uri = filename.to_string();
-    match web::block(move || get_snapshot(&uri, frame_offset)).await {
-        Ok(jpg) => Ok(jpg),
-        Err(_) => Err(()),
+pub async fn fetch_observation_image(observation_id: i64) -> Result<Vec<u8>, ()> {
+    let db = db_registry::get_db();
+    let obs_response = db
+        .send(FetchObservation { id: observation_id })
+        .await
+        .map_err(|_| {
+            error!("Error fetching FetchObservation");
+        })?;
+
+    match obs_response {
+        Ok(observation) => {
+            let mut unit_response = db
+                .send(FetchVideoUnit {
+                    id: observation.video_unit_id,
+                })
+                .await
+                .map_err(|_| {
+                    error!("Failed to send FetchVideoUnit message");
+                })?
+                .map_err(|_| {
+                    error!("FetchVideoUnit db error!");
+                })?;
+            let file = unit_response.1.pop();
+            if let Some(file) = file {
+                let offset = u64::try_from(observation.frame_offset).map_err(|_| {
+                    error!(
+                        "Invalid offset in observation: {}",
+                        observation.frame_offset
+                    );
+                })?;
+                let snap = match web::block(move || get_snapshot(&file.filename, offset)).await {
+                    Ok(jpg) => Ok(jpg),
+                    Err(_) => Err(()),
+                }?;
+                Ok(snap)
+            } else {
+                error!("video unit db failed");
+                Err(())
+            }
+        }
+        Err(err) => {
+            error!("observation error: {}", err.to_string());
+            Err(())
+        }
     }
 }
 
@@ -102,44 +142,22 @@ pub fn get_snapshot(path: &str, microsecond_offset: u64) -> Result<Vec<u8>, ()> 
         error!("failed to wait on child");
     })?;
 
-    Ok(output.stdout)
+    if output.stdout.is_empty() {
+        Err(())
+    } else {
+        Ok(output.stdout)
+    }
 }
 
 /// Implements fetching observation snapshot
 pub async fn fetch_observation_snapshot(
     observation_id: Path<i64>,
-    state: Data<RouteState>,
+    _state: Data<RouteState>,
 ) -> Result<HttpResponse, Error> {
-    let obs_response = state
-        .db
-        .send(FetchObservation {
-            id: observation_id.into_inner(),
-        })
-        .await?;
-
-    match obs_response {
-        Ok(observation) => {
-            let mut unit_response = state
-                .db
-                .send(FetchVideoUnit {
-                    id: observation.video_unit_id,
-                })
-                .await??;
-            let file = unit_response.1.pop();
-            if let Some(file) = file {
-                let offset = u64::try_from(observation.frame_offset).map_err(|_| {
-                    HttpResponse::InternalServerError().body(format!(
-                        "Invalid offset in observation: {}",
-                        observation.frame_offset,
-                    ))
-                })?;
-                let snap = fetch_observation_image(&file.filename, offset).await?;
-                Ok(HttpResponse::Ok().content_type("image/jpeg").body(snap))
-            } else {
-                Ok(HttpResponse::InternalServerError().body("video unit db failed"))
-            }
-        }
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    let res = fetch_observation_image(observation_id.into_inner()).await;
+    match res {
+        Ok(snap) => Ok(HttpResponse::Ok().content_type("image/jpeg").body(snap)),
+        Err(_) => Ok(HttpResponse::InternalServerError().body("failed to fetch image")),
     }
 }
 
@@ -196,6 +214,7 @@ async fn get_observation_clip(
         Err(_) => Err(()),
     }
 }
+
 /// Route to fetch video clip for observation
 pub async fn fetch_observation_clip(
     observation_id: Path<i64>,

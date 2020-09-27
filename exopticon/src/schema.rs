@@ -19,7 +19,7 @@ table! {
         notifier_id -> Int4,
         inserted_at -> Timestamptz,
         updated_at -> Timestamptz,
-        notification_topic -> Varchar,
+        contact_group -> Varchar,
     }
 }
 
@@ -93,6 +93,14 @@ table! {
         enabled -> Bool,
         inserted_at -> Timestamp,
         updated_at -> Timestamp,
+    }
+}
+
+table! {
+    notification_contacts (id) {
+        id -> Int4,
+        group_name -> Text,
+        username -> Text,
     }
 }
 
@@ -194,6 +202,7 @@ allow_tables_to_appear_in_same_query!(
     analysis_subscriptions,
     camera_groups,
     cameras,
+    notification_contacts,
     notifiers,
     observations,
     subscription_masks,

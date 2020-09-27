@@ -1,17 +1,17 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
+//use std::convert::TryInto;
 
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
 
 use crate::db_registry;
 use crate::models::FetchAllNotifier;
-use crate::mqtt_actor::{MqttActor, SendMqttMessage};
+use crate::telegram_actor::TelegramActor;
 
 /// Notifier Supervisor starts child notifiers and routes notifications
 pub struct NotifierSupervisor {
     /// child workers
-    workers: HashMap<i32, Addr<MqttActor>>,
+    workers: HashMap<i32, Addr<TelegramActor>>,
 }
 
 impl Actor for NotifierSupervisor {
@@ -63,16 +63,10 @@ impl Handler<SyncNotifiers> for NotifierSupervisor {
                 };
 
                 for n in notifiers {
-                    debug!("Starting mqtt actor!");
-                    let address = MqttActor::new(
-                        n.hostname.clone(),
-                        n.port
-                            .try_into()
-                            .expect("notifier port failed to convert to u16!"),
-                        n.username.clone(),
-                        n.password.clone(),
-                    )
-                    .start();
+                    debug!("Starting notifier actor!");
+                    let address =
+                        TelegramActor::new(n.password.clone().unwrap_or_else(|| String::from("")))
+                            .start();
                     with_ctx(|actor: &mut Self, _| {
                         actor.workers.insert(n.id, address);
                     });
@@ -87,12 +81,14 @@ impl Handler<SyncNotifiers> for NotifierSupervisor {
 
 /// Message requesting to send an alert to the given notifier
 pub struct SendNotification {
-    /// id of Notifier to use
+    /// id of target notifier
     pub notifier_id: i32,
-    /// notification topic
-    pub topic: String,
-    /// notification payload, probably json
-    pub payload: String,
+    /// name of targeted contact group
+    pub contact_group: String,
+    /// Optional Message
+    pub message: Option<String>,
+    /// Optional image attachment
+    pub attachment: Option<Vec<u8>>,
 }
 
 impl Message for SendNotification {
@@ -104,10 +100,7 @@ impl Handler<SendNotification> for NotifierSupervisor {
 
     fn handle(&mut self, msg: SendNotification, _ctx: &mut Context<Self>) -> Self::Result {
         if let Some(addr) = self.workers.get(&msg.notifier_id) {
-            addr.do_send(SendMqttMessage {
-                topic: msg.topic,
-                payload: msg.payload,
-            });
+            addr.do_send(msg);
         }
     }
 }

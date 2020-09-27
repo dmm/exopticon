@@ -112,9 +112,6 @@ mod notifier_handler;
 /// Notifier supervisor
 mod notifier_supervisor;
 
-/// mqtt client actor
-mod mqtt_actor;
-
 /// Implemenents `DbExecutor` handler for creating and querying observations.
 mod observation_handler;
 
@@ -141,6 +138,9 @@ mod schema;
 
 /// Routes for handling static files
 mod static_routes;
+
+/// telegram actor module
+mod telegram_actor;
 
 /// Routes for handling users
 mod user_routes;

@@ -1,5 +1,8 @@
 use crate::errors::ServiceError;
-use crate::models::{CreateNotifier, DbExecutor, DeleteNotifier, FetchAllNotifier, Notifier};
+use crate::models::{
+    CreateNotifier, DbExecutor, DeleteNotifier, FetchAllNotifier, FetchNotificationContactsByGroup,
+    NotificationContact, Notifier,
+};
 use actix::{Handler, Message};
 use diesel::*;
 
@@ -53,6 +56,29 @@ impl Handler<FetchAllNotifier> for DbExecutor {
 
         notifiers
             .load::<Notifier>(conn)
+            .map_err(|_error| ServiceError::InternalServerError)
+    }
+}
+
+impl Message for FetchNotificationContactsByGroup {
+    type Result = Result<Vec<NotificationContact>, ServiceError>;
+}
+
+impl Handler<FetchNotificationContactsByGroup> for DbExecutor {
+    type Result = Result<Vec<NotificationContact>, ServiceError>;
+
+    fn handle(
+        &mut self,
+        msg: FetchNotificationContactsByGroup,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        use crate::schema::notification_contacts::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        notification_contacts
+            .filter(group_name.eq(msg.group_name))
+            .limit(1000)
+            .load(conn)
             .map_err(|_error| ServiceError::InternalServerError)
     }
 }

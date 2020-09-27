@@ -32,7 +32,7 @@ pub struct RemoveFile {
 
 use crate::schema::{
     alert_rule_cameras, alert_rules, analysis_engines, analysis_instances, camera_groups, cameras,
-    notifiers, observations, users, video_files, video_units,
+    notification_contacts, notifiers, observations, users, video_files, video_units,
 };
 
 /// Full camera group model. Represents a full row returned from the
@@ -735,8 +735,8 @@ pub struct AlertRule {
     pub inserted_at: DateTime<Utc>,
     /// modified date time
     pub updated_at: DateTime<Utc>,
-    /// topic to send notification with
-    pub notification_topic: String,
+    /// contact group to send alert
+    pub contact_group: String,
 }
 
 #[derive(Clone, Identifiable, Associations, Debug, Queryable, PartialEq, Eq, Hash)]
@@ -796,8 +796,8 @@ pub struct CreateAlertRule {
     pub cool_down_time: i64,
     /// id of notifier to use
     pub notifier_id: i32,
-    /// topic to send notification with
-    pub notification_topic: String,
+    /// contact group to send alert
+    pub contact_group: String,
 }
 
 /// Represents a request to delete an Alert Rule
@@ -861,3 +861,22 @@ pub struct DeleteNotifier {
 
 /// Represents a request to fetch all Notifiers
 pub struct FetchAllNotifier {}
+
+/// Represents a notification contact
+#[derive(Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "notification_contacts"]
+pub struct NotificationContact {
+    /// id of notification contact
+    pub id: i32,
+    /// All contacts with same `group_name` will be notified together
+    pub group_name: String,
+    /// username of the contact, currently Telegram id
+    pub username: String,
+}
+
+/// Request for notification contacts in specified group
+pub struct FetchNotificationContactsByGroup {
+    /// name of group to fetch contacts for
+    pub group_name: String,
+}

@@ -1,5 +1,5 @@
 #FROM gw000/debian-cuda:9.1_7.0
-FROM debian-cuda:10.0-buster-devel AS devel
+FROM dmattli/debian-cuda:10.0-buster-devel AS devel
 WORKDIR /exopticon
 
 ENV CC=gcc-7
@@ -137,9 +137,9 @@ WORKDIR /exopticon
 
 COPY --chown=exopticon:exopticon . ./
 
-RUN cargo build --release
+RUN cargo make --profile release build-release
 
-FROM debian-cuda:10.0-buster-runtime
+FROM dmattli/debian-cuda:10.0-buster-runtime
 WORKDIR /exopticon
 
 USER root
@@ -166,7 +166,6 @@ RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid
 RUN chown exopticon:exopticon /exopticon
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
-COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exsnap .
 
 ENV EXOPTICONWORKERS=/exopticon/workers/
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages

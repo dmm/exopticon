@@ -2,13 +2,16 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::time::Instant;
 
+use actix::fut::wrap_future;
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
+use tokio::time::{delay_for, Duration};
 use url::Url;
 
 use crate::db_registry;
-use crate::models::{AlertRuleModel, FetchAllAlertRule, Observation};
+use crate::models::{AlertRule, AlertRuleModel, FetchAllAlertRule, Observation};
 use crate::notifier_supervisor::{NotifierSupervisor, SendNotification};
+use crate::observation_routes::fetch_observation_image;
 use crate::ws_camera_server::{
     CameraFrame, FrameSource, Subscribe, SubscriptionSubject, WsCameraServer,
 };
@@ -111,12 +114,48 @@ impl AlertActor {
         };
         Some(url)
     }
+
+    /// Send a notification
+    async fn send_notification(rule: AlertRule, o: Observation) {
+        debug!("Sending notification for observation: {}", o.id);
+        let url = match Self::generate_observation_url(&o) {
+            Some(url) => url.to_string(),
+            None => "".to_string(),
+        };
+
+        let message = Some(format!(
+            "Alert! Alert!\n {} detected with {}% certainty {}",
+            o.details, o.score, url
+        ));
+
+        NotifierSupervisor::from_registry().do_send(SendNotification {
+            notifier_id: rule.notifier_id,
+            contact_group: rule.contact_group.clone(),
+            message: message.clone(),
+            attachment: None,
+        });
+
+        // Wait for one second then fetch image. We do this because
+        // the frame may not have been written yet.  This has to be
+        // fixed to allow trick playing live video as well.
+        delay_for(Duration::new(2, 0)).await;
+        let image = match fetch_observation_image(o.id).await {
+            Ok(img) => Some(img),
+            Err(_) => None,
+        };
+        NotifierSupervisor::from_registry().do_send(SendNotification {
+            notifier_id: rule.notifier_id,
+            contact_group: rule.contact_group.clone(),
+            message: None,
+            attachment: image,
+        });
+    }
 }
 
 impl Handler<CameraFrame> for AlertActor {
     type Result = ();
 
-    fn handle(&mut self, msg: CameraFrame, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
         // Find alert rules for the source of this frame
         debug!("Got a frame...");
         let analysis_instance_id = match msg.source {
@@ -155,18 +194,10 @@ impl Handler<CameraFrame> for AlertActor {
                         if Self::rule_matches(r, msg.camera_id, o) {
                             new_fire_times.insert(r.rule().id, Instant::now());
                             debug!("Alert! Alert!");
-                            let url = match Self::generate_observation_url(o) {
-                                Some(url) => url.to_string(),
-                                None => "".to_string(),
-                            };
-                            NotifierSupervisor::from_registry().do_send(SendNotification {
-                                notifier_id: r.rule().notifier_id,
-                                topic: r.rule().notification_topic.clone(),
-                                payload: format!(
-                                    "{{\"tag\": \"{}\", \"details\": \"{}\", \"score\": {}, \"url\": \"{}\"}}",
-                                    o.tag, o.details, o.score, url
-                                ),
-                            });
+                            ctx.spawn(wrap_future(Self::send_notification(
+                                r.rule().clone(),
+                                o.clone(),
+                            )));
                         }
                     }
                 }
