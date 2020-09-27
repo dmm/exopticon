@@ -436,14 +436,13 @@ cleanup:
 
 
         c->size += pkt->size;
-        return_value = av_interleaved_write_frame(c->fcx, pkt);
+        return_value = av_write_frame(c->fcx, pkt);
         if (return_value < 0) {
                 char errbuf[100];
                 av_strerror(return_value, errbuf, 100);
                 fprintf(stderr, "%s, %d\n", errbuf, return_value);
 
         }
-        return_value = av_interleaved_write_frame(c->fcx, NULL);
 
         return return_value;
 }
