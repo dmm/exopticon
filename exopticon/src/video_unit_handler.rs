@@ -170,7 +170,6 @@ impl Handler<FetchBetweenVideoUnit> for DbExecutor {
             .filter(camera_id.eq(msg.camera_id))
             .filter(begin_time.le(msg.end_time.naive_utc()))
             .filter(end_time.ge(msg.begin_time.naive_utc()))
-            .filter(begin_time.ne(end_time))
             .order(begin_time.asc())
             .limit(1000)
             .load(conn)
