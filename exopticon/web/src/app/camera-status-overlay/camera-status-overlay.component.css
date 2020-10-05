@@ -10,7 +10,7 @@ div {
   background: rgba(0, 0, 0, 0.7);
 }
 span {
-    background: black;
-    border-radius: 15px;
-    padding: 5px 10px 5px 10px;
+  background: black;
+  border-radius: 15px;
+  padding: 5px 10px 5px 10px;
 }

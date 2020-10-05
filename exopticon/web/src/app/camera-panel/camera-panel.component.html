@@ -1,19 +1,23 @@
 <div class="panel">
-  <div class="wrapper"
-       *ngFor="let camera of enabledCameras"
-       (mouseover)="selectCameraView(camera.id); $event.stopPropagation();"
-       (mouseleave)="deselectCameraView(); $event.stopPropagation();"
-       (touchstart)="onTouchStart(camera.id); $event.stopPropagation();"
-       [style.width.%]="(100 / columns)"
-       [style.height.vh]="(100 / rows)">
+  <div
+    class="wrapper"
+    *ngFor="let camera of enabledCameras"
+    (mouseover)="selectCameraView(camera.id); $event.stopPropagation()"
+    (mouseleave)="deselectCameraView(); $event.stopPropagation()"
+    (touchstart)="onTouchStart(camera.id); $event.stopPropagation()"
+    [style.width.%]="100 / columns"
+    [style.height.vh]="100 / rows"
+  >
     <div class="camera-width" *ngIf="rows === -1"></div>
     <div class="content">
-      <app-camera-view [camera]="camera"
-                       [selected]="selectedCameraId === camera.id"
-                       [enabled]="pageVisible && cameraVisibility.get(camera.id)"
-                       [videoService]="videoService"
-                       [resolution]="resolution"
-                       (isVisible)="updateCameraViewVisibility(camera.id, $event)">
+      <app-camera-view
+        [camera]="camera"
+        [selected]="selectedCameraId === camera.id"
+        [enabled]="pageVisible && cameraVisibility.get(camera.id)"
+        [videoService]="videoService"
+        [resolution]="resolution"
+        (isVisible)="updateCameraViewVisibility(camera.id, $event)"
+      >
       </app-camera-view>
     </div>
   </div>

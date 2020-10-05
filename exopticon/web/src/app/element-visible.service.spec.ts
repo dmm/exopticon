@@ -1,8 +1,7 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed } from "@angular/core/testing";
+import { ElementVisibleService } from "./element-visible.service";
 
-import { ElementVisibleService } from './element-visible.service';
-
-describe('ElementVisibleService', () => {
+describe("ElementVisibleService", () => {
   let service: ElementVisibleService;
 
   beforeEach(() => {
@@ -10,7 +9,7 @@ describe('ElementVisibleService', () => {
     service = TestBed.inject(ElementVisibleService);
   });
 
-  it('should be created', () => {
+  it("should be created", () => {
     expect(service).toBeTruthy();
   });
 });

@@ -1,8 +1,7 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed } from "@angular/core/testing";
+import { VideoClipService } from "./video-clip.service";
 
-import { VideoClipService } from './video-clip.service';
-
-describe('VideoClipService', () => {
+describe("VideoClipService", () => {
   let service: VideoClipService;
 
   beforeEach(() => {
@@ -10,7 +9,7 @@ describe('VideoClipService', () => {
     service = TestBed.inject(VideoClipService);
   });
 
-  it('should be created', () => {
+  it("should be created", () => {
     expect(service).toBeTruthy();
   });
 });

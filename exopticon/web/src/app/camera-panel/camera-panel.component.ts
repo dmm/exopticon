@@ -1,14 +1,20 @@
-import { Component, ChangeDetectorRef, HostListener, OnInit, Input, NgZone } from '@angular/core';
-import { ActivatedRoute, Router, Params } from '@angular/router';
-import { Camera } from '../camera';
-import { CameraService, PtzDirection } from '../camera.service';
-import { VideoService } from '../video.service';
-import { CameraResolution } from '../frame-message';
+import {
+  ChangeDetectorRef,
+  Component,
+  HostListener,
+  NgZone,
+  OnInit,
+} from "@angular/core";
+import { ActivatedRoute, Router } from "@angular/router";
+import { Camera } from "../camera";
+import { CameraService, PtzDirection } from "../camera.service";
+import { CameraResolution } from "../frame-message";
+import { VideoService } from "../video.service";
 
 @Component({
-  selector: 'app-camera-panel',
-  templateUrl: './camera-panel.component.html',
-  styleUrls: ['./camera-panel.component.css']
+  selector: "app-camera-panel",
+  templateUrl: "./camera-panel.component.html",
+  styleUrls: ["./camera-panel.component.css"],
 })
 export class CameraPanelComponent implements OnInit {
   cameras: Camera[];
@@ -23,12 +29,14 @@ export class CameraPanelComponent implements OnInit {
   private rows: number;
   private resolution: CameraResolution;
 
-  constructor(private cameraService: CameraService,
+  constructor(
+    private cameraService: CameraService,
     public videoService: VideoService,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
     private router: Router,
-    private ngZone: NgZone) {
+    private ngZone: NgZone
+  ) {
     this.cameras = [];
     this.enabledCameras = [];
     this.cameraVisibility = new Map<number, boolean>();
@@ -38,43 +46,40 @@ export class CameraPanelComponent implements OnInit {
   }
 
   getCameras(): void {
-    this.cameraService
-      .getCameras()
-      .subscribe(
-        cameras => {
-          this.cameras = cameras.filter(c => c.enabled);
-          this.enableCameras();
-        }
-        ,
-        () => {
-          window.location.pathname = '/login';
-        }
-      )
+    this.cameraService.getCameras().subscribe(
+      (cameras) => {
+        this.cameras = cameras.filter((c) => c.enabled);
+        this.enableCameras();
+      },
+      () => {
+        window.location.pathname = "/login";
+      }
+    );
   }
 
   ngOnInit() {
     this.pageVisible = true;
 
-    this.route.paramMap.subscribe(params => {
-      if (params.has('cols')) {
-        this.columns = parseInt(params.get('cols'), 10);
+    this.route.paramMap.subscribe((params) => {
+      if (params.has("cols")) {
+        this.columns = parseInt(params.get("cols"), 10);
       } else {
         this.columns = 1;
       }
-      if (params.has('rows')) {
-        this.rows = parseInt(params.get('rows'), 10);
+      if (params.has("rows")) {
+        this.rows = parseInt(params.get("rows"), 10);
       } else {
         this.rows = -1;
       }
 
-      if (params.has('offset')) {
-        this.enabledCamerasOffset = parseInt(params.get('offset'), 10) || 0;
+      if (params.has("offset")) {
+        this.enabledCamerasOffset = parseInt(params.get("offset"), 10) || 0;
       } else {
         this.enabledCamerasOffset = 0;
       }
 
-      if (params.has('res')) {
-        if (params.get('res').toLowerCase() === 'hd') {
+      if (params.has("res")) {
+        if (params.get("res").toLowerCase() === "hd") {
           this.resolution = CameraResolution.Hd;
         } else {
           this.resolution = CameraResolution.Sd;
@@ -87,19 +92,19 @@ export class CameraPanelComponent implements OnInit {
     this.videoService.connect();
   }
 
-  @HostListener('document:visibilitychange', ['$event'])
+  @HostListener("document:visibilitychange", ["$event"])
   onVisibilityChange() {
     this.ngZone.run(() => {
-      this.pageVisible = !document['hidden'];
+      this.pageVisible = !document["hidden"];
     });
   }
 
-  @HostListener('window:keyup', ['$event'])
+  @HostListener("window:keyup", ["$event"])
   KeyEvent(event: KeyboardEvent) {
-    console.log('keycode: ' + event.keyCode);
+    console.log("keycode: " + event.keyCode);
     let offset = this.enabledCamerasOffset;
     let cameraId = this.getKeyboardControlCameraId();
-    console.log('keyboard control camera id: ' + cameraId);
+    console.log("keyboard control camera id: " + cameraId);
     switch (event.keyCode) {
       case 78:
         // 'n'
@@ -111,32 +116,30 @@ export class CameraPanelComponent implements OnInit {
         break;
       case 65:
         // 'a'
-        if (cameraId)
-          this.cameraService.ptz(cameraId, PtzDirection.left);
+        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.left);
         break;
       case 68:
         // 'd'
-        if (cameraId)
-          this.cameraService.ptz(cameraId, PtzDirection.right);
+        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.right);
         break;
       case 87:
         // 'w'
-        if (cameraId)
-          this.cameraService.ptz(cameraId, PtzDirection.up);
+        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.up);
         break;
       case 83:
         // 's'
-        if (cameraId)
-          this.cameraService.ptz(cameraId, PtzDirection.down);
+        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.down);
         break;
     }
 
     if (offset !== this.enabledCamerasOffset) {
-      this.router.navigate(['./', this.merge({ 'offset': offset }, this.route.snapshot.params)],
+      this.router.navigate(
+        ["./", this.merge({ offset: offset }, this.route.snapshot.params)],
         {
-          queryParamsHandling: 'preserve',
-          relativeTo: this.route
-        });
+          queryParamsHandling: "preserve",
+          relativeTo: this.route,
+        }
+      );
     }
   }
 
@@ -175,8 +178,12 @@ export class CameraPanelComponent implements OnInit {
   }
 
   enableCameras() {
-    let count = this.rows === -1 ? this.cameras.length : this.columns * this.rows;
-    this.enabledCameras = this.rotateArray(this.cameras, this.enabledCamerasOffset).slice(0, count);
+    let count =
+      this.rows === -1 ? this.cameras.length : this.columns * this.rows;
+    this.enabledCameras = this.rotateArray(
+      this.cameras,
+      this.enabledCamerasOffset
+    ).slice(0, count);
   }
 
   selectCameraView(cameraIndex: number) {
@@ -212,5 +219,4 @@ export class CameraPanelComponent implements OnInit {
 
     return -1;
   }
-
 }

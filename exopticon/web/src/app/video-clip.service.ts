@@ -1,31 +1,27 @@
-import { Injectable } from '@angular/core';
-import { Observable, Subject, Subscription } from 'rxjs';
-import {mergeMap} from 'rxjs/operators';
-
-import { VideoUnitService } from './video-unit.service';
-import { PlaybackSubject, VideoService, SubscriptionSubject } from './video.service';
-import { WsMessage, FrameMessage, CameraResolution } from './frame-message';
+import { Injectable } from "@angular/core";
+import { Observable } from "rxjs";
+import { WsMessage } from "./frame-message";
+import { VideoUnitService } from "./video-unit.service";
+import { PlaybackSubject, VideoService } from "./video.service";
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class VideoClipService {
-
-  constructor(private videoUnitService: VideoUnitService,
-              private videoService: VideoService) {}
-
+  constructor(
+    private videoUnitService: VideoUnitService,
+    private videoService: VideoService
+  ) {}
 
   playContext(videoUnitId: number, frameOffset: number): Observable<WsMessage> {
     let initialSubject: PlaybackSubject = {
-      kind: 'playback',
+      kind: "playback",
       id: Math.floor(Math.random() * Math.floor(10000)),
       videoUnitId: videoUnitId,
-      offset: frameOffset
+      offset: frameOffset,
     };
 
     this.videoService.connect();
     return this.videoService.getObservable(initialSubject);
-
-
   }
 }

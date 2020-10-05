@@ -1,4 +1,3 @@
-
 export interface Observation {
   id: number;
   videoUnitId: number;

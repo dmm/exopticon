@@ -1,14 +1,21 @@
-import { SimpleChanges, Component, ChangeDetectorRef, ElementRef, OnInit, Output, EventEmitter, Input, NgZone } from '@angular/core';
-import { Observable, Subscription } from 'rxjs';
-
-import { Camera } from '../camera';
-import { SubscriptionSubject, VideoService } from '../video.service';
-import { CameraResolution, WsMessage } from '../frame-message';
+import {
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  SimpleChanges,
+} from "@angular/core";
+import { Observable } from "rxjs";
+import { Camera } from "../camera";
+import { CameraResolution, WsMessage } from "../frame-message";
+import { SubscriptionSubject, VideoService } from "../video.service";
 
 @Component({
-  selector: 'app-camera-view',
-  templateUrl: './camera-view.component.html',
-  styleUrls: ['./camera-view.component.css']
+  selector: "app-camera-view",
+  templateUrl: "./camera-view.component.html",
+  styleUrls: ["./camera-view.component.css"],
 })
 export class CameraViewComponent implements OnInit {
   @Input() camera: Camera;
@@ -24,8 +31,7 @@ export class CameraViewComponent implements OnInit {
   private videoSubject: SubscriptionSubject;
   public frameService?: Observable<WsMessage>;
 
-  constructor(private changeRef: ChangeDetectorRef) {
-  }
+  constructor(private changeRef: ChangeDetectorRef) {}
 
   ngOnInit() {
     if (this.enabled) {
@@ -34,22 +40,22 @@ export class CameraViewComponent implements OnInit {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes.hasOwnProperty('enabled')) {
-      if (changes['enabled'].currentValue) {
-        this.activate()
+    if (changes.hasOwnProperty("enabled")) {
+      if (changes["enabled"].currentValue) {
+        this.activate();
       } else {
         this.deactivate();
       }
     }
 
-    if (changes.hasOwnProperty('resolution')) {
+    if (changes.hasOwnProperty("resolution")) {
       // handle changing resolution
     }
   }
 
   activate() {
     this.videoSubject = {
-      kind: 'camera',
+      kind: "camera",
       cameraId: this.camera.id,
       resolution: this.resolution,
     };

@@ -1,30 +1,29 @@
-
-import { Observation } from './observation';
+import { Observation } from "./observation";
 
 export enum CameraResolution {
-  Sd = 'SD',
-  Hd = 'HD',
+  Sd = "SD",
+  Hd = "HD",
 }
 
 export interface CameraSource {
-  kind: 'camera';
+  kind: "camera";
   cameraId: number;
 }
 
 export interface AnalysisSource {
-  kind: 'analysisEngine';
+  kind: "analysisEngine";
   analysisEngineId: number;
 }
 
 export interface PlaybackSource {
-  kind: 'playback';
+  kind: "playback";
   id: number;
 }
 
 export type FrameSource = AnalysisSource | CameraSource | PlaybackSource;
 
 export class FrameMessage {
-  kind: 'frame';
+  kind: "frame";
   source: FrameSource;
   resolution: CameraResolution;
   jpeg: string;
@@ -36,7 +35,7 @@ export class FrameMessage {
 }
 
 export class PlaybackEnd {
-  kind: 'playbackEnd';
+  kind: "playbackEnd";
   id: number;
 }
 

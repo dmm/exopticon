@@ -1,16 +1,14 @@
-import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { async, ComponentFixture, TestBed } from "@angular/core/testing";
+import { CameraOverlayComponent } from "./camera-overlay.component";
 
-import { CameraOverlayComponent } from './camera-overlay.component';
-
-describe('CameraOverlayComponent', () => {
+describe("CameraOverlayComponent", () => {
   let component: CameraOverlayComponent;
   let fixture: ComponentFixture<CameraOverlayComponent>;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ CameraOverlayComponent ]
-    })
-    .compileComponents();
+      declarations: [CameraOverlayComponent],
+    }).compileComponents();
   }));
 
   beforeEach(() => {
@@ -19,7 +17,7 @@ describe('CameraOverlayComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
   });
 });

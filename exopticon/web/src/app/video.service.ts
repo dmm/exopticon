@@ -1,36 +1,37 @@
-import { Injectable } from '@angular/core';
-import { Observable, Subject, Subscription } from 'rxjs';
-import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-
-import { WsMessage, FrameMessage, CameraResolution } from './frame-message';
+import { Injectable } from "@angular/core";
+import { Observable, Subject, Subscription } from "rxjs";
+import { webSocket, WebSocketSubject } from "rxjs/webSocket";
+import { CameraResolution, FrameMessage, WsMessage } from "./frame-message";
 
 export interface CameraSubject {
-  kind: 'camera';
+  kind: "camera";
   cameraId: number;
   resolution: CameraResolution;
 }
 
 export interface AnalysisSubject {
-  kind: 'analysisEngine';
+  kind: "analysisEngine";
   analysisEngineId: number;
 }
 
 export interface PlaybackSubject {
-  kind: 'playback';
+  kind: "playback";
   id: number;
   videoUnitId: number;
   offset: number;
 }
-export type SubscriptionSubject = AnalysisSubject | CameraSubject | PlaybackSubject;
+export type SubscriptionSubject =
+  | AnalysisSubject
+  | CameraSubject
+  | PlaybackSubject;
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class VideoService {
   private subject: WebSocketSubject<Object>;
   private subscriberCount = 0;
   private subscription?: Subscription;
-
 
   constructor() {
     this.subscription = null;
@@ -38,8 +39,8 @@ export class VideoService {
 
   public connect(url?: string): WebSocketSubject<Object> {
     if (!url) {
-      let parse = document.createElement('a');
-      parse.href = document.querySelector('base')['href'];
+      let parse = document.createElement("a");
+      parse.href = document.querySelector("base")["href"];
 
       let loc = window.location;
       if (loc.protocol === "https:") {
@@ -47,7 +48,7 @@ export class VideoService {
       } else {
         url = "ws:";
       }
-      var pathname = parse.pathname === '/' ? '' : `/${parse.pathname}`;
+      var pathname = parse.pathname === "/" ? "" : `/${parse.pathname}`;
       url += `//${parse.host}${pathname}/v1/ws_json`;
       console.log(`websocket url: ${url}`);
     }
@@ -62,12 +63,12 @@ export class VideoService {
     if (this.subscription === null) {
       this.subscription = this.subject.subscribe(
         (frame: FrameMessage) => {
-          if (frame.kind === 'frame') {
-            this.subject.next('Ack');
+          if (frame.kind === "frame") {
+            this.subject.next("Ack");
           }
         },
-        () => { },
-        () => { }
+        () => {},
+        () => {}
       );
     }
   }
@@ -85,91 +86,86 @@ export class VideoService {
   }
 
   public getObservable(subject: SubscriptionSubject): Observable<WsMessage> {
-    let frameSub: WebSocketSubject<WsMessage> = this.subject as unknown as WebSocketSubject<WsMessage>;
+    let frameSub: WebSocketSubject<WsMessage> = (this
+      .subject as unknown) as WebSocketSubject<WsMessage>;
 
     return frameSub.multiplex(
       () => {
         this.setupAcker();
         this.subscriberCount++;
         switch (subject.kind) {
-          case 'camera':
+          case "camera":
             return {
-              'Subscribe': {
-                'Camera': [subject.cameraId, subject.resolution],
-              }
+              Subscribe: {
+                Camera: [subject.cameraId, subject.resolution],
+              },
             };
-          case 'analysisEngine':
+          case "analysisEngine":
             return {
-              'Subscribe': {
-                'AnalysisEngine': subject.analysisEngineId,
-              }
+              Subscribe: {
+                AnalysisEngine: subject.analysisEngineId,
+              },
             };
-          case 'playback':
+          case "playback":
             return {
-              'StartPlayback': {
+              StartPlayback: {
                 id: subject.id,
                 video_unit_id: subject.videoUnitId,
                 offset: subject.offset,
-              }
-            }
+              },
+            };
         }
       },
       () => {
         this.subscriberCount--;
         this.cleanupAcker();
         switch (subject.kind) {
-          case 'camera':
+          case "camera":
             return {
-              'Unsubscribe': {
-                'Camera': [subject.cameraId, subject.resolution],
-              }
+              Unsubscribe: {
+                Camera: [subject.cameraId, subject.resolution],
+              },
             };
-          case 'analysisEngine':
+          case "analysisEngine":
             return {
-              'Unsubscribe': {
-                'AnalysisEngine': subject.analysisEngineId,
-              }
+              Unsubscribe: {
+                AnalysisEngine: subject.analysisEngineId,
+              },
             };
-          case 'playback':
+          case "playback":
             return {
-              'StopPlayback': {
+              StopPlayback: {
                 id: subject.id,
-              }
+              },
             };
-
         }
       },
       (m: WsMessage): boolean => {
-
-        if (m.kind === 'frame') {
+        if (m.kind === "frame") {
           switch (m.source.kind) {
-            case 'camera':
-              return subject.kind === 'camera'
-                && subject.cameraId === m.source.cameraId
-                && subject.resolution === m.resolution;
-            case 'analysisEngine':
-              return subject.kind === 'analysisEngine' && subject.analysisEngineId === m.source.analysisEngineId;
+            case "camera":
+              return (
+                subject.kind === "camera" &&
+                subject.cameraId === m.source.cameraId &&
+                subject.resolution === m.resolution
+              );
+            case "analysisEngine":
+              return (
+                subject.kind === "analysisEngine" &&
+                subject.analysisEngineId === m.source.analysisEngineId
+              );
 
-
-
-
-
-            case 'playback':
-              return subject.kind === 'playback'
-                && subject.id === m.source.id;
+            case "playback":
+              return subject.kind === "playback" && subject.id === m.source.id;
           }
-        } else if (m.kind === 'playbackEnd') {
-          return subject.kind === 'playback'
-            && subject.id == m.id;
+        } else if (m.kind === "playbackEnd") {
+          return subject.kind === "playback" && subject.id == m.id;
         } else {
           // invalid kind
         }
-      });
+      }
+    );
   }
-
-
-
-
 
   public getWriteSubject(): Subject<Object> {
     return this.subject;

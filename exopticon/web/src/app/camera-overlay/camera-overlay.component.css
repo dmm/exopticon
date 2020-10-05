@@ -1,6 +1,5 @@
-
 :host {
-  border: 1px solid #0F0;
+  border: 1px solid #0f0;
 }
 
 .camera-name {
@@ -12,18 +11,18 @@
 }
 
 .overlay-button {
-  background:#000;
-  opacity:.8;
-  filter:alpha(opacity=80);
-  border:1px solid;
-  border-radius:10px;
-  display:inline-block;
-  text-decoration:none;
-  verical-align:middle;
-  white-space:nowrap;
-  text-align:center;
-  user-select:none;
-  padding:.376rem .76rem;
+  background: #000;
+  opacity: 0.8;
+  filter: alpha(opacity=80);
+  border: 1px solid;
+  border-radius: 10px;
+  display: inline-block;
+  text-decoration: none;
+  verical-align: middle;
+  white-space: nowrap;
+  text-align: center;
+  user-select: none;
+  padding: 0.376rem 0.76rem;
 }
 
 .ptz-overlay {

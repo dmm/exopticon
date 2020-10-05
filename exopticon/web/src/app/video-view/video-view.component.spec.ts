@@ -1,16 +1,14 @@
-import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { async, ComponentFixture, TestBed } from "@angular/core/testing";
+import { VideoViewComponent } from "./video-view.component";
 
-import { VideoViewComponent } from './video-view.component';
-
-describe('VideoViewComponent', () => {
+describe("VideoViewComponent", () => {
   let component: VideoViewComponent;
   let fixture: ComponentFixture<VideoViewComponent>;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ VideoViewComponent ]
-    })
-    .compileComponents();
+      declarations: [VideoViewComponent],
+    }).compileComponents();
   }));
 
   beforeEach(() => {
@@ -19,7 +17,7 @@ describe('VideoViewComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
   });
 });

@@ -4,7 +4,8 @@ div {
   height: 100%;
 }
 
-canvas, img {
+canvas,
+img {
   display: block;
   width: 100%;
   height: 100%;
@@ -19,4 +20,3 @@ canvas, img {
   -ms-user-select: none;
   object-fit: contain;
 }
-

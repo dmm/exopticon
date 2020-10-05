@@ -1,5 +1,5 @@
 <div class="alert-view">
-<!---
+  <!---
 <app-video-view
   [frameService]="currentVideoService"
   (status)="handleVideoStatus($event)"
@@ -7,9 +7,11 @@
   #videoDiv>
   </app-video-view>
 -->
-<video controls autoplay loop>
-  <source src="/v1/observations/{{ observationId }}/clip#t=-5" type="video/mp4">
-</video>
-<img src="/v1/observations/{{ observationId }}/snapshot">
-
+  <video controls autoplay loop>
+    <source
+      src="/v1/observations/{{ observationId }}/clip#t=-5"
+      type="video/mp4"
+    />
+  </video>
+  <img src="/v1/observations/{{ observationId }}/snapshot" />
 </div>

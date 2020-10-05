@@ -2,16 +2,21 @@
   [frameService]="currentVideoService"
   (frameOffset)="progress($event)"
   (status)="handleVideoStatus($event)"
-  class="video-view">
-  </app-video-view>
+  class="video-view"
+>
+</app-video-view>
 <div class="control-bar">
-  <div class="begin-time-display">{{viewStartFormatted}}</div>
+  <div class="begin-time-display">{{ viewStartFormatted }}</div>
   <div class="button prev-button" (click)="timeShift(-1)"><<</div>
   <div class="button next-button" (click)="timeShift(1)">>></div>
 </div>
 <div class="progress-bar">
-
   <canvas #canvas width="1000" height="20" class="video-availability"></canvas>
-  <canvas #observations width="1000" height="20" class="observations"
-          (click)="handleProgressClick($event)"></canvas>
+  <canvas
+    #observations
+    width="1000"
+    height="20"
+    class="observations"
+    (click)="handleProgressClick($event)"
+  ></canvas>
 </div>

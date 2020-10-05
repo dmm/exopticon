@@ -1,16 +1,14 @@
-import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { async, ComponentFixture, TestBed } from "@angular/core/testing";
+import { PlaybackViewComponent } from "./playback-view.component";
 
-import { PlaybackViewComponent } from './playback-view.component';
-
-describe('PlaybackViewComponent', () => {
+describe("PlaybackViewComponent", () => {
   let component: PlaybackViewComponent;
   let fixture: ComponentFixture<PlaybackViewComponent>;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ PlaybackViewComponent ]
-    })
-    .compileComponents();
+      declarations: [PlaybackViewComponent],
+    }).compileComponents();
   }));
 
   beforeEach(() => {
@@ -19,7 +17,7 @@ describe('PlaybackViewComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
   });
 });

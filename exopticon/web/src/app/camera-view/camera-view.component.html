@@ -1,12 +1,16 @@
-<div snInViewport
-     (inViewportChange)="onInViewportChange($event)"
-     [inViewportOptions]="{rootMargin: '-10% 0% -10% 0%'}"
-     >
-  <app-video-view [frameService]="frameService"
-                  (status)="onVideoStatusChange($event)">
+<div
+  snInViewport
+  (inViewportChange)="onInViewportChange($event)"
+  [inViewportOptions]="{ rootMargin: '-10% 0% -10% 0%' }"
+>
+  <app-video-view
+    [frameService]="frameService"
+    (status)="onVideoStatusChange($event)"
+  >
   </app-video-view>
   <app-camera-overlay [camera]="camera" *ngIf="selected"></app-camera-overlay>
-  <app-camera-status-overlay *ngIf="status !== 'active'"
-                             [status]="status"></app-camera-status-overlay>
-
+  <app-camera-status-overlay
+    *ngIf="status !== 'active'"
+    [status]="status"
+  ></app-camera-status-overlay>
 </div>

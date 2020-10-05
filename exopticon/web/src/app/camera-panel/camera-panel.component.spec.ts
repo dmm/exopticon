@@ -1,16 +1,14 @@
-import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { async, ComponentFixture, TestBed } from "@angular/core/testing";
+import { CameraPanelComponent } from "./camera-panel.component";
 
-import { CameraPanelComponent } from './camera-panel.component';
-
-describe('CameraPanelComponent', () => {
+describe("CameraPanelComponent", () => {
   let component: CameraPanelComponent;
   let fixture: ComponentFixture<CameraPanelComponent>;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ CameraPanelComponent ]
-    })
-    .compileComponents();
+      declarations: [CameraPanelComponent],
+    }).compileComponents();
   }));
 
   beforeEach(() => {
@@ -19,7 +17,7 @@ describe('CameraPanelComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
   });
 });

@@ -1,4 +1,3 @@
-
 export class Camera {
   id: number;
   cameraGroupId: number;

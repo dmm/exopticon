@@ -1,16 +1,14 @@
-import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { async, ComponentFixture, TestBed } from "@angular/core/testing";
+import { AlertViewComponent } from "./alert-view.component";
 
-import { AlertViewComponent } from './alert-view.component';
-
-describe('AlertViewComponent', () => {
+describe("AlertViewComponent", () => {
   let component: AlertViewComponent;
   let fixture: ComponentFixture<AlertViewComponent>;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ AlertViewComponent ]
-    })
-    .compileComponents();
+      declarations: [AlertViewComponent],
+    }).compileComponents();
   }));
 
   beforeEach(() => {
@@ -19,7 +17,7 @@ describe('AlertViewComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
   });
 });
