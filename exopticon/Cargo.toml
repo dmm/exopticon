@@ -16,7 +16,6 @@ default-run = "exopticon"
 [dependencies]
 onvif = { path = "../onvif" }
 exserial = { path = "../exserial" }
-exsnap = { path = "../exsnap" }
 actix = "0.9.0"
 actix-http = "^1.0.1"
 actix-identity = "0.2"
