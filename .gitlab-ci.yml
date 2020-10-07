@@ -59,6 +59,5 @@ release:
   - ./release changelog
   - ./release commit-and-tag CHANGELOG.md release_info
   - ./release --ci-commit-tag v$RELEASE_VERSION add-download-link -n release -u $RELEASE_URL -d "$RELEASE_DESC"
-  when: manual
   only:
   - master
