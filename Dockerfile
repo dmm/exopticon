@@ -130,6 +130,13 @@ ENV CUDACXX=/usr/local/cuda-10.0/bin/nvcc
 FROM devel AS prod-build
 WORKDIR /exopticon
 
+USER root
+
+# Add cuda stubs so we can build without the driver libcuda.so
+RUN ln /usr/local/cuda/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1
+
+USER exopticon:exopticon
+
 COPY --chown=exopticon:exopticon . ./
 
 RUN cargo make --profile release build-release
