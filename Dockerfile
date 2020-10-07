@@ -157,7 +157,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libreadline5 libsqlite3-0 libssl1.1 libwebp6 \
   libxml2 libxslt1.1 libyaml-0-2 \
   zlib1g libturbojpeg0 \
-  python-setuptools python3-pip python3-opencv ffmpeg \
+  python-setuptools python3-pip python3-opencv python3-wheel ffmpeg \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
