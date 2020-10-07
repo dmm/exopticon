@@ -33,6 +33,8 @@ pre-release:
     - cargo make ci-flow
   only:
     - branches
+  except:
+    - master
 
 release:
   stage: release
