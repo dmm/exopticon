@@ -21,7 +21,7 @@ version:
   stage: version
   image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.19.0
   script:
-    - release next-version --allow-current > .next-version
+    - release next-version --bump-patch > .next-version
   artifacts:
     paths:
     - .next-version
@@ -73,7 +73,7 @@ release:
   - . release_info
 
   - release -v
-  - release changelog
+  - release changelog || true
   - release commit-and-tag CHANGELOG.md release_info
   - release --ci-commit-tag v$RELEASE_VERSION add-download-link -n release -u $RELEASE_URL -d "$RELEASE_DESC"
   only:
