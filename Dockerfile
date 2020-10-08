@@ -173,7 +173,7 @@ ENV EXOPTICONWORKERS=/exopticon/workers/
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV PATH=/exopticon:$PATH
 
-COPY --chown=exopticon:exopticon --from=prod-build /exopticon/workers/dist ./workers
+COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/assets/workers ./workers
 
 USER exopticon
 
