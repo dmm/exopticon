@@ -14,6 +14,7 @@ variables:
 stages:
   - version
   - build
+  - image
   - release
 
 version:
@@ -36,28 +37,40 @@ pre-release:
   except:
     - master
 
-release:
-  stage: release
+image:
+  stage: image
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
   services:
   - docker:dind
   script:
-  - rm -f release_info
-  - echo "RELEASE_URL=https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/release" > release_info
-  - echo "RELEASE_DESC=\"$(uname -mo) binary\"" >> release_info
-  - echo "RELEASE_SHA=$CI_COMMIT_SHA" >> release_info
-  - echo "RELEASE_VERSION=$(<.next-version)" >> release_info
-  - . release_info
+  - rm -f build_info
+  - echo "RELEASE_URL=https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/release" > build_info
+  - echo "RELEASE_DESC=\"$(uname -mo) binary\"" >> build_info
+  - echo "RELEASE_SHA=$CI_COMMIT_SHA" >> build_info
+  - echo "RELEASE_VERSION=$(<.next-version)" >> build_info
+  - . build_info
 
   - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   - docker build -t $CI_REGISTRY_IMAGE:v$RELEASE_VERSION .
   - docker push $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
+  artifacts:
+     paths:
+     - build_info
+
+release:
+  stage: release
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.19.
+  script:
+  - rm -f release_info
+  - mv build_info release_info
+  - . release_info
 
   - ./release -v
   - ./release changelog
   - ./release commit-and-tag CHANGELOG.md release_info
   - ./release --ci-commit-tag v$RELEASE_VERSION add-download-link -n release -u $RELEASE_URL -d "$RELEASE_DESC"
+  when: manual
   only:
   - master
