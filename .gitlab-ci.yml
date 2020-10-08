@@ -33,11 +33,11 @@ pre-release:
   script:
     - cargo make ci-flow
   only:
-    - branches
+  - branches
   except:
-    - master
+  - master
 
-image:
+build-image:
   stage: image
   image: docker:stable
   variables:
@@ -58,6 +58,8 @@ image:
   artifacts:
      paths:
      - build_info
+  only:
+  - master
 
 release:
   stage: release
