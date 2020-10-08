@@ -51,6 +51,7 @@ build-image:
   - echo "RELEASE_SHA=$CI_COMMIT_SHA" >> build_info
   - echo "RELEASE_VERSION=$(<.next-version)" >> build_info
   - . build_info
+  - cat build_info
   - cat .next-version
   - echo $RELEASE_VERSION
   - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
