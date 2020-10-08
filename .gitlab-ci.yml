@@ -20,7 +20,7 @@ stages:
   - release
 
 devel-image:
-  state: base-image
+  stage: base-image
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
@@ -35,7 +35,7 @@ devel-image:
       - ./Dockerfile.build
 
 runtime-image:
-  state: base-image
+  stage: base-image
   image: docker:stable
   variables:
     DOCKER_DRIVER: overlay2
