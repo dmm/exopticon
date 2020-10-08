@@ -1,4 +1,4 @@
-image: dmattli/exopticon-build:latest
+image: debian:buster
 
 cache:
   key: "$CI_JOB_NAME"
@@ -12,42 +12,10 @@ variables:
   RUST_BACKTRACE: FULL
   GIT_SUBMODULE_STRATEGY: recursive
 stages:
-  - base-image
-  - runtime-image
   - version
   - build
   - image
   - release
-
-devel-image:
-  stage: base-image
-  image: docker:stable
-  variables:
-    DOCKER_DRIVER: overlay2
-  services:
-  - docker:dind
-  script:
-  - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
-  - docker build -t dmattli/exopticon-build:devel -f Dockerfile.build .
-  - docker push dmattli/exopticon-build:devel
-  only:
-    changes:
-      - ./Dockerfile.build
-
-runtime-image:
-  stage: runtime-image
-  image: docker:stable
-  variables:
-    DOCKER_DRIVER: overlay2
-  services:
-  - docker:dind
-  script:
-  - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
-  - docker build -t dmattli/exopticon-build:runtime -f Dockerfile.runtime .
-  - docker push dmattli/exopticon-build:runtime
-  only:
-    changes:
-      - ./Dockerfile.runtime
 
 version:
   stage: version
@@ -62,6 +30,7 @@ version:
 
 pre-release:
   stage: build
+  image: dmattli/exopticon-build:devel
   script:
     - cargo make ci-flow
   only:
@@ -85,7 +54,10 @@ build-image:
   - . build_info
   - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   - docker build -t $CI_REGISTRY_IMAGE:v$RELEASE_VERSION .
+  - docker build -t $CI_REGISTRY_IMAGE:latest .
   - docker push $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
+  - docker push $CI_REGISTRY_IMAGE:latest
+
   artifacts:
      paths:
      - build_info
