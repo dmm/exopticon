@@ -1,4 +1,4 @@
-FROM dmattli/exopticon-build:devel
+FROM dmattli/exopticon-build:devel AS prod-build
 
 WORKDIR /exopticon
 
