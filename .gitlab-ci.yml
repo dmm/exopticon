@@ -73,8 +73,8 @@ release:
   - . release_info
 
   - release -v
-  - release changelog || true
-  - release commit-and-tag CHANGELOG.md release_info
-  - release --ci-commit-tag v$RELEASE_VERSION add-download-link -n release -u $RELEASE_URL -d "$RELEASE_DESC"
+  - release --bump-patch changelog
+  - release --bump-patch commit-and-tag CHANGELOG.md release_info
+  - release --bump-patch --ci-commit-tag v$RELEASE_VERSION add-download-link -n release -u $RELEASE_URL -d "$RELEASE_DESC"
   only:
   - master
