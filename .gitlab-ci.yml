@@ -12,10 +12,42 @@ variables:
   RUST_BACKTRACE: FULL
   GIT_SUBMODULE_STRATEGY: recursive
 stages:
+  - base-image
+  - runtime-image
   - version
   - build
   - image
   - release
+
+devel-image:
+  state: base-image
+  image: docker:stable
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+  - docker:dind
+  script:
+  - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+  - docker build -t dmattli/exopticon-build:devel -f Dockerfile.build .
+  - docker push dmattli/exopticon-build:devel
+  only:
+    changes:
+      - ./Dockerfile.build
+
+runtime-image:
+  state: base-image
+  image: docker:stable
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+  - docker:dind
+  script:
+  - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+  - docker build -t dmattli/exopticon-build:runtime -f Dockerfile.runtime .
+  - docker push dmattli/exopticon-build:runtime
+  only:
+    changes:
+      - ./Dockerfile.runtime
 
 version:
   stage: version
