@@ -1,2 +1,8 @@
 [core]
     analytics = false
+    remote = public
+['remote "ssh"']
+    url = ssh://exopticon-data@web-vm/exopticon/data
+    verify = true
+['remote "public"']
+    url = https://dev.exopticon.org/data
