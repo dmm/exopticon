@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.0.2
+2020-10-09
+
+### Fixes
+
+- chore: make each build stage run in a docker image (05d53bea4678c9dcf75ddf230e9e4262d3de21a4)
+- Merge branch 'master' of gitlab.com:dmattli/exopticon (cd2dcace77539c6ab5d6e29bf2d402565cee2aae)
+- chore: bump patch on build (40e7bdba4cb85e7102317145fdb05d8889f6adcb)
+- chore: Add bump-patch to release commands. (fa5049862733acaed34128b874a8d135ce92c3d5)
+
 ## 0.0.1
 2020-10-08
 
