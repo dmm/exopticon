@@ -87,6 +87,4 @@ export class CameraViewComponent implements OnInit {
       this.status = status;
     }, 0);
   }
-
-  onInViewportChange(inViewport: boolean) {}
 }
