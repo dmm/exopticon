@@ -1,8 +1,4 @@
-<div
-  snInViewport
-  (inViewportChange)="onInViewportChange($event)"
-  [inViewportOptions]="{ rootMargin: '-10% 0% -10% 0%' }"
->
+<div #wrapperDiv>
   <app-video-view
     [frameService]="frameService"
     (status)="onVideoStatusChange($event)"

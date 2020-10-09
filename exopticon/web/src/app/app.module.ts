@@ -1,7 +1,6 @@
 import { HttpClientModule } from "@angular/common/http";
 import { NgModule } from "@angular/core";
 import { BrowserModule } from "@angular/platform-browser";
-import { InViewportModule } from "@thisissoon/angular-inviewport";
 import { AlertViewComponent } from "./alert-view/alert-view.component";
 import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.component";
 import { AppRoutingModule } from "./app-routing.module";
@@ -26,12 +25,7 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     PlaybackViewComponent,
     AlertViewComponent,
   ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    InViewportModule,
-    HttpClientModule,
-  ],
+  imports: [BrowserModule, AppRoutingModule, HttpClientModule],
   providers: [CameraService],
   bootstrap: [AppComponent],
 })
