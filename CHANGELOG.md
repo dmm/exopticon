@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.0.3
+2020-10-10
+
+### Fixes
+
+- Add link to libcuda.so stub. [skip-ci] (8adbddb57838a97e42fe9d26df8a0be2a969d209)
+
 ## 0.0.2
 2020-10-09
 
