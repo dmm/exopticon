@@ -9,7 +9,6 @@
     unused,
     future_incompatible,
     clippy::all,
-    clippy::restriction,
     clippy::pedantic,
     clippy::nursery,
     clippy::cargo
