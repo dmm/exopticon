@@ -38,7 +38,7 @@ pub enum TimeType {
 impl std::fmt::Display for TimeType {
     /// Implementing display format for the `TimeType` enum
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
+        match *self {
             Self::Manual => write!(f, "Manual"),
             Self::Ntp => write!(f, "Ntp"),
         }
@@ -50,7 +50,7 @@ impl Serialize for TimeType {
     where
         S: Serializer,
     {
-        match self {
+        match *self {
             Self::Manual => serializer.serialize_str("Manual"),
             Self::Ntp => serializer.serialize_str("NTP"),
         }
@@ -116,7 +116,7 @@ pub enum NtpType {
 impl std::fmt::Display for NtpType {
     /// Implementing display format for the `TimeType` enum
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
+        match *self {
             Self::Ipv4 => write!(f, "IPv4"),
             Self::Ipv6 => write!(f, "IPv6"),
             Self::Dns => write!(f, "DNS"),

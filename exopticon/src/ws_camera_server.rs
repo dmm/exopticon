@@ -136,6 +136,7 @@ pub struct WsCameraServer {
 
 impl WsCameraServer {
     /// Add `WsSession` subscriber
+    #[allow(clippy::option_if_let_else)]
     fn add_subscriber(&mut self, subject: &SubscriptionSubject, client: Client) -> bool {
         if let Some(subscription) = self.subscriptions.get_mut(subject) {
             subscription.insert(client)
