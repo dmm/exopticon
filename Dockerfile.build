@@ -103,15 +103,18 @@ RUN chown 1000:1000 /cargo /rust
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
 RUN chown exopticon:exopticon /exopticon
 
+# provide link to libcuda.so stubs
+RUN ln /usr/local/cuda-10.0/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1
+
 USER exopticon:exopticon
 
 ENV CARGO_HOME=/cargo
 ENV RUST_HOME=/rust
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+  && /cargo/bin/rustup toolchain install 1.47.0 \
+  && /cargo/bin/rustup default 1.47.0 \
   && /cargo/bin/rustup component add clippy \
-  && /cargo/bin/rustup update \
-  && /cargo/bin/rustup default stable \
   && /cargo/bin/cargo install --force cargo-make
 
 RUN pip3 install msgpack imutils numpy dvc[ssh]
