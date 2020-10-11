@@ -2,11 +2,6 @@ FROM dmattli/exopticon-build:devel AS prod-build
 
 WORKDIR /exopticon
 
-USER root
-
-# Add cuda stubs so we can build without the driver libcuda.so
-RUN ln /usr/local/cuda/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1
-
 USER exopticon:exopticon
 
 COPY --chown=exopticon:exopticon . ./
