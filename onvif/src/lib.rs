@@ -1,12 +1,6 @@
 //! Onvif client library
 
-#![deny(
-    clippy::all,
-    clippy::restriction,
-    clippy::pedantic,
-    clippy::nursery,
-    clippy::cargo
-)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 #![allow(clippy::integer_arithmetic)]
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::multiple_crate_versions)]
