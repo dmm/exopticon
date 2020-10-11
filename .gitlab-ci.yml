@@ -1,16 +1,10 @@
-image: debian:buster
-
-cache:
-  key: "$CI_JOB_NAME"
-  untracked: true
-  paths:
-  - cargo/
-  - target/
+image: dmattli/exopticon-build:devel
 
 # Set any required environment variables here
 variables:
   RUST_BACKTRACE: FULL
   GIT_SUBMODULE_STRATEGY: recursive
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
 stages:
   - version
   - build
@@ -30,9 +24,12 @@ version:
 
 pre-release:
   stage: build
-  image: dmattli/exopticon-build:devel
   script:
     - cargo make ci-flow
+  cache:
+    paths:
+      - .cargo
+      - target
   only:
   - branches
   except:
