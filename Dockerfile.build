@@ -103,9 +103,6 @@ RUN chown 1000:1000 /cargo /rust
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
 RUN chown exopticon:exopticon /exopticon
 
-# provide link to libcuda.so stubs
-RUN ln /usr/local/cuda-10.0/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1
-
 USER exopticon:exopticon
 
 ENV CARGO_HOME=/cargo
