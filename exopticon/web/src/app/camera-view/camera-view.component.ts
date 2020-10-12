@@ -6,11 +6,14 @@ import {
   OnInit,
   Output,
   SimpleChanges,
+  ViewChild,
+  ElementRef,
 } from "@angular/core";
 import { Observable } from "rxjs";
 import { Camera } from "../camera";
 import { CameraResolution, WsMessage } from "../frame-message";
 import { SubscriptionSubject, VideoService } from "../video.service";
+import { ElementVisibleService } from "../element-visible.service";
 
 @Component({
   selector: "app-camera-view",
@@ -26,17 +29,30 @@ export class CameraViewComponent implements OnInit {
 
   @Output() isVisible = new EventEmitter<boolean>();
 
+  @ViewChild("wrapperDiv") wrapperDiv: ElementRef;
+
   public status: string;
 
   private videoSubject: SubscriptionSubject;
   public frameService?: Observable<WsMessage>;
 
-  constructor(private changeRef: ChangeDetectorRef) {}
+  constructor(
+    private changeRef: ChangeDetectorRef,
+    private visibilityService: ElementVisibleService
+  ) {}
 
   ngOnInit() {
     if (this.enabled) {
       this.activate();
     }
+  }
+
+  ngAfterViewInit() {
+    this.visibilityService
+      .elementVisible(this.wrapperDiv)
+      .subscribe((visible) => {
+        this.isVisible.emit(visible);
+      });
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -70,9 +86,5 @@ export class CameraViewComponent implements OnInit {
     setTimeout(() => {
       this.status = status;
     }, 0);
-  }
-
-  onInViewportChange(inViewport: boolean) {
-    this.isVisible.emit(inViewport);
   }
 }

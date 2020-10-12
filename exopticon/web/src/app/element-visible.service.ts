@@ -10,7 +10,6 @@ export class ElementVisibleService {
   private pageVisible$: Observable<boolean>;
 
   constructor(@Inject(DOCUMENT) document: any) {
-    console.log("got document! " + document);
     this.pageVisible$ = concat(
       defer(() => of(!document.hidden)),
       fromEvent(document, "visibilitychange").pipe(map((e) => !document.hidden))
@@ -23,7 +22,6 @@ export class ElementVisibleService {
         observer.next(entries);
       });
 
-      console.log(element);
       intersectionObserver.observe(element.nativeElement);
 
       return () => {
