@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.0.5
+2020-10-12
+
+### Fixes
+
+- Remove clippy::restriction lints (6c9c050d19d4d61027c32cf5b30eca15629e8432)
+
 ## 0.0.4
 2020-10-11
 
