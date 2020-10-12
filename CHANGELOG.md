@@ -2,6 +2,23 @@
 
 <!--- next entry here -->
 
+## 0.1.0
+2020-10-12
+
+### Features
+
+- **web:** Remove the angular-inviewport dependency. (752943bdc0f22304f9692b73dd34b501e6f76946)
+
+### Fixes
+
+- **web:** Remove logs from ElementVisibleService. (3035c7c4c8f4766bd4b42e5377400971fce3f6ea)
+- **web:** Remove an unused method in CameraView. (52919adc2d509806b2d24eadb26c49c0bf7b615f)
+- Remove clippy::restriction lints (3e0fa8f58578f026de6d6ce512af9dc3c8a753c0)
+- Fix clippy lints for rustc version 1.47.0 (287fb5b2f8e5f7928fa581f371cfbec992a30e81)
+- Add link to libcuda.so stub. [skip-ci] (e3b182a2b583ffc1e61da3a954a5c1b718c12a2e)
+- **cicd:** libcuda.so.1 link is created in the base image now. (8a76bf4c1f15ce072670a0b066efd0fc0754fad1)
+- **cicd:** Remove _the other_ hardlink to the libcuda stub. (57f1febd07f30c43fbc04c02a6adfc5573e23306)
+
 ## 0.0.5
 2020-10-12
 
