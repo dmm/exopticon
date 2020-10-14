@@ -29,6 +29,8 @@ extern crate base64_serde;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
+extern crate diesel_migrations;
+#[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate failure;
@@ -179,6 +181,8 @@ use crate::app::RouteState;
 use crate::models::{CreateCameraGroup, CreateUser};
 use crate::root_supervisor::{ExopticonMode, RootSupervisor};
 
+embed_migrations!("migrations/");
+
 /// Interactively prompts the operator and adds a new user with the
 /// details provided. This is for bootstrapping users on a new
 /// install. It should be run before the main system is started.
@@ -267,6 +271,14 @@ fn main() {
     let pool = r2d2::Pool::builder()
         .build(manager)
         .expect("Failed to create pool.");
+
+    // Run migrations
+    info!("Running migrations...");
+    embedded_migrations::run_with_output(
+        &pool.clone().get().expect("migration connection failed"),
+        &mut std::io::stdout(),
+    )
+    .expect("migrations failed!");
 
     let address: Addr<DbExecutor> = SyncArbiter::start(4, move || DbExecutor(pool.clone()));
 
