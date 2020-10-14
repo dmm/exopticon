@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.2.0
+2020-10-14
+
+### Features
+
+- **web:** Update the project to Angular 10. (b9f3cbe36e1dc8c6fa150ce8435b0781b6aed33a)
+
 ## 0.1.0
 2020-10-12
 
