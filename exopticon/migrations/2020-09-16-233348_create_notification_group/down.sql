@@ -3,4 +3,4 @@
 DROP TABLE notification_contacts;
 
 ALTER TABLE alert_rules
-RENAME COLUMN 'contact_group' TO 'notification_topic';
+RENAME COLUMN contact_group TO notification_topic;
