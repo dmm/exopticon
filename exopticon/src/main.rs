@@ -275,7 +275,7 @@ fn main() {
     // Run migrations
     info!("Running migrations...");
     embedded_migrations::run_with_output(
-        &pool.clone().get().expect("migration connection failed"),
+        &pool.get().expect("migration connection failed"),
         &mut std::io::stdout(),
     )
     .expect("migrations failed!");
