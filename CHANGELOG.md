@@ -2,6 +2,18 @@
 
 <!--- next entry here -->
 
+## 0.3.0
+2020-10-15
+
+### Features
+
+- Embed migrations and run them at startup. (bbc5f49303f41cde9b8c86264bbc25c3d19deafa)
+
+### Fixes
+
+- **db:** Fix migration syntax. (6b5456c85e975835ce8d91b395ac151bc43e975d)
+- Remove a redundant clone. (a7ea9f1f465af6f819cc64466b688f7cfc45cf4f)
+
 ## 0.2.0
 2020-10-14
 
