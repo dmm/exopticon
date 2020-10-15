@@ -10,6 +10,7 @@ stages:
   - build
   - image
   - release
+  - deploy
 
 version:
   stage: version
