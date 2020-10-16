@@ -95,4 +95,4 @@ deploy:
     - ssh $DEPLOY_HOST "docker pull $CI_REGISTRY_IMAGE:v$RELEASE_VERSION"
     - ssh $DEPLOY_HOST "find /dev/ -name nvidia* -exec printf '--device={} ' \;" >> cuda_args
     - ssh $DEPLOY_HOST "find /usr/lib/x86_64-linux-gnu/ \( -name libcuda* -o -name libnvidia* \) -maxdepth 1 -not -type d -exec printf '-v {}:{}:ro ' \;" >> cuda_args
-    - ssh $DEPLOY_HOST docker run --name exopticon-prod --env DATABASE_URL=$DATABASE_URL --env ROOT_URL=$ROOT_URL $(cat cuda_args) -v "/var/run/postgresql:/var/run/postgresql" -v "/video:/video" -p 3002:3000 $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
+    - ssh $DEPLOY_HOST docker run -d --name exopticon-prod --env DATABASE_URL=$DATABASE_URL --env ROOT_URL=$ROOT_URL $(cat cuda_args) -v "/var/run/postgresql:/var/run/postgresql" -v "/video:/video" -p 3002:3000 $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
