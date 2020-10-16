@@ -2,6 +2,25 @@
 
 <!--- next entry here -->
 
+## 0.4.0
+2020-10-16
+
+### Features
+
+- **cicd:** Add production deployment to the ci/cd pipeline. (013f50f635b485330e7d5275f725f0c5f6b13b95)
+
+### Fixes
+
+- **cicd:** Add deploy stage. (0d083b9825d99adf9237e23008748304121d4e26)
+- **cicd:** hack to get version into deploy stage. (d3c687363ab7e3ee1a48e8c1e30bd22c4ab7f62a)
+- **cicd:** fix ssh key variable name (7b5767dc62d417005f9b19a8e70c161c28122dff)
+- **cicd:** Change library 'find' command to not use shell globbing. (9b22786c0f96ce5739f95582f7ef20d1d670d0fd)
+- **cicd:** Remove old container during deploy. (758d31c212cd9e02e77edfa1cde59701297f10e4)
+- **cicd:** Add DATABASE_URL and ROOT_URL vars to docker run. (1f60077cbb298b465281291c4335ce0b6ccdbe57)
+- **cicd:** Map env variables because they are exported to remote. (5b318470164e1ac8877c9a2b1284ff0faa285223)
+- **cicd:** Make sure deployed container runs in background. (d71c820f71c13bb07cf9cad366d53babce6f9c6a)
+- **build:** Build web assets before release build. (586becb106c9a9cd6d2d4a7f6f2541a420d42090)
+
 ## 0.3.0
 2020-10-15
 
