@@ -89,7 +89,7 @@ deploy:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - printf "%s" "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-    - printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - printf "%s" "$SSH_DEPLOYMENT_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
     - ssh $DEPLOY_HOST "docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY"
     - ssh $DEPLOY_HOST "docker stop exopticon-prod" || true
