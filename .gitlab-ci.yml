@@ -91,6 +91,7 @@ deploy:
     - chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
     - ssh $DEPLOY_HOST "docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY"
     - ssh $DEPLOY_HOST "docker stop exopticon-prod" || true
+    - ssh $DEPLOY_HOST "docker rm exopticon-prod" || true
     - ssh $DEPLOY_HOST "docker pull $CI_REGISTRY_IMAGE:v$RELEASE_VERSION"
     - ssh $DEPLOY_HOST "find /dev/ -name nvidia* -exec printf '--device={} ' \;" >> cuda_args
     - ssh $DEPLOY_HOST "find /usr/lib/x86_64-linux-gnu/ \( -name libcuda* -o -name libnvidia* \) -maxdepth 1 -not -type d -exec printf '-v {}:{}:ro ' \;" >> cuda_args
