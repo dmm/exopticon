@@ -82,9 +82,7 @@ deploy:
   stage: deploy
   image: kroniak/ssh-client
   script:
-    - echo "RELEASE_DESC=\"$(uname -mo) binary\"" >> build_info
-    - echo "RELEASE_SHA=$CI_COMMIT_SHA" >> build_info
-    - echo "RELEASE_VERSION=$(cat .next-version)" >> build_info
+    - echo "RELEASE_VERSION=0.3.0" >> build_info
     - . build_info
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
