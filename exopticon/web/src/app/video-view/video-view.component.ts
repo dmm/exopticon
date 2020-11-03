@@ -63,7 +63,6 @@ export class VideoViewComponent implements OnInit {
     this.isActive = false;
     this.status.emit("loading");
 
-    let oldSubscription = undefined; //this.subscription;
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
@@ -100,14 +99,6 @@ export class VideoViewComponent implements OnInit {
         this.status.emit("eof");
       }
     );
-
-    console.log(`old subscription: ${oldSubscription}`);
-    if (oldSubscription) {
-      // still potentially bad if a frame from the old subscription
-      // hits first.
-      console.log("removing old subscription");
-      oldSubscription.unsubscribe();
-    }
   }
 
   drawObservations(

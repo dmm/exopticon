@@ -1,24 +1,31 @@
-<div class="panel">
+<div class="panel"
+    waIntersectionObserver
+
+    waIntersectionThreshold="0.1"
+>
   <div
+    *ngFor="let camera of cameraPanelService.cameras; index as i"
     class="wrapper"
-    *ngFor="let camera of enabledCameras"
-    (mouseover)="selectCameraView(camera.id); $event.stopPropagation()"
-    (mouseleave)="deselectCameraView(); $event.stopPropagation()"
-    (touchstart)="onTouchStart(camera.id); $event.stopPropagation()"
-    [style.width.%]="100 / columns"
-    [style.height.vh]="100 / rows"
+    (touchstart)="cameraPanelService.touchCamera(camera.id); $event.stopPropagation()"
+    (mouseenter)="cameraPanelService.mouseOver(camera.id); $event.stopPropagation()"
+    (mouseleave)="cameraPanelService.mouseLeave(camera.id); $event.stopPropagation()"
+    [style.width.%]="100 / cameraPanelService.columnCount"
+    [style.height.vh]="100 / cameraPanelService.rowCount"
   >
-    <div class="camera-width" *ngIf="rows === -1"></div>
-    <div class="content">
+    <div class="camera-width" *ngIf="cameraPanelService.rowCount === -1"></div>
+    <div class="content"
+         (waIntersectionObservee)="cameraPanelService.setCameraVisibility(camera.id, $event)"
+         >
       <app-camera-view
         [camera]="camera"
-        [selected]="selectedCameraId === camera.id"
-        [enabled]="pageVisible && cameraVisibility.get(camera.id)"
+        [selected]="cameraPanelService.selectedCameraId === camera.id"
+        [enabled]="cameraPanelService.cameraDesiredState[i]"
         [videoService]="videoService"
-        [resolution]="resolution"
-        (isVisible)="updateCameraViewVisibility(camera.id, $event)"
+        [resolution]="cameraPanelService.resolution"
+
       >
       </app-camera-view>
     </div>
   </div>
+
 </div>

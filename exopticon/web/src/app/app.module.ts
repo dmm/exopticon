@@ -1,6 +1,7 @@
 import { HttpClientModule } from "@angular/common/http";
 import { NgModule } from "@angular/core";
 import { BrowserModule } from "@angular/platform-browser";
+import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
 import { AlertViewComponent } from "./alert-view/alert-view.component";
 import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.component";
 import { AppRoutingModule } from "./app-routing.module";
@@ -25,7 +26,12 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     PlaybackViewComponent,
     AlertViewComponent,
   ],
-  imports: [BrowserModule, AppRoutingModule, HttpClientModule],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    HttpClientModule,
+    IntersectionObserverModule,
+  ],
   providers: [CameraService],
   bootstrap: [AppComponent],
 })

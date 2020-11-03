@@ -1,19 +1,18 @@
 import {
   ChangeDetectorRef,
   Component,
+  ElementRef,
   EventEmitter,
   Input,
   OnInit,
   Output,
   SimpleChanges,
   ViewChild,
-  ElementRef,
 } from "@angular/core";
 import { Observable } from "rxjs";
 import { Camera } from "../camera";
 import { CameraResolution, WsMessage } from "../frame-message";
 import { SubscriptionSubject, VideoService } from "../video.service";
-import { ElementVisibleService } from "../element-visible.service";
 
 @Component({
   selector: "app-camera-view",
@@ -36,10 +35,7 @@ export class CameraViewComponent implements OnInit {
   private videoSubject: SubscriptionSubject;
   public frameService?: Observable<WsMessage>;
 
-  constructor(
-    private changeRef: ChangeDetectorRef,
-    private visibilityService: ElementVisibleService
-  ) {}
+  constructor(private changeRef: ChangeDetectorRef) {}
 
   ngOnInit() {
     if (this.enabled) {
@@ -47,13 +43,7 @@ export class CameraViewComponent implements OnInit {
     }
   }
 
-  ngAfterViewInit() {
-    this.visibilityService
-      .elementVisible(this.wrapperDiv)
-      .subscribe((visible) => {
-        this.isVisible.emit(visible);
-      });
-  }
+  ngAfterViewInit() {}
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes.hasOwnProperty("enabled")) {

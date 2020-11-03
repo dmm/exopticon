@@ -1,4 +1,4 @@
-import { Injectable } from "@angular/core";
+import { EventEmitter, Injectable } from "@angular/core";
 import { Observable, Subject, Subscription } from "rxjs";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 import { CameraResolution, FrameMessage, WsMessage } from "./frame-message";
@@ -32,6 +32,7 @@ export class VideoService {
   private subject: WebSocketSubject<Object>;
   private subscriberCount = 0;
   private subscription?: Subscription;
+  private errorObservable: EventEmitter<string> = new EventEmitter<string>();
 
   constructor() {
     this.subscription = null;
@@ -59,6 +60,10 @@ export class VideoService {
     return this.subject;
   }
 
+  public getErrorObservable(): EventEmitter<string> {
+    return this.errorObservable;
+  }
+
   private setupAcker() {
     if (this.subscription === null) {
       this.subscription = this.subject.subscribe(
@@ -67,7 +72,11 @@ export class VideoService {
             this.subject.next("Ack");
           }
         },
-        () => {},
+        () => {
+          this.errorObservable.emit("error!");
+          this.subscription = null;
+          this.setupAcker();
+        },
         () => {}
       );
     }

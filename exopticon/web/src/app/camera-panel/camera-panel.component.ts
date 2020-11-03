@@ -10,11 +10,13 @@ import { Camera } from "../camera";
 import { CameraService, PtzDirection } from "../camera.service";
 import { CameraResolution } from "../frame-message";
 import { VideoService } from "../video.service";
+import { CameraPanelService } from "../camera-panel.service";
 
 @Component({
   selector: "app-camera-panel",
   templateUrl: "./camera-panel.component.html",
   styleUrls: ["./camera-panel.component.css"],
+  providers: [CameraPanelService],
 })
 export class CameraPanelComponent implements OnInit {
   cameras: Camera[];
@@ -23,13 +25,13 @@ export class CameraPanelComponent implements OnInit {
   error: any;
   selectedCameraId?: number;
   overlayDisabledId?: number;
-  pageVisible: boolean;
   private cameraVisibility: Map<number, boolean>;
   private columns: number;
   private rows: number;
   private resolution: CameraResolution;
 
   constructor(
+    public cameraPanelService: CameraPanelService,
     private cameraService: CameraService,
     public videoService: VideoService,
     private cdr: ChangeDetectorRef,
@@ -37,20 +39,12 @@ export class CameraPanelComponent implements OnInit {
     private router: Router,
     private ngZone: NgZone
   ) {
-    this.cameras = [];
-    this.enabledCameras = [];
-    this.cameraVisibility = new Map<number, boolean>();
-    this.columns = 1;
-    this.rows = -1;
     this.resolution = CameraResolution.Sd;
   }
 
   getCameras(): void {
     this.cameraService.getCameras().subscribe(
-      (cameras) => {
-        this.cameras = cameras.filter((c) => c.enabled);
-        this.enableCameras();
-      },
+      (cameras) => {},
       () => {
         window.location.pathname = "/login";
       }
@@ -58,51 +52,32 @@ export class CameraPanelComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.pageVisible = true;
-
     this.route.paramMap.subscribe((params) => {
       if (params.has("cols")) {
-        this.columns = parseInt(params.get("cols"), 10);
-      } else {
-        this.columns = 1;
+        this.cameraPanelService.setCols(parseInt(params.get("cols"), 10));
       }
       if (params.has("rows")) {
-        this.rows = parseInt(params.get("rows"), 10);
-      } else {
-        this.rows = -1;
+        this.cameraPanelService.setRows(parseInt(params.get("rows"), 10));
       }
 
       if (params.has("offset")) {
-        this.enabledCamerasOffset = parseInt(params.get("offset"), 10) || 0;
-      } else {
-        this.enabledCamerasOffset = 0;
+        this.cameraPanelService.setOffset(parseInt(params.get("offset"), 10));
       }
 
       if (params.has("res")) {
         if (params.get("res").toLowerCase() === "hd") {
-          this.resolution = CameraResolution.Hd;
-        } else {
-          this.resolution = CameraResolution.Sd;
+          this.cameraPanelService.setResolution(CameraResolution.Hd);
         }
       }
-      this.enableCameras();
     });
 
-    this.getCameras();
     this.videoService.connect();
-  }
-
-  @HostListener("document:visibilitychange", ["$event"])
-  onVisibilityChange() {
-    this.ngZone.run(() => {
-      this.pageVisible = !document["hidden"];
-    });
   }
 
   @HostListener("window:keyup", ["$event"])
   KeyEvent(event: KeyboardEvent) {
     console.log("keycode: " + event.keyCode);
-    let offset = this.enabledCamerasOffset;
+    let offset = this.cameraPanelService.offset;
     let cameraId = this.getKeyboardControlCameraId();
     console.log("keyboard control camera id: " + cameraId);
     switch (event.keyCode) {
@@ -116,23 +91,23 @@ export class CameraPanelComponent implements OnInit {
         break;
       case 65:
         // 'a'
-        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.left);
+        this.cameraPanelService.ptz(PtzDirection.left);
         break;
       case 68:
         // 'd'
-        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.right);
+        this.cameraPanelService.ptz(PtzDirection.right);
         break;
       case 87:
         // 'w'
-        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.up);
+        this.cameraPanelService.ptz(PtzDirection.up);
         break;
       case 83:
         // 's'
-        if (cameraId) this.cameraService.ptz(cameraId, PtzDirection.down);
+        this.cameraPanelService.ptz(PtzDirection.down);
         break;
     }
 
-    if (offset !== this.enabledCamerasOffset) {
+    if (offset !== this.cameraPanelService.offset) {
       this.router.navigate(
         ["./", this.merge({ offset: offset }, this.route.snapshot.params)],
         {
@@ -160,32 +135,6 @@ export class CameraPanelComponent implements OnInit {
     return params;
   }
 
-  rotateArray(arr: Array<any>, length: number): Array<any> {
-    if (arr.length === 0) return [];
-    arr = arr.slice();
-
-    if (length > 0) {
-      for (let i = 0; i < length; i++) {
-        arr.unshift(arr.pop());
-      }
-    } else {
-      for (let i = 0; i < Math.abs(length); i++) {
-        arr.push(arr.shift());
-      }
-    }
-
-    return arr;
-  }
-
-  enableCameras() {
-    let count =
-      this.rows === -1 ? this.cameras.length : this.columns * this.rows;
-    this.enabledCameras = this.rotateArray(
-      this.cameras,
-      this.enabledCamerasOffset
-    ).slice(0, count);
-  }
-
   selectCameraView(cameraIndex: number) {
     if (cameraIndex !== this.overlayDisabledId) {
       this.selectedCameraId = cameraIndex;
@@ -211,6 +160,7 @@ export class CameraPanelComponent implements OnInit {
   }
 
   getKeyboardControlCameraId(): number {
+    return;
     if (this.enabledCameras.length === 1) {
       return this.enabledCameras[0].id;
     } else if (this.selectedCameraId) {
