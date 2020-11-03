@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.5.0
+2020-11-03
+
+### Features
+
+- Switch tslint to double quotes. (8bc332ca7bada8c5cb1a2468ecf4b2b25287e2aa)
+- Initial CameraPanelService implementation. (26fb9079e1eb2bad5bece794b6462e4a20c9ef67)
+
 ## 0.4.0
 2020-10-16
 
