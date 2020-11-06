@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.1
+2020-11-06
+
+### Fixes
+
+- fix dockerignore file (75672a9f301337c799e28e53a80d3fab673a3983)
+
 ## 0.5.0
 2020-11-03
 
