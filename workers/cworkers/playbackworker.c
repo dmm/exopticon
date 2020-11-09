@@ -28,6 +28,7 @@
 #include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixfmt.h>
+#include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -381,47 +382,14 @@ cleanup:
 
 int checkforquit()
 {
-        int ret = 0;
-        int quit = 0;
-        char buf[1024];
-        fd_set rfds;
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 0;
+        struct pollfd pfd;
+        pfd.fd = 0;
+        pfd.events = 0;
+        poll(&pfd, 1, 0);
 
-        FD_ZERO(&rfds);
-        FD_SET(0, &rfds);
+        int eof = pfd.revents & POLLHUP;
 
-        do {
-                ret = select(1, &rfds, NULL, NULL, &timeout);
-                size_t read_size = 0;
-                if (ret > 0 && FD_ISSET(0, &rfds)) {
-
-                        // select return value is greater than 0 and stdin is in
-                        // the set, read!
-                        read_size = fread(buf, 1, 1, stdin);
-                }
-
-                if (feof(stdin) != 0) {
-                        quit = 1;
-                }
-
-
-
-                // TODO change second loop condition to assert
-                for (size_t i = 0; i < read_size && i < sizeof(buf); ++i) {
-                        if (buf[i] == 'q') {
-                                quit = 1;
-                                break;
-                        }
-                }
-        } while (ret > 0 && quit == 0);
-
-        if (quit == 1) {
-                fprintf(stderr, "CHECK FOR QUIT TRUE\n\n\n");
-        }
-
-        return quit;
+        return eof;
 }
 
 int main(int argc, char *argv[])
