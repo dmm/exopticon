@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.2
+2020-11-10
+
+### Fixes
+
+- playbackworker: fix eof detection on stdin. (a6d68280bf35dbf62a8764063473e9e6424e92db)
+
 ## 0.5.1
 2020-11-06
 
