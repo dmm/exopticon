@@ -15,14 +15,15 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libreadline5 libsqlite3-0 libssl1.1 libwebp6 \
   libxml2 libxslt1.1 libyaml-0-2 \
   zlib1g libturbojpeg0 \
+  python3-opencv \
   ffmpeg \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-      python3-setuptools python3-pip python3-opencv python3-wheel \
+      python3-setuptools python3-pip python3-wheel \
     && pip3 install msgpack imutils numpy \
-    && apt-get purge -y python3-setuptools python3-pip python3-opencv python3-wheel \
+    && apt-get purge -y python3-setuptools python3-pip python3-wheel \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
