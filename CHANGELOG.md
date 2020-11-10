@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.5
+2020-11-10
+
+### Fixes
+
+- **docker:** stop purging python3-opencv (eb4bf56052c2ca067428e6e1f35c0f1e20953a3a)
+
 ## 0.5.4
 2020-11-10
 
