@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.3
+2020-11-10
+
+### Fixes
+
+- Add SECRET_KEY to prod deploy (2f05ddd8b817e30a3bbafbb312c5b868ee4f52a9)
+
 ## 0.5.2
 2020-11-10
 
