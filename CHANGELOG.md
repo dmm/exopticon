@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.4
+2020-11-10
+
+### Fixes
+
+- **web:** Add dist and node_modules to dockerignore (4d75737580197b38ff365847339cc7b254863a35)
+
 ## 0.5.3
 2020-11-10
 
