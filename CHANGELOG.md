@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.7
+2020-11-12
+
+### Fixes
+
+- build: merge dockerfiles (9a7ff3d5cf3d266cf20208022dca2890f67540f7)
+
 ## 0.5.6
 2020-11-12
 
