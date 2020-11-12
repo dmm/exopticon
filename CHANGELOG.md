@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.6
+2020-11-12
+
+### Fixes
+
+- build: recombine the Dockerfile into one. (5841423f63d115c57bfe4603a072ae5ca771aca3)
+
 ## 0.5.5
 2020-11-10
 
