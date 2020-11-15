@@ -1,11 +1,11 @@
-import { async, ComponentFixture, TestBed } from "@angular/core/testing";
+import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
 import { CameraStatusOverlayComponent } from "./camera-status-overlay.component";
 
 describe("CameraStatusOverlayComponent", () => {
   let component: CameraStatusOverlayComponent;
   let fixture: ComponentFixture<CameraStatusOverlayComponent>;
 
-  beforeEach(async(() => {
+  beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [CameraStatusOverlayComponent],
     }).compileComponents();
