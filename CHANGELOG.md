@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.5.8
+2020-11-15
+
+### Fixes
+
+- refactor(web]: Upgrade to Angular 11 (0fff31a003af4652dd09957a608e6ad7e840befc)
+
 ## 0.5.7
 2020-11-12
 
