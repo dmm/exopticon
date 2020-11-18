@@ -1,0 +1,3 @@
+outs:
+- md5: 65de538f30fffd7710f1f36a2f585ee3
+  path: ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite

@@ -16,6 +16,7 @@ cm_run_task cworkers
 cm_run_task exopticon
 cm_run_task yolov4
 cm_run_task frigate
+cm_run_task coral
 '''
 ]
 
@@ -109,6 +110,21 @@ mkdir -p ${asset_dir}/data || true
 
 cp -r ${worker_dir}/frigate/frigate/motion.py ${asset_dir}/data
 cp -r ${worker_dir}/motion.py ${asset_dir}
+'''
+]
+
+[tasks.coral]
+script = [
+'''
+worker_dir=${CARGO_MAKE_WORKING_DIRECTORY}"/coral/"
+asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}"/target/assets/workers/coral/"
+
+
+mkdir -p ${asset_dir}/data/ || true
+cp -a ${worker_dir}/data/. ${asset_dir}/data/
+
+# Deploy coral.py
+cp ${worker_dir}/coral.py ${asset_dir}
 '''
 ]
 
