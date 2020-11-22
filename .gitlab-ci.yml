@@ -1,4 +1,4 @@
-image: dmattli/exopticon-build:devel
+image: debian:buster
 
 # Set any required environment variables here
 variables:
