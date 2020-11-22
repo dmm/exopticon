@@ -1,5 +1,4 @@
 target
 Cargo.lock
-.git
 exopticon/web/dist/
 exopticon/web/node_modules/

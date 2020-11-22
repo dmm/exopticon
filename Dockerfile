@@ -75,6 +75,8 @@ COPY --chown=exopticon:exopticon . ./
 
 RUN cargo make --profile release build-release
 
+RUN dvc pull workers/yolov4/data/yolov4-tiny.weights
+
 FROM dmattli/debian-cuda:10.0-buster-runtime
 
 WORKDIR /exopticon
