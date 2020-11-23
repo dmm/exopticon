@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.5.9
+2020-11-23
+
+### Fixes
+
+- Pull yolov4-tiny model from dvc when building image (e3cbfc59ff974bdc0cceff446729ec888537e776)
+- **cicd:** Fix ci/cd image (12879ddb805806cfe5f815584f03bbc89bb8e310)
+- **cicd:** try this image (e49effddc135b88d02f8be81ea7a6127b85fa3e6)
+- **cicd:** docker build on prerelease (3d486f5ddf34162c50d0377588ea4c42022da82b)
+
 ## 0.5.8
 2020-11-15
 
