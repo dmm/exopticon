@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.6.1
+2020-11-24
+
+### Fixes
+
+- **cicd:** Move build after pulling dvc models (6e0e8086a14ef8e920872d9d2a6d4e5d349a1b12)
+
 ## 0.6.0
 2020-11-24
 
