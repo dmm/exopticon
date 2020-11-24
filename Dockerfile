@@ -1,4 +1,4 @@
-FROM dmattli/debian-cuda:10.0-buster-devel AS prod-build
+FROM dmattli/debian-cuda:10.0-buster-devel AS exopticon-build
 WORKDIR /exopticon
 
 ENV CC=gcc-7
@@ -24,6 +24,17 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
+# Add Coral tpu repository and install python libraries
+RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
+    && wget -O - https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+    && apt-get update \
+    && apt-get install -y python3-pycoral edgetpu-compiler libedgetpu1-std \
+    && mkdir temp && cd temp && apt-get download libedgetpu1-max \
+    && ar x libedgetpu1-max* && tar xf data.tar.xz && cp usr/lib/x86_64-linux-gnu/libedgetpu.so.1.0 /usr/lib/x86_64-linux-gnu/ \
+    && cd .. && rm -rf temp \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # install node.js and npm
 RUN mkdir /node && cd /node \
     && wget https://nodejs.org/dist/v12.16.2/node-v12.16.2-linux-x64.tar.xz -O node.tar.xz \
@@ -42,6 +53,7 @@ RUN chown 1000:1000 /cargo /rust
 
 # configure run user
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
+RUN adduser exopticon plugdev
 RUN chown exopticon:exopticon /exopticon
 
 USER exopticon:exopticon
@@ -69,15 +81,18 @@ ENV CUDACXX=/usr/local/cuda-10.0/bin/nvcc
 
 WORKDIR /exopticon
 
+FROM exopticon-build AS prod-build
+
 USER exopticon:exopticon
 
 COPY --chown=exopticon:exopticon . ./
 
 RUN cargo make --profile release build-release
 
-RUN dvc pull workers/yolov4/data/yolov4-tiny.weights
+RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
+      workers/coral/data/ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite
 
-FROM dmattli/debian-cuda:10.0-buster-runtime
+FROM dmattli/debian-cuda:10.0-buster-runtime AS exopticon-runtime
 
 WORKDIR /exopticon
 
@@ -99,6 +114,17 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
+# Add Coral tpu repository and install python libraries
+RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
+    && wget -O - https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+    && apt-get update \
+    && apt-get install -y python3-pycoral libedgetpu1-std \
+    && mkdir temp && cd temp && apt-get download libedgetpu1-max \
+    && ar x libedgetpu1-max* && tar xf data.tar.xz && cp usr/lib/x86_64-linux-gnu/libedgetpu.so.1.0 /usr/lib/x86_64-linux-gnu/ \
+    && cd .. && rm -rf temp \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN apt-get update && apt-get install --no-install-recommends -y \
       python3-setuptools python3-pip python3-wheel \
     && pip3 install msgpack imutils numpy \
@@ -109,6 +135,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 # configure run user
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
 RUN chown exopticon:exopticon /exopticon
+
+FROM exopticon-runtime
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
 
