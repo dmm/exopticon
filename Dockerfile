@@ -118,10 +118,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
     && wget -O - https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
     && apt-get update \
-    && apt-get install -y python3-pycoral libedgetpu1-std \
+    && apt-get install -y python3-pycoral libedgetpu1-std xz-utils \
     && mkdir temp && cd temp && apt-get download libedgetpu1-max \
     && ar x libedgetpu1-max* && tar xf data.tar.xz && cp usr/lib/x86_64-linux-gnu/libedgetpu.so.1.0 /usr/lib/x86_64-linux-gnu/ \
     && cd .. && rm -rf temp \
+    && apt-get purge -y xz-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
