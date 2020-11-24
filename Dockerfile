@@ -87,10 +87,10 @@ USER exopticon:exopticon
 
 COPY --chown=exopticon:exopticon . ./
 
-RUN cargo make --profile release build-release
-
 RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
       workers/coral/data/ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite
+
+RUN cargo make --profile release build-release
 
 FROM dmattli/debian-cuda:10.0-buster-runtime AS exopticon-runtime
 
