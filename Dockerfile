@@ -89,6 +89,8 @@ COPY --chown=exopticon:exopticon . ./
 
 RUN cargo make --profile release build-release
 
+RUN dvc pull workers/coral/data/ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite
+
 FROM dmattli/debian-cuda:10.0-buster-runtime AS exopticon-runtime
 
 WORKDIR /exopticon
