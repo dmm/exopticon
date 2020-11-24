@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.6.0
+2020-11-24
+
+### Features
+
+- **analysis:** Implement initial coral analysis worker (670ab95d2f7bf80f89401f2f4ba80cd924a2a091)
+- **analysis:** Merge branch '27-coral-analysis-worker' (0afca87334dc1ae7625259a7b40f8e5f01f16d82)
+
+### Fixes
+
+- **cicd:** Add ssd mobilenet model dvc pull (4897b4d7f8c8ce547a5b158421aa9487995d1e4a)
+- **cicd:** Install xz-utils to unpack libedgetpu deb (0ce5371e496a5d6872d49da36000ed58ae556682)
+
 ## 0.5.9
 2020-11-23
 
