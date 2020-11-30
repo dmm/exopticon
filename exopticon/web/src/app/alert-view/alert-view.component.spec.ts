@@ -25,11 +25,13 @@ describe("AlertViewComponent", () => {
   let component: AlertViewComponent;
   let fixture: ComponentFixture<AlertViewComponent>;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
-      declarations: [AlertViewComponent],
-    }).compileComponents();
-  }));
+  beforeEach(
+    waitForAsync(() => {
+      TestBed.configureTestingModule({
+        declarations: [AlertViewComponent],
+      }).compileComponents();
+    })
+  );
 
   beforeEach(() => {
     fixture = TestBed.createComponent(AlertViewComponent);

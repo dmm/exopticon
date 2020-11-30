@@ -25,11 +25,13 @@ describe("PlaybackViewComponent", () => {
   let component: PlaybackViewComponent;
   let fixture: ComponentFixture<PlaybackViewComponent>;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
-      declarations: [PlaybackViewComponent],
-    }).compileComponents();
-  }));
+  beforeEach(
+    waitForAsync(() => {
+      TestBed.configureTestingModule({
+        declarations: [PlaybackViewComponent],
+      }).compileComponents();
+    })
+  );
 
   beforeEach(() => {
     fixture = TestBed.createComponent(PlaybackViewComponent);

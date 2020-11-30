@@ -18,11 +18,10 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { TestBed } from '@angular/core/testing';
+import { TestBed } from "@angular/core/testing";
+import { CameraPanelService } from "./camera-panel.service";
 
-import { CameraPanelService } from './camera-panel.service';
-
-describe('CameraPanelService', () => {
+describe("CameraPanelService", () => {
   let service: CameraPanelService;
 
   beforeEach(() => {
@@ -30,7 +29,7 @@ describe('CameraPanelService', () => {
     service = TestBed.inject(CameraPanelService);
   });
 
-  it('should be created', () => {
+  it("should be created", () => {
     expect(service).toBeTruthy();
   });
 });

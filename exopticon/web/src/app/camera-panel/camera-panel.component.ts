@@ -27,10 +27,10 @@ import {
 } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Camera } from "../camera";
+import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
 import { CameraResolution } from "../frame-message";
 import { VideoService } from "../video.service";
-import { CameraPanelService } from "../camera-panel.service";
 
 @Component({
   selector: "app-camera-panel",

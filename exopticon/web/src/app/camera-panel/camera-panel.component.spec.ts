@@ -25,11 +25,13 @@ describe("CameraPanelComponent", () => {
   let component: CameraPanelComponent;
   let fixture: ComponentFixture<CameraPanelComponent>;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
-      declarations: [CameraPanelComponent],
-    }).compileComponents();
-  }));
+  beforeEach(
+    waitForAsync(() => {
+      TestBed.configureTestingModule({
+        declarations: [CameraPanelComponent],
+      }).compileComponents();
+    })
+  );
 
   beforeEach(() => {
     fixture = TestBed.createComponent(CameraPanelComponent);

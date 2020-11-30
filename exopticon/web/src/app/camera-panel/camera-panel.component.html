@@ -17,34 +17,37 @@
     You should have received a copy of the GNU General Public License
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<div class="panel"
-    waIntersectionObserver
-
-    waIntersectionThreshold="0.1"
->
+<div class="panel" waIntersectionObserver waIntersectionThreshold="0.1">
   <div
     *ngFor="let camera of cameraPanelService.cameras; index as i"
     class="wrapper"
-    (touchstart)="cameraPanelService.touchCamera(camera.id); $event.stopPropagation()"
-    (mouseenter)="cameraPanelService.mouseOver(camera.id); $event.stopPropagation()"
-    (mouseleave)="cameraPanelService.mouseLeave(camera.id); $event.stopPropagation()"
+    (touchstart)="
+      cameraPanelService.touchCamera(camera.id); $event.stopPropagation()
+    "
+    (mouseenter)="
+      cameraPanelService.mouseOver(camera.id); $event.stopPropagation()
+    "
+    (mouseleave)="
+      cameraPanelService.mouseLeave(camera.id); $event.stopPropagation()
+    "
     [style.width.%]="100 / cameraPanelService.columnCount"
     [style.height.vh]="100 / cameraPanelService.rowCount"
   >
     <div class="camera-width" *ngIf="cameraPanelService.rowCount === -1"></div>
-    <div class="content"
-         (waIntersectionObservee)="cameraPanelService.setCameraVisibility(camera.id, $event)"
-         >
+    <div
+      class="content"
+      (waIntersectionObservee)="
+        cameraPanelService.setCameraVisibility(camera.id, $event)
+      "
+    >
       <app-camera-view
         [camera]="camera"
         [selected]="cameraPanelService.selectedCameraId === camera.id"
         [enabled]="cameraPanelService.cameraDesiredState[i]"
         [videoService]="videoService"
         [resolution]="cameraPanelService.resolution"
-
       >
       </app-camera-view>
     </div>
   </div>
-
 </div>
