@@ -2,6 +2,20 @@
 
 <!--- next entry here -->
 
+## 0.6.2
+2020-11-30
+
+### Fixes
+
+- chore: Add GPLv3 to exopticon rust source files. (0e83f65c98056ac809683be2dd7d10df7d683049)
+- chore: Add GPLv3 header to web source files. (83f1ca5d0751c1b81125cbbbd3b15d58161ce86a)
+- chore(web): fix formatting and add check-format to build. (0d5afd69f1a469c9c1568d73533d644f24c1e1ec)
+- chore: Add GPLv3 header to playback sources (3375e2bf53db289c1268c7cad052b34ec4359134)
+- chore: Update workspace GPLv3 headers (2f50d1482f0be7196e0ac342c9361d09426caf23)
+- chore: Add GPLv3 license (ae77ee9e3b2888a5ea7cbefe1b29589b89b56389)
+- chore: Change onvif license to GPLv3 (a948ecf27fed162cab18eef064a6fed013408311)
+- chore: Update Cargo manifests to GPLv3 (8f387e1650df1bc51c087a499e93bea42dfea247)
+
 ## 0.6.1
 2020-11-24
 
