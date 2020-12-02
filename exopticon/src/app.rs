@@ -84,7 +84,7 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
         )
         .service(web::resource("/index.html").route(web::get().to(index)))
         .service(
-            web::resource("/{file:[^/]+(.js|.js.map|.css)}")
+            web::resource("/{file:[^/]+(.js|.js.map|.css|.webmanifest)}")
                 .route(web::get().to(static_routes::fetch_static_file)),
         )
         .service(

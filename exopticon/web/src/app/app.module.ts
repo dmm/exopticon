@@ -35,6 +35,10 @@ import { CameraService } from "./camera.service";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
 import { VideoViewComponent } from "./video-view/video-view.component";
+import { ServiceWorkerModule } from "@angular/service-worker";
+import { environment } from "../environments/environment";
+import { HTTP_INTERCEPTORS } from "@angular/common/http";
+import { AuthInterceptor } from "./auth.interceptor";
 
 @NgModule({
   declarations: [
@@ -55,8 +59,14 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     HttpClientModule,
     IntersectionObserverModule,
     ReactiveFormsModule,
+    ServiceWorkerModule.register("ngsw-worker.js", {
+      enabled: environment.production,
+    }),
   ],
-  providers: [CameraService],
+  providers: [
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
+    CameraService,
+  ],
   bootstrap: [AppComponent],
 })
 export class AppModule {}

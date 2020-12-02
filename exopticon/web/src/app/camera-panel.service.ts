@@ -122,26 +122,37 @@ export class CameraPanelService {
   }
 
   private setCameras() {
-    this.cameraService.getCameras().subscribe((cameras) => {
-      this.unsortedCameras = cameras
-        .filter((c) => c.enabled)
-        .map((c) => {
-          let camera = new PanelCamera();
-          camera.camera = c;
-          camera.inViewport = false;
-          camera.enabled = true;
-          return camera;
+    this.cameraService.getCameras().subscribe(
+      (cameras) => {
+        this.unsortedCameras = cameras
+          .filter((c) => c.enabled)
+          .map(
+            (c) => {
+              let camera = new PanelCamera();
+              camera.camera = c;
+              camera.inViewport = false;
+              camera.enabled = true;
+              return camera;
+            },
+            () => {
+              // error fetching cameras
+              setTimeout(() => this.setCameras(), 2000);
+            }
+          );
+
+        this.videoService.getErrorObservable().subscribe((error) => {
+          console.log("Caught error and restarting!");
+          // TODO: Should we implement exponential backoff? We probably
+          // need connection management in general.
+          setTimeout(() => this.setCameras(), 2000);
         });
 
-      this.videoService.getErrorObservable().subscribe((error) => {
-        console.log("Caught error and restarting!");
-        // TODO: Should we implement exponential backoff? We probably
-        // need connection management in general.
-        this.setCameras();
-      });
-
-      this.projectCameras();
-    });
+        this.projectCameras();
+      },
+      (err) => {
+        setTimeout(() => this.setCameras(), 2000);
+      }
+    );
   }
 
   private projectCameras() {
