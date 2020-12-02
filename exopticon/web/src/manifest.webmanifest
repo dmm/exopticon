@@ -1,11 +1,10 @@
 {
   "name": "exopticon",
   "short_name": "exopticon",
-  "theme_color": "#1976d2",
-  "background_color": "#fafafa",
+  "theme_color": "#00FF00",
+  "background_color": "#000000",
   "display": "standalone",
-  "scope": "./",
-  "start_url": "./",
+  "start_url": "/",
   "icons": [
     {
       "src": "static/assets/icons/icon-96x96.png",
