@@ -20,6 +20,7 @@
 
 import { HttpClientModule } from "@angular/common/http";
 import { NgModule } from "@angular/core";
+import { ReactiveFormsModule } from "@angular/forms";
 import { BrowserModule } from "@angular/platform-browser";
 import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
 import { AlertViewComponent } from "./alert-view/alert-view.component";
@@ -31,6 +32,7 @@ import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { CameraStatusOverlayComponent } from "./camera-status-overlay/camera-status-overlay.component";
 import { CameraViewComponent } from "./camera-view/camera-view.component";
 import { CameraService } from "./camera.service";
+import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
 import { VideoViewComponent } from "./video-view/video-view.component";
 
@@ -45,12 +47,14 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     VideoViewComponent,
     PlaybackViewComponent,
     AlertViewComponent,
+    LoginComponent,
   ],
   imports: [
     BrowserModule,
     AppRoutingModule,
     HttpClientModule,
     IntersectionObserverModule,
+    ReactiveFormsModule,
   ],
   providers: [CameraService],
   bootstrap: [AppComponent],

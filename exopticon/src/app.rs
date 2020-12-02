@@ -75,26 +75,20 @@ pub async fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<Htt
 /// helper function to create and returns the app after mounting all routes/resources
 #[allow(clippy::too_many_lines)]
 pub fn generate_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/login").route(web::get().to(static_routes::login)))
+    cfg
         // routes for authentication
         .service(
             web::resource("/auth")
                 .route(web::post().to(login))
                 .route(web::delete().to(logout)),
         )
-        .service(
-            web::resource("/index.html")
-                .wrap(WebAuth)
-                .route(web::get().to(index)),
-        )
+        .service(web::resource("/index.html").route(web::get().to(index)))
         .service(
             web::resource("/{file:[^/]+(.js|.js.map|.css)}")
-                .wrap(WebAuth)
                 .route(web::get().to(static_routes::fetch_static_file)),
         )
         .service(
             web::resource("/static/{tail:.*}")
-                .wrap(WebAuth)
                 .route(web::get().to(static_routes::fetch_static_file)),
         )
         // v1 api scope

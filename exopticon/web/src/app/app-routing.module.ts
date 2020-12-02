@@ -23,9 +23,11 @@ import { RouterModule, Routes } from "@angular/router";
 import { AlertViewComponent } from "./alert-view/alert-view.component";
 import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
+import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
 
 const routes: Routes = [
+  { path: "login", component: LoginComponent },
   { path: "cameras", component: CameraPanelComponent },
   { path: "analysis_engine/:id", component: AnalysisPanelComponent },
   { path: "cameras/:id/playback", component: PlaybackViewComponent },

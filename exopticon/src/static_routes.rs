@@ -25,7 +25,6 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::{body::Body, web::Path, HttpRequest, HttpResponse};
-use askama::Template;
 
 /// Fetches static index file, returns `HttpResponse`
 pub fn index(_req: HttpRequest) -> HttpResponse {
@@ -35,19 +34,6 @@ pub fn index(_req: HttpRequest) -> HttpResponse {
             .body(Body::from_slice(content.as_ref())),
         None => HttpResponse::NotFound().body("404 Not Found"),
     }
-}
-
-#[derive(Template)]
-#[template(path = "login.html")]
-struct Login;
-
-/// Fetches login page and returns `HttpResponse`
-pub fn login(_req: HttpRequest) -> HttpResponse {
-    let s = Login
-        .render()
-        .expect("unabled to file login page, build is broken?");
-
-    HttpResponse::Ok().content_type("text/html").body(s)
 }
 
 #[derive(RustEmbed)]

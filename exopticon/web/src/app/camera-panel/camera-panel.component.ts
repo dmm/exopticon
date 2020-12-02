@@ -63,12 +63,7 @@ export class CameraPanelComponent implements OnInit {
   }
 
   getCameras(): void {
-    this.cameraService.getCameras().subscribe(
-      (cameras) => {},
-      () => {
-        window.location.pathname = "/login";
-      }
-    );
+    this.cameraService.getCameras().subscribe((cameras) => {});
   }
 
   ngOnInit() {

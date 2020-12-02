@@ -186,6 +186,7 @@ mod ws_session;
 
 use crate::models::DbExecutor;
 use actix::prelude::*;
+use actix_http::cookie::SameSite;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware::Logger, App, HttpServer};
 use base64::{decode, encode};
@@ -322,9 +323,9 @@ fn main() {
                 CookieIdentityPolicy::new(&secret)
                     .name("id")
                     .path("/")
-                    //                .domain(domain.as_str())
                     .max_age_time(Duration::days(7)) // just for testing
-                    .secure(false),
+                    .secure(true)
+                    .same_site(SameSite::Strict),
             ))
             // setup builtin logger to get nice logging for each request
             .wrap(Logger::default())
