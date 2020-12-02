@@ -17,17 +17,17 @@
  * You should have received a copy of the GNU General Public License
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { Injectable } from "@angular/core";
 import {
-  HttpRequest,
-  HttpHandler,
-  HttpEvent,
-  HttpInterceptor,
   HttpErrorResponse,
+  HttpEvent,
+  HttpHandler,
+  HttpInterceptor,
+  HttpRequest,
 } from "@angular/common/http";
+import { Injectable } from "@angular/core";
+import { Router } from "@angular/router";
 import { Observable, of, throwError } from "rxjs";
 import { catchError } from "rxjs/operators";
-import { Router } from "@angular/router";
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {

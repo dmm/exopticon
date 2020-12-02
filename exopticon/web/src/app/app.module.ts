@@ -18,15 +18,18 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { HttpClientModule } from "@angular/common/http";
+import { HttpClientModule, HTTP_INTERCEPTORS } from "@angular/common/http";
 import { NgModule } from "@angular/core";
 import { ReactiveFormsModule } from "@angular/forms";
 import { BrowserModule } from "@angular/platform-browser";
+import { ServiceWorkerModule } from "@angular/service-worker";
 import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
+import { environment } from "../environments/environment";
 import { AlertViewComponent } from "./alert-view/alert-view.component";
 import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.component";
 import { AppRoutingModule } from "./app-routing.module";
 import { AppComponent } from "./app.component";
+import { AuthInterceptor } from "./auth.interceptor";
 import { CameraOverlayComponent } from "./camera-overlay/camera-overlay.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { CameraStatusOverlayComponent } from "./camera-status-overlay/camera-status-overlay.component";
@@ -35,10 +38,6 @@ import { CameraService } from "./camera.service";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
 import { VideoViewComponent } from "./video-view/video-view.component";
-import { ServiceWorkerModule } from "@angular/service-worker";
-import { environment } from "../environments/environment";
-import { HTTP_INTERCEPTORS } from "@angular/common/http";
-import { AuthInterceptor } from "./auth.interceptor";
 
 @NgModule({
   declarations: [

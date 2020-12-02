@@ -18,7 +18,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 import { TestBed } from "@angular/core/testing";
-
 import { AuthInterceptor } from "./auth.interceptor";
 
 describe("AuthInterceptor", () => {
