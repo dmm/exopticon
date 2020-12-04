@@ -1,23 +1,3 @@
-/*
- * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
- *
- * This file is part of Exopticon.
- *
- * Exopticon is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Exopticon is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 table! {
     alert_rule_cameras (id) {
         id -> Int4,
@@ -140,7 +120,6 @@ table! {
 table! {
     observations (id) {
         id -> Int8,
-        video_unit_id -> Int4,
         frame_offset -> Int8,
         tag -> Text,
         details -> Text,
@@ -150,6 +129,7 @@ table! {
         lr_x -> Int2,
         lr_y -> Int2,
         inserted_at -> Timestamptz,
+        video_unit_id -> Uuid,
     }
 }
 
@@ -180,23 +160,23 @@ table! {
 table! {
     video_files (id) {
         id -> Int4,
-        video_unit_id -> Int4,
         filename -> Varchar,
         size -> Int4,
         inserted_at -> Timestamp,
         updated_at -> Timestamp,
+        video_unit_id -> Uuid,
     }
 }
 
 table! {
     video_units (id) {
-        id -> Int4,
         camera_id -> Int4,
         monotonic_index -> Int4,
         begin_time -> Timestamp,
         end_time -> Timestamp,
         inserted_at -> Timestamp,
         updated_at -> Timestamp,
+        id -> Uuid,
     }
 }
 
