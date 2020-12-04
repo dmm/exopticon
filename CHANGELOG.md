@@ -2,6 +2,23 @@
 
 <!--- next entry here -->
 
+## 0.7.0
+2020-12-04
+
+### Features
+
+- Implement ServiceWorker and initial PWA (2041e28981a474b201a398550f5dd082fb7a778b)
+- Add new header (8d77cbb29a45703d86fa32137103f28c96e6c0b3)
+- Add HOME button to header (d98457dc7bfea625d4ae3858433c5ad3bc01cddb)
+
+### Fixes
+
+- Rework authentication flow to live inside Angular (47341d8ef6c583045924bbd603dd6071eff73ca9)
+- **web:** fix formatting (efb7c962b3904a6eac4a2de026da760afc1ebd29)
+- Build with production environment so web manifest is included (741c79530679e41c7e4d6e2c707e30fc69d99a82)
+- style pwa splash screen (25382449391e4a80d8ff50b2dd9e8df5ab0bd9b6)
+- fix layout width (d0b23e8052202e7f0a85fc0efcd02e4e4e655585)
+
 ## 0.6.2
 2020-11-30
 
