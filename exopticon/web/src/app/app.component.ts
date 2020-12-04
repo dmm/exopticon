@@ -17,9 +17,8 @@
  * You should have received a copy of the GNU General Public License
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 import { Component } from "@angular/core";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 
 @Component({
   selector: "app-root",
@@ -30,7 +29,7 @@ export class AppComponent {
   title = "exopticon";
   fullscreen = false;
 
-  constructor(private route: ActivatedRoute) {}
+  constructor(private route: ActivatedRoute, public router: Router) {}
 
   ngOnInit() {
     this.route.queryParamMap.subscribe((params) => {
@@ -40,5 +39,9 @@ export class AppComponent {
         this.fullscreen = false;
       }
     });
+  }
+
+  redirect() {
+    this.router.navigateByUrl("/cameras");
   }
 }
