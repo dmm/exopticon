@@ -22,12 +22,20 @@
   height: 100%;
   display: grid;
   grid-row: 2;
-  grid-template-rows: 36px minmax(0, 1fr);
+  grid-template-rows: 75px minmax(0, 1fr);
 }
 
 .top-menu {
+  position: relative;
+  display: grid;
+  grid-template-columns: 75px 1fr 1fr;
+  grid-template-rows: 75px;
   font-weight: bold;
-  height: 36px;
+}
+
+.top-menu button {
+  margin-left: 10px;
+  width: 160px;
 }
 
 div.main-content {
@@ -36,10 +44,10 @@ div.main-content {
 }
 
 div.logo {
-  display: flex;
+  grid-column: 1;
 }
 
 div.logo img {
-  height: 34px;
+  height: 100%;
   width: auto;
 }
