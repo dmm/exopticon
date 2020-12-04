@@ -27,6 +27,7 @@
 
 .top-menu {
   position: relative;
+  width: 100%;
   display: grid;
   grid-template-columns: 75px 1fr 1fr;
   grid-template-rows: 75px;
@@ -35,7 +36,7 @@
 
 .top-menu button {
   margin-left: 10px;
-  width: 160px;
+  width: 120px;
 }
 
 div.main-content {
