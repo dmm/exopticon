@@ -1,4 +1,3 @@
 target
-Cargo.lock
 exopticon/web/dist/
 exopticon/web/node_modules/
