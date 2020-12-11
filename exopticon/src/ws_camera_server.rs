@@ -23,6 +23,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix::{Actor, AsyncContext, Context, Handler, Message, Recipient, Supervised, SystemService};
 use base64::STANDARD;
+use uuid::Uuid;
 
 use crate::models::Observation;
 
@@ -96,7 +97,7 @@ pub struct CameraFrame {
     /// source of frame
     pub source: FrameSource,
     /// id of video unit
-    pub video_unit_id: i32,
+    pub video_unit_id: Uuid,
     /// offset from beginning of video unit
     pub offset: i64,
     /// original width of image

@@ -26,12 +26,14 @@
     "@js-joda/timezone": "^2.2",
     "@ng-web-apis/common": "^1.7.0",
     "@ng-web-apis/intersection-observer": "^2.1.0",
+    "@types/uuid": "^8.3.0",
     "core-js": "^3.1.4",
     "i": "^0.3.6",
     "npm": "^6.14.8",
     "rxjs": "^6.5.5",
     "rxjs-compat": "^6.5.2",
     "tslib": "^2.0.0",
+    "uuid": "^8.3.1",
     "zone.js": "~0.10.2"
   },
   "devDependencies": {

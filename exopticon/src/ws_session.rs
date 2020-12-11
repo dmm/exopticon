@@ -29,6 +29,7 @@ use actix_web_actors::ws;
 use base64::STANDARD_NO_PAD;
 use rmp_serde::Serializer;
 use serde::Serialize;
+use uuid::Uuid;
 
 use crate::db_registry;
 use crate::fair_queue::FairQueue;
@@ -67,7 +68,7 @@ pub enum WsCommand {
         /// playback id, currently supplied by client
         id: u64,
         /// id of video unit id to play
-        video_unit_id: i32,
+        video_unit_id: Uuid,
         /// initial offset to begin playback
         offset: i64,
     },
@@ -109,7 +110,7 @@ pub struct RawCameraFrame {
     /// source of frame
     pub source: FrameSource,
     /// id of video unit
-    pub video_unit_id: i32,
+    pub video_unit_id: Uuid,
     /// offset from beginning of video unit
     pub offset: i64,
     /// observations associated with frame

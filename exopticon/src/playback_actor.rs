@@ -31,6 +31,7 @@ use bytes::BytesMut;
 use exserial::models::CaptureMessage;
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
+use uuid::Uuid;
 
 use crate::models::Observation;
 use crate::playback_supervisor::{PlaybackSupervisor, StopPlayback};
@@ -53,7 +54,7 @@ pub struct PlaybackActor {
     /// client provided playback id
     pub id: u64,
     /// id of video unit to play
-    pub video_unit_id: i32,
+    pub video_unit_id: Uuid,
     /// initial frame offset to play
     pub initial_offset: i64,
     /// path to video file to play
@@ -84,7 +85,7 @@ impl PlaybackActor {
     /// Returns newly initialized playback actor
     pub const fn new(
         id: u64, // stream id provided by client
-        video_unit_id: i32,
+        video_unit_id: Uuid,
         initial_offset: i64,
         video_file_path: String,
         observations: Vec<Observation>,

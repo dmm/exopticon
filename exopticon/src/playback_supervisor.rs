@@ -23,6 +23,7 @@
 use std::collections::HashMap;
 
 use actix::{Actor, Addr, Context, Handler, Message, Supervised, SystemService};
+use uuid::Uuid;
 
 use crate::models::Observation;
 use crate::playback_actor::PlaybackActor;
@@ -37,7 +38,7 @@ pub struct StartPlayback {
     /// `Addr` of target ws_session
     pub address: Addr<WsSession>,
     /// initial video unit id
-    pub video_unit_id: i32,
+    pub video_unit_id: Uuid,
     /// initial offset
     pub offset: i64,
     /// filename

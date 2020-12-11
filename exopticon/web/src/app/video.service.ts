@@ -37,7 +37,7 @@ export interface AnalysisSubject {
 export interface PlaybackSubject {
   kind: "playback";
   id: number;
-  videoUnitId: number;
+  videoUnitId: string;
   offset: number;
 }
 export type SubscriptionSubject =

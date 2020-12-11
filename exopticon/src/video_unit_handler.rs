@@ -64,6 +64,7 @@ impl Handler<CreateVideoUnitFile> for DbExecutor {
         // TODO: Wrap this in a transaction
         let video_unit: VideoUnit = diesel::insert_into(video_units)
             .values(CreateVideoUnit {
+                id: msg.video_unit_id,
                 camera_id: msg.camera_id,
                 monotonic_index: msg.monotonic_index,
                 begin_time: msg.begin_time,

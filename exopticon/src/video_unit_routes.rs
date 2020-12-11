@@ -23,6 +23,7 @@
 
 use actix_web::{web::Data, web::Path, web::Query, Error, HttpResponse};
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 use crate::app::RouteState;
 use crate::models::{FetchBetweenVideoUnit, FetchVideoUnit};
@@ -35,7 +36,7 @@ use crate::models::{FetchBetweenVideoUnit, FetchVideoUnit};
 /// * `state` - `RouteState` struct
 ///
 pub async fn fetch_video_unit(
-    path: Path<i32>,
+    path: Path<Uuid>,
     state: Data<RouteState>,
 ) -> Result<HttpResponse, Error> {
     let db_response = state

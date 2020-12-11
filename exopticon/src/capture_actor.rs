@@ -35,6 +35,7 @@ use chrono::{DateTime, Utc};
 use exserial::models::CaptureMessage;
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
+use uuid::Uuid;
 
 use crate::capture_supervisor::{CaptureSupervisor, RestartCaptureWorker};
 use crate::db_registry;
@@ -113,7 +114,7 @@ pub struct CaptureActor {
     /// absolute path to video storage
     pub storage_path: String,
     /// id of currently open video unit
-    pub video_unit_id: Option<i32>,
+    pub video_unit_id: Option<Uuid>,
     /// id of currently open video file
     pub video_file_id: Option<i32>,
     /// frame offset from beginning of the current video unit
@@ -192,7 +193,9 @@ impl CaptureActor {
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
                     },
-                    video_unit_id: self.video_unit_id.unwrap_or(-1),
+                    video_unit_id: self
+                        .video_unit_id
+                        .expect("video unit to be set. state violation!"),
                     offset,
                     unscaled_width,
                     unscaled_height,
@@ -213,7 +216,7 @@ impl CaptureActor {
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
                     },
-                    video_unit_id: self.video_unit_id.unwrap_or(-1),
+                    video_unit_id: self.video_unit_id.unwrap_or(Uuid::nil()),
                     offset,
                     unscaled_width,
                     unscaled_height,
@@ -224,20 +227,21 @@ impl CaptureActor {
                 filename,
                 begin_time,
             } => {
+                let new_id = Uuid::new_v4();
                 // worker has created a new file. Write video_unit and
                 // file to database.
                 if let Ok(date) = begin_time.parse::<DateTime<Utc>>() {
                     let fut = db_registry::get_db().send(CreateVideoUnitFile {
+                        video_unit_id: new_id,
                         camera_id: self.camera_id,
                         monotonic_index: 0,
                         begin_time: date.naive_utc(),
                         filename: filename.clone(),
                     });
-
+                    self.video_unit_id = Some(new_id);
                     ctx.spawn(wrap_future::<_, Self>(fut).map(
                         |result, actor, _ctx| match result {
-                            Ok(Ok((video_unit, video_file))) => {
-                                actor.video_unit_id = Some(video_unit.id);
+                            Ok(Ok((_video_unit, video_file))) => {
                                 actor.video_file_id = Some(video_file.id);
                                 actor.filename = Some(filename)
                             }

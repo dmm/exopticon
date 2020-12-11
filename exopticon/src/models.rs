@@ -23,6 +23,7 @@ use actix::{Actor, SyncContext};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
+use uuid::Uuid;
 
 use crate::ws_camera_server::FrameSource;
 
@@ -241,7 +242,7 @@ pub struct FetchAllCamera {}
 #[serde(rename_all = "camelCase")]
 pub struct OutputVideoUnit {
     /// id of video unit
-    pub id: i32,
+    pub id: Uuid,
     /// id of associated camera
     pub camera_id: i32,
     /// monotonic index of video unit
@@ -262,8 +263,6 @@ pub struct OutputVideoUnit {
 #[belongs_to(Camera)]
 #[table_name = "video_units"]
 pub struct VideoUnit {
-    /// id of video unit
-    pub id: i32,
     /// id of associated camera
     pub camera_id: i32,
     /// monotonic index
@@ -276,6 +275,8 @@ pub struct VideoUnit {
     pub inserted_at: NaiveDateTime,
     /// update time
     pub updated_at: NaiveDateTime,
+    /// id of video unit
+    pub id: Uuid,
 }
 
 /// Represents request to create new video unit record
@@ -291,6 +292,8 @@ pub struct CreateVideoUnit {
     pub begin_time: NaiveDateTime,
     /// end time in UTC
     pub end_time: NaiveDateTime,
+    /// id of video unit
+    pub id: Uuid,
 }
 
 /// Represents request to update video unit record
@@ -298,8 +301,6 @@ pub struct CreateVideoUnit {
 #[serde(rename_all = "camelCase")]
 #[table_name = "video_units"]
 pub struct UpdateVideoUnit {
-    /// id of video unit to update
-    pub id: i32,
     /// if present, new associated camera id
     pub camera_id: Option<i32>,
     /// if present, new monotonic index
@@ -308,12 +309,14 @@ pub struct UpdateVideoUnit {
     pub begin_time: Option<NaiveDateTime>,
     /// if present, new end time, in UTC
     pub end_time: Option<NaiveDateTime>,
+    /// id of video unit to update
+    pub id: Uuid,
 }
 
 /// Represents a request to fetch a specified video unit
 pub struct FetchVideoUnit {
     /// id of video unit to fetch
-    pub id: i32,
+    pub id: Uuid,
 }
 
 /// Represents a request to fetch video units between specified times
@@ -334,8 +337,6 @@ pub struct FetchBetweenVideoUnit {
 pub struct VideoFile {
     /// id of video file
     pub id: i32,
-    /// id of associated video unit
-    pub video_unit_id: i32,
     /// filename of video file
     pub filename: String,
     /// size in bytes of video file
@@ -344,6 +345,8 @@ pub struct VideoFile {
     pub inserted_at: NaiveDateTime,
     /// update time
     pub updated_at: NaiveDateTime,
+    /// id of associated video unit
+    pub video_unit_id: Uuid,
 }
 
 /// Represents request to create new video file
@@ -351,12 +354,12 @@ pub struct VideoFile {
 #[serde(rename_all = "camelCase")]
 #[table_name = "video_files"]
 pub struct CreateVideoFile {
-    /// id of video unit to own this video file
-    pub video_unit_id: i32,
     /// filename for new video file
     pub filename: String,
     /// size in bytes of new video file
     pub size: i32,
+    /// id of video unit to own this video file
+    pub video_unit_id: Uuid,
 }
 
 /// Represents request to update video file
@@ -367,7 +370,7 @@ pub struct UpdateVideoFile {
     /// id of video file to update
     pub id: i32,
     /// if present, new id of associated video unit
-    pub video_unit_id: Option<i32>,
+    pub video_unit_id: Option<Uuid>,
     /// if present, new filename
     pub filename: Option<String>,
     /// if present, new file size
@@ -376,6 +379,8 @@ pub struct UpdateVideoFile {
 
 /// Represents a request to create a new video unit and file pair
 pub struct CreateVideoUnitFile {
+    /// id of video unit
+    pub video_unit_id: Uuid,
     /// id of camera associated with new video unit and file
     pub camera_id: i32,
     /// monotonic index
@@ -389,7 +394,7 @@ pub struct CreateVideoUnitFile {
 /// Represents request to update a video unit and video file pair
 pub struct UpdateVideoUnitFile {
     /// id of video unit
-    pub video_unit_id: i32,
+    pub video_unit_id: Uuid,
     /// end time, in UTC
     pub end_time: NaiveDateTime,
     /// id of video file
@@ -409,7 +414,7 @@ pub struct FetchOldVideoUnitFile {
 /// Represents request to delete video units
 pub struct DeleteVideoUnitFiles {
     /// vec of ids of video units to delete
-    pub video_unit_ids: Vec<i32>,
+    pub video_unit_ids: Vec<Uuid>,
     /// vec of id of video files to delete
     pub video_file_ids: Vec<i32>,
 }
@@ -426,8 +431,6 @@ pub struct FetchEmptyVideoFile;
 pub struct Observation {
     /// id of Observation
     pub id: i64,
-    /// id of owning video unit
-    pub video_unit_id: i32,
     /// offset from beginning of video unit, starts at 0
     pub frame_offset: i64,
     /// Identifies the type of observation, eg Person, Motion, Deer
@@ -447,6 +450,8 @@ pub struct Observation {
     pub lr_y: i16,
     /// Time that observation record was inserted
     pub inserted_at: DateTime<Utc>,
+    /// id of owning video unit
+    pub video_unit_id: Uuid,
 }
 
 /// Represents a request to create a single observation.
@@ -454,8 +459,6 @@ pub struct Observation {
 #[serde(rename_all = "camelCase")]
 #[table_name = "observations"]
 pub struct CreateObservation {
-    /// id of owning video unit
-    pub video_unit_id: i32,
     /// offset from beginning of video unit, starts at 0
     pub frame_offset: i64,
     /// Identifies the type of observation, eg Person, Motion, Deer
@@ -473,6 +476,8 @@ pub struct CreateObservation {
     pub lr_x: i16,
     /// lower-right y coordinate
     pub lr_y: i16,
+    /// id of owning video unit
+    pub video_unit_id: Uuid,
 }
 
 /// Represents a request to create one or more observation records.
@@ -497,7 +502,7 @@ pub struct FetchObservations {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FetchObservationsByVideoUnit {
     /// video unit id to fetch observations for
-    pub video_unit_id: i32,
+    pub video_unit_id: Uuid,
 }
 
 /// Represents a request fetch an `Observation` by observation id

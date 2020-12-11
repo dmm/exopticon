@@ -37,6 +37,7 @@ use log::Level;
 use serde::Deserialize;
 use tokio::process::Command;
 use tokio_util::codec::length_delimited;
+use uuid::Uuid;
 
 use crate::analysis_supervisor::{AnalysisSupervisor, RestartAnalysisActor};
 use crate::fair_queue::FairQueue;
@@ -230,7 +231,7 @@ impl AnalysisActor {
                         analysis_engine_id: self.id,
                         tag,
                     },
-                    video_unit_id: -1,
+                    video_unit_id: Uuid::nil(),
                     offset: -1,
                     unscaled_width: -1,
                     unscaled_height: -1,
