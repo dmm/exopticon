@@ -2,6 +2,21 @@
 
 <!--- next entry here -->
 
+## 0.8.0
+2020-12-12
+
+### Breaking changes
+
+#### Switch VideoUnit to uuid for primary key (5d327cc824f106b1fb47e6f30d7078100d980dd7)
+
+VideoUnit now uses a uuid for id
+
+### Fixes
+
+- Change video_unit table to use a uuid primary key (45f9cfed3bcd9b3b8a05681a2e5cd433f3566e61)
+- Remove Cargo.lock from .dockerignore to fix build (475b838a9530c75f3ee11174a8353c782327a944)
+- Add Cargo.lock (6ce486d79824f483c63856d74cd6058a2bdc4e5f)
+
 ## 0.7.0
 2020-12-04
 
