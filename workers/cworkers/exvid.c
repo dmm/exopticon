@@ -26,6 +26,8 @@
 #include <poll.h>
 #include <time.h>
 
+#include "libavutil/opt.h"
+
 #include "exvid.h"
 
 static int64_t timespec_to_ms_interval(const struct timespec beg,
@@ -266,6 +268,11 @@ int ex_open_output_stream(struct in_context *in,
                 return_value = 1;
                 goto cleanup;
         }
+
+        // Set avformat options
+        av_opt_set(out->fcx, "fflags", "+flush_packets", 0);
+        av_opt_set(out->fcx, "avioflags", "+direct", 0);
+
         for (unsigned int i = 0; i < in->fcx->nb_streams; i++) {
                 if (i == (uint64_t)in->stream_index) {
                         AVStream *out_stream;
@@ -442,6 +449,7 @@ cleanup:
                 fprintf(stderr, "%s, %d\n", errbuf, return_value);
 
         }
+        av_write_frame(c->fcx, NULL);
 
         return return_value;
 }
