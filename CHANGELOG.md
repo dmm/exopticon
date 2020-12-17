@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.9.0
+2020-12-17
+
+### Features
+
+- Flush packets and use direct io (54790da79a3023306d622da697bdeac9d7d4880e)
+
 ## 0.8.0
 2020-12-12
 
