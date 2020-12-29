@@ -27,6 +27,7 @@
 #include <time.h>
 
 #include "libavutil/opt.h"
+#include "libavutil/pixdesc.h"
 
 #include "exvid.h"
 
@@ -122,8 +123,40 @@ int ex_init_input(struct in_context *c) {
         return 0;
 }
 
+static int hw_decoder_init(struct in_context *c, const enum AVHWDeviceType type) {
+    int err = 0;
+
+    if ((err = av_hwdevice_ctx_create(&c->hw_device_ctx, type,
+                                      NULL, NULL, 0)) < 0) {
+            av_log(NULL, AV_LOG_INFO, "Failed to create specified HW device.");
+            return err;
+    }
+
+    c->ccx->hw_device_ctx = av_buffer_ref(c->hw_device_ctx);
+
+    return err;
+}
+
+
+static enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
+                                        const enum AVPixelFormat *pix_fmts) {
+    const enum AVPixelFormat *p;
+
+    // touch ctx to prevent an unused parameter warning
+    (void)(ctx);
+
+    for (p = pix_fmts; *p != -1; p++) {
+        if (*p == AV_PIX_FMT_CUDA)
+            return *p;
+    }
+
+    av_log(NULL, AV_LOG_INFO, "Failed to get HW surface format.\n");
+    return AV_PIX_FMT_NONE;
+}
+
 int ex_open_input_stream(const char *url, struct in_context *c) {
         int return_value = 0;
+
         c->fcx = avformat_alloc_context();
 
         // setup interrupt callback
@@ -180,6 +213,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         }
         c->st = c->fcx->streams[c->stream_index];
 
+
         // Initialize codec
         c->codec = avcodec_find_decoder(c->codecpar->codec_id);
         if (c->codec == NULL) {
@@ -194,13 +228,51 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                 goto cleanup;
         }
 
-        int avcodec_ret = avcodec_parameters_to_context(c->ccx, c->codecpar);
-        if (avcodec_ret < 0) {
-                return_value = 6;
-                goto cleanup;
+        if (c->hw_accel_type == AV_HWDEVICE_TYPE_CUDA) {
+                av_log(NULL, AV_LOG_INFO, "HARDWAREAERAERASERASERASERASDEFASDFASDFASDFFd\n\n\n\n");
+                for (int i = 0;; i++) {
+                        const AVCodecHWConfig *config = avcodec_get_hw_config(c->codec, i);
+                        if (!config) {
+                                av_log(NULL, AV_LOG_INFO, "Decoder %s does not support device type %s.\n",
+                                       c->codec->name, av_hwdevice_get_type_name(c->hw_accel_type));
+                                return_value = 8;
+                                goto cleanup;
+                        }
+                        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+                            config->device_type == c->hw_accel_type) {
+                                c->hw_pix_fmt = config->pix_fmt;
+                                av_log(NULL, AV_LOG_INFO, "PIXEL FORMAT: %s\n", av_get_pix_fmt_name(c->hw_pix_fmt));
+                                break;
+                        }
+                }
+
+                int avcodec_ret = avcodec_parameters_to_context(c->ccx, c->codecpar);
+                if (avcodec_ret < 0) {
+                        av_log(NULL, AV_LOG_FATAL, "Failed to copy codec pars to context");
+                        return_value = 6;
+                        goto cleanup;
+                }
+
+                c->ccx->get_format = get_hw_format;
+
+                if (hw_decoder_init(c, c->hw_accel_type)) {
+                        av_log(NULL, AV_LOG_INFO, "HW decoder successfully initialized!");
+                }
+
+                // get formats
+                enum AVPixelFormat *hw_formats;
+                if (av_hwframe_transfer_get_formats(c->ccx->hw_device_ctx, AV_HWFRAME_TRANSFER_DIRECTION_FROM, &hw_formats, 0) == 0) {
+                        for (enum AVPixelFormat *p = hw_formats; *p != AV_PIX_FMT_NONE; p++) {
+                                av_log(NULL, AV_LOG_INFO, "HW PIXEL FORMAT: %s", av_get_pix_fmt_name(*p));
+                        }
+                } else {
+                        av_log(NULL, AV_LOG_ERROR, "Failed to fetch hw pixel format");
+                        goto cleanup;
+                }
         }
 
         if (avcodec_open2(c->ccx, c->codec, NULL) < 0) {
+                av_log(NULL, AV_LOG_FATAL, "Failed to open codec");
                 return_value = 7;
                 goto cleanup;
         }
@@ -242,6 +314,8 @@ int ex_free_input(struct in_context *c)
         if (c->fcx != NULL) {
                 avformat_free_context(c->fcx);
         }
+        av_buffer_unref(&c->hw_device_ctx);
+
         return 0;
 }
 

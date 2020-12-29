@@ -65,7 +65,6 @@ struct CameraState {
         AVCodecContext *occx;
         AVCodec *ocodec;
         AVStream *ost;
-        int frames_per_second;
         int o_index;
         // Begin, End time for output file
         struct timespec begin_time;
@@ -84,28 +83,17 @@ struct CameraState {
         int switch_file;
 };
 
-struct FrameTime {
-        int64_t decode_time;
-        int64_t file_write_time;
-        int64_t stream_write_time;
-        int64_t read_time;
-        int64_t whole_loop;
-};
-
-struct CapturePerformance {
-        struct FrameTime frame_times[50];
-        int count;
-
-        struct FrameTime min;
-        struct FrameTime max;
-        struct FrameTime avg;
-};
+static int is_hwaccel_pix_fmt(enum AVPixelFormat pix_fmt)
+{
+        const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
+        return desc->flags & AV_PIX_FMT_FLAG_HWACCEL;
+}
 
 static const AVRational microsecond =
-  {
-   .num = 1,
-   .den = 1E6,
-  };
+{
+        .num = 1,
+        .den = 1E6,
+};
 
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -194,7 +182,7 @@ int encode_jpeg_ffmpeg(AVFrame *frame, AVPacket *pkt)
 {
         AVCodec *codec = NULL;
         AVCodecContext *ccx = NULL;
-        enum AVPixelFormat img_fmt = AV_PIX_FMT_YUVJ420P;
+        enum AVPixelFormat img_fmt = AV_PIX_FMT_YUV420P;
         int ret = 0;
         bs_log("Frame format: %d", frame->format);
         // Find the mjpeg encoder
@@ -259,11 +247,12 @@ cleanup:
 
 int encode_jpeg(AVFrame *frame, AVPacket *pkt)
 {
-        if (frame->format == AV_PIX_FMT_YUV420P || frame->format == AV_PIX_FMT_YUVJ420P) {
-                return encode_jpeg_turbo(frame, pkt);
+// frame->format is now expected to be AV_PIX_FMT_YUVJ420P
+        if (frame->format != AV_PIX_FMT_YUV420P) {
+                bs_log("Invalid frame format %s provided!",  av_get_pix_fmt_name(frame->format));
+                return 1;
         }
-
-        return encode_jpeg_ffmpeg(frame, pkt);
+        return encode_jpeg_turbo(frame, pkt);
 }
 
 int write_jpeg(AVPacket *pkt, const char *filename)
@@ -389,6 +378,11 @@ int64_t timespec_to_ms(const struct timespec time)
 
 AVFrame* scale_frame(AVFrame *input, int width, int height)
 {
+        // Correct color space if using deprecated pix fmt
+        if (input->format == AV_PIX_FMT_YUVJ420P) {
+                input->format = AV_PIX_FMT_YUV420P;
+                input->color_range = AVCOL_RANGE_JPEG;
+        }
         AVFrame* resizedFrame = av_frame_alloc();
         if (resizedFrame == NULL) {
                 return NULL;
@@ -411,7 +405,7 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
         struct SwsContext *sws_context = sws_getCachedContext(NULL,
                                                               input->width,
                                                               input->height,
-                                                              AV_PIX_FMT_YUV420P,//input->format,
+                                                              input->format,
                                                               resizedFrame->width,
                                                               resizedFrame->height,
                                                               resizedFrame->format,
@@ -460,21 +454,26 @@ int send_scaled_frame(AVFrame *frame, const int64_t offset, const int width, con
 int send_full_frame(AVFrame *frame, const int64_t offset)
 {
         struct FrameMessage message;
-
-        AVPacket jpegPkt;
-        av_init_packet(&jpegPkt);
-        encode_jpeg(frame, &jpegPkt);
-
-        message.jpeg = jpegPkt.buf->data;
-        message.jpeg_size = jpegPkt.buf->size;
         message.unscaled_height = frame->height;
         message.unscaled_width = frame->width;
         message.offset = offset;
 
+        AVPacket jpeg_pkt;
+        av_init_packet(&jpeg_pkt);
+
+        AVFrame *scaledFrame = NULL;
+        scaledFrame = scale_frame(frame, frame->width, frame->height);
+
+        // jpeg encode frame
+        encode_jpeg(scaledFrame, &jpeg_pkt);
+        message.jpeg = jpeg_pkt.buf->data;
+        message.jpeg_size = jpeg_pkt.buf->size;
+
         send_frame_message(&message);
 
-        av_packet_unref(&jpegPkt);
-
+        av_freep(&(scaledFrame->data));
+        av_frame_free(&scaledFrame);
+        av_packet_unref(&jpeg_pkt);
         return 0;
 }
 
@@ -486,7 +485,7 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
 
         // ensure packet is from selected video stream
         if (pkt->stream_index != in->stream_index) {
-          return 1;
+                return 1;
         }
 
         // Check if output file if oversized and we are have a
@@ -530,8 +529,8 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
         if (pkt->stream_index != in->stream_index) {
                 return 0;
         }
-
         AVFrame *frame = av_frame_alloc();
+        AVFrame *sw_frame = NULL;
 
         int send_ret = avcodec_send_packet(in->ccx, pkt);
         if (send_ret != 0) {
@@ -545,7 +544,7 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
         if (receive_ret != 0) {
                 char errbuf[100];
                 av_strerror(receive_ret, errbuf, 100);
-                av_log(NULL, AV_LOG_FATAL, "Error receiving frame: %s", errbuf);
+                bs_log("Error receiving frame: %s", errbuf);
                 goto cleanup;
         }
         // Calculate microsecond offset from frame->pts
@@ -554,10 +553,25 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                                                          in->st->time_base,
                                                          microsecond);
 
-        send_full_frame(frame, offset_microseconds);
-        send_scaled_frame(frame, offset_microseconds, 640, 360);
+        // retrieve data from gpu, if necessary
+        if (is_hwaccel_pix_fmt(frame->format)) {
+                sw_frame = av_frame_alloc();
+                if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0) {
+                        fprintf(stderr, "Error transferring the data to system memory\n");
+                        goto cleanup;
+                }
+                send_full_frame(sw_frame, offset_microseconds);
+                send_scaled_frame(sw_frame, offset_microseconds, 640, 360);
+        } else {
+                send_full_frame(frame, offset_microseconds);
+                send_scaled_frame(frame, offset_microseconds, 640, 360);
+
+        }
+
+
 
 cleanup:
+        av_frame_free(&sw_frame);
         av_frame_free(&frame);
         return 0;
 }
@@ -572,15 +586,13 @@ int main(int argc, char *argv[])
         const char *program_name = argv[0];
         const char *input_uri;
 
-        if (argc < 5) {
-                fprintf(stderr, "Usage: %s url frames_per_second "
-                                "output_directory jpg_name\n",
+        if (argc < 4) {
+                fprintf(stderr, "Usage: %s url output_directory hwaccel_type\n",
                         program_name);
                 return 1;
         }
         input_uri = argv[1];
-        cam.frames_per_second = atoi(argv[2]);
-        cam.output_directory_name = argv[3];
+        cam.output_directory_name = argv[2];
 
         // Seed rand
         srand(time(NULL));
@@ -589,6 +601,8 @@ int main(int argc, char *argv[])
         ex_init(my_av_log_callback);
         ex_init_input(&cam.in);
         ex_init_output(&cam.out);
+
+        cam.in.hw_accel_type = av_hwdevice_find_type_by_name(argv[3]);
 
         cam.ofcx = NULL;
         cam.got_key_frame = 0;

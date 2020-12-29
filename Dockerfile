@@ -8,8 +8,7 @@ ENV CXX=g++-7
 RUN echo 'deb-src http://http.debian.net/debian buster main contrib non-free' > /etc/apt/sources.list.d/src.list
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # Exopticon Build Dependencies
-  libavcodec-dev libavformat-dev libswscale-dev libavfilter-dev \
-  libavutil-dev libturbojpeg0-dev bzip2 \
+  libturbojpeg0-dev bzip2 \
   dpkg-dev file imagemagick libbz2-dev libc6-dev \
   libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
   libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
@@ -20,20 +19,67 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
   curl python3-pil python3-lxml \
   python3 python3-pip python3-setuptools python3-wheel \
-  git libopencv-dev python3-opencv cmake ffmpeg \
+  git libopencv-dev python3-opencv cmake \
+# ffmpeg \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
+# Install nvdec headers
+RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git \
+    && cd nv-codec-headers \
+    && make \
+    && make install
+
+# Build ffmpeg
+RUN apt-get update && apt-get -y build-dep ffmpeg \
+    && git clone https://github.com/FFmpeg/FFmpeg -b master ffmpeg \
+    && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
+
+RUN cd ffmpeg && ./configure \
+       --enable-cuvid \
+       --enable-gpl \
+       --enable-libass \
+       --enable-vaapi \
+       --enable-libfreetype \
+       --enable-libmp3lame \
+       --enable-libopus \
+       --enable-libtheora \
+       --enable-libvorbis \
+       --enable-libvpx \
+       --enable-libx264 \
+       --enable-shared \
+    && make -j`getconf _NPROCESSORS_ONLN` \
+    && make install \
+    && apt-get clean
+
 # Add Coral tpu repository and install python libraries
-RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
-    && wget -O - https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && apt-get update \
-    && apt-get install -y python3-pycoral edgetpu-compiler libedgetpu1-std \
-    && mkdir temp && cd temp && apt-get download libedgetpu1-max \
-    && ar x libedgetpu1-max* && tar xf data.tar.xz && cp usr/lib/x86_64-linux-gnu/libedgetpu.so.1.0 /usr/lib/x86_64-linux-gnu/ \
-    && cd .. && rm -rf temp \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+ RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
+     && wget -O - https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+     && apt-get update \
+     && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
+     && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
+        libedgetpu1-max=15.0 python3-pycoral edgetpu-compiler \
+     && apt-get clean \
+     && rm -rf /var/lib/apt/lists/*
+
+ENV FLASK_ENV=development
+ENV DEBIAN_FRONTEND=noninteractive
+# Install packages for apt repo
+RUN apt-get -qq update \
+#    && apt-get upgrade -y \
+    && apt-get -qq install --no-install-recommends -y \
+    gnupg wget unzip tzdata python3-gi \
+    && apt-get -qq install --no-install-recommends -y \
+        python3-pip \
+#    && pip3 install -U /wheels/*.whl \
+    && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
+    && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
+    && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
+        libedgetpu1-max=15.0 \
+    && rm -rf /var/lib/apt/lists/* \ # /wheels \
+    && (apt-get autoremove -y; apt-get autoclean -y)
+
 
 # install node.js and npm
 RUN mkdir /node && cd /node \

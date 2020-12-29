@@ -216,7 +216,7 @@ impl CaptureActor {
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
                     },
-                    video_unit_id: self.video_unit_id.unwrap_or(Uuid::nil()),
+                    video_unit_id: self.video_unit_id.unwrap_or_else(Uuid::nil),
                     offset,
                     unscaled_width,
                     unscaled_height,
@@ -320,11 +320,12 @@ impl Handler<StartWorker> for CaptureActor {
             .iter()
             .collect();
 
+        let hwaccel_method =
+            env::var("EXOPTICON_HWACCEL_METHOD").unwrap_or_else(|_| "none".to_string());
         let mut cmd = Command::new(executable_path);
         cmd.arg(&self.stream_url);
-        cmd.arg("0");
         cmd.arg(&storage_path);
-        cmd.arg("/dev/null");
+        cmd.arg(hwaccel_method);
         cmd.stdout(Stdio::piped());
 
         let mut child = cmd.spawn().expect("Failed to launch");

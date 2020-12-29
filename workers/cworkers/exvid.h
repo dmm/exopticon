@@ -37,6 +37,9 @@ struct in_context {
         AVCodec           *codec;
         AVStream          *st;
         int               stream_index;
+        enum AVPixelFormat hw_pix_fmt;
+        enum AVHWDeviceType hw_accel_type;
+        AVBufferRef       *hw_device_ctx;
 
         struct timespec   last_frame_time;
         struct timespec  interrupt_time;
