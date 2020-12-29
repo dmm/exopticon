@@ -33,7 +33,7 @@ RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git \
 # Build ffmpeg
 RUN apt-get update && apt-get -y build-dep ffmpeg \
     && git clone https://github.com/FFmpeg/FFmpeg -b master ffmpeg \
-    && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
+    && cd ffmpeg && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
 
 RUN cd ffmpeg && ./configure \
        --enable-cuvid \
