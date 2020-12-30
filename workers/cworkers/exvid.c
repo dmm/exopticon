@@ -229,11 +229,10 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         }
 
         if (c->hw_accel_type == AV_HWDEVICE_TYPE_CUDA) {
-                av_log(NULL, AV_LOG_INFO, "HARDWAREAERAERASERASERASERASDEFASDFASDFASDFFd\n\n\n\n");
                 for (int i = 0;; i++) {
                         const AVCodecHWConfig *config = avcodec_get_hw_config(c->codec, i);
                         if (!config) {
-                                av_log(NULL, AV_LOG_INFO, "Decoder %s does not support device type %s.\n",
+                                av_log(NULL, AV_LOG_INFO, "Decoder %s does not support device type %s.",
                                        c->codec->name, av_hwdevice_get_type_name(c->hw_accel_type));
                                 return_value = 8;
                                 goto cleanup;
@@ -241,7 +240,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
                             config->device_type == c->hw_accel_type) {
                                 c->hw_pix_fmt = config->pix_fmt;
-                                av_log(NULL, AV_LOG_INFO, "PIXEL FORMAT: %s\n", av_get_pix_fmt_name(c->hw_pix_fmt));
+                                av_log(NULL, AV_LOG_DEBUG, "PIXEL FORMAT: %s", av_get_pix_fmt_name(c->hw_pix_fmt));
                                 break;
                         }
                 }
