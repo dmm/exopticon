@@ -2,6 +2,20 @@
 
 <!--- next entry here -->
 
+## 0.10.0
+2020-12-30
+
+### Features
+
+- cuda video decoding (bc748373985d7c16a106af6584f7dae601ae0fae)
+
+### Fixes
+
+- fix ffmpeg build in Dockerfile (5b6667053b0dd50f7f8926472780d7e165592b35)
+- Add ffmpeg to runtime (b8dd5c4be548a4af50c20c08047ce3d3878215cf)
+- remove debug messages from exvid (3db5449e286f8cbca0852dca80b0342678c321ed)
+- Add pycoral and pillow to runtime environment (59e239d016d1b5aff83959ac6a35b36e9cfc7526)
+
 ## 0.9.0
 2020-12-17
 
