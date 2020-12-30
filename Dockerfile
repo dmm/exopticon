@@ -184,12 +184,12 @@ RUN apt-get -qq update \
     && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
     && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
     && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=15.0 \
+        libedgetpu1-max=15.0 python3-pycoral \
     && rm -rf /var/lib/apt/lists/* \ # /wheels \
     && (apt-get autoremove -y; apt-get autoclean -y)
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-      python3-setuptools python3-pip python3-wheel \
+      python3-setuptools python3-pip python3-wheel python3-pillow \
     && pip3 install msgpack imutils numpy \
     && apt-get purge -y python3-setuptools python3-pip python3-wheel \
     && apt-get clean \
