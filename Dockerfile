@@ -36,9 +36,18 @@ RUN apt-get update && apt-get -y build-dep ffmpeg \
     && cd ffmpeg && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
 
 RUN cd ffmpeg && ./configure \
+       --disable-sdl2 \
+       --disable-alsa \
+       --disable-xlib \
+       --disable-sndio \
+       --disable-libxcb \
+       --disable-libxcb-shm \
+       --disable-libxcb-xfixes \
+       --disable-libxcb-shape \
+       --disable-libass \
        --enable-cuvid \
+       --enable-nvdec \
        --enable-gpl \
-       --enable-libass \
        --enable-vaapi \
        --enable-libfreetype \
        --enable-libmp3lame \
@@ -49,8 +58,7 @@ RUN cd ffmpeg && ./configure \
        --enable-libx264 \
        --enable-shared \
     && make -j`getconf _NPROCESSORS_ONLN` \
-    && make install \
-    && apt-get clean
+    && make install
 
 # Add Coral tpu repository and install python libraries
  RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
@@ -145,8 +153,7 @@ WORKDIR /exopticon
 USER root
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-  libavcodec58 libavformat58 libswscale5 libavfilter7 \
-  libavutil56 libturbojpeg0 bzip2 \
+  libturbojpeg0 bzip2 \
   libbz2-1.0 libc6 \
   libcurl4 libevent-2.1-6 libffi6 \
   libgdbm6 libgeoip1 libglib2.0 \
@@ -156,21 +163,30 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libxml2 libxslt1.1 libyaml-0-2 \
   zlib1g libturbojpeg0 \
   python3-opencv \
-  ffmpeg \
+  # ffmpeg runtime deps
+  libxcb-shape0 libxcb-xfixes0 \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
+
 # Add Coral tpu repository and install python libraries
-RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
-    && wget -O - https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && apt-get update \
-    && apt-get install -y python3-pycoral libedgetpu1-std xz-utils \
-    && mkdir temp && cd temp && apt-get download libedgetpu1-max \
-    && ar x libedgetpu1-max* && tar xf data.tar.xz && cp usr/lib/x86_64-linux-gnu/libedgetpu.so.1.0 /usr/lib/x86_64-linux-gnu/ \
-    && cd .. && rm -rf temp \
-    && apt-get purge -y xz-utils \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+ENV FLASK_ENV=development
+ENV DEBIAN_FRONTEND=noninteractive
+# Install packages for apt repo
+RUN apt-get -qq update \
+#    && apt-get upgrade -y \
+    && apt-get -qq install --no-install-recommends -y \
+    gnupg wget unzip tzdata python3-gi \
+    && apt-get -qq install --no-install-recommends -y \
+        python3-pip \
+#    && pip3 install -U /wheels/*.whl \
+    && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
+    && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
+    && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
+        libedgetpu1-max=15.0 \
+    && rm -rf /var/lib/apt/lists/* \ # /wheels \
+    && (apt-get autoremove -y; apt-get autoclean -y)
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
       python3-setuptools python3-pip python3-wheel \
@@ -189,9 +205,16 @@ COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exo
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/assets/workers ./workers
 
+# Copy ffmpeg libraries
+RUN mkdir -p /usr/local/lib /usr/local/bin \
+  && apt-get install $(apt-cache depends ffmpeg | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ')
+COPY --from=exopticon-build /usr/local/lib/lib* /usr/local/lib/
+COPY --from=exopticon-build /usr/local/bin /usr/local/bin
+
 ENV EXOPTICONWORKERS=/exopticon/workers/
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV PATH=/exopticon:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib
 
 USER exopticon
 
