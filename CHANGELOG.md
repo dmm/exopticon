@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.10.2
+2020-12-31
+
+### Fixes
+
+- fix cuvid library name (a9b61046c2a295658d65e49def401ec5bd77777b)
+
 ## 0.10.1
 2020-12-31
 
