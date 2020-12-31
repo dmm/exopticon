@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.10.1
+2020-12-31
+
+### Fixes
+
+- Map libcuvid libraries into production container (0e488b08b06a3230981355965449ef926a6b746b)
+
 ## 0.10.0
 2020-12-30
 
