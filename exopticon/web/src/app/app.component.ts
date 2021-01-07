@@ -20,14 +20,22 @@
 import { Component } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 
+export enum MenuState {
+  None,
+  Main,
+  Armed,
+}
+
 @Component({
   selector: "app-root",
   templateUrl: "./app.component.html",
   styleUrls: ["./app.component.css"],
 })
 export class AppComponent {
+  public menuStates = MenuState;
   title = "exopticon";
   fullscreen = false;
+  menuState = MenuState.None;
 
   constructor(private route: ActivatedRoute, public router: Router) {}
 
@@ -42,6 +50,18 @@ export class AppComponent {
   }
 
   redirect() {
-    this.router.navigateByUrl("/cameras");
+    this.router.navigateByUrl("/camera_panel");
+  }
+
+  handleClick(menu) {
+    if (menu === "main" && this.menuState == MenuState.None) {
+      this.menuState = MenuState.Main;
+    } else if (menu === "main" && this.menuState == MenuState.Main) {
+      this.menuState = MenuState.None;
+    }
+  }
+
+  closeMenu() {
+    this.menuState = MenuState.None;
   }
 }

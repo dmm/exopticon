@@ -20,7 +20,7 @@
 
 import { HttpClientModule, HTTP_INTERCEPTORS } from "@angular/common/http";
 import { NgModule } from "@angular/core";
-import { ReactiveFormsModule } from "@angular/forms";
+import { FormsModule, ReactiveFormsModule } from "@angular/forms";
 import { BrowserModule } from "@angular/platform-browser";
 import { ServiceWorkerModule } from "@angular/service-worker";
 import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
@@ -54,6 +54,7 @@ import { VideoViewComponent } from "./video-view/video-view.component";
   ],
   imports: [
     BrowserModule,
+    FormsModule,
     AppRoutingModule,
     HttpClientModule,
     IntersectionObserverModule,

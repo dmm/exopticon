@@ -20,28 +20,38 @@
 
 :host {
   height: 100%;
-  display: grid;
-  grid-row: 2;
-  grid-template-rows: 75px minmax(0, 1fr);
 }
 
 .top-menu {
   position: relative;
+  height: 75px;
   width: 100%;
   display: grid;
-  grid-template-columns: 75px 1fr 1fr;
+  grid-template-columns: 75px 1fr 130px 200px 5px;
   grid-template-rows: 75px;
   font-weight: bold;
 }
 
-.top-menu button {
+.top-menu > .logo {
+  cursor: pointer;
+}
+
+.top-menu > button {
   margin-left: 10px;
-  width: 120px;
+  font-size: 23px;
+
+}
+
+.top-menu > .menu-button {
+  grid-column: 3;
+}
+
+.top-menu > .arm-button {
+  grid-column: 4;
 }
 
 div.main-content {
-  grid-column: span 1;
-  grid-row: span 2;
+  height: calc(100% - 75px);
 }
 
 div.logo {
@@ -52,3 +62,40 @@ div.logo img {
   height: 100%;
   width: auto;
 }
+
+#menu {
+  overflow: none;
+  position: relative;
+  margin-top: 10px;
+}
+
+#menu > .menu-wrapper {
+  border: 1px solid;
+  padding: 10px;
+  margin-right: 5px;
+  margin-left: 5px;
+  margin-bottom: 20px;
+}
+
+#menu > h3 {
+  margin-top: 0;
+}
+
+#menu > .menu-wrapper > .button-wrapper {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-gap: 10px;
+  justify-content: center;
+}
+
+.button-wrapper > a {
+  height: 40px;
+  display: block;
+  border: 1px solid;
+  text-align: center;
+  padding-top: 15px;
+  text-decoration: none;
+}
+
+

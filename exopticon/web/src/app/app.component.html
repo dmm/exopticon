@@ -19,10 +19,23 @@
 -->
 <div class="top-menu" *ngIf="!fullscreen">
   <div class="logo">
-    <img src="static/assets/logo.png" alt="EXOPTICON" />
+      <img src="static/assets/logo.png" alt="EXOPTICON" (click)="redirect()" />
   </div>
-  <button (click)="redirect()">HOME</button>
-  <button>ALERTS</button>
+  <button type="button" class="menu-button" (click)="handleClick('main')">
+      MENU
+  </button>
+  <button type="button" class="arm-button">UNARMED</button>
+</div>
+<div *ngIf="this.menuState == this.menuStates.Main" id="menu">
+  <div class="menu-wrapper">
+  <h3>MAIN MENU</h3>
+  <div class="button-wrapper">
+    <button (click)="closeMenu()" [routerLink]="['/camera_panel']">CAMERA PANEL</button>
+    <button (click)="closeMenu()" [routerLink]="['/cameras']">CAMERA ADMIN</button>
+    <button (click)="closeMenu()" [routerLink]="['/cameras']">USER ADMIN</button>
+    <button (click)="closeMenu()" [routerLink]="['/cameras']">CAMERAS</button>
+  </div>
+  </div>
 </div>
 <div class="main-content">
   <router-outlet></router-outlet>
