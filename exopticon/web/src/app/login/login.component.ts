@@ -57,7 +57,7 @@ export class LoginComponent implements OnInit {
 
     let username = this.loginForm.controls.username.value;
     let password = this.loginForm.controls.password.value;
-    console.log(`${username} and ${password}`);
+
     combineLatest([
       redirectPath,
       this.authService.login(username, password),
