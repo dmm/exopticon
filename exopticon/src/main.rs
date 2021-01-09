@@ -224,6 +224,7 @@ fn add_user(
 
     let password = PasswordInput::new()
         .with_prompt("Enter password for initial user")
+        .with_confirmation("Confirm password", "Passwords mismatching")
         .interact()?;
 
     let fut2 = address.send(CreateUser {
