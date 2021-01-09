@@ -1,0 +1,76 @@
+/*
+ * Exopticon - A free video surveillance system.
+ * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ *
+ * This file is part of Exopticon.
+ *
+ * Exopticon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Exopticon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+:host {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+h2,
+h3 {
+  grid-column: 2;
+  text-align: center;
+}
+
+.camera-wrapper {
+  grid-column: 2;
+}
+
+form {
+  display: grid;
+  grid-template-columns: 1fr 150px 1em 300px 1fr;
+  grid-gap: 0.3em 0.6em;
+  grid-auto-flow: dense;
+  align-items: center;
+}
+
+input,
+button,
+select {
+  grid-column: 3 / 5;
+  width: auto;
+  margin: 0;
+}
+
+label {
+  grid-column: 2 / 3;
+  width: auto;
+  padding: 0;
+  margin: 0;
+  text-align: right;
+}
+
+input[type="checkbox"] {
+  justify-self: start;
+  margin: 0;
+}
+
+@media only screen and (max-width: 600px) {
+  form {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  input,
+  button,
+  select,
+  label {
+    grid-column: 1;
+    text-align: left;
+  }
+}

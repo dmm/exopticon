@@ -22,18 +22,22 @@ import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
 import { AlertViewComponent } from "./alert-view/alert-view.component";
 import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.component";
+import { CameraDetailComponent } from "./camera-detail/camera-detail.component";
+import { CameraListComponent } from "./camera-list/camera-list.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
 
 const routes: Routes = [
   { path: "login", component: LoginComponent },
-  { path: "cameras", component: CameraPanelComponent },
+  { path: "camera_panel", component: CameraPanelComponent },
   { path: "analysis_engine/:id", component: AnalysisPanelComponent },
+  { path: "cameras", component: CameraListComponent },
+  { path: "cameras/:id", component: CameraDetailComponent },
   { path: "cameras/:id/playback", component: PlaybackViewComponent },
   { path: "alerts/:id", component: AlertViewComponent },
-  { path: "", redirectTo: "/cameras", pathMatch: "full" },
-  { path: "**", redirectTo: "/cameras", pathMatch: "full" },
+  { path: "", redirectTo: "/camera_panel", pathMatch: "full" },
+  { path: "**", redirectTo: "/camera_panel", pathMatch: "full" },
 ];
 
 @NgModule({

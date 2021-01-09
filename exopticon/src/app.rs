@@ -116,7 +116,7 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 )
                 .service(web::resource("/cameras/discover").route(web::get().to(discover)))
                 .service(
-                    web::resource("/cameras{id}")
+                    web::resource("/cameras/{id}")
                         .route(web::post().to(update_camera))
                         .route(web::get().to(fetch_camera)),
                 )

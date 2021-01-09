@@ -30,6 +30,8 @@ import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.componen
 import { AppRoutingModule } from "./app-routing.module";
 import { AppComponent } from "./app.component";
 import { AuthInterceptor } from "./auth.interceptor";
+import { CameraDetailComponent } from "./camera-detail/camera-detail.component";
+import { CameraListComponent } from "./camera-list/camera-list.component";
 import { CameraOverlayComponent } from "./camera-overlay/camera-overlay.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { CameraStatusOverlayComponent } from "./camera-status-overlay/camera-status-overlay.component";
@@ -51,6 +53,8 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     PlaybackViewComponent,
     AlertViewComponent,
     LoginComponent,
+    CameraListComponent,
+    CameraDetailComponent,
   ],
   imports: [
     BrowserModule,
