@@ -66,28 +66,9 @@ RUN cd ffmpeg && ./configure \
      && apt-get update \
      && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
      && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=15.0 python3-pycoral edgetpu-compiler \
+        libedgetpu1-max python3-pycoral edgetpu-compiler python3-gi \
      && apt-get clean \
      && rm -rf /var/lib/apt/lists/*
-
-ENV FLASK_ENV=development
-ENV DEBIAN_FRONTEND=noninteractive
-# Install packages for apt repo
-RUN apt-get -qq update \
-#    && apt-get upgrade -y \
-    && apt-get -qq install --no-install-recommends -y \
-    gnupg wget unzip tzdata python3-gi \
-    && apt-get -qq install --no-install-recommends -y \
-        python3-pip \
-#    && pip3 install -U /wheels/*.whl \
-    && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-    && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
-    && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
-    && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=15.0 \
-    && rm -rf /var/lib/apt/lists/* \ # /wheels \
-    && (apt-get autoremove -y; apt-get autoclean -y)
-
 
 # install node.js and npm
 RUN mkdir /node && cd /node \
@@ -106,11 +87,10 @@ RUN mkdir /cargo && mkdir /rust
 RUN chown 1000:1000 /cargo /rust
 
 # configure run user
-RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
-RUN adduser exopticon plugdev
+RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon -G plugdev --uid 1000 exopticon
 RUN chown exopticon:exopticon /exopticon
 
-USER exopticon:exopticon
+USER exopticon:plugdev
 
 ENV CARGO_HOME=/cargo
 ENV RUST_HOME=/rust
