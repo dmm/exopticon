@@ -29,7 +29,7 @@ export class Camera {
   password: string;
   rtspUrl: string;
   ptzType: string;
-  ptzProfile_token: string;
+  ptzProfileToken: string;
   enabled: boolean;
   insertedAt: string;
   updatedAt: string;

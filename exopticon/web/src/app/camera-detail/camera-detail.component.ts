@@ -20,7 +20,7 @@
 
 import { Component, OnInit } from "@angular/core";
 import { ActivatedRoute, ParamMap } from "@angular/router";
-import { Observable } from "rxjs";
+import { Observable, of } from "rxjs";
 import { switchMap } from "rxjs/operators";
 import { Camera } from "../camera";
 import { CameraService } from "../camera.service";
@@ -40,9 +40,16 @@ export class CameraDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.camera$ = this.route.paramMap.pipe(
-      switchMap((params: ParamMap) =>
-        this.cameraService.getCamera(params.get("id"))
-      )
+      switchMap((params: ParamMap) => {
+        if (params.get("id") !== "0") {
+          return this.cameraService.getCamera(+params.get("id"));
+        } else {
+          let cam = new Camera();
+          cam.id = 0;
+          cam.cameraGroupId = 1;
+          return of(cam);
+        }
+      })
     );
   }
 

@@ -20,6 +20,7 @@
 <h2>Camera Details</h2>
 <div class="camera-wrapper" *ngIf="camera$ | async as camera">
   <h3>"{{ camera.name }}"</h3>
+  <div class="submitMessage"></div>
   <form #cameraForm="ngForm">
     <label>Name:</label>
     <input [(ngModel)]="camera.name" name="name" />
@@ -54,6 +55,9 @@
       <option value="onvif">Onvif</option>
       <option value="onvif_continuous">Onvif Continuous</option>
     </select>
+
+    <label>Ptz Profile Token::</label>
+    <input [(ngModel)]="camera.ptzProfileToken" name="ptzProfileToken" />
 
     <label>enabled:</label>
     <input

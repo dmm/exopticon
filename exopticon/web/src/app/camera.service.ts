@@ -54,12 +54,11 @@ export class CameraService {
   }
 
   setCamera(camera: Camera): Observable<Camera> {
-    return this.http
-      .post<Camera>(this.cameraUrl + "/" + camera.id, camera)
-      .pipe(
-        map((data) => data),
-        catchError(this.handleError)
-      );
+    let url = this.cameraUrl + (camera.id == 0 ? "" : "/" + camera.id);
+    return this.http.post<Camera>(url, camera).pipe(
+      map((data) => data),
+      catchError(this.handleError)
+    );
   }
 
   ptz(cameraId: number, direction: PtzDirection) {
