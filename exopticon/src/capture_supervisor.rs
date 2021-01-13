@@ -22,8 +22,11 @@ use std::time::Duration;
 
 use actix::fut::wrap_future;
 use actix::prelude::*;
+use actix_interop::{critical_section, with_ctx, FutureInterop};
 
 use crate::capture_actor::CaptureActor;
+use crate::db_registry;
+use crate::models::FetchAllCameraGroupAndCameras;
 
 /// Message instructing `CaptureSupervisor` to start a capture actor
 pub struct StartCaptureWorker {
@@ -60,6 +63,12 @@ pub struct RestartCaptureWorker {
 }
 
 impl Message for RestartCaptureWorker {
+    type Result = ();
+}
+
+pub struct SyncCaptureActors {}
+
+impl Message for SyncCaptureActors {
     type Result = ();
 }
 
@@ -122,6 +131,53 @@ impl Handler<RestartCaptureWorker> for CaptureSupervisor {
                 );
             },
         );
+        ctx.spawn(fut);
+    }
+}
+
+impl Handler<SyncCaptureActors> for CaptureSupervisor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: SyncCaptureActors, ctx: &mut Context<Self>) -> Self::Result {
+        let fut = async {
+            critical_section::<Self, _>(async {
+                with_ctx(|actor: &mut Self, _| {
+                    for (id, addr) in &actor.workers {
+                        addr.do_send(StopCaptureWorker { id: *id });
+                    }
+                    actor.workers.clear();
+                });
+
+                // Fetch cameras
+                let groups = match db_registry::get_db()
+                    .send(FetchAllCameraGroupAndCameras {})
+                    .await
+                {
+                    Ok(Ok(c)) => c,
+                    Ok(Err(_)) | Err(_) => return,
+                };
+
+                for g in groups {
+                    for c in g.1 {
+                        if c.enabled {
+                            let storage_path = g.0.storage_path.clone();
+                            with_ctx(|_actor: &mut Self, ctx: &mut Context<Self>| {
+                                ctx.notify_later(
+                                    StartCaptureWorker {
+                                        id: c.id,
+                                        stream_url: c.rtsp_url,
+                                        storage_path,
+                                    },
+                                    Duration::new(1, 0),
+                                );
+                            });
+                        }
+                    }
+                }
+            })
+            .await;
+        }
+        .interop_actor(self);
         ctx.spawn(fut);
     }
 }

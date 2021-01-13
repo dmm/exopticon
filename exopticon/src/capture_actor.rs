@@ -33,11 +33,12 @@ use actix::{
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use exserial::models::CaptureMessage;
-use tokio::process::Command;
+use tokio::io::AsyncWriteExt;
+use tokio::process::{ChildStdin, Command};
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
-use crate::capture_supervisor::{CaptureSupervisor, RestartCaptureWorker};
+use crate::capture_supervisor::{CaptureSupervisor, RestartCaptureWorker, StopCaptureWorker};
 use crate::db_registry;
 use crate::models::{CreateVideoUnitFile, UpdateVideoUnitFile};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
@@ -105,6 +106,11 @@ pub struct CaptureMessage {
 }
 */
 
+enum CaptureState {
+    Running,
+    Shutdown,
+}
+
 /// Holds state of capture actor
 pub struct CaptureActor {
     /// id of camera actor is capturing video for
@@ -121,6 +127,10 @@ pub struct CaptureActor {
     pub offset: i64,
     /// filename currently being captured
     pub filename: Option<String>,
+    /// stdin of worker process
+    pub stdin: Option<ChildStdin>,
+    /// State of CaptureActor
+    state: CaptureState,
 }
 
 impl CaptureActor {
@@ -134,6 +144,8 @@ impl CaptureActor {
             video_file_id: None,
             offset: 0,
             filename: None,
+            stdin: None,
+            state: CaptureState::Running,
         }
     }
 
@@ -276,11 +288,13 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for CaptureActor {
             Ok(b) => b,
             Err(e) => {
                 error!("CaptureActor: stream handle error! {}", e);
-                CaptureSupervisor::from_registry().do_send(RestartCaptureWorker {
-                    id: self.camera_id,
-                    stream_url: self.stream_url.clone(),
-                    storage_path: self.storage_path.clone(),
-                });
+                if let CaptureState::Running = self.state {
+                    CaptureSupervisor::from_registry().do_send(RestartCaptureWorker {
+                        id: self.camera_id,
+                        stream_url: self.stream_url.clone(),
+                        storage_path: self.storage_path.clone(),
+                    });
+                }
                 ctx.terminate();
                 return;
             }
@@ -327,12 +341,14 @@ impl Handler<StartWorker> for CaptureActor {
         cmd.arg(&storage_path);
         cmd.arg(hwaccel_method);
         cmd.stdout(Stdio::piped());
+        cmd.stdin(Stdio::piped());
 
         let mut child = cmd.spawn().expect("Failed to launch");
         let stdout = child
             .stdout
             .take()
             .expect("Failed to open stdout on worker child");
+        self.stdin = Some(child.stdin.take().expect("Failed to open stdin"));
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
         Self::add_stream(framed_stream, ctx);
         let fut = wrap_future::<_, Self>(child).map(|_status, actor, ctx| {
@@ -349,10 +365,32 @@ impl Handler<StartWorker> for CaptureActor {
                 actor.close_file(ctx, filename, Utc::now());
                 actor.filename = None;
             }
-
-            ctx.notify_later(StartWorker {}, Duration::new(5, 0));
+            match actor.state {
+                CaptureState::Running => {
+                    ctx.notify_later(StartWorker {}, Duration::new(5, 0));
+                }
+                CaptureState::Shutdown => {
+                    debug!("Shutting down captureworker...");
+                    ctx.terminate();
+                }
+            }
         });
         ctx.spawn(fut);
+    }
+}
+
+impl Handler<StopCaptureWorker> for CaptureActor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: StopCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
+        self.state = CaptureState::Shutdown;
+        match &mut self.stdin {
+            Some(stdin) => {
+                stdin.shutdown();
+            }
+            None => {}
+        }
+        self.stdin = None;
     }
 }
 
