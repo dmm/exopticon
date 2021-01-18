@@ -2,6 +2,23 @@
 
 <!--- next entry here -->
 
+## 0.11.0
+2021-01-18
+
+### Features
+
+- Initial main menu (f4d8ec67cc8c8c4af91cca9b56eccfe41e655947)
+- Add camera form (b496ffebb4ba031322f12f9a268190d2d1b0a6b4)
+- Add password confirmation to cli user creation (dfda99b11a7ff44ff2301379c4225b69de2255f3)
+- Allow camera detail form to submit new cameras. (d71e779feaf1cfc90bef52e0a4cf872712b43b6e)
+- Sync cameras when camera is added or updated (59a459a3764f3d19ab8b0f012a665f17b876a272)
+
+### Fixes
+
+- remove unnecessary logging (55818e82eb4399181b43b31c3378381dad50b98f)
+- include python3-gi in dev and runtime images. (8c7c0cfa4182ba83a8704f0a5bc8e0dc17c0b990)
+- Restart captureworkers when a camera is updated. (0faf54abf2dca714f7ce00df42b82a11324cd503)
+
 ## 0.10.2
 2020-12-31
 
