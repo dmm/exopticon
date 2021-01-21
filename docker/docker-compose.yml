@@ -1,0 +1,17 @@
+version: '2.4'
+
+services:
+  exopticon:
+    build:
+      context: ..
+    environment:
+      DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
+      RUST_LOG: ${RUST_LOG-info,exopticon::capture_actor=debug}
+    restart: always
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    device_cgroup_rules:
+      - 'a 189:*  rwm'
+    volumes:
+      - $EXOPTICON_VIDEO_PATH:/video
+      - /dev/bus/usb:/dev/bus/usb

@@ -1,0 +1,34 @@
+version: '2.4'
+
+services:
+  nginx:
+    image: nginx:1.19-alpine
+    restart: unless-stopped
+    environment:
+      - EXOPTICON_HOST
+    volumes:
+      - ./config/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+      - ./config/reload-nginx.sh:/docker-entrypoint.d/reload-nginx.sh:ro
+      - ${EXOPTICON_DATA_PATH}/letsencrypt:/etc/letsencrypt:ro
+    ports:
+#      - "80:80"
+      - "${EXOPTICON_PORT}:443"
+#    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+#    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+  certbot:
+    image: certbot/dns-cloudflare:latest
+    restart: unless-stopped
+    volumes:
+      - ${EXOPTICON_DATA_PATH}/letsencrypt:/etc/letsencrypt
+    entrypoint: >-
+      /bin/sh -c 'trap exit TERM;
+      printf "dns_cloudflare_api_token = %s\n" "$DNS_CLOUDFLARE_API_KEY" > /root/cloudflare.ini;
+      while :; do
+      certbot certonly
+      -n
+      --email ${DNS_CLOUDFLARE_EMAIL}
+      --agree-tos
+      --dns-cloudflare
+      --dns-cloudflare-credentials /root/cloudflare.ini
+      -d ${EXOPTICON_HOST};
+      sleep 12h & wait $${!}; done;'

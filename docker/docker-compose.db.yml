@@ -1,0 +1,12 @@
+version: '2.4'
+
+services:
+  db:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}
+    volumes:
+      - type: bind
+        source: /home/user/exdata/db
+        target: /var/lib/postgresql/data

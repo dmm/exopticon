@@ -104,6 +104,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 RUN pip3 install msgpack imutils numpy dvc[ssh]
 RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
 
+WORKDIR /exopticon
+
+FROM exopticon-build AS development
+# This state is just used for local development
 # configure environment
 ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
@@ -113,7 +117,9 @@ ENV CUDA_PATH=/usr/local/cuda-10.0/bin
 ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-10.0
 ENV CUDACXX=/usr/local/cuda-10.0/bin/nvcc
 
-WORKDIR /exopticon
+USER exopticon:plugdev
+
+ENTRYPOINT ["tail", "-f", "/dev/null"]
 
 FROM exopticon-build AS prod-build
 
@@ -196,6 +202,6 @@ ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV PATH=/exopticon:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-USER exopticon
+USER exopticon:plugdev
 
 ENTRYPOINT /exopticon/exopticon
