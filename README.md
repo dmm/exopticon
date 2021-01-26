@@ -1,70 +1,52 @@
 # EXOPTICON
 
-Video Surveillance
-
 ## Installation
-1. Fetch the sources
+1. Pre-install requirements
+* Network layout
+* Install docker and docker-compose
+2. Fetch the sources
 
-    $ git clone https://gitlab.com/dmattli/exopticon.git
+```bash
+$ git clone https://gitlab.com/dmattli/exopticon.git
+```
 
-2. Grab the exopticon-build image
+This will fetch master which should contain the latest
+release. Alternatively you could checkout a specific release:
 
-    $ docker pull dmattli/exopticon-build:latest
+```bash
+cd exopticon/
+git checkout v0.11.0
+```
 
-3. Start the build
+3. Configure docker compose by setting the variables exopticon/docker/.env:
 
-    $ cd exopticon && docker run -v "$(pwd)":/exopticon -w /exopticon dmattli/exopticon-build:latest sh -c 'cargo build --release'
+* EXOPTICON_DB_PATH
+  This is the path to store the database files.
+* EXOPTICON_VIDEO_PATH
+  This is the path where video files will be stored
+* EXOPTICON_POSTGRES_PASSWORD
+  Password for the postgres database. This really isn't used by you so
+  just set it to something long.
 
-4. Prepare database
+4. Call docker compose
 
+### Non-cuda
+```bash
+cd exopticon/docker/
+docker-compose -f docker-compose.db.yml -f docker-compose.yml up -d
+```
 
-    $ sudo -u postgres psql # Run psql as user that can create users and databases
+### cuda
+```bash
+cd exopticon/docker/
+./gen-cuda.bash |  docker-compose -f docker-compose.db.yml -f docker-compose.yml -f /dev/stdin up -d
+```
 
-    # Create the database
-    postgres=# CREATE DATABASE exopticon;
+5. Create initial user
 
-    # Create the database user
-    postgres=# CREATE USER exopticon_user WITH PASSWORD 'change_this_password;
+```bash
+docker exec -it exopticon_exopticon_1 /exopticon/exopticon --add-user
+```
 
-    # Grant access to the database
-    postgres=# GRANT ALL PRIVILEGES ON DATABASE exopticon TO exopticon_user;
+## Development environment
 
-    postgres=# \q
-
-    # Now run the diesel migrations
-    $  docker run -it --rm -v "$(pwd)":/exopticon \
-       -e DATABASE_URL=postgres://exopticon_user:'change_this_password'@10.0.0.2/exopticon \ # SET THIS DB CONNECTION STRING
-       -w /exopticon dmattli/exopticon-build:latest sh -c 'diesel setup'
-    Running migration 2018-10-22-125302_initial_schema
-    Running migration 2018-12-11-144804_users
-    Running migration 2019-06-28-192842_create_observations
-
-5. Create initial user and camera group
-
-    $ docker run -it --rm -v "$(pwd)":/exopticon \
-       -e DATABASE_URL=postgres://exopticon_user:'change_this_password'@10.0.0.2/exopticon \ # SET THIS DB CONNECTION STRING
-       -w /exopticon dmattli/exopticon-build:latest sh -c 'target/release/exopticon --add-user'
-    Enter username for initial user: user1
-    Enter password for initial user: [hidden]
-    Created User!
-
-    $ docker run -it --rm -v "$(pwd)":/exopticon \
-      -e DATABASE_URL=postgres://exopticon_user:'change_this_password'@10.0.0.2/exopticon \ # SET THIS DB CONNECTION STRING
-      -w /exopticon dmattli/exopticon-build:latest sh -c 'target/release/exopticon --add-camera-group'
-    Enter storage path for recorded video: /tank/video
-    Enter max space used at this path, in megabytes: 2000
-
-
-6. Run EXOPTICON
-    docker run -it --rm \
-               $(ls /dev/nvidia* | xargs -I{} echo '--device={}') \
-               $(ls /usr/lib/x86_64-linux-gnu/{libcuda,libnvidia}* | xargs -I{} echo '-v {}:{}:ro') \
-               -v "$(pwd)":/exopticon -v "$HOME/.cargo/registry":/root/.cargo/registry \
-               -v "/var/run/postgresql":/var/run/postgresql \
-               -v "/mnt/videotest:/mnt/videotest"  \
-               -v "$HOME/.cargo:/home/exopticon/.cargo" \
-               -w /exopticon -e RUST_LOG='exopticon=debug' \
-               -e RUST_BACKTRACE=1  \
-               --network=host --user=exopticon \
-               dmattli/exopticon-cuda-dev:10.2 \
-               sh -c '~/.cargo/bin/cargo build'

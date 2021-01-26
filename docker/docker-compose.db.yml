@@ -8,5 +8,5 @@ services:
       POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}
     volumes:
       - type: bind
-        source: /home/user/exdata/db
+        source: ${EXOPTICON_DB_PATH}
         target: /var/lib/postgresql/data
