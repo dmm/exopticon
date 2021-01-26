@@ -239,7 +239,7 @@ impl AnalysisActor {
             }
             AnalysisWorkerMessage::TimingReport { tag, times } => {
                 let (avg, min, max) = calculate_statistics(&times);
-                debug!(
+                info!(
                     "Analysis Actor got {} time report! {:.2} avg, {:.2} min, {:.2} max",
                     tag,
                     avg / 1000,

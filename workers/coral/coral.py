@@ -42,25 +42,34 @@ class CoralWorker(ExopticonWorker):
 
     def handle_frame(self, frame):
         self.interpreter.invoke()
-        image = cv2.cvtColor(frame.image, cv2.COLOR_BGR2RGB)
+        image = frame.image
+        offset = [0, 0]
+        if len(frame.observations) > 0:
+            box = frame.get_observation_bounding_box()
+            print(box)
+            offset = [box[0], box[1]]
+            image = frame.get_region(box)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(image)
         _, scale = common.set_resized_input(
             self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
         objs = detect.get_objects(self.interpreter, 0.5,  scale)
 
         observations = []
+        important_labels = ["person", "car", "truck"]
         for o in objs:
-            observations.append({
-                "videoUnitId": frame.video_unit_id,
-                "frameOffset": frame.offset,
-                "tag": "object",
-                "details": self.labels.get(o.id, o.id),
-                "score": int(o.score * 100),
-                "ulX": max(int(o.bbox.xmin), 0),
-                "ulY": max(int(o.bbox.ymin), 0),
-                "lrX": int(o.bbox.xmax),
-                "lrY": int(o.bbox.ymax)
-            })
+            if self.labels.get(o.id, o.id) in important_labels:
+                observations.append({
+                    "videoUnitId": frame.video_unit_id,
+                    "frameOffset": frame.offset,
+                    "tag": "object",
+                    "details": self.labels.get(o.id, o.id),
+                    "score": int(o.score * 100),
+                    "ulX": max(int(o.bbox.xmin + offset[0]), 0),
+                    "ulY": max(int(o.bbox.ymin + offset[1]), 0),
+                    "lrX": int(o.bbox.xmax + offset[0]),
+                    "lrY": int(o.bbox.ymax + offset[1])
+                })
 
         if len(observations) > 0:
             self.write_observations(frame, observations)

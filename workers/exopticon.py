@@ -20,7 +20,7 @@
 import copy
 import cv2
 import msgpack
-import numpy
+import numpy as np
 import struct
 import sys
 import time
@@ -30,6 +30,7 @@ import argparse
 import logging
 import json
 import base64
+import math
 
 class AnalysisMask(object):
     def __init__(self, ul_x, ul_y, lr_x, lr_y):
@@ -79,7 +80,7 @@ class AnalysisFrame(object):
 
     def __load_image(self, image_str):
         msg_buf = base64.standard_b64decode(image_str)
-        msg_buf = numpy.frombuffer(msg_buf, dtype=numpy.uint8)
+        msg_buf = np.frombuffer(msg_buf, dtype=np.uint8)
 
         image = cv2.imdecode(msg_buf, cv2.IMREAD_COLOR)
 
@@ -125,18 +126,86 @@ class AnalysisFrame(object):
         lr_x = -1
         lr_y = -1
 
-        for o in self.observation:
+        for o in self.observations:
             if o.ul_x < ul_x:
                 ul_x = o.ul_x
             if o.ul_y < ul_y:
                 ul_y = o.ul_y
-            if lr_x > o.lr_x:
+            if lr_x < o.lr_x:
                 lr_x = o.lr_x
-            if lr_y > o.lr_y:
+            if lr_y < o.lr_y:
                 lr_y = o.lr_y
 
         return [ul_x, ul_y, lr_x, lr_y]
 
+    def calculate_region(image_dims, region, min_size):
+        # [height, width] of region
+        rdims = [region[3] - region[1] + 1, region[2] - region[0] + 1]
+        new_region = [0, 0, 0, 0]
+        # if region.width >= min_size, return actual width
+        if rdims[1] >= min_size:
+            new_region[0] = region[0]
+            new_region[2] = region[2]
+        # if region.height >= min_size, return actual height
+        if rdims[0] >= min_size:
+            new_region[1] = region[1]
+            new_region[3] = region[3]
+        # if image.width is <= min_size, return whole width
+        if image_dims[1] <= min_size:
+            new_region[0] = 0
+            new_region[2] = image_dims[1] - 1
+        # if image.height is <= min_size, return whole height
+        if image_dims[0] <= min_size:
+            new_region[1] = 0
+            new_region[3] = image_dims[0] - 1
+
+        # region.width < min_size, expand region width
+        if image_dims[1] > min_size and rdims[1] < min_size:
+            expand_size = min_size - rdims[1]
+            half_expand = expand_size / 2.0
+        #   new_ul_x = region.ul_x + round(half_expand)
+            new_region[0] = region[0] - round(half_expand)
+        #   new_lr_x = region.lr_x + math.ceil(half_expand)
+            new_region[2] = region[2] + math.ceil(half_expand)
+            if new_region[0] < 0:
+                diff = 0 - new_region[0]
+                new_region[2] += diff
+                new_region[0] = 0
+            elif new_region[2] > image_dims[1] - 1:
+                diff = new_region[2] - image_dims[1] - 1
+                new_region[2] = image_dims[1] - 1
+                new_region[0] -= diff
+
+        # region.height < min_size, expand region height
+        if image_dims[0] > min_size and rdims[0] < min_size:
+            expand_size = min_size - rdims[0]
+            half_expand = expand_size / 2.0
+            print("Half expand: " + str(half_expand))
+            new_region[1] = region[1] - round(half_expand)
+            new_region[3] = region[3] + math.ceil(half_expand)
+            print("Region: " + str(new_region))
+            if new_region[1] < 0:
+                diff = 0 - new_region[1]
+                new_region[3] += diff - 1
+                new_region[1] = 0
+            elif new_region[3] > image_dims[0] - 1:
+                diff = new_region[3] - image_dims[0] - 1
+                new_region[3] = image_dims[0] - 1
+                new_region[1] -= diff
+
+        return new_region
+
+    # Returns slice of image data
+    def get_region(self, region, min_size=0):
+
+        new_region = AnalysisFrame.calculate_region(self.image.shape, region, min_size)
+        image = self.image[new_region[1]:new_region[3], new_region[0]:new_region[2]]
+        return image
+
+class FrameSlice(object):
+    def __init__(self, image, offset):
+        self.image = image
+        self.offset = offset
 
 class WorkerHandler(logging.Handler):
     def __init__(self, worker):
