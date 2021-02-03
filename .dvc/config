@@ -4,5 +4,9 @@
 ['remote "ssh"']
     url = ssh://exopticon-data@web-vm/exopticon/data
     verify = true
+['remote "b2"']
+    url = s3://exopticon-data/
+    endpointurl = https://s3.us-west-001.backblazeb2.com
 ['remote "public"']
-    url = https://dev.exopticon.org/data
+    url = s3://exopticon-data/
+    endpointurl = https://s3.us-west-001.backblazeb2.com
