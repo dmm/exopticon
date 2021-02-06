@@ -2,6 +2,22 @@
 
 <!--- next entry here -->
 
+## 0.12.0
+2021-02-06
+
+### Features
+
+- Add docker-compose files (1389b25451255ceb19b43cd2fcac9c4a79018d3f)
+- Implement initial docker compose files. (dd49eedf30c47b6f1a0ba109b6e64826d46f813f)
+- broken subregion detection (57faf5df61faab0fb8c3c7b7246ae964b992bbac)
+
+### Fixes
+
+- Include env variables in runtime and development stages (54936b2d62a889877158def1d5e68a181c704cba)
+- Add b2 dvc remotes (32fe16e430bfa80a6b66d77c9902178f5d07a1a0)
+- install dvc s3 support (197dfa75e7638ddbc4ec37f35c8ca733509c8ec0)
+- Change default dvc remote to http (5f60d76de9c670690ce11076a4f30caff527b0c5)
+
 ## 0.11.0
 2021-01-18
 
