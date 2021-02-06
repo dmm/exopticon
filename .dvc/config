@@ -8,5 +8,4 @@
     url = s3://exopticon-data/
     endpointurl = https://s3.us-west-001.backblazeb2.com
 ['remote "public"']
-    url = s3://exopticon-data/
-    endpointurl = https://s3.us-west-001.backblazeb2.com
+    url = https://f001.backblazeb2.com/file/exopticon-data/
