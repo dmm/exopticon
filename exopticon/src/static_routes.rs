@@ -24,7 +24,12 @@
 // implemented by actix-web.
 #![allow(clippy::needless_pass_by_value)]
 
+use std::collections::BTreeMap;
+use std::env;
+use std::str::from_utf8;
+
 use actix_web::{body::Body, web::Path, HttpRequest, HttpResponse};
+use handlebars::Handlebars;
 
 /// Fetches static index file, returns `HttpResponse`
 pub fn index(_req: HttpRequest) -> HttpResponse {
@@ -46,7 +51,7 @@ struct Asset;
 /// `req` - file request
 ///
 pub fn fetch_static_file(tail: Path<String>) -> HttpResponse {
-    info!("Static path: {}", tail);
+    debug!("Fetching static file: {}", tail);
 
     let path = tail.into_inner();
 
@@ -54,6 +59,49 @@ pub fn fetch_static_file(tail: Path<String>) -> HttpResponse {
         Some(content) => HttpResponse::Ok()
             .content_type(mime_guess::from_path(path).first_or_octet_stream().as_ref())
             .body(Body::from_slice(content.as_ref())),
+        None => HttpResponse::NotFound().body("404 Not Found"),
+    }
+}
+
+/// Returns `HttpResponse` with templated webmanifest
+///
+/// # Arguments
+/// `req` - file request
+///
+pub fn fetch_webmanifest(_req: HttpRequest) -> HttpResponse {
+    error!("Calling fetch_webmanifest!");
+    let handlebars = Handlebars::new();
+    let mut data = BTreeMap::new();
+
+    data.insert(
+        "name",
+        env::var("EXOPTICON_NAME").unwrap_or_else(|_| "Exopticon".to_string()),
+    );
+    data.insert(
+        "short_name",
+        env::var("EXOPTICON_SHORT_NAME").unwrap_or_else(|_| "Exopticon".to_string()),
+    );
+
+    match Asset::get("manifest.webmanifest") {
+        Some(content) => {
+            let template = if let Ok(templ) = from_utf8(&content) {
+                templ
+            } else {
+                error!("Failed to parse webmanifest template. Invalid utf8!");
+                return HttpResponse::InternalServerError().finish();
+            };
+            let manifest = if let Ok(manifest) = handlebars.render_template(template, &data) {
+                manifest
+            } else {
+                error!("Failed to render webmanifest template!");
+                return HttpResponse::InternalServerError().finish();
+            };
+
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .body(Body::from_slice(manifest.as_ref()))
+        }
+
         None => HttpResponse::NotFound().body("404 Not Found"),
     }
 }

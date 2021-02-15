@@ -1,6 +1,6 @@
 {
-  "name": "exopticon",
-  "short_name": "exopticon",
+  "name": "{{name}}",
+  "short_name": "{{short_name}}",
   "theme_color": "#00FF00",
   "background_color": "#000000",
   "display": "standalone",
