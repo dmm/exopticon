@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libxml2-dev libxslt-dev libyaml-dev make patch xz-utils \
   zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
   curl python3-pil python3-lxml \
-  python3 python3-pip python3-setuptools python3-wheel \
+  python3 python3-dev python3-pip python3-setuptools python3-wheel \
   git libopencv-dev python3-opencv cmake \
 # ffmpeg \
   && apt-get clean \
