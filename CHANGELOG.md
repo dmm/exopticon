@@ -2,6 +2,17 @@
 
 <!--- next entry here -->
 
+## 0.13.0
+2021-02-16
+
+### Features
+
+- Make webmanifest template (c22f721ef2288dbc24bd8b003d59adc15c2e1af1)
+
+### Fixes
+
+- Add python3-dev as a dependency to fix dvc build (0c54da7d97e85fd97a61404b1681b12a9cf18639)
+
 ## 0.12.0
 2021-02-06
 
