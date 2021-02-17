@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.13.1
+2021-02-17
+
+### Fixes
+
+- Refactor docker-compose files to use single .env file (f14b3721b8aba7891d3f6a9c7912644bdc53eb6b)
+
 ## 0.13.0
 2021-02-16
 
