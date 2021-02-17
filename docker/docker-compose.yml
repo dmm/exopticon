@@ -2,11 +2,11 @@ version: '2.4'
 
 services:
   exopticon:
-    build:
-      context: ..
+    env_file:
+      - ../release_info
+    image: dmattli/exopticon:v${RELEASE_VERSION}
     environment:
       DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
-      RUST_LOG: ${RUST_LOG-info,exopticon::capture_actor=debug}
     restart: always
     devices:
       - /dev/bus/usb:/dev/bus/usb
