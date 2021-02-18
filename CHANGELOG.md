@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.13.2
+2021-02-18
+
+### Fixes
+
+- Document creation of dev environment (faa96e2c0f8fcc461c88e5053f70a5ef60107382)
+
 ## 0.13.1
 2021-02-17
 
