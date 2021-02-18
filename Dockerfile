@@ -118,6 +118,12 @@ FROM exopticon-build AS development
 # This state is just used for local development
 # configure environment
 
+USER root
+
+# Create volume mount paths and set ownership
+RUN mkdir -p /cargo /exopticon/target \
+ && chown exopticon:plugdev /cargo /exopticon/target
+
 USER exopticon:plugdev
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]

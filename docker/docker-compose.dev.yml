@@ -5,6 +5,8 @@ services:
     build:
       context: ..
       target: development
+    depends_on:
+      - db
     environment:
       DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
     ports:
@@ -13,6 +15,11 @@ services:
     device_cgroup_rules:
       - 'a 189:* rwm'
     volumes:
+      - cargo_home:/cargo
+      - target:/exopticon/target
       - /dev/bus/usb:/dev/bus/usb
       - ..:/exopticon # map source directory for development
       - $EXOPTICON_VIDEO_PATH:/video
+volumes:
+  cargo_home:
+  target:
