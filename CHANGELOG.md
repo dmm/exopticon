@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.13.3
+2021-02-19
+
+### Fixes
+
+- only start enabled AnalysisInstances (a5e9eb43b1ea0b5434b92e4089b68ca0b9cdec7d)
+
 ## 0.13.2
 2021-02-18
 
