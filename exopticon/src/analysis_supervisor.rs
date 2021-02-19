@@ -192,13 +192,17 @@ impl Handler<SyncAnalysisActors> for AnalysisSupervisor {
                 if let Ok(Ok(res)) = res {
                     for engine in res {
                         for a in engine.1 {
-                            inner_ctx.notify(RestartAnalysisActor {
-                                id: a.id,
-                                executable_name: engine.0.entry_point.clone(),
-                                arguments: Vec::new(),
-                                max_fps: a.max_fps,
-                                subscriptions: a.subscriptions,
-                            });
+                            if a.enabled {
+                                inner_ctx.notify(RestartAnalysisActor {
+                                    id: a.id,
+                                    executable_name: engine.0.entry_point.clone(),
+                                    arguments: Vec::new(),
+                                    max_fps: a.max_fps,
+                                    subscriptions: a.subscriptions,
+                                });
+                            } else {
+                                inner_ctx.notify(StopAnalysisActor { id: a.id });
+                            }
                         }
                     }
                 }
