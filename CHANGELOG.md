@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.13.4
+2021-02-26
+
+### Fixes
+
+- enable Docker buildkit (5ba38bd0b6a3cf69163b67b130d4f9d1be43e271)
+
 ## 0.13.3
 2021-02-19
 
