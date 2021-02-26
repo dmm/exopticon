@@ -5,6 +5,10 @@ variables:
   RUST_BACKTRACE: FULL
   GIT_SUBMODULE_STRATEGY: recursive
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  DOCKER_BUILDKIT: 1
+  DOCKER_CLI_EXPERIMENTAL: enabled
+  DOCKER_DRIVER: overlay2
+
 stages:
   - version
   - build
@@ -26,8 +30,6 @@ version:
 pre-release:
   stage: build
   image: docker:stable
-  variables:
-    DOCKER_DRIVER: overlay2
   services:
   - docker:dind
   script:
@@ -40,8 +42,6 @@ pre-release:
 build-image:
   stage: image
   image: docker:stable
-  variables:
-    DOCKER_DRIVER: overlay2
   services:
   - docker:dind
   script:
