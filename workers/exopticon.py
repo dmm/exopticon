@@ -180,10 +180,8 @@ class AnalysisFrame(object):
         if image_dims[0] > min_size and rdims[0] < min_size:
             expand_size = min_size - rdims[0]
             half_expand = expand_size / 2.0
-            print("Half expand: " + str(half_expand))
             new_region[1] = region[1] - round(half_expand)
             new_region[3] = region[3] + math.ceil(half_expand)
-            print("Region: " + str(new_region))
             if new_region[1] < 0:
                 diff = 0 - new_region[1]
                 new_region[3] += diff - 1
