@@ -33,6 +33,7 @@ export interface CameraSource {
 export interface AnalysisSource {
   kind: "analysisEngine";
   analysisEngineId: number;
+  tag: string;
 }
 
 export interface PlaybackSource {
