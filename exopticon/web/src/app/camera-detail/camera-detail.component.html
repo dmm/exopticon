@@ -18,55 +18,73 @@
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <h2>Camera Details</h2>
-<div class="camera-wrapper" *ngIf="camera$ | async as camera">
-  <h3>"{{ camera.name }}"</h3>
-  <div class="submitMessage"></div>
-  <form #cameraForm="ngForm">
-    <label>Name:</label>
-    <input [(ngModel)]="camera.name" name="name" />
+<ng-container *ngIf="analysisConfig$ | async as analysisConfig">
+  <div class="camera-wrapper" *ngIf="camera$ | async as camera">
+    <h3>"{{ camera.name }}"</h3>
+    <div class="submitMessage"></div>
+    <form #cameraForm="ngForm">
+      <label>Name:</label>
+      <input [(ngModel)]="camera.name" name="name" />
 
-    <label>ip:</label>
-    <input [(ngModel)]="camera.ip" name="ip" />
+      <label>ip:</label>
+      <input [(ngModel)]="camera.ip" name="ip" />
 
-    <label>onvif port:</label>
-    <input [(ngModel)]="camera.onvifPort" name="onvifPort" />
+      <label>onvif port:</label>
+      <input [(ngModel)]="camera.onvifPort" name="onvifPort" />
 
-    <label>mac:</label>
-    <input [(ngModel)]="camera.mac" name="mac" />
+      <label>mac:</label>
+      <input [(ngModel)]="camera.mac" name="mac" />
 
-    <label>username:</label>
-    <input [(ngModel)]="camera.username" name="username" />
+      <label>username:</label>
+      <input [(ngModel)]="camera.username" name="username" />
 
-    <label>password:</label>
-    <input [(ngModel)]="camera.password" name="password" />
+      <label>password:</label>
+      <input [(ngModel)]="camera.password" name="password" />
 
-    <label>rtsp url:</label>
-    <input [(ngModel)]="camera.rtspUrl" name="rtspUrl" />
+      <label>rtsp url:</label>
+      <input [(ngModel)]="camera.rtspUrl" name="rtspUrl" />
 
-    <label for="ptzType">Ptz Type:</label>
-    <select
-      class="form-control"
-      id="ptzType"
-      required
-      [(ngModel)]="camera.ptzType"
-      name="ptzType"
-    >
-      <option value="none">None</option>
-      <option value="onvif">Onvif</option>
-      <option value="onvif_continuous">Onvif Continuous</option>
-    </select>
+      <label for="ptzType">Ptz Type:</label>
+      <select
+        class="form-control"
+        id="ptzType"
+        required
+        [(ngModel)]="camera.ptzType"
+        name="ptzType"
+      >
+        <option value="none">None</option>
+        <option value="onvif">Onvif</option>
+        <option value="onvif_continuous">Onvif Continuous</option>
+      </select>
 
-    <label>Ptz Profile Token::</label>
-    <input [(ngModel)]="camera.ptzProfileToken" name="ptzProfileToken" />
+      <label>Ptz Profile Token::</label>
+      <input [(ngModel)]="camera.ptzProfileToken" name="ptzProfileToken" />
 
-    <label>enabled:</label>
-    <input
-      type="checkbox"
-      [checked]="camera.enabled"
-      (change)="camera.enabled = !camera.enabled"
-      name="ptzType"
-    />
+      <label>enabled:</label>
+      <input
+        type="checkbox"
+        [checked]="camera.enabled"
+        (change)="camera.enabled = !camera.enabled"
+        name="ptzType"
+      />
 
-    <button type="submit" (click)="onSubmit(camera)">Edit Camera</button>
-  </form>
-</div>
+      <label>Analysis Configuration</label>
+      <select
+        class="form-control"
+        id="analysisConfiguration"
+        name="analysisConfiguration"
+        required
+        [(ngModel)]="analysisConfig.analysisType"
+      >
+        <option value="none">None</option>
+        <option value="motion">Motion</option>
+        <option value="yolo">Yolo</option>
+        <option value="coral">Coral</option>
+      </select>
+
+      <button type="submit" (click)="onSubmit(camera, analysisConfig)">
+        Edit Camera
+      </button>
+    </form>
+  </div>
+</ng-container>

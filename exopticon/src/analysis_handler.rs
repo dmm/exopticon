@@ -22,10 +22,11 @@ use actix::{Handler, Message};
 use chrono::NaiveDateTime;
 use diesel::*;
 
+use crate::analysis_routes::{AnalysisConfiguration, AnalysisType, FetchAnalysisConfiguration};
 use crate::errors::ServiceError;
 use crate::models::{
     AnalysisEngine, AnalysisInstanceChangeset, AnalysisInstanceModel, AnalysisSubscriptionModel,
-    CreateAnalysisEngine, CreateAnalysisInstanceModel, DbExecutor, DeleteAnalysisEngine,
+    Camera, CreateAnalysisEngine, CreateAnalysisInstanceModel, DbExecutor, DeleteAnalysisEngine,
     DeleteAnalysisInstanceModel, FetchAllAnalysisModel, FetchAnalysisEngine,
     FetchAnalysisInstanceModel, SubscriptionMask, UpdateAnalysisEngine,
     UpdateAnalysisInstanceModel,
@@ -174,7 +175,10 @@ fn insert_subscriptions(
                 NaiveDateTime,
                 NaiveDateTime,
             )>(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Error inserting analysis subscription: {}", error);
+                ServiceError::InternalServerError
+            })?;
         // Insert masks
         for m in &s.masks {
             diesel::insert_into(subscription_masks)
@@ -186,7 +190,10 @@ fn insert_subscriptions(
                     lr_y.eq(m.lr_y),
                 ))
                 .execute(conn)
-                .map_err(|_error| ServiceError::InternalServerError)?;
+                .map_err(|error| {
+                    error!("Error inserting subscription masks! {}", error);
+                    ServiceError::InternalServerError
+                })?;
         }
     }
     Ok(())
@@ -426,5 +433,279 @@ impl Handler<DeleteAnalysisInstanceModel> for DbExecutor {
         diesel::delete(analysis_instances.filter(id.eq(msg.id))).execute(conn)?;
 
         Ok(())
+    }
+}
+
+impl Message for FetchAnalysisConfiguration {
+    type Result = Result<AnalysisConfiguration, ServiceError>;
+}
+
+impl Handler<FetchAnalysisConfiguration> for DbExecutor {
+    type Result = Result<AnalysisConfiguration, ServiceError>;
+
+    fn handle(&mut self, msg: FetchAnalysisConfiguration, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::analysis_instances::dsl::*;
+        use crate::schema::analysis_subscriptions::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        conn.transaction(|| {
+            let motion_id: Option<i32> = analysis_instances
+                .inner_join(
+                    analysis_subscriptions
+                        .on(analysis_instance_id.eq(crate::schema::analysis_instances::dsl::id)),
+                )
+                .select(crate::schema::analysis_instances::id)
+                .filter(analysis_engine_id.eq(AnalysisType::Motion as i32))
+                .filter(camera_id.eq(msg.camera_id))
+                .get_result(conn)
+                .optional()
+                .map_err(|_error| ServiceError::InternalServerError)?;
+
+            // Fetch Coral and Yolo analysis instance ids
+            let coral_id: i32 = analysis_instances
+                .select(crate::schema::analysis_instances::dsl::id)
+                .filter(analysis_engine_id.eq(AnalysisType::Coral as i32))
+                .get_result(conn)
+                .map_err(|error| {
+                    error!("Failed to fetch coral analysis instance: {}", error);
+                    ServiceError::InternalServerError
+                })?;
+            let yolo_id: i32 = analysis_instances
+                .select(crate::schema::analysis_instances::dsl::id)
+                .filter(analysis_engine_id.eq(AnalysisType::Yolo as i32))
+                .get_result(conn)
+                .map_err(|error| {
+                    error!("Failed to fetch yolo analysis instance: {}", error);
+                    ServiceError::InternalServerError
+                })?;
+
+            debug!(
+                "Motion id: {:?} coral id: {:?} Yolo id: {:?}",
+                motion_id, coral_id, yolo_id
+            );
+            let obj_id: Option<i32> =
+                match motion_id {
+                    Some(motion_id) => analysis_instances
+                        .inner_join(analysis_subscriptions.on(
+                            analysis_instance_id.eq(crate::schema::analysis_instances::dsl::id),
+                        ))
+                        .select(crate::schema::analysis_instances::dsl::id)
+                        .filter(
+                            analysis_engine_id
+                                .eq(AnalysisType::Coral as i32)
+                                .or(analysis_engine_id.eq(AnalysisType::Yolo as i32)),
+                        )
+                        .filter(source_analysis_instance_id.eq(motion_id))
+                        .get_result(conn)
+                        .optional()
+                        .map_err(|_error| ServiceError::InternalServerError)?,
+
+                    None => None,
+                };
+
+            debug!("Object id: {:?}", obj_id);
+
+            Ok(AnalysisConfiguration {
+                camera_id: msg.camera_id,
+                analysis_type: match (motion_id, obj_id) {
+                    (None, None) => AnalysisType::None,
+                    (Some(_), None) => AnalysisType::Motion,
+                    (Some(_), Some(obj_detection_id)) => {
+                        if obj_detection_id == yolo_id {
+                            AnalysisType::Yolo
+                        } else if obj_detection_id == coral_id {
+                            AnalysisType::Coral
+                        } else {
+                            error!(
+                                "Invalid object detection engine selected! {}",
+                                obj_detection_id
+                            );
+                            return Err(ServiceError::InternalServerError);
+                        }
+                    }
+                    (_, _) => return Err(ServiceError::InternalServerError),
+                },
+            })
+        })
+    }
+}
+
+impl Message for AnalysisConfiguration {
+    type Result = Result<Self, ServiceError>;
+}
+
+impl Handler<AnalysisConfiguration> for DbExecutor {
+    type Result = Result<AnalysisConfiguration, ServiceError>;
+
+    #[allow(clippy::too_many_lines)]
+    fn handle(&mut self, msg: AnalysisConfiguration, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::analysis_instances::dsl::*;
+        use crate::schema::analysis_subscriptions::dsl::*;
+        use crate::schema::cameras::dsl::*;
+        use crate::schema::subscription_masks::dsl::{
+            analysis_subscription_id, subscription_masks,
+        };
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        conn.transaction(|| {
+            debug!("one!");
+            let motion_id: Option<i32> = analysis_instances
+                .inner_join(
+                    analysis_subscriptions
+                        .on(analysis_instance_id.eq(crate::schema::analysis_instances::dsl::id)),
+                )
+                .select(crate::schema::analysis_instances::dsl::id)
+                .filter(analysis_engine_id.eq(AnalysisType::Motion as i32))
+                .filter(camera_id.eq(msg.camera_id))
+                .get_result(conn)
+                .optional()
+                .map_err(|error| {
+                    error!("Failed to fetch motion analysis instance: {}", error);
+                    ServiceError::InternalServerError
+                })?;
+            debug!("two!");
+            if let Some(id2) = motion_id {
+                // delete existing motion analysis instance
+                let subs = analysis_subscriptions
+                    .filter(analysis_instance_id.eq(id2))
+                    .load::<(
+                        i32,
+                        i32,
+                        Option<i32>,
+                        Option<i32>,
+                        NaiveDateTime,
+                        NaiveDateTime,
+                    )>(conn)
+                    .map_err(|error| {
+                        error!(
+                            "Failed to fetch subscriptions for motion analysis instance: {}",
+                            error
+                        );
+                        ServiceError::InternalServerError
+                    })?;
+                debug!("three");
+                for s in subs {
+                    // delete child masks
+                    diesel::delete(subscription_masks.filter(analysis_subscription_id.eq(s.0)))
+                        .execute(conn)?;
+                    diesel::delete(
+                        analysis_subscriptions
+                            .filter(crate::schema::analysis_subscriptions::dsl::id.eq(s.0)),
+                    )
+                    .execute(conn)?;
+                }
+                debug!("four");
+                // delete object detection subscriptions
+                let obj_subs: Option<i32> = analysis_subscriptions
+                    .filter(source_analysis_instance_id.eq(id2))
+                    .select(crate::schema::analysis_subscriptions::dsl::id)
+                    .get_result(conn)
+                    .optional()
+                    .map_err(|_error| ServiceError::InternalServerError)?;
+
+                if let Some(sub_id) = obj_subs {
+                    diesel::delete(subscription_masks.filter(analysis_subscription_id.eq(sub_id)))
+                        .execute(conn)?;
+                    diesel::delete(
+                        analysis_subscriptions
+                            .filter(crate::schema::analysis_subscriptions::dsl::id.eq(sub_id)),
+                    )
+                    .execute(conn)?;
+                }
+                debug!("five");
+                diesel::delete(
+                    analysis_instances.filter(crate::schema::analysis_instances::dsl::id.eq(id2)),
+                )
+                .execute(conn)?;
+            }
+
+            // Now create new analysis configuration
+            if msg.analysis_type != AnalysisType::None {
+                // create motion analysis
+                let camera = cameras
+                    .find(msg.camera_id)
+                    .get_result::<Camera>(conn)
+                    .map_err(|error| {
+                        error!("Failed to fetch camera: {}", error);
+                        ServiceError::InternalServerError
+                    })?;
+                debug!("six");
+                let motion_instance = diesel::insert_into(analysis_instances)
+                    .values((
+                        analysis_engine_id.eq(AnalysisType::Motion as i32),
+                        crate::schema::analysis_instances::dsl::name
+                            .eq(format!("{} motion detection", camera.name)),
+                        max_fps.eq(10),
+                        crate::schema::analysis_instances::dsl::enabled.eq(true),
+                    ))
+                    .get_result::<(i32, i32, String, i32, bool, NaiveDateTime, NaiveDateTime)>(conn)
+                    .map_err(|error| {
+                        error!("Failed to insert new motion instance: {}", error);
+                        ServiceError::InternalServerError
+                    })?;
+                debug!("seven");
+                // Insert motion analysis subscription
+                insert_subscriptions(
+                    motion_instance.0,
+                    &[AnalysisSubscriptionModel {
+                        source: FrameSource::Camera {
+                            camera_id: msg.camera_id,
+                        },
+                        masks: Vec::new(),
+                    }],
+                    conn,
+                )?;
+
+                if msg.analysis_type == AnalysisType::Coral {
+                    // fetch coral instance
+                    let coral_id: i32 = analysis_instances
+                        .select(crate::schema::analysis_instances::dsl::id)
+                        .filter(analysis_engine_id.eq(AnalysisType::Coral as i32))
+                        .get_result(conn)
+                        .map_err(|error| {
+                            error!("Failed to fetch coral analysis instance: {}", error);
+                            ServiceError::InternalServerError
+                        })?;
+
+                    // Insert coral analysis subscription
+                    insert_subscriptions(
+                        coral_id,
+                        &[AnalysisSubscriptionModel {
+                            source: FrameSource::AnalysisEngine {
+                                analysis_engine_id: motion_instance.0,
+                                tag: "".to_string(),
+                            },
+                            masks: Vec::new(),
+                        }],
+                        conn,
+                    )?;
+                } else if msg.analysis_type == AnalysisType::Yolo {
+                    // fetch yolo instance
+                    let yolo_id: i32 = analysis_instances
+                        .select(crate::schema::analysis_instances::dsl::id)
+                        .filter(analysis_engine_id.eq(AnalysisType::Yolo as i32))
+                        .get_result(conn)
+                        .map_err(|error| {
+                            error!("Failed to fetch yolo analysis instance: {}", error);
+                            ServiceError::InternalServerError
+                        })?;
+
+                    // Insert coral analysis subscription
+                    insert_subscriptions(
+                        yolo_id,
+                        &[AnalysisSubscriptionModel {
+                            source: FrameSource::AnalysisEngine {
+                                analysis_engine_id: motion_instance.0,
+                                tag: "".to_string(),
+                            },
+                            masks: Vec::new(),
+                        }],
+                        conn,
+                    )?;
+                }
+            }
+
+            Ok(msg)
+        })
     }
 }

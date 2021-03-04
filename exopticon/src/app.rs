@@ -28,8 +28,9 @@ use actix_web_actors::ws;
 use crate::alert_rule_routes::{create_alert_rule, fetch_all_alert_rules};
 use crate::analysis_routes::{
     create_analysis_engine, create_analysis_instance, delete_analysis_engine,
-    delete_analysis_instance, fetch_analysis_engine, fetch_analysis_instance,
-    update_analysis_engine, update_analysis_instance,
+    delete_analysis_instance, fetch_analysis_configuration, fetch_analysis_engine,
+    fetch_analysis_instance, update_analysis_configuration, update_analysis_engine,
+    update_analysis_instance,
 };
 use crate::auth_routes::{login, logout, Auth, WebAuth};
 use crate::camera_group_routes::{
@@ -150,6 +151,11 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .service(
                     web::resource("/cameras/{camera_id}/observations")
                         .route(web::get().to(fetch_observations_between)),
+                )
+                .service(
+                    web::resource("/cameras/{camera_id}/analysis_configuration")
+                        .route(web::get().to(fetch_analysis_configuration))
+                        .route(web::post().to(update_analysis_configuration)),
                 )
                 // routes to video_unit
                 .service(web::resource("/video_units/{id}").route(web::get().to(fetch_video_unit)))

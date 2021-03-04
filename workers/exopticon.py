@@ -115,10 +115,10 @@ class AnalysisFrame(object):
         self.masks = []
 
         for m in raw_masks:
-            self.masks.append(AnalysisMask(int(m["ul_x"] * x_scale),
-                                           int(m["ul_y"] * y_scale),
-                                           int(m["lr_x"] * x_scale),
-                                           int(m["lr_y"] * y_scale)))
+            self.masks.append(AnalysisMask(int(m["ulX"] * x_scale),
+                                           int(m["ulY"] * y_scale),
+                                           int(m["lrX"] * x_scale),
+                                           int(m["lrY"] * y_scale)))
 
     def get_observation_bounding_box(self):
         ul_x = 999999999999

@@ -567,7 +567,7 @@ pub struct CreateUser {
 }
 
 /// Analysis Engine database value
-#[derive(Queryable, Associations, Identifiable, Serialize)]
+#[derive(Queryable, Associations, Clone, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "analysis_engines"]
 pub struct AnalysisEngine {
@@ -626,7 +626,7 @@ pub struct DeleteAnalysisEngine {
 }
 
 /// Request to create `AnalysisInstanceModel`
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct CreateAnalysisInstanceModel {
     /// id of owner, an analysis engine
     pub analysis_engine_id: i32,
@@ -693,7 +693,7 @@ pub struct DeleteAnalysisInstanceModel {
 }
 
 /// Represents the analysis instance domain model
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct AnalysisInstanceModel {
     /// analysis instance id
     pub id: i32,

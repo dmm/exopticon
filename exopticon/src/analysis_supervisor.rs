@@ -21,15 +21,15 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use actix::fut::wrap_future;
 use actix::prelude::*;
+use actix_interop::{critical_section, with_ctx, FutureInterop};
 
-use crate::analysis_actor::AnalysisActor;
-use crate::db_registry;
-use crate::models::{AnalysisSubscriptionModel, FetchAllAnalysisModel};
+use crate::models::{AnalysisEngine, AnalysisSubscriptionModel, FetchAllAnalysisModel};
 use crate::ws_camera_server::{
     FrameResolution, FrameSource, Subscribe, SubscriptionSubject, WsCameraServer,
 };
+use crate::{analysis_actor::AnalysisActor, models::AnalysisInstanceModel};
+use crate::{db_registry, ws_camera_server::Unsubscribe};
 
 /// Message telling supervisor to start new analysis actor
 #[derive(Serialize, Deserialize)]
@@ -61,18 +61,7 @@ impl Message for StopAnalysisActor {
 }
 
 /// Message requesting an `AnalysisWorker` restart
-pub struct RestartAnalysisActor {
-    /// id of analysis instance
-    pub id: i32,
-    /// name of executable implementing analysis worker
-    pub executable_name: String,
-    /// arguments to provide analysis worker on startup
-    pub arguments: Vec<String>,
-    /// max frames-per-second to send to worker
-    pub max_fps: i32,
-    /// frame source subscriptions
-    pub subscriptions: Vec<AnalysisSubscriptionModel>,
-}
+pub struct RestartAnalysisActor {}
 
 impl Message for RestartAnalysisActor {
     type Result = ();
@@ -89,7 +78,14 @@ impl Message for SyncAnalysisActors {
 /// `AnalysisSupervisor` actor
 pub struct AnalysisSupervisor {
     /// supervised actors
-    actors: HashMap<i32, Addr<AnalysisActor>>,
+    actors: HashMap<
+        i32,
+        (
+            AnalysisEngine,
+            AnalysisInstanceModel,
+            Option<Addr<AnalysisActor>>,
+        ),
+    >,
 }
 
 impl Actor for AnalysisSupervisor {
@@ -97,6 +93,7 @@ impl Actor for AnalysisSupervisor {
 
     fn started(&mut self, ctx: &mut Context<Self>) {
         ctx.notify(SyncAnalysisActors {});
+        ctx.notify(RestartAnalysisActor {});
     }
 }
 
@@ -111,23 +108,108 @@ impl Default for AnalysisSupervisor {
 impl SystemService for AnalysisSupervisor {}
 impl Supervised for AnalysisSupervisor {}
 
-impl Handler<StartAnalysisActor> for AnalysisSupervisor {
-    type Result = i32;
+impl Handler<StopAnalysisActor> for AnalysisSupervisor {
+    type Result = ();
 
-    fn handle(&mut self, msg: StartAnalysisActor, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Starting analysis actor id: {}", msg.id);
+    fn handle(&mut self, msg: StopAnalysisActor, _ctx: &mut Context<Self>) -> Self::Result {
+        info!("Stopping analysis actor id: {}", &msg.id);
+        self.actors.remove(&msg.id);
+    }
+}
+
+impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: RestartAnalysisActor, ctx: &mut Context<Self>) -> Self::Result {
+        let fut = async move {
+            critical_section::<Self, _>(async move {
+                with_ctx(|actor: &mut Self, ctx: &mut Context<Self>| {
+                    for (engine, instance, addr) in actor.actors.values_mut() {
+                        if addr.is_none() && instance.enabled {
+                            info!("Restarting analysis actor id: {}", instance.id);
+                            let new_addr = Self::start_actor(engine, instance);
+                            *addr = Some(new_addr);
+                        }
+
+                        if let Some(addr2) = addr {
+                            if !addr2.connected() && instance.enabled {
+                                info!("Restarting analysis actor id: {}", instance.id);
+                                let new_addr = Self::start_actor(engine, instance);
+                                *addr = Some(new_addr);
+                            }
+                        }
+                    }
+                    ctx.notify_later(RestartAnalysisActor {}, Duration::from_secs(10));
+                });
+            })
+            .await;
+        }
+        .interop_actor(self);
+
+        ctx.spawn(fut);
+    }
+}
+
+// Right now this handler only restarts actors, eventually it should
+// restart them only when changed.
+impl Handler<SyncAnalysisActors> for AnalysisSupervisor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: SyncAnalysisActors, ctx: &mut Context<Self>) -> Self::Result {
+        // fetch analysis engines
+        let fut = async move {
+            critical_section::<Self, _>(async move {
+                let analysis_instances =
+                    match db_registry::get_db().send(FetchAllAnalysisModel {}).await {
+                        Ok(Ok(n)) => n,
+                        Ok(Err(_)) | Err(_) => {
+                            error!("Failed to load analysis instances during sync!");
+                            return;
+                        }
+                    };
+
+                with_ctx(|actor: &mut Self, _| {
+                    actor.clear_actors();
+                    for engine in &analysis_instances {
+                        for instance in &engine.1 {
+                            actor
+                                .actors
+                                .insert(instance.id, (engine.0.clone(), instance.clone(), None));
+                        }
+                    }
+                });
+            })
+            .await;
+        }
+        .interop_actor(self);
+        ctx.spawn(fut);
+    }
+}
+
+impl AnalysisSupervisor {
+    /// Returns new `AnalysisSupervisor`
+    pub fn new() -> Self {
+        Self {
+            actors: HashMap::new(),
+        }
+    }
+
+    pub fn start_actor(
+        engine: &AnalysisEngine,
+        new_actor: &AnalysisInstanceModel,
+    ) -> Addr<AnalysisActor> {
+        info!("Starting analysis actor id: {}", new_actor.id);
         let actor = AnalysisActor::new(
-            msg.id,
-            msg.executable_name,
-            msg.arguments,
-            msg.max_fps,
-            msg.subscriptions.clone(),
+            new_actor.id,
+            engine.entry_point.clone(),
+            Vec::new(),
+            new_actor.max_fps,
+            new_actor.subscriptions.clone(),
             db_registry::get_db(),
         );
         let address = actor.start();
-        self.actors.insert(msg.id, address.clone());
 
-        for sub in msg.subscriptions {
+        for sub in &new_actor.subscriptions {
             // setup camera subscriptions
             let subject = match sub.source {
                 FrameSource::Camera { camera_id } => {
@@ -144,80 +226,35 @@ impl Handler<StartAnalysisActor> for AnalysisSupervisor {
             });
         }
 
-        msg.id
+        address
     }
-}
-
-impl Handler<StopAnalysisActor> for AnalysisSupervisor {
-    type Result = ();
-
-    fn handle(&mut self, msg: StopAnalysisActor, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Stopping analysis actor id: {}", &msg.id);
-        self.actors.remove(&msg.id);
-    }
-}
-
-impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
-    type Result = ();
-
-    fn handle(&mut self, msg: RestartAnalysisActor, ctx: &mut Context<Self>) -> Self::Result {
-        info!("Restarting analysis actor id: {}", msg.id);
-        let fut = wrap_future(ctx.address().send(StopAnalysisActor { id: msg.id })).map(
-            |_res, _act: &mut Self, ctx: &mut Context<Self>| {
-                ctx.notify_later(
-                    StartAnalysisActor {
-                        id: msg.id,
-                        executable_name: msg.executable_name,
-                        arguments: msg.arguments,
-                        max_fps: msg.max_fps,
-                        subscriptions: msg.subscriptions,
-                    },
-                    Duration::new(5, 0),
-                );
-            },
-        );
-        ctx.spawn(fut);
-    }
-}
-
-// Right now this handler only restarts actors, eventually it should
-// restart them only when changed.
-impl Handler<SyncAnalysisActors> for AnalysisSupervisor {
-    type Result = ();
-
-    fn handle(&mut self, _msg: SyncAnalysisActors, ctx: &mut Context<Self>) -> Self::Result {
-        // fetch analysis engines
-        let fut = wrap_future(db_registry::get_db().send(FetchAllAnalysisModel {})).map(
-            |res, _act, inner_ctx: &mut Context<Self>| {
-                if let Ok(Ok(res)) = res {
-                    for engine in res {
-                        for a in engine.1 {
-                            if a.enabled {
-                                inner_ctx.notify(RestartAnalysisActor {
-                                    id: a.id,
-                                    executable_name: engine.0.entry_point.clone(),
-                                    arguments: Vec::new(),
-                                    max_fps: a.max_fps,
-                                    subscriptions: a.subscriptions,
-                                });
-                            } else {
-                                inner_ctx.notify(StopAnalysisActor { id: a.id });
-                            }
+    pub fn clear_actors(&mut self) {
+        for (_, (_, instance, addr)) in self.actors.drain() {
+            if let Some(addr) = addr {
+                // actor is alive
+                // remove frame subscriptions
+                for sub in instance.subscriptions {
+                    // Unsubscribe actor from frames
+                    let subject = match sub.source {
+                        FrameSource::Camera { camera_id } => {
+                            SubscriptionSubject::Camera(camera_id, FrameResolution::SD)
                         }
-                    }
+                        FrameSource::AnalysisEngine {
+                            analysis_engine_id, ..
+                        } => SubscriptionSubject::AnalysisEngine(analysis_engine_id),
+                        FrameSource::Playback { id } => SubscriptionSubject::Playback(id, 0, 0),
+                    };
+                    WsCameraServer::from_registry().do_send(Unsubscribe {
+                        subject,
+                        client: addr.clone().recipient(),
+                    });
                 }
-            },
-        );
-
-        ctx.spawn(fut);
-    }
-}
-
-impl AnalysisSupervisor {
-    /// Returns new `AnalysisSupervisor`
-    pub fn new() -> Self {
-        Self {
-            actors: HashMap::new(),
+                // Ask actor to die
+                addr.do_send(StopAnalysisActor { id: instance.id });
+                // because we are 'drain'ing the HashMap the addr will
+                // be dropped. This should be the last reference so
+                // the analysis actor should be cleaned up after this.
+            }
         }
     }
 }

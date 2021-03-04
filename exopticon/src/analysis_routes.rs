@@ -29,6 +29,26 @@ use crate::models::{
     UpdateAnalysisEngine, UpdateAnalysisInstanceModel,
 };
 
+#[derive(PartialEq, Copy, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AnalysisType {
+    None = 0,
+    Motion = 1,
+    Yolo = 2,
+    Coral = 3,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisConfiguration {
+    pub camera_id: i32,
+    pub analysis_type: AnalysisType,
+}
+
+pub struct FetchAnalysisConfiguration {
+    pub camera_id: i32,
+}
+
 /// Route to create new `AnalysisEngine`
 pub async fn create_analysis_engine(
     analysis_engine_request: Json<CreateAnalysisEngine>,
@@ -157,4 +177,38 @@ pub async fn delete_analysis_instance(
         .await?;
 
     Ok(HttpResponse::Ok().finish())
+}
+
+pub async fn fetch_analysis_configuration(
+    path: Path<i32>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, Error> {
+    let analysis_configuration = state
+        .db
+        .send(FetchAnalysisConfiguration {
+            camera_id: path.into_inner(),
+        })
+        .await??;
+    Ok(HttpResponse::Ok().json(analysis_configuration))
+}
+
+pub async fn update_analysis_configuration(
+    path: Path<i32>,
+    analysis_configuration: Json<AnalysisConfiguration>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, Error> {
+
+    let analysis_configuration = state
+        .db
+        .send(AnalysisConfiguration {
+            camera_id: path.into_inner(),
+            analysis_type: analysis_configuration.analysis_type,
+        })
+        .await??;
+
+    AnalysisSupervisor::from_registry()
+        .send(SyncAnalysisActors {})
+        .await?;
+
+    Ok(HttpResponse::Ok().json(analysis_configuration))
 }

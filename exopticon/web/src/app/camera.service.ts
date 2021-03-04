@@ -22,7 +22,7 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable, throwError as observableThrowError } from "rxjs";
 import { catchError, map } from "rxjs/operators";
-import { Camera } from "./camera";
+import { AnalysisConfiguration, Camera } from "./camera";
 
 export enum PtzDirection {
   left,
@@ -72,6 +72,34 @@ export class CameraService {
       .subscribe(
         () => {},
         () => {}
+      );
+  }
+
+  getCameraAnalysisConfiguration(
+    camera_id: number | string
+  ): Observable<AnalysisConfiguration> {
+    return this.http
+      .get<AnalysisConfiguration>(
+        this.cameraUrl + "/" + camera_id + "/analysis_configuration"
+      )
+      .pipe(
+        map((data) => data),
+        catchError(this.handleError)
+      );
+  }
+
+  setCameraAnalysisConfiguration(
+    camera_id: number | string,
+    configuration: AnalysisConfiguration
+  ): Observable<AnalysisConfiguration> {
+    return this.http
+      .post<AnalysisConfiguration>(
+        this.cameraUrl + "/" + camera_id + "/analysis_configuration",
+        configuration
+      )
+      .pipe(
+        map((data) => data),
+        catchError(this.handleError)
       );
   }
 

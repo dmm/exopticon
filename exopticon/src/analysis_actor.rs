@@ -39,7 +39,7 @@ use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
-use crate::analysis_supervisor::{AnalysisSupervisor, RestartAnalysisActor};
+use crate::analysis_supervisor::StopAnalysisActor;
 use crate::fair_queue::FairQueue;
 use crate::models::{
     AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor, SubscriptionMask,
@@ -324,13 +324,6 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for AnalysisActor {
             Ok(b) => b,
             Err(err) => {
                 error!("Caught error! {}", err);
-                AnalysisSupervisor::from_registry().do_send(RestartAnalysisActor {
-                    id: self.id,
-                    executable_name: self.executable_name.clone(),
-                    arguments: self.arguments.clone(),
-                    max_fps: self.max_fps,
-                    subscriptions: self.subscriptions.drain().map(|(_k, v)| v).collect(),
-                });
                 ctx.terminate();
                 return;
             }
@@ -411,6 +404,15 @@ impl Handler<CameraFrame> for AnalysisActor {
         self.frame_queue.push_back(msg.source.clone(), msg);
 
         self.push_frame(ctx);
+    }
+}
+
+impl Handler<StopAnalysisActor> for AnalysisActor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: StopAnalysisActor, ctx: &mut Context<Self>) -> Self::Result {
+        self.worker_stdin = None;
+        ctx.stop();
     }
 }
 
