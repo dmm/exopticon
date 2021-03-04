@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.14.0
+2021-03-04
+
+### Features
+
+- Add simple analysis configuration and angular form. (69ce252f4a6ee73281b8aaa0105e62e1725b301b)
+
+### Fixes
+
+- Add missing "tag" field to CameraSource (31dfa49b6b169c37a6ae7d033ac3278ef49bde7b)
+- Enabled Docker buildkit (803b3eb3a96dd14e38d9c148d614672b5c1c4283)
+- pull env variables into compose file (77702faa24c8d861fe11a7756ca054ad83b9aee3)
+
 ## 0.13.5
 2021-02-26
 
