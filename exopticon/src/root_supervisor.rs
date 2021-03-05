@@ -22,12 +22,9 @@ use actix::{registry::SystemService, Actor, ActorFuture, Addr, AsyncContext, Con
 
 use crate::alert_actor::AlertActor;
 use crate::analysis_supervisor::AnalysisSupervisor;
-use crate::capture_supervisor::{CaptureSupervisor, StartCaptureWorker};
+use crate::capture_supervisor::CaptureSupervisor;
 use crate::file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
-use crate::models::{
-    CameraGroup, CameraGroupAndCameras, DbExecutor, FetchAllCameraGroup,
-    FetchAllCameraGroupAndCameras,
-};
+use crate::models::{CameraGroup, DbExecutor, FetchAllCameraGroup};
 use crate::notifier_supervisor::NotifierSupervisor;
 
 /// Enumeration of Exopticon run modes
@@ -77,18 +74,6 @@ impl RootSupervisor {
     /// Starts all child workers for this supervisor
     fn start_workers(&self, ctx: &mut Context<Self>) {
         debug!("starting workers!");
-        let capture_future = self
-            .db_worker
-            .send(FetchAllCameraGroupAndCameras {})
-            .into_actor(self)
-            .map(|res, act, _ctx| {
-                if let Ok(Ok(r)) = res {
-                    act.start_capture_workers(r);
-                }
-            });
-
-        ctx.spawn(capture_future);
-
         let fut = self
             .db_worker
             .send(FetchAllCameraGroup {})
@@ -100,21 +85,6 @@ impl RootSupervisor {
             });
 
         ctx.spawn(fut);
-    }
-
-    /// Starts capture workers using provided camera structs
-    fn start_capture_workers(&self, cameras: Vec<CameraGroupAndCameras>) {
-        for g in cameras {
-            for c in g.1 {
-                if c.enabled {
-                    self.capture_supervisor.do_send(StartCaptureWorker {
-                        id: c.id,
-                        stream_url: c.rtsp_url,
-                        storage_path: g.0.storage_path.clone(),
-                    });
-                }
-            }
-        }
     }
 
     /// Starts deletion workers based on the `CameraGroup`s provided.

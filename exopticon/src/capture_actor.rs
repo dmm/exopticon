@@ -38,7 +38,7 @@ use tokio::process::{ChildStdin, Command};
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
-use crate::capture_supervisor::{CaptureSupervisor, RestartCaptureWorker, StopCaptureWorker};
+use crate::capture_supervisor::{StopCaptureWorker};
 use crate::db_registry;
 use crate::models::{CreateVideoUnitFile, UpdateVideoUnitFile};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
@@ -288,13 +288,7 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for CaptureActor {
             Ok(b) => b,
             Err(e) => {
                 error!("CaptureActor: stream handle error! {}", e);
-                if let CaptureState::Running = self.state {
-                    CaptureSupervisor::from_registry().do_send(RestartCaptureWorker {
-                        id: self.camera_id,
-                        stream_url: self.stream_url.clone(),
-                        storage_path: self.storage_path.clone(),
-                    });
-                }
+                self.stdin = None;
                 ctx.terminate();
                 return;
             }
@@ -371,6 +365,7 @@ impl Handler<StartWorker> for CaptureActor {
                 }
                 CaptureState::Shutdown => {
                     debug!("Shutting down captureworker...");
+                    actor.stdin = None;
                     ctx.terminate();
                 }
             }
@@ -383,6 +378,7 @@ impl Handler<StopCaptureWorker> for CaptureActor {
     type Result = ();
 
     fn handle(&mut self, _msg: StopCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
+        debug!("Camera {} received StopCaptureWorker, going to shutdown...", self.camera_id);
         self.state = CaptureState::Shutdown;
         match &mut self.stdin {
             Some(stdin) => {

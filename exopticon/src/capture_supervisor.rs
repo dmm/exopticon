@@ -20,27 +20,12 @@
 
 use std::time::Duration;
 
-use actix::fut::wrap_future;
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
 
 use crate::capture_actor::CaptureActor;
 use crate::db_registry;
-use crate::models::FetchAllCameraGroupAndCameras;
-
-/// Message instructing `CaptureSupervisor` to start a capture actor
-pub struct StartCaptureWorker {
-    /// id of camera to start capture worker for
-    pub id: i32,
-    /// rtsp url of video stream to capture
-    pub stream_url: String,
-    /// full path to capture video to
-    pub storage_path: String,
-}
-
-impl Message for StartCaptureWorker {
-    type Result = ();
-}
+use crate::models::{Camera, FetchAllCameraGroupAndCameras};
 
 /// Message instructing `CaptureSupervisor` to stop the specified worker
 pub struct StopCaptureWorker {
@@ -52,34 +37,31 @@ impl Message for StopCaptureWorker {
     type Result = ();
 }
 
-/// Message requesting a `CaptureWorker` restart
-pub struct RestartCaptureWorker {
-    /// id of camera to restart capture worker for
-    pub id: i32,
-    /// rtsp url of video stream to capture
-    pub stream_url: String,
-    /// full path to capture video to
-    pub storage_path: String,
-}
-
-impl Message for RestartCaptureWorker {
-    type Result = ();
-}
-
 pub struct SyncCaptureActors {}
 
 impl Message for SyncCaptureActors {
     type Result = ();
 }
 
+pub struct RestartCaptureActors {}
+
+impl Message for RestartCaptureActors {
+    type Result = ();
+}
+
 /// holds state of `CaptureSupervisor` actor
 pub struct CaptureSupervisor {
     /// Child workers
-    workers: Vec<(i32, Addr<CaptureActor>)>,
+    workers: Vec<(String, Camera, Option<Addr<CaptureActor>>)>,
 }
 
 impl Actor for CaptureSupervisor {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        ctx.notify(SyncCaptureActors {});
+        ctx.notify_later(RestartCaptureActors {}, Duration::from_secs(2));
+    }
 }
 
 impl Default for CaptureSupervisor {
@@ -94,47 +76,48 @@ impl Supervised for CaptureSupervisor {}
 
 impl SystemService for CaptureSupervisor {}
 
-impl Handler<StartCaptureWorker> for CaptureSupervisor {
+impl Handler<RestartCaptureActors> for CaptureSupervisor {
     type Result = ();
 
-    fn handle(&mut self, msg: StartCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Supervisor: Starting camera id: {}", msg.id);
-        let id = msg.id.to_owned();
-        let address = CaptureActor::new(msg.id, msg.stream_url, msg.storage_path).start();
-        self.workers.push((id, address));
-    }
-}
+    fn handle(&mut self, _msg: RestartCaptureActors, ctx: &mut Context<Self>) -> Self::Result {
+        let fut = async {
+            critical_section::<Self, _>(async {
+                with_ctx(|actor: &mut Self, ctx: &mut Context<Self>| {
+                    for (storage_path, camera, addr) in &mut actor.workers {
+                        if addr.is_none() && camera.enabled {
+                            info!("Restarting capture actor id: {}", camera.id);
+                            let new_addr = CaptureActor::new(
+                                camera.id,
+                                camera.rtsp_url.clone(),
+                                (*storage_path).to_string(),
+                            )
+                            .start();
+                            *addr = Some(new_addr);
+                        }
 
-impl Handler<StopCaptureWorker> for CaptureSupervisor {
-    type Result = ();
+                        if let Some(addr2) = addr {
+                            if !addr2.connected() && camera.enabled {
+                                info!("Restarting capture actor id: {}", camera.id);
+                                let new_addr = CaptureActor::new(
+                                    camera.id,
+                                    camera.rtsp_url.clone(),
+                                    (*storage_path).to_string(),
+                                )
+                                .start();
+                                *addr = Some(new_addr);
+                            }
+                        }
+                    }
+                    ctx.notify_later(RestartCaptureActors {}, Duration::from_secs(10));
+                });
+            })
+            .await;
+        }
+        .interop_actor(self);
 
-    fn handle(&mut self, msg: StopCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Stopping camera id: {}", msg.id);
-        self.workers.retain(|(id, _)| *id != msg.id);
-    }
-}
-
-impl Handler<RestartCaptureWorker> for CaptureSupervisor {
-    type Result = ();
-
-    fn handle(&mut self, msg: RestartCaptureWorker, ctx: &mut Context<Self>) -> Self::Result {
-        info!("Restarting camera id: {}", msg.id);
-        let fut = wrap_future(ctx.address().send(StopCaptureWorker { id: msg.id })).map(
-            |_res, _act: &mut Self, ctx: &mut Context<Self>| {
-                ctx.notify_later(
-                    StartCaptureWorker {
-                        id: msg.id,
-                        stream_url: msg.stream_url,
-                        storage_path: msg.storage_path,
-                    },
-                    Duration::new(5, 0),
-                );
-            },
-        );
         ctx.spawn(fut);
     }
 }
-
 impl Handler<SyncCaptureActors> for CaptureSupervisor {
     type Result = ();
 
@@ -142,8 +125,10 @@ impl Handler<SyncCaptureActors> for CaptureSupervisor {
         let fut = async {
             critical_section::<Self, _>(async {
                 with_ctx(|actor: &mut Self, _| {
-                    for (id, addr) in &actor.workers {
-                        addr.do_send(StopCaptureWorker { id: *id });
+                    for (_, camera, addr) in &actor.workers {
+                        if let Some(addr) = addr {
+                            addr.do_send(StopCaptureWorker { id: camera.id });
+                        }
                     }
                     actor.workers.clear();
                 });
@@ -156,24 +141,15 @@ impl Handler<SyncCaptureActors> for CaptureSupervisor {
                     Ok(Ok(c)) => c,
                     Ok(Err(_)) | Err(_) => return,
                 };
-
-                for g in groups {
-                    for c in g.1 {
-                        if c.enabled {
+                debug!("Syncing capture actors!");
+                with_ctx(|actor: &mut Self, _| {
+                    for g in groups {
+                        for c in g.1 {
                             let storage_path = g.0.storage_path.clone();
-                            with_ctx(|_actor: &mut Self, ctx: &mut Context<Self>| {
-                                ctx.notify_later(
-                                    StartCaptureWorker {
-                                        id: c.id,
-                                        stream_url: c.rtsp_url,
-                                        storage_path,
-                                    },
-                                    Duration::new(1, 0),
-                                );
-                            });
+                            actor.workers.push((storage_path, c, None));
                         }
                     }
-                }
+                });
             })
             .await;
         }
