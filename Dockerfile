@@ -101,7 +101,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && /cargo/bin/rustup component add clippy \
   && /cargo/bin/cargo install --force cargo-make
 
-RUN pip3 install msgpack imutils numpy dvc[s3]
+RUN pip3 install msgpack imutils numpy dvc[s3]==1.11.16
 RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
 
 ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
