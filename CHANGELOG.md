@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.15.0
+2021-03-06
+
+### Features
+
+- Add default yolo and coral obj analysis instances (7638ea8f6006b73cd6540ee4bcbb27ccb72c2d4a)
+
 ## 0.14.0
 2021-03-04
 
