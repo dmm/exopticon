@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.15.1
+2021-03-06
+
+### Fixes
+
+- fix sycning capture actors (eed80eba5b56a7cb44bcf9b781587a9205025ee9)
+- Set dvc version to 1.11.16 (3de51329f5c9311ca8c31196de549c9fc1156255)
+
 ## 0.15.0
 2021-03-06
 
