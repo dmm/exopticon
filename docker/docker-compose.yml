@@ -2,8 +2,6 @@ version: '2.4'
 
 services:
   exopticon:
-    env_file:
-      - ../release_info
     image: dmattli/exopticon:v${RELEASE_VERSION}
     environment:
       DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db

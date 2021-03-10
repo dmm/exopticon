@@ -2,7 +2,6 @@ version: '2.4'
 
 services:
   exopticon:
-    devices:
-$CUDA_DEVS
-    volumes:
-$CUDA_LIBS
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all

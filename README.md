@@ -31,7 +31,7 @@ bash -ac 'source ../release_info && docker-compose -f docker-compose.db.yml -f d
 ### cuda
 ```bash
 cd exopticon/docker/
-./gen-cuda.bash |  docker-compose -f docker-compose.db.yml -f docker-compose.yml -f /dev/stdin up -d
+bash -ac 'source ../release-info && docker-compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml -d'
 ```
 
 5. Create initial user
