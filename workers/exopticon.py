@@ -198,7 +198,8 @@ class AnalysisFrame(object):
 
         new_region = AnalysisFrame.calculate_region(self.image.shape, region, min_size)
         image = self.image[new_region[1]:new_region[3], new_region[0]:new_region[2]]
-        return image
+        offset = [new_region[1], new_region[3]]
+        return FrameSlice(image, offset)
 
 class FrameSlice(object):
     def __init__(self, image, offset):

@@ -46,9 +46,10 @@ class CoralWorker(ExopticonWorker):
         offset = [0, 0]
         if len(frame.observations) > 0:
             box = frame.get_observation_bounding_box()
-            print(box)
-            offset = [box[0], box[1]]
-            image = frame.get_region(box)
+            slice = frame.get_region(box)
+            offset = slice.offset
+            image = slice.image
+
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(image)
         _, scale = common.set_resized_input(
