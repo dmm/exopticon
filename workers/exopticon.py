@@ -212,7 +212,7 @@ class WorkerHandler(logging.Handler):
         self.worker = worker
     def emit(self, record):
         log_entry = self.format(record)
-        self.worker.raw_log(20, log_entry)
+        self.worker.raw_log(record.levelno, log_entry)
 
 class ExopticonWorker(object):
     def __init__(self, worker_name):
@@ -230,6 +230,9 @@ class ExopticonWorker(object):
         self.__log_handler.setLevel(logging.DEBUG)
         self.logger.addHandler(self.__log_handler)
 
+        # Configure exception hook to capture an uncaught exception
+        sys.excepthook = lambda x, y, z: self.__log_exception(x, y, z)
+
         # Reopen stdout(fd 1)
         newfd = os.dup(1)
         # Open the real stdout(now fd 3)
@@ -246,11 +249,14 @@ class ExopticonWorker(object):
         self.__frame_height = frame_height
 
     # Implement private methods
+    def __log_exception(self, exception_type, value, tb):
+        self.logger.error("Capture Worker exception: %s %s %s", exception_type, value, tb)
+
     def __cleanup(self):
         self.cleanup()
 
     def raw_log(self, level_number, message):
-        log_dict = {'Log': {'level': 'Info', 'message': message}}
+        log_dict = {'Log': {'level': level_number, 'message': message}}
         serialized = json.dumps(log_dict)
         self.__write_framed_message(serialized)
 

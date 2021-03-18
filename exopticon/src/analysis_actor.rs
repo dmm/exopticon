@@ -95,7 +95,7 @@ enum AnalysisWorkerMessage {
     /// Log message from worker
     Log {
         /// log level index
-        level: LogLevel,
+        level: i32,
         /// Worker log message
         message: String,
     },
@@ -197,6 +197,20 @@ impl AnalysisActor {
     fn message_to_action(&mut self, msg: AnalysisWorkerMessage, ctx: &mut Context<Self>) {
         match msg {
             AnalysisWorkerMessage::Log { level, message } => {
+                let log_level = match level {
+                    50 | 40 => Level::Error,
+                    30 => Level::Warn,
+                    20 => Level::Info,
+                    10 => Level::Debug,
+                    _ => Level::Trace,
+                };
+                log!(
+                    log_level,
+                    "Analysis worker {} log message: {}",
+                    self.id,
+                    message
+                );
+
                 debug!("Analysis Worker log: {:?} {}", level, message)
             }
             AnalysisWorkerMessage::FrameRequest(count) => {
@@ -362,6 +376,7 @@ impl Handler<StartWorker> for AnalysisActor {
         }
         cmd.stdout(Stdio::piped());
         cmd.stdin(Stdio::piped());
+        //        cmd.stderr(Stdio::null());
         let mut worker = match cmd.spawn() {
             Ok(w) => w,
             Err(err) => {
