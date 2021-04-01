@@ -7,7 +7,7 @@
 2. Fetch the sources
 
 ```bash
-$ git clone https://gitlab.com/dmattli/exopticon.git
+$ git clone --recurse-submodules https://gitlab.com/dmattli/exopticon.git
 ```
 
 This will fetch master which should contain the latest
