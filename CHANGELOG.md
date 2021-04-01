@@ -2,6 +2,22 @@
 
 <!--- next entry here -->
 
+## 0.16.0
+2021-04-01
+
+### Features
+
+- perform object detection on motion slice of image (ba6192020f7de681579163a22a11e65089e13eba)
+- attach level to logs from analysis worker (70526a279c06b3d5ab9a46c065e63bec5993622c)
+
+### Fixes
+
+- Switch to cuda runtime (b5facda41f1c5ce1efe3e8763a45481b5b416e6a)
+- Add comments to .env file (58f7eb92adec1b7f8eb953396c3a72441fd0642c)
+- capture_actor: log stream closes as debug (5e7206d9890e698bf72db5cf6a69984c20345d63)
+- change README to run make ci-flow so web assets are built (956a4c3c3fcda57e0c9fbd1dd81ff4407a7dc1d7)
+- Add submodules to clone command in README (c27479af4e1b07e57c8da57bd1d76af61683da56)
+
 ## 0.15.1
 2021-03-06
 
