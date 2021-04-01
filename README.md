@@ -67,7 +67,7 @@ docker exec -it exopticon_exopticon_1 /bin/bash
 
 ### Build exopticon
 ```
-exopticon@a08865046dd9:/exopticon$ cargo make
+exopticon@a08865046dd9:/exopticon$ cargo make ci-flow
 .... build output ...
 ```
 
