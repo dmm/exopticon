@@ -17,7 +17,7 @@
     You should have received a copy of the GNU General Public License
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<div class="top-menu" *ngIf="!fullscreen">
+<div class="top-menu" *ngIf="!fullscreen && isLoggedIn$ | async">
   <div class="logo">
     <img src="static/assets/logo.png" alt="EXOPTICON" (click)="redirect()" />
   </div>

@@ -19,6 +19,8 @@
  */
 import { Component } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
+import { Observable } from "rxjs";
+import { AuthService } from "./auth.service";
 
 export enum MenuState {
   None,
@@ -36,8 +38,13 @@ export class AppComponent {
   title = "exopticon";
   fullscreen = false;
   menuState = MenuState.None;
+  isLoggedIn$: Observable<boolean>;
 
-  constructor(private route: ActivatedRoute, public router: Router) {}
+  constructor(
+    private route: ActivatedRoute,
+    public router: Router,
+    private authService: AuthService
+  ) {}
 
   ngOnInit() {
     this.route.queryParamMap.subscribe((params) => {
@@ -47,6 +54,7 @@ export class AppComponent {
         this.fullscreen = false;
       }
     });
+    this.isLoggedIn$ = this.authService.isLoggedIn;
   }
 
   redirect() {

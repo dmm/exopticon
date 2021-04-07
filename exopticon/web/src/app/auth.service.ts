@@ -20,13 +20,21 @@
 
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
-import { Observable, of } from "rxjs";
+import { BehaviorSubject, Observable, of } from "rxjs";
 import { catchError, map } from "rxjs/operators";
 
 @Injectable({
   providedIn: "root",
 })
 export class AuthService {
+  private loggedIn: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(
+    false
+  );
+
+  get isLoggedIn() {
+    return this.loggedIn.asObservable();
+  }
+
   constructor(private http: HttpClient) {}
 
   login(username: string, password: string): Observable<boolean> {
@@ -36,7 +44,10 @@ export class AuthService {
         password: password,
       })
       .pipe(
-        map(() => true),
+        map(() => {
+          this.loggedIn.next(true);
+          return true;
+        }),
         catchError(() => of(false))
       );
   }
