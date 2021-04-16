@@ -36,27 +36,16 @@ use crate::{db_registry, ws_camera_server::Unsubscribe};
 #[derive(Clone)]
 pub struct AnalysisMetrics {
     pub process_count: IntCounterVec,
-    pub reject_count: IntCounterVec,
     pub restart_count: IntCounterVec,
 }
 
 impl AnalysisMetrics {
     pub fn new() -> Self {
-        let metrics = Self {
+        Self {
             process_count: IntCounterVec::new(
                 opts!(
                     "analysis_process_count",
                     "Number of frames processed by analysis instance"
-                )
-                .namespace("exopticon"),
-                &["instance_id", "instance_name"],
-            )
-            .expect("Unable to create analysis metric"),
-
-            reject_count: IntCounterVec::new(
-                opts!(
-                    "analysis_reject_count",
-                    "Number of frames rejected by analysis_instance"
                 )
                 .namespace("exopticon"),
                 &["instance_id", "instance_name"],
@@ -80,9 +69,6 @@ impl AnalysisMetrics {
             .register(Box::new(self.process_count.clone()))
             .map_err(|_| ())?;
         registry
-            .register(Box::new(self.reject_count.clone()))
-            .map_err(|_| ())?;
-        registry
             .register(Box::new(self.restart_count.clone()))
             .map_err(|_| ())?;
 
@@ -92,7 +78,8 @@ impl AnalysisMetrics {
 
 /// Message telling supervisor to start new analysis actor
 #[derive(Serialize, Deserialize)]
-pub struct StartAnalysisActor {    /// id of analysis instance
+pub struct StartAnalysisActor {
+    /// id of analysis instance
     pub id: i32,
     /// name of executable implementing analysis worker
     pub executable_name: String,

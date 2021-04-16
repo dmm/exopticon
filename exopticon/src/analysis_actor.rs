@@ -429,12 +429,7 @@ impl Handler<CameraFrame> for AnalysisActor {
 
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Context<Self>) -> Self::Result {
         // Enqueue received frame
-        if self.frame_queue.push_back(msg.source.clone(), msg) {
-            self.metrics
-                .reject_count
-                .with_label_values(&[&self.id.to_string(), ""])
-                .inc_by(1);
-        }
+        self.frame_queue.push_back(msg.source.clone(), msg);
 
         self.push_frame(ctx);
     }
