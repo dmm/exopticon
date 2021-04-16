@@ -23,18 +23,76 @@ use std::time::Duration;
 
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
+use prometheus::{opts, IntCounterVec, Registry};
 
 use crate::models::{AnalysisEngine, AnalysisSubscriptionModel, FetchAllAnalysisModel};
+use crate::prom_registry;
 use crate::ws_camera_server::{
     FrameResolution, FrameSource, Subscribe, SubscriptionSubject, WsCameraServer,
 };
 use crate::{analysis_actor::AnalysisActor, models::AnalysisInstanceModel};
 use crate::{db_registry, ws_camera_server::Unsubscribe};
 
+#[derive(Clone)]
+pub struct AnalysisMetrics {
+    pub process_count: IntCounterVec,
+    pub reject_count: IntCounterVec,
+    pub restart_count: IntCounterVec,
+}
+
+impl AnalysisMetrics {
+    pub fn new() -> Self {
+        let metrics = Self {
+            process_count: IntCounterVec::new(
+                opts!(
+                    "analysis_process_count",
+                    "Number of frames processed by analysis instance"
+                )
+                .namespace("exopticon"),
+                &["instance_id", "instance_name"],
+            )
+            .expect("Unable to create analysis metric"),
+
+            reject_count: IntCounterVec::new(
+                opts!(
+                    "analysis_reject_count",
+                    "Number of frames rejected by analysis_instance"
+                )
+                .namespace("exopticon"),
+                &["instance_id", "instance_name"],
+            )
+            .expect("Unable to create analysis metric"),
+
+            restart_count: IntCounterVec::new(
+                opts!(
+                    "analysis_restart_count",
+                    "Number of unplanned restarts by analysis instance"
+                )
+                .namespace("exopticon"),
+                &["instance_id", "instance_name"],
+            )
+            .expect("Unable to create analysis metric"),
+        }
+    }
+
+    pub fn register(&self, registry: &Registry) -> Result<(), ()> {
+        registry
+            .register(Box::new(self.process_count.clone()))
+            .map_err(|_| ())?;
+        registry
+            .register(Box::new(self.reject_count.clone()))
+            .map_err(|_| ())?;
+        registry
+            .register(Box::new(self.restart_count.clone()))
+            .map_err(|_| ())?;
+
+        Ok(())
+    }
+}
+
 /// Message telling supervisor to start new analysis actor
 #[derive(Serialize, Deserialize)]
-pub struct StartAnalysisActor {
-    /// id of analysis instance
+pub struct StartAnalysisActor {    /// id of analysis instance
     pub id: i32,
     /// name of executable implementing analysis worker
     pub executable_name: String,
@@ -86,12 +144,20 @@ pub struct AnalysisSupervisor {
             Option<Addr<AnalysisActor>>,
         ),
     >,
+    metrics: AnalysisMetrics,
 }
 
 impl Actor for AnalysisSupervisor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
+        match self
+            .metrics
+            .register(&prom_registry::get_metrics().registry)
+        {
+            Ok(()) => (),
+            Err(()) => error!("Failed to register analysis metrics!"),
+        }
         ctx.notify(SyncAnalysisActors {});
         ctx.notify(RestartAnalysisActor {});
     }
@@ -101,6 +167,7 @@ impl Default for AnalysisSupervisor {
     fn default() -> Self {
         Self {
             actors: HashMap::new(),
+            metrics: AnalysisMetrics::new(),
         }
     }
 }
@@ -127,14 +194,16 @@ impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
                     for (engine, instance, addr) in actor.actors.values_mut() {
                         if addr.is_none() && instance.enabled {
                             info!("Restarting analysis actor id: {}", instance.id);
-                            let new_addr = Self::start_actor(engine, instance);
+                            let new_addr =
+                                Self::start_actor(engine, instance, actor.metrics.clone());
                             *addr = Some(new_addr);
                         }
 
                         if let Some(addr2) = addr {
                             if !addr2.connected() && instance.enabled {
                                 info!("Restarting analysis actor id: {}", instance.id);
-                                let new_addr = Self::start_actor(engine, instance);
+                                let new_addr =
+                                    Self::start_actor(engine, instance, actor.metrics.clone());
                                 *addr = Some(new_addr);
                             }
                         }
@@ -189,14 +258,18 @@ impl Handler<SyncAnalysisActors> for AnalysisSupervisor {
 impl AnalysisSupervisor {
     /// Returns new `AnalysisSupervisor`
     pub fn new() -> Self {
+        let metrics = AnalysisMetrics::new();
+
         Self {
             actors: HashMap::new(),
+            metrics,
         }
     }
 
     pub fn start_actor(
         engine: &AnalysisEngine,
         new_actor: &AnalysisInstanceModel,
+        metrics: AnalysisMetrics,
     ) -> Addr<AnalysisActor> {
         info!("Starting analysis actor id: {}", new_actor.id);
         let actor = AnalysisActor::new(
@@ -206,6 +279,7 @@ impl AnalysisSupervisor {
             new_actor.max_fps,
             new_actor.subscriptions.clone(),
             db_registry::get_db(),
+            metrics,
         );
         let address = actor.start();
 

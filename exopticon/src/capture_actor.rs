@@ -24,7 +24,6 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::time::Duration;
 
 use actix::{
     fut::wrap_future, registry::SystemService, Actor, ActorContext, ActorFuture, AsyncContext,
@@ -361,7 +360,9 @@ impl Handler<StartWorker> for CaptureActor {
             }
             match actor.state {
                 CaptureState::Running => {
-                    ctx.notify_later(StartWorker {}, Duration::new(5, 0));
+                    debug!("Shutting down running captureworker...");
+                    actor.stdin = None;
+                    ctx.terminate();
                 }
                 CaptureState::Shutdown => {
                     debug!("Shutting down captureworker...");

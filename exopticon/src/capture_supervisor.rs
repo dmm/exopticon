@@ -22,10 +22,41 @@ use std::time::Duration;
 
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
+use prometheus::{opts, IntCounterVec, Registry};
 
 use crate::capture_actor::CaptureActor;
 use crate::db_registry;
 use crate::models::{Camera, FetchAllCameraGroupAndCameras};
+use crate::prom_registry;
+
+#[derive(Clone)]
+pub struct CaptureMetrics {
+    pub restart_count: IntCounterVec,
+}
+
+impl CaptureMetrics {
+    pub fn new() -> Self {
+        Self {
+            restart_count: IntCounterVec::new(
+                opts!(
+                    "capture_restart_count",
+                    "Number of unplanned restarts of capture worker"
+                )
+                .namespace("exopticon"),
+                &["camera_id", "camera_name"],
+            )
+            .expect("Unable to create capture metric"),
+        }
+    }
+
+    pub fn register(&self, registry: &Registry) -> Result<(), ()> {
+        registry
+            .register(Box::new(self.restart_count.clone()))
+            .map_err(|_| ())?;
+
+        Ok(())
+    }
+}
 
 /// Message instructing `CaptureSupervisor` to stop the specified worker
 pub struct StopCaptureWorker {
@@ -53,12 +84,21 @@ impl Message for RestartCaptureActors {
 pub struct CaptureSupervisor {
     /// Child workers
     workers: Vec<(String, Camera, Option<Addr<CaptureActor>>)>,
+    metrics: CaptureMetrics,
 }
 
 impl Actor for CaptureSupervisor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
+        match self
+            .metrics
+            .register(&prom_registry::get_metrics().registry)
+        {
+            Ok(()) => (),
+            Err(()) => error!("Failed to register capture metrics!"),
+        }
+
         ctx.notify(SyncCaptureActors {});
         ctx.notify_later(RestartCaptureActors {}, Duration::from_secs(2));
     }
@@ -68,6 +108,7 @@ impl Default for CaptureSupervisor {
     fn default() -> Self {
         Self {
             workers: Vec::new(),
+            metrics: CaptureMetrics::new(),
         }
     }
 }
@@ -105,6 +146,11 @@ impl Handler<RestartCaptureActors> for CaptureSupervisor {
                                 )
                                 .start();
                                 *addr = Some(new_addr);
+                                actor
+                                    .metrics
+                                    .restart_count
+                                    .with_label_values(&[&camera.id.to_string(), &camera.name])
+                                    .inc_by(1);
                             }
                         }
                     }

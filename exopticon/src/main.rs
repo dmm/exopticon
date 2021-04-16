@@ -145,6 +145,9 @@ mod playback_actor;
 /// Implements playback supervisor
 mod playback_supervisor;
 
+/// Implements prometheus registry
+mod prom_registry;
+
 /// Implements `DbExecutor` handler for creating users
 mod register_handler;
 
@@ -189,6 +192,7 @@ use actix::prelude::*;
 use actix_http::cookie::SameSite;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware::Logger, App, HttpServer};
+use actix_web_prom::PrometheusMetrics;
 use base64::{decode, encode};
 use chrono::Duration;
 use dialoguer::{Input, PasswordInput};
@@ -196,7 +200,7 @@ use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use rand::Rng;
 
-use std::env;
+use std::{env, thread};
 
 use crate::app::RouteState;
 use crate::models::{CreateCameraGroup, CreateUser};
@@ -314,6 +318,20 @@ fn main() {
         env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 32]>()));
     let secret = decode(&secret_string)
         .expect("Invalid SECRET_KEY env var provided. Must be 32bytes encoded as base64");
+
+    // Initialize prometheus metrics
+    let prometheus = PrometheusMetrics::new("exopticon", Some("/metrics"), None);
+    prom_registry::set_metrics(prometheus.clone());
+
+    thread::spawn(move || {
+        let mut sys = System::new("metrics");
+        let srv = HttpServer::new(move || App::new().wrap(prometheus.clone()))
+            .bind("0.0.0.0:3001")
+            .expect("Could not bind to 0.0.0.0:3000")
+            .run();
+        sys.block_on(srv)
+            .expect("Failed to block on metrics server");
+    });
 
     HttpServer::new(move || {
         App::new()

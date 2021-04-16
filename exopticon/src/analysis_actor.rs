@@ -39,7 +39,7 @@ use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
-use crate::analysis_supervisor::StopAnalysisActor;
+use crate::analysis_supervisor::{AnalysisMetrics, StopAnalysisActor};
 use crate::fair_queue::FairQueue;
 use crate::models::{
     AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor, SubscriptionMask,
@@ -161,6 +161,8 @@ pub struct AnalysisActor {
     pub frame_queue: FairQueue<FrameSource, CameraFrame>,
     /// Address of database actor
     pub db_address: Addr<DbExecutor>,
+    /// metrics
+    pub metrics: AnalysisMetrics,
 }
 
 impl AnalysisActor {
@@ -172,6 +174,7 @@ impl AnalysisActor {
         max_fps: i32,
         subscriptions: Vec<AnalysisSubscriptionModel>,
         db_address: Addr<DbExecutor>,
+        metrics: AnalysisMetrics,
     ) -> Self {
         let mut sub_map = HashMap::new();
         for s in subscriptions {
@@ -190,6 +193,7 @@ impl AnalysisActor {
             last_frame_time: None,
             frame_queue: FairQueue::new(),
             db_address,
+            metrics,
         }
     }
 
@@ -210,8 +214,6 @@ impl AnalysisActor {
                     self.id,
                     message
                 );
-
-                debug!("Analysis Worker log: {:?} {}", level, message)
             }
             AnalysisWorkerMessage::FrameRequest(count) => {
                 self.frames_requested = count;
@@ -253,7 +255,7 @@ impl AnalysisActor {
             }
             AnalysisWorkerMessage::TimingReport { tag, times } => {
                 let (avg, min, max) = calculate_statistics(&times);
-                info!(
+                debug!(
                     "Analysis Actor got {} time report! {:.2} avg, {:.2} min, {:.2} max",
                     tag,
                     avg / 1000,
@@ -281,6 +283,11 @@ impl AnalysisActor {
                 }
             }
         }
+
+        self.metrics
+            .process_count
+            .with_label_values(&[&self.id.to_string(), ""])
+            .inc_by(1);
 
         // Take ownership of the worker's stdin. If any of the below
         // conditionals fail this will be dropped, closing stdin. That
@@ -403,6 +410,12 @@ impl Handler<StartWorker> for AnalysisActor {
         let fut = wrap_future::<_, Self>(worker).map(|_status, actor, ctx| {
             info!("Analysis actor {}: analysis worker died...", actor.id);
 
+            actor
+                .metrics
+                .restart_count
+                .with_label_values(&[&actor.id.to_string(), ""])
+                .inc_by(1);
+
             // Restart worker in five seconds
             ctx.notify_later(StartWorker {}, Duration::new(5, 0));
         });
@@ -416,7 +429,12 @@ impl Handler<CameraFrame> for AnalysisActor {
 
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Context<Self>) -> Self::Result {
         // Enqueue received frame
-        self.frame_queue.push_back(msg.source.clone(), msg);
+        if self.frame_queue.push_back(msg.source.clone(), msg) {
+            self.metrics
+                .reject_count
+                .with_label_values(&[&self.id.to_string(), ""])
+                .inc_by(1);
+        }
 
         self.push_frame(ctx);
     }

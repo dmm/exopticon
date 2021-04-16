@@ -222,6 +222,8 @@ class ExopticonWorker(object):
         self.__current_frame = None
         self.__frame_times = []
         self.__stdout = sys.stdout
+        self.__start_time = time.monotonic()
+        self.__frame_count = 0
 
         # configure logging
         self.logger = logging.getLogger(self.__worker_name)
@@ -301,7 +303,7 @@ class ExopticonWorker(object):
             o["ulY"] = int(o["ulY"] * y_scale)
             o["lrX"] = int(o["lrX"] * x_scale)
             o["lrY"] = int(o["lrY"] * y_scale)
-        self.logger.info('observations: ' + str(observations))
+
         observations_dict = {'Observation': observations}
         serialized = json.dumps(observations_dict)
         self.__write_framed_message(serialized)

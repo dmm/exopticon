@@ -59,7 +59,6 @@ class MotionWorker(ExopticonWorker):
                 "lrY": int(box[3])
             })
         if len(motion_boxes) > 0:
-            self.logger.info("Found " + str(len(motion_boxes)) + " boxes!")
             self.write_observations(frame, observations)
 
 
