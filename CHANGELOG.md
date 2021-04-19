@@ -2,6 +2,20 @@
 
 <!--- next entry here -->
 
+## 0.17.0
+2021-04-19
+
+### Features
+
+- Hide top menu when not logged in (dbc2e318e8a2478183b9c4187bc2762a08b84af0)
+- Implement prometheus metrics for capture and analysis actors (06e34317c55b1ed12dcf88bca9d6606f48d76642)
+- Add prometheus + grafana metrics (a5cc052f85f6f138f82421045be8be2c7e6849de)
+
+### Fixes
+
+- remove reject count for now (61a69026197cb2fc6d6fc889f0816ef7500220be)
+- Fix missing menu on reopening without login (061ad82d8bddc80dff5df9f40fce3936b058ef85)
+
 ## 0.16.0
 2021-04-01
 
