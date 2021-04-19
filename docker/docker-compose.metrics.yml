@@ -1,0 +1,28 @@
+version: '2.4'
+
+services:
+  grafana:
+    image: grafana/grafana:7.5.4
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana_datasource.yml:/etc/grafana/provisioning/datasources/exopticon.yml
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    ports:
+      - 3002:3000
+  prometheus:
+    image: prom/prometheus:v2.26.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    expose:
+      - 9090
+
+volumes:
+  grafana_data:
+  prometheus_data:
+
