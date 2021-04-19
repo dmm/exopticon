@@ -53,6 +53,13 @@ pub async fn login(
     }
 }
 
+pub fn check_login(id: Identity) -> HttpResponse {
+    match id.identity() {
+        None => HttpResponse::NotFound().into(),
+        Some(_) => HttpResponse::Ok().into(),
+    }
+}
+
 /// Route to make logout attempt
 pub fn logout(id: Identity) -> HttpResponse {
     id.forget();

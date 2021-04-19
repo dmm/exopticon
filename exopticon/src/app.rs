@@ -32,7 +32,7 @@ use crate::analysis_routes::{
     fetch_analysis_instance, update_analysis_configuration, update_analysis_engine,
     update_analysis_instance,
 };
-use crate::auth_routes::{login, logout, Auth, WebAuth};
+use crate::auth_routes::{check_login, login, logout, Auth, WebAuth};
 use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
 };
@@ -81,6 +81,7 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
         .service(
             web::resource("/auth")
                 .route(web::post().to(login))
+                .route(web::get().to(check_login))
                 .route(web::delete().to(logout)),
         )
         .service(web::resource("/index.html").route(web::get().to(index)))

@@ -21,7 +21,7 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable, of } from "rxjs";
-import { catchError, map } from "rxjs/operators";
+import { catchError, map, mergeMap } from "rxjs/operators";
 
 @Injectable({
   providedIn: "root",
@@ -32,6 +32,14 @@ export class AuthService {
   );
 
   get isLoggedIn() {
+    return this.http.get("/auth", { observe: "response" }).pipe(
+      mergeMap((response) => {
+        this.loggedIn.next(response.ok);
+        return this.loggedIn.asObservable();
+      }),
+      catchError(() => this.loggedIn.asObservable())
+    );
+
     return this.loggedIn.asObservable();
   }
 
