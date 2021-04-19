@@ -29,6 +29,39 @@ pub struct FrameMessage {
     pub unscaled_width: i32,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+pub enum FrameResolution {
+    /// Standard definition frame, 480p
+    SD,
+    /// High definition frame, camera native resolution
+    HD,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum FrameSource {
+    /// Camera with camera id
+    Camera {
+        /// id of camera
+        #[serde(rename = "cameraId")]
+        camera_id: i32,
+    },
+    /// Analysis Engine, with engine id
+    AnalysisEngine {
+        /// id of source analysis engine
+        #[serde(rename = "analysisEngineId")]
+        analysis_engine_id: i32,
+        /// identifying tag for analysis frame
+        tag: String,
+    },
+    /// Video Playback
+    Playback {
+        /// Playback id, must be unique per socket
+        id: u64,
+    },
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub enum CaptureMessage {
     Log {
@@ -56,4 +89,22 @@ pub enum CaptureMessage {
         filename: String,
         end_time: String,
     },
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CameraFrame {
+    /// id of camera that produced frame
+    pub camera_id: i32,
+    /// jpeg image data
+    pub jpeg: Vec<u8>,
+    /// resolution of frame
+    pub resolution: FrameResolution,
+    /// source of frame
+    pub source: FrameSource,
+    /// offset from beginning of video unit
+    pub offset: i64,
+    /// original width of image
+    pub unscaled_width: i32,
+    /// original height of image,
+    pub unscaled_height: i32,
 }
