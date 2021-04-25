@@ -31,6 +31,7 @@ import logging
 import json
 import base64
 import math
+import traceback
 
 class AnalysisMask(object):
     def __init__(self, ul_x, ul_y, lr_x, lr_y):
@@ -49,6 +50,9 @@ class Observation(object):
         self.ul_y = ul_y
         self.lr_x = lr_x
         self.lr_y = lr_y
+
+    def box(self):
+        return (self.ul_x, self.ul_y, self.lr_x, self.lr_y)
 
 def scale_observations(x_scale, y_scale, observations):
     scaled_observations = []
@@ -195,16 +199,18 @@ class AnalysisFrame(object):
 
     # Returns slice of image data
     def get_region(self, region, min_size=0):
-
-        new_region = AnalysisFrame.calculate_region(self.image.shape, region, min_size)
+        #new_region = AnalysisFrame.calculate_region(self.image.shape, region, min_size)
+        new_region = region
         image = self.image[new_region[1]:new_region[3], new_region[0]:new_region[2]]
-        offset = [new_region[1], new_region[3]]
+        offset = [new_region[0], new_region[1]]
         return FrameSlice(image, offset)
 
 class FrameSlice(object):
     def __init__(self, image, offset):
         self.image = image
         self.offset = offset
+    def __str__(self):
+        return f"Frame slice offsets: ({self.offset[0]} {self.offset[1]})"
 
 class WorkerHandler(logging.Handler):
     def __init__(self, worker):
@@ -252,7 +258,7 @@ class ExopticonWorker(object):
 
     # Implement private methods
     def __log_exception(self, exception_type, value, tb):
-        self.logger.error("Capture Worker exception: %s %s %s", exception_type, value, tb)
+        self.logger.error("Capture Worker exception: %s %s %s", exception_type, value, traceback.format_tb(tb))
 
     def __cleanup(self):
         self.cleanup()
@@ -323,7 +329,6 @@ class ExopticonWorker(object):
         if len(self.__frame_times) >= 100:
             self.__write_timing('frame', self.__frame_times)
             self.__frame_times = []
-        #self.log_info('Ran for :' + str(duration * 1000) + ' ms')
 
     @staticmethod
     def get_data_dir():

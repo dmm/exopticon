@@ -23,6 +23,7 @@ import os
 import cv2
 from PIL import Image
 from PIL import ImageDraw
+from collections import defaultdict
 
 from pycoral.adapters import common
 from pycoral.adapters import detect
@@ -40,36 +41,53 @@ class CoralWorker(ExopticonWorker):
         input_size = common.input_size(self.interpreter)
         self.labels = read_label_file(os.path.join(ExopticonWorker.get_data_dir(), "coco_labels.txt"))
 
-    def handle_frame(self, frame):
-        self.interpreter.invoke()
-        image = frame.image
-        offset = [0, 0]
-        if len(frame.observations) > 0:
-            box = frame.get_observation_bounding_box()
-            slice = frame.get_region(box)
-            offset = slice.offset
-            image = slice.image
-
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    def detect(self, image, offset):
         image = Image.fromarray(image)
         _, scale = common.set_resized_input(
             self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
-        objs = detect.get_objects(self.interpreter, 0.5,  scale)
+        self.interpreter.invoke()
+        objs = detect.get_objects(self.interpreter, 0.5, scale)
 
         observations = []
-        important_labels = ["person", "car", "truck"]
         for o in objs:
-            if self.labels.get(o.id, o.id) in important_labels:
+            observations.append((
+                self.labels.get(o.id, o.id),
+                o.score,
+                (max(int(o.bbox.xmin * scale[1] + offset[0]), 0),
+                 max(int(o.bbox.ymin * scale[0] + offset[1]), 0),
+                 int(o.bbox.xmax * scale[1]  + offset[0]),
+                 int(o.bbox.ymax * scale[0]  + offset[1]))
+
+            ))
+        return observations
+
+    def handle_frame(self, frame):
+        image = frame.image
+        offset = [0, 0]
+        important_labels = ["person", "car", "truck", "dog"]
+
+        detections = []
+
+        for obs in frame.observations:
+            slice = frame.get_region(obs.box())
+            offset = slice.offset
+            image = slice.image
+            detections.extend(self.detect(image, offset))
+
+
+        observations = []
+        for o in detections:
+            if o[0] in important_labels:
                 observations.append({
                     "videoUnitId": frame.video_unit_id,
                     "frameOffset": frame.offset,
                     "tag": "object",
-                    "details": self.labels.get(o.id, o.id),
-                    "score": int(o.score * 100),
-                    "ulX": max(int(o.bbox.xmin + offset[0]), 0),
-                    "ulY": max(int(o.bbox.ymin + offset[1]), 0),
-                    "lrX": int(o.bbox.xmax + offset[0]),
-                    "lrY": int(o.bbox.ymax + offset[1])
+                    "details": o[0],
+                    "score": int(o[1] * 100),
+                    "ulX": o[2][0],
+                    "ulY": o[2][1],
+                    "lrX": o[2][2],
+                    "lrY": o[2][3]
                 })
 
         if len(observations) > 0:
