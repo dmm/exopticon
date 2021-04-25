@@ -220,10 +220,10 @@ impl AnalysisActor {
                 self.push_frame(ctx);
             }
             AnalysisWorkerMessage::Observation(observations) => {
-                let fut = self.db_address.send(CreateObservations { observations });
-                ctx.spawn(wrap_future(fut).map(|result, actor: &mut Self, _ctx| {
-                    if let Ok(Ok(new_observations)) = result {
-                        if let Some(mut frame) = actor.last_frame.take() {
+                if let Some(mut frame) = self.last_frame.take() {
+                    let fut = self.db_address.send(CreateObservations { observations });
+                    ctx.spawn(wrap_future(fut).map(|result, actor: &mut Self, _ctx| {
+                        if let Ok(Ok(new_observations)) = result {
                             frame.source = FrameSource::AnalysisEngine {
                                 analysis_engine_id: actor.id,
                                 tag: "".to_string(),
@@ -231,11 +231,11 @@ impl AnalysisActor {
 
                             frame.observations = new_observations;
                             WsCameraServer::from_registry().do_send(frame);
+                        } else {
+                            error!("Error inserting observations!")
                         }
-                    } else {
-                        error!("Error inserting observations!")
-                    }
-                }));
+                    }));
+                }
             }
             AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
                 WsCameraServer::from_registry().do_send(CameraFrame {
