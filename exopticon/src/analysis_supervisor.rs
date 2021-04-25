@@ -76,7 +76,6 @@ impl AnalysisMetrics {
     }
 }
 
-/// Message telling supervisor to start new analysis actor
 #[derive(Serialize, Deserialize)]
 pub struct StartAnalysisActor {
     /// id of analysis instance
@@ -243,16 +242,6 @@ impl Handler<SyncAnalysisActors> for AnalysisSupervisor {
 }
 
 impl AnalysisSupervisor {
-    /// Returns new `AnalysisSupervisor`
-    pub fn new() -> Self {
-        let metrics = AnalysisMetrics::new();
-
-        Self {
-            actors: HashMap::new(),
-            metrics,
-        }
-    }
-
     pub fn start_actor(
         engine: &AnalysisEngine,
         new_actor: &AnalysisInstanceModel,

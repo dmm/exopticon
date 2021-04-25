@@ -105,11 +105,10 @@ impl RootSupervisor {
     /// * `db_worker` - `Addr` of `DbExecutor`
     ///
     pub fn new(start_mode: ExopticonMode, db_worker: Addr<DbExecutor>) -> Self {
-        let analysis_supervisor = AnalysisSupervisor::new().start();
         let deletion_supervisor = FileDeletionSupervisor::new().start();
 
         Self {
-            analysis_supervisor,
+            analysis_supervisor: AnalysisSupervisor::from_registry(),
             capture_supervisor: CaptureSupervisor::from_registry(),
             deletion_supervisor,
             notifier_supervisor: NotifierSupervisor::from_registry(),
