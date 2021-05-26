@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
@@ -85,6 +85,7 @@ pub struct CaptureSupervisor {
     /// Child workers
     workers: Vec<(String, Camera, Option<Addr<CaptureActor>>)>,
     metrics: CaptureMetrics,
+    capture_start: Instant,
 }
 
 impl Actor for CaptureSupervisor {
@@ -109,6 +110,7 @@ impl Default for CaptureSupervisor {
         Self {
             workers: Vec::new(),
             metrics: CaptureMetrics::new(),
+            capture_start: Instant::now(),
         }
     }
 }
@@ -131,6 +133,7 @@ impl Handler<RestartCaptureActors> for CaptureSupervisor {
                                 camera.id,
                                 camera.rtsp_url.clone(),
                                 (*storage_path).to_string(),
+                                actor.capture_start,
                             )
                             .start();
                             *addr = Some(new_addr);
@@ -143,6 +146,7 @@ impl Handler<RestartCaptureActors> for CaptureSupervisor {
                                     camera.id,
                                     camera.rtsp_url.clone(),
                                     (*storage_path).to_string(),
+                                    actor.capture_start,
                                 )
                                 .start();
                                 *addr = Some(new_addr);

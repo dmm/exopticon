@@ -31,7 +31,7 @@ use crate::models::{
     FetchAnalysisInstanceModel, SubscriptionMask, UpdateAnalysisEngine,
     UpdateAnalysisInstanceModel,
 };
-use crate::ws_camera_server::FrameSource;
+use crate::ws_camera_server::{FrameResolution, SubscriptionSubject};
 
 impl Message for CreateAnalysisEngine {
     type Result = Result<AnalysisEngine, ServiceError>;
@@ -150,12 +150,9 @@ fn insert_subscriptions(
     // Insert subscriptions
     for s in subscriptions {
         let ids = match s.source {
-            FrameSource::Camera { camera_id: cid } => (Some(cid), None),
-            FrameSource::AnalysisEngine {
-                analysis_engine_id: aid,
-                ..
-            } => (None, Some(aid)),
-            FrameSource::Playback { .. } => {
+            SubscriptionSubject::Camera(cid, _) => (Some(cid), None),
+            SubscriptionSubject::AnalysisEngine(analysis_id) => (None, Some(analysis_id)),
+            SubscriptionSubject::Playback(_, _, _) => {
                 return Err(ServiceError::BadRequest(
                     "Playback is an invalid subscription source".to_string(),
                 ))
@@ -311,12 +308,10 @@ fn fetch_subscriptions(
             .collect();
 
         let source = match s.2 {
-            Some(aid) => FrameSource::Camera { camera_id: aid },
-            None => FrameSource::AnalysisEngine {
-                analysis_engine_id: s.3.expect("Referential integrity!"),
-                tag: "".to_string(),
-            },
+            Some(cid) => SubscriptionSubject::Camera(cid, FrameResolution::SD),
+            None => SubscriptionSubject::AnalysisEngine(s.3.expect("Referential integrity!")),
         };
+
         subscriptions.push(AnalysisSubscriptionModel { source, masks: m });
     }
 
@@ -648,9 +643,8 @@ impl Handler<AnalysisConfiguration> for DbExecutor {
                 insert_subscriptions(
                     motion_instance.0,
                     &[AnalysisSubscriptionModel {
-                        source: FrameSource::Camera {
-                            camera_id: msg.camera_id,
-                        },
+                        source: SubscriptionSubject::Camera(msg.camera_id, FrameResolution::SD),
+
                         masks: Vec::new(),
                     }],
                     conn,
@@ -671,10 +665,7 @@ impl Handler<AnalysisConfiguration> for DbExecutor {
                     insert_subscriptions(
                         coral_id,
                         &[AnalysisSubscriptionModel {
-                            source: FrameSource::AnalysisEngine {
-                                analysis_engine_id: motion_instance.0,
-                                tag: "".to_string(),
-                            },
+                            source: SubscriptionSubject::AnalysisEngine(motion_instance.0),
                             masks: Vec::new(),
                         }],
                         conn,
@@ -694,10 +685,7 @@ impl Handler<AnalysisConfiguration> for DbExecutor {
                     insert_subscriptions(
                         yolo_id,
                         &[AnalysisSubscriptionModel {
-                            source: FrameSource::AnalysisEngine {
-                                analysis_engine_id: motion_instance.0,
-                                tag: "".to_string(),
-                            },
+                            source: SubscriptionSubject::AnalysisEngine(motion_instance.0),
                             masks: Vec::new(),
                         }],
                         conn,

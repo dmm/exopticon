@@ -181,6 +181,7 @@ impl Handler<CameraFrame> for AlertActor {
         let analysis_instance_id = match msg.source {
             FrameSource::Camera {
                 camera_id: _camera_id,
+                analysis_offset: _,
             } => {
                 // We shouldn't get frames from a camera...
                 error!(
@@ -199,7 +200,7 @@ impl Handler<CameraFrame> for AlertActor {
             }
             FrameSource::AnalysisEngine {
                 analysis_engine_id,
-                tag: _tag,
+                analysis_offset: _,
             } => analysis_engine_id,
         };
 

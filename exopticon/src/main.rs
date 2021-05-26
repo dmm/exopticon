@@ -56,8 +56,6 @@ extern crate serde_derive;
 extern crate failure;
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate rust_embed;
 
 /// Alert rule actor
 mod alert_actor;

@@ -27,9 +27,7 @@ use prometheus::{opts, IntCounterVec, Registry};
 
 use crate::models::{AnalysisEngine, AnalysisSubscriptionModel, FetchAllAnalysisModel};
 use crate::prom_registry;
-use crate::ws_camera_server::{
-    FrameResolution, FrameSource, Subscribe, SubscriptionSubject, WsCameraServer,
-};
+use crate::ws_camera_server::{Subscribe, WsCameraServer};
 use crate::{analysis_actor::AnalysisActor, models::AnalysisInstanceModel};
 use crate::{db_registry, ws_camera_server::Unsubscribe};
 
@@ -261,17 +259,8 @@ impl AnalysisSupervisor {
 
         for sub in &new_actor.subscriptions {
             // setup camera subscriptions
-            let subject = match sub.source {
-                FrameSource::Camera { camera_id } => {
-                    SubscriptionSubject::Camera(camera_id, FrameResolution::SD)
-                }
-                FrameSource::AnalysisEngine {
-                    analysis_engine_id, ..
-                } => SubscriptionSubject::AnalysisEngine(analysis_engine_id),
-                FrameSource::Playback { id } => SubscriptionSubject::Playback(id, 0, 0),
-            };
             WsCameraServer::from_registry().do_send(Subscribe {
-                subject,
+                subject: sub.source.clone(),
                 client: address.clone().recipient(),
             });
         }
@@ -285,17 +274,8 @@ impl AnalysisSupervisor {
                 // remove frame subscriptions
                 for sub in instance.subscriptions {
                     // Unsubscribe actor from frames
-                    let subject = match sub.source {
-                        FrameSource::Camera { camera_id } => {
-                            SubscriptionSubject::Camera(camera_id, FrameResolution::SD)
-                        }
-                        FrameSource::AnalysisEngine {
-                            analysis_engine_id, ..
-                        } => SubscriptionSubject::AnalysisEngine(analysis_engine_id),
-                        FrameSource::Playback { id } => SubscriptionSubject::Playback(id, 0, 0),
-                    };
                     WsCameraServer::from_registry().do_send(Unsubscribe {
-                        subject,
+                        subject: sub.source.clone(),
                         client: addr.clone().recipient(),
                     });
                 }

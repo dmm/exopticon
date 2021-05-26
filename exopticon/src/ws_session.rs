@@ -120,6 +120,20 @@ pub struct RawCameraFrame {
     pub jpeg: Vec<u8>,
 }
 
+impl From<&RawCameraFrame> for SubscriptionSubject {
+    fn from(item: &RawCameraFrame) -> Self {
+        match item.source {
+            FrameSource::Camera { camera_id, .. } => {
+                Self::Camera(camera_id, item.resolution.clone())
+            }
+            FrameSource::AnalysisEngine {
+                analysis_engine_id, ..
+            } => Self::AnalysisEngine(analysis_engine_id),
+            FrameSource::Playback { id } => Self::Playback(id, 0, 0),
+        }
+    }
+}
+
 /// An actor representing a websocket connection
 pub struct WsSession {
     /// True when the websocket is ready to send
@@ -135,7 +149,7 @@ pub struct WsSession {
     pub live_frames: u32,
 
     /// Queue of frames awaiting delivery
-    pub frame_queue: FairQueue<FrameSource, RawCameraFrame>,
+    pub frame_queue: FairQueue<SubscriptionSubject, RawCameraFrame>,
 }
 
 impl WsSession {
@@ -247,7 +261,8 @@ impl WsSession {
 
     /// handle frame, potentially sending it to client
     fn handle_frame(&mut self, msg: RawCameraFrame, ctx: &mut <Self as Actor>::Context) {
-        self.frame_queue.push_back(msg.source.clone(), msg);
+        self.frame_queue
+            .push_back(SubscriptionSubject::from(&msg), msg);
         self.push_frame_if_ready(ctx);
     }
 }
@@ -324,7 +339,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                             subject: subject.clone(),
                             client: ctx.address().recipient(),
                         });
-                        self.frame_queue.remove(&FrameSource::from(subject));
+                        self.frame_queue.remove(&subject);
                     }
 
                     Ok(WsCommand::StartPlayback {

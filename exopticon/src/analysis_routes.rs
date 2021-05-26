@@ -197,7 +197,6 @@ pub async fn update_analysis_configuration(
     analysis_configuration: Json<AnalysisConfiguration>,
     state: Data<RouteState>,
 ) -> Result<HttpResponse, Error> {
-
     let analysis_configuration = state
         .db
         .send(AnalysisConfiguration {

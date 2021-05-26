@@ -44,7 +44,9 @@ use crate::fair_queue::FairQueue;
 use crate::models::{
     AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor, SubscriptionMask,
 };
-use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
+use crate::ws_camera_server::{
+    CameraFrame, FrameResolution, FrameSource, SubscriptionSubject, WsCameraServer,
+};
 
 base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
 
@@ -141,7 +143,7 @@ pub struct AnalysisActor {
     /// arguments to provide to executable
     pub arguments: Vec<String>,
     /// frame sources
-    pub subscriptions: HashMap<FrameSource, AnalysisSubscriptionModel>,
+    pub subscriptions: HashMap<SubscriptionSubject, AnalysisSubscriptionModel>,
     /// stdin of worker process
     pub worker_stdin: Option<
         tokio_util::codec::FramedWrite<
@@ -158,7 +160,7 @@ pub struct AnalysisActor {
     /// represents the previous time a frame was sent to worker
     pub last_frame_time: Option<Instant>,
     /// Queue of frames to feed analysis worker
-    pub frame_queue: FairQueue<FrameSource, CameraFrame>,
+    pub frame_queue: FairQueue<SubscriptionSubject, CameraFrame>,
     /// Address of database actor
     pub db_address: Addr<DbExecutor>,
     /// metrics
@@ -223,10 +225,23 @@ impl AnalysisActor {
                 if let Some(mut frame) = self.last_frame.take() {
                     let fut = self.db_address.send(CreateObservations { observations });
                     ctx.spawn(wrap_future(fut).map(|result, actor: &mut Self, _ctx| {
+                        let offset = match frame.source {
+                            FrameSource::Camera {
+                                camera_id: _,
+                                analysis_offset,
+                            }
+                            | FrameSource::AnalysisEngine {
+                                analysis_engine_id: _,
+                                analysis_offset,
+                            } => analysis_offset,
+                            FrameSource::Playback { id } => {
+                                panic!("Playback is not a valid analysis source {}", id);
+                            }
+                        };
                         if let Ok(Ok(new_observations)) = result {
                             frame.source = FrameSource::AnalysisEngine {
                                 analysis_engine_id: actor.id,
-                                tag: "".to_string(),
+                                analysis_offset: offset,
                             };
 
                             frame.observations = new_observations;
@@ -237,7 +252,7 @@ impl AnalysisActor {
                     }));
                 }
             }
-            AnalysisWorkerMessage::FrameReport { tag, jpeg } => {
+            AnalysisWorkerMessage::FrameReport { tag: _, jpeg } => {
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: 0,
                     jpeg,
@@ -245,7 +260,7 @@ impl AnalysisActor {
                     resolution: FrameResolution::SD,
                     source: FrameSource::AnalysisEngine {
                         analysis_engine_id: self.id,
-                        tag,
+                        analysis_offset: Duration::from_secs(0),
                     },
                     video_unit_id: Uuid::nil(),
                     offset: -1,
@@ -296,7 +311,7 @@ impl AnalysisActor {
             // we know there is a frame to send because of the initial
             // check. Is there a better way?
             if let Some(frame) = self.frame_queue.pop_front() {
-                let masks = match self.subscriptions.get(&frame.source) {
+                let masks = match self.subscriptions.get(&SubscriptionSubject::from(&frame)) {
                     None => Vec::new(),
                     Some(source) => source.masks.clone(),
                 };
@@ -429,7 +444,7 @@ impl Handler<CameraFrame> for AnalysisActor {
 
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Context<Self>) -> Self::Result {
         // Enqueue received frame
-        self.frame_queue.push_back(msg.source.clone(), msg);
+        self.frame_queue.push_back(SubscriptionSubject::from(&msg), msg);
 
         self.push_frame(ctx);
     }

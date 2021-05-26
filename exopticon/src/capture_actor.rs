@@ -24,6 +24,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Instant;
 
 use actix::{
     fut::wrap_future, registry::SystemService, Actor, ActorContext, ActorFuture, AsyncContext,
@@ -118,6 +119,8 @@ pub struct CaptureActor {
     pub stream_url: String,
     /// absolute path to video storage
     pub storage_path: String,
+    /// capture start time
+    pub capture_start: Instant,
     /// id of currently open video unit
     pub video_unit_id: Option<Uuid>,
     /// id of currently open video file
@@ -134,11 +137,17 @@ pub struct CaptureActor {
 
 impl CaptureActor {
     /// Returns new initialized `CaptureActor`
-    pub const fn new(camera_id: i32, stream_url: String, storage_path: String) -> Self {
+    pub const fn new(
+        camera_id: i32,
+        stream_url: String,
+        storage_path: String,
+        capture_start: Instant,
+    ) -> Self {
         Self {
             camera_id,
             stream_url,
             storage_path,
+            capture_start,
             video_unit_id: None,
             video_file_id: None,
             offset: 0,
@@ -203,6 +212,7 @@ impl CaptureActor {
                     resolution: FrameResolution::HD,
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
+                        analysis_offset: Instant::now().duration_since(self.capture_start),
                     },
                     video_unit_id: self
                         .video_unit_id
@@ -226,6 +236,7 @@ impl CaptureActor {
                     resolution: FrameResolution::SD,
                     source: FrameSource::Camera {
                         camera_id: self.camera_id,
+                        analysis_offset: Instant::now().duration_since(self.capture_start),
                     },
                     video_unit_id: self.video_unit_id.unwrap_or_else(Uuid::nil),
                     offset,

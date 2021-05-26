@@ -97,6 +97,21 @@ table! {
 }
 
 table! {
+    event_observations (id) {
+        id -> Int8,
+        event_id -> Int8,
+        observation_id -> Int8,
+    }
+}
+
+table! {
+    events (id) {
+        id -> Int8,
+        tag -> Text,
+    }
+}
+
+table! {
     notification_contacts (id) {
         id -> Int4,
         group_name -> Text,
@@ -188,6 +203,8 @@ joinable!(alerts -> alert_rules (alert_rule_id));
 joinable!(analysis_instances -> analysis_engines (analysis_engine_id));
 joinable!(analysis_subscriptions -> cameras (camera_id));
 joinable!(cameras -> camera_groups (camera_group_id));
+joinable!(event_observations -> events (event_id));
+joinable!(event_observations -> observations (observation_id));
 joinable!(observations -> video_units (video_unit_id));
 joinable!(subscription_masks -> analysis_subscriptions (analysis_subscription_id));
 joinable!(video_files -> video_units (video_unit_id));
@@ -202,6 +219,8 @@ allow_tables_to_appear_in_same_query!(
     analysis_subscriptions,
     camera_groups,
     cameras,
+    event_observations,
+    events,
     notification_contacts,
     notifiers,
     observations,

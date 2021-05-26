@@ -20,6 +20,7 @@
 
 #![allow(clippy::empty_enum)]
 use std::collections::{HashMap, HashSet};
+use std::time::Duration;
 
 use actix::{Actor, AsyncContext, Context, Handler, Message, Recipient, Supervised, SystemService};
 use base64::STANDARD;
@@ -48,33 +49,20 @@ pub enum FrameSource {
         /// id of camera
         #[serde(rename = "cameraId")]
         camera_id: i32,
+        analysis_offset: Duration,
     },
     /// Analysis Engine, with engine id
     AnalysisEngine {
         /// id of source analysis engine
         #[serde(rename = "analysisEngineId")]
         analysis_engine_id: i32,
-        /// identifying tag for analysis frame
-        tag: String,
+        analysis_offset: Duration,
     },
     /// Video Playback
     Playback {
         /// Playback id, must be unique per socket
         id: u64,
     },
-}
-
-impl From<SubscriptionSubject> for FrameSource {
-    fn from(item: SubscriptionSubject) -> Self {
-        match item {
-            SubscriptionSubject::Camera(camera_id, _resolution) => Self::Camera { camera_id },
-            SubscriptionSubject::AnalysisEngine(analysis_engine_id) => Self::AnalysisEngine {
-                analysis_engine_id,
-                tag: "".to_string(),
-            },
-            SubscriptionSubject::Playback(id, _, _) => Self::Playback { id },
-        }
-    }
 }
 
 /// An actor address that can receive `CameraFrame` messages
@@ -115,6 +103,22 @@ pub enum SubscriptionSubject {
     AnalysisEngine(i32),
     /// Playback id, name, initial video unit id, initial offset
     Playback(u64, i32, i64),
+}
+
+impl From<&CameraFrame> for SubscriptionSubject {
+    fn from(item: &CameraFrame) -> Self {
+        match item.source {
+            FrameSource::AnalysisEngine {
+                analysis_engine_id,
+                analysis_offset: _,
+            } => Self::AnalysisEngine(analysis_engine_id),
+            FrameSource::Camera {
+                camera_id,
+                analysis_offset: _,
+            } => Self::Camera(camera_id, item.resolution.clone()),
+            FrameSource::Playback { id } => Self::Playback(id, 0, 0),
+        }
+    }
 }
 
 /// subscribe message
@@ -190,7 +194,7 @@ impl WsCameraServer {
     ///
     fn send_frame(&mut self, frame: &CameraFrame, ctx: &<Self as Actor>::Context) {
         let subject = match &frame.source {
-            FrameSource::Camera { camera_id } => {
+            FrameSource::Camera { camera_id, .. } => {
                 SubscriptionSubject::Camera(*camera_id, frame.resolution.clone())
             }
 

@@ -30,6 +30,7 @@ use std::str::from_utf8;
 
 use actix_web::{body::Body, web::Path, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
+use rust_embed::RustEmbed;
 
 /// Fetches static index file, returns `HttpResponse`
 pub fn index(_req: HttpRequest) -> HttpResponse {

@@ -25,7 +25,7 @@ use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
 use uuid::Uuid;
 
-use crate::ws_camera_server::FrameSource;
+use crate::ws_camera_server::SubscriptionSubject;
 
 /// This is db executor actor. can be run in parallel
 pub struct DbExecutor(pub Pool<ConnectionManager<PgConnection>>);
@@ -713,7 +713,7 @@ pub struct AnalysisInstanceModel {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct AnalysisSubscriptionModel {
     /// source of frames
-    pub source: FrameSource,
+    pub source: SubscriptionSubject,
     /// masks that apply to this subscription
     pub masks: Vec<SubscriptionMask>,
 }
