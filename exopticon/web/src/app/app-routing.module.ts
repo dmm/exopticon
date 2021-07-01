@@ -25,9 +25,9 @@ import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.componen
 import { CameraDetailComponent } from "./camera-detail/camera-detail.component";
 import { CameraListComponent } from "./camera-list/camera-list.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
+import { EventListComponent } from "./event-list/event-list.component";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
-import {EventListComponent } from "./event-list/event-list.component";
 
 const routes: Routes = [
   { path: "login", component: LoginComponent },
