@@ -40,6 +40,7 @@ import { CameraService } from "./camera.service";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
 import { VideoViewComponent } from "./video-view/video-view.component";
+import { EventListComponent } from './event-list/event-list.component';
 
 @NgModule({
   declarations: [
@@ -55,6 +56,7 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     LoginComponent,
     CameraListComponent,
     CameraDetailComponent,
+    EventListComponent,
   ],
   imports: [
     BrowserModule,

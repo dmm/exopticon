@@ -31,7 +31,7 @@ use tempfile::tempdir;
 
 use crate::app::RouteState;
 use crate::db_registry;
-use crate::models::{FetchObservation, FetchObservations, FetchVideoUnit};
+use crate::models::{FetchObservation, FetchObservations, FetchVideoUnit, QueryEvents};
 use crate::video_unit_routes::DateRange;
 
 /// Implements route the fetchs `Observation`s from the database
@@ -270,6 +270,16 @@ pub async fn fetch_observation_clip(
                 Ok(HttpResponse::InternalServerError().body("video unit db failed"))
             }
         }
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+/// Route to query events
+pub async fn fetch_events(state: Data<RouteState>) -> Result<HttpResponse, Error> {
+    let db_response = state.db.send(QueryEvents { tags: Vec::new() }).await?;
+
+    match db_response {
+        Ok(events) => Ok(HttpResponse::Ok().json(events)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }

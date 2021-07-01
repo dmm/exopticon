@@ -108,8 +108,8 @@ asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}"/target/assets/workers/friga
 
 mkdir -p ${asset_dir}/data || true
 
-cp -r ${worker_dir}/frigate/frigate/motion.py ${asset_dir}/data
 cp -r ${worker_dir}/motion.py ${asset_dir}
+cp -r ${worker_dir}/event.py ${asset_dir}
 '''
 ]
 

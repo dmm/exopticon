@@ -53,7 +53,8 @@ pub struct RemoveFile {
 
 use crate::schema::{
     alert_rule_cameras, alert_rules, analysis_engines, analysis_instances, camera_groups, cameras,
-    notification_contacts, notifiers, observations, users, video_files, video_units,
+    event_observations, events, notification_contacts, notifiers, observations, users, video_files,
+    video_units,
 };
 
 /// Full camera group model. Represents a full row returned from the
@@ -720,6 +721,7 @@ pub struct AnalysisSubscriptionModel {
 
 /// Represents an instance of an analysis subscription mask
 #[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SubscriptionMask {
     /// upper-left x
     pub ul_x: i16,
@@ -904,4 +906,58 @@ pub struct NotificationContact {
 pub struct FetchNotificationContactsByGroup {
     /// name of group to fetch contacts for
     pub group_name: String,
+}
+
+/// Represents Event record
+#[derive(AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
+#[table_name = "events"]
+pub struct Event {
+    /// Event id
+    pub id: Uuid,
+    /// Event tag
+    pub tag: String,
+}
+
+/// Represents event observation record
+#[derive(AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
+#[table_name = "event_observations"]
+pub struct EventObservation {
+    /// Event id
+    pub event_id: Uuid,
+    /// Observation id
+    pub observation_id: i64,
+}
+
+/// Create model for Events
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateEvent {
+    pub id: Uuid,
+    /// Event tag
+    pub tag: String,
+    /// Observations
+    pub observations: Vec<i64>,
+}
+
+/// Domain model for Events
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub struct EventModel {
+    ///event id
+    pub id: Uuid,
+    /// Event tag
+    pub tag: String,
+    /// Event start time
+    pub begin_time: DateTime<Utc>,
+    /// Event end time
+    pub end_time: DateTime<Utc>,
+    /// Observations
+    pub observations: Vec<i64>,
+}
+
+/// Query Events
+#[derive(Clone, Deserialize, Serialize, Debug)]
+pub struct QueryEvents {
+    /// Vec of tags to match event for
+    pub tags: Vec<String>,
 }

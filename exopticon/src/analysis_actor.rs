@@ -39,13 +39,16 @@ use tokio::process::Command;
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
-use crate::analysis_supervisor::{AnalysisMetrics, StopAnalysisActor};
 use crate::fair_queue::FairQueue;
 use crate::models::{
     AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor, SubscriptionMask,
 };
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, SubscriptionSubject, WsCameraServer,
+};
+use crate::{
+    analysis_supervisor::{AnalysisMetrics, StopAnalysisActor},
+    models::CreateEvent,
 };
 
 base64_serde_type!(Base64Standard, STANDARD_NO_PAD);
@@ -69,6 +72,7 @@ enum LogLevel {
 
 impl From<Level> for LogLevel {
     #[must_use]
+
     fn from(item: Level) -> Self {
         match item {
             Level::Error => Self::Error,
@@ -120,6 +124,7 @@ enum AnalysisWorkerMessage {
         /// timing values
         times: Vec<u64>,
     },
+    Event(CreateEvent),
 }
 
 /// Represents message sent to worker
@@ -277,6 +282,23 @@ impl AnalysisActor {
                     min / 1000,
                     max / 1000
                 )
+            }
+            AnalysisWorkerMessage::Event(event) => {
+                let fut = self.db_address.send(event);
+                ctx.spawn(
+                    wrap_future(fut).map(|result, _actor: &mut Self, _ctx| match result {
+                        Ok(Ok(event)) => {
+                            debug!("Inserted event! {:?}", event);
+                        }
+
+                        Ok(Err(e)) => {
+                            error!("Failed to add event: {}", e);
+                        }
+                        Err(e) => {
+                            error!("Failed to add event: {}", e);
+                        }
+                    }),
+                );
             }
         }
     }
@@ -444,7 +466,8 @@ impl Handler<CameraFrame> for AnalysisActor {
 
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Context<Self>) -> Self::Result {
         // Enqueue received frame
-        self.frame_queue.push_back(SubscriptionSubject::from(&msg), msg);
+        self.frame_queue
+            .push_back(SubscriptionSubject::from(&msg), msg);
 
         self.push_frame(ctx);
     }

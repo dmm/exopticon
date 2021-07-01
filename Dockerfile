@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
   curl python3-pil python3-lxml \
   python3 python3-dev python3-pip python3-setuptools python3-wheel \
-  git libopencv-dev python3-opencv cmake \
+  git libopencv-dev python3-opencv python3-scipy cmake \
 # ffmpeg \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
@@ -182,7 +182,7 @@ RUN apt-get -qq update \
     && (apt-get autoremove -y; apt-get autoclean -y)
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-      python3-setuptools python3-pip python3-wheel python3-pillow \
+      python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
     && pip3 install msgpack imutils numpy \
     && apt-get purge -y python3-setuptools python3-pip python3-wheel \
     && apt-get clean \

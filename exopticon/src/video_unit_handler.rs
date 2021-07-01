@@ -253,6 +253,7 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
 
     fn handle(&mut self, msg: DeleteVideoUnitFiles, _: &mut Self::Context) -> Self::Result {
         use crate::schema;
+        use crate::schema::event_observations::dsl::*;
         use crate::schema::observations::dsl::*;
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
@@ -264,12 +265,28 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
         )
         .execute(conn)
         .map_err(|_error| ServiceError::InternalServerError)?;
+
+        diesel::delete(event_observations)
+            .filter(
+                schema::event_observations::columns::observation_id.eq_any(
+                    observations
+                        .filter(
+                            schema::observations::columns::video_unit_id
+                                .eq(any(&msg.video_unit_ids)),
+                        )
+                        .select(schema::observations::columns::id),
+                ),
+            )
+            .execute(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
         diesel::delete(
             observations
                 .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids))),
         )
         .execute(conn)
         .map_err(|_error| ServiceError::InternalServerError)?;
+
         diesel::delete(
             video_units.filter(schema::video_units::columns::id.eq(any(msg.video_unit_ids))),
         )

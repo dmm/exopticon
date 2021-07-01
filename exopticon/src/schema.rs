@@ -99,15 +99,17 @@ table! {
 table! {
     event_observations (id) {
         id -> Int8,
-        event_id -> Int8,
+        event_id -> Uuid,
         observation_id -> Int8,
     }
 }
 
 table! {
     events (id) {
-        id -> Int8,
+        id -> Uuid,
         tag -> Text,
+        inserted_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 

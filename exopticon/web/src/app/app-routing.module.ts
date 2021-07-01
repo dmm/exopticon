@@ -27,6 +27,7 @@ import { CameraListComponent } from "./camera-list/camera-list.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
+import {EventListComponent } from "./event-list/event-list.component";
 
 const routes: Routes = [
   { path: "login", component: LoginComponent },
@@ -36,6 +37,7 @@ const routes: Routes = [
   { path: "cameras/:id", component: CameraDetailComponent },
   { path: "cameras/:id/playback", component: PlaybackViewComponent },
   { path: "alerts/:id", component: AlertViewComponent },
+  { path: "events", component: EventListComponent },
   { path: "", redirectTo: "/camera_panel", pathMatch: "full" },
   { path: "**", redirectTo: "/camera_panel", pathMatch: "full" },
 ];

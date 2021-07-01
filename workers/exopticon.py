@@ -23,6 +23,7 @@ import msgpack
 import numpy as np
 import struct
 import sys
+from select import select
 import time
 from functools import partial
 import os
@@ -74,6 +75,8 @@ class AnalysisFrame(object):
         f = m["frame"]
 
         self.camera_id = f["camera_id"]
+        self.analysis_offset = f["source"]["analysis_offset"]["secs"]
+        self.analysis_offset += f["source"]["analysis_offset"]["nanos"] / 1000000000
         self.video_unit_id = f["video_unit_id"]
         self.unscaled_height = f["unscaled_height"]
         self.unscaled_width = f["unscaled_width"]
@@ -220,6 +223,9 @@ class WorkerHandler(logging.Handler):
         log_entry = self.format(record)
         self.worker.raw_log(record.levelno, log_entry)
 
+class TimeoutError(Exception):
+    pass
+
 class ExopticonWorker(object):
     def __init__(self, worker_name):
         self.__worker_name = worker_name
@@ -274,6 +280,9 @@ class ExopticonWorker(object):
         self.__write_framed_message(serialized)
 
     def __read_frame(self):
+        rlist, _, _ = select([sys.stdin], [], [], 0.1)
+        if not rlist:
+            raise TimeoutError()
         len_buf = sys.stdin.buffer.read(4)
         msg_len = struct.unpack('>L', len_buf)[0]
         msg_buf = sys.stdin.buffer.read(msg_len)
@@ -314,6 +323,17 @@ class ExopticonWorker(object):
         serialized = json.dumps(observations_dict)
         self.__write_framed_message(serialized)
 
+    def write_event(self, event):
+        event_model = {
+            "id": event['id'],
+            "tag": event['label'],
+            "observations": list(map(lambda a: a.id, event['observations']))
+        }
+        event_dict = {'Event': event_model}
+        serialized = json.dumps(event_dict)
+        self.logger.info("Writing event: " + serialized)
+        self.__write_framed_message(serialized)
+
     def __write_framed_message(self, serialized):
         serialized = serialized.encode('utf-8')
         packed_len = struct.pack('>L', len(serialized))
@@ -330,6 +350,9 @@ class ExopticonWorker(object):
             self.__write_timing('frame', self.__frame_times)
             self.__frame_times = []
 
+    def handle_timeout(self):
+        pass
+
     @staticmethod
     def get_data_dir():
         return os.path.join(sys.path[0], "data")
@@ -344,9 +367,12 @@ class ExopticonWorker(object):
         try:
             while True:
                 self.__request_frame()
-                frame = self.__read_frame()
-                self.__apply_masks(frame)
-                self.__handle_frame(frame)
+                try:
+                    frame = self.__read_frame()
+                    self.__apply_masks(frame)
+                    self.__handle_frame(frame)
+                except TimeoutError:
+                    self.handle_timeout()
         except EOFError:
             sys.exit(0)
         finally:
