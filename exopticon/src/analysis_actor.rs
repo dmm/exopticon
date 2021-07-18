@@ -41,7 +41,8 @@ use uuid::Uuid;
 
 use crate::fair_queue::FairQueue;
 use crate::models::{
-    AnalysisSubscriptionModel, CreateObservation, CreateObservations, DbExecutor, SubscriptionMask,
+    AnalysisSubscriptionModel, CreateObservation, CreateObservationSnapshot, CreateObservations,
+    DbExecutor, SubscriptionMask,
 };
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, SubscriptionSubject, WsCameraServer,
@@ -284,9 +285,10 @@ impl AnalysisActor {
                 )
             }
             AnalysisWorkerMessage::Event(event) => {
-                let fut = self.db_address.send(event);
-                ctx.spawn(
-                    wrap_future(fut).map(|result, _actor: &mut Self, _ctx| match result {
+                let db = self.db_address.clone();
+                let fut = async move {
+                    let ob_id = event.display_observation_id;
+                    match db.send(event).await {
                         Ok(Ok(event)) => {
                             debug!("Inserted event! {:?}", event);
                         }
@@ -297,8 +299,28 @@ impl AnalysisActor {
                         Err(e) => {
                             error!("Failed to add event: {}", e);
                         }
-                    }),
-                );
+                    };
+
+                    match db
+                        .send(CreateObservationSnapshot {
+                            observation_id: ob_id,
+                        })
+                        .await
+                    {
+                        Ok(Ok(event)) => {
+                            debug!("Inserted observation snapshot! {:?}", event);
+                        }
+
+                        Ok(Err(e)) => {
+                            error!("Failed to add observation snapshot: {}", e);
+                        }
+                        Err(e) => {
+                            error!("Failed to add observation snapshot: {}", e);
+                        }
+                    };
+                };
+
+                ctx.spawn(wrap_future(fut));
             }
         }
     }

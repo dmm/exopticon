@@ -190,11 +190,18 @@ class EventWorker(ExopticonWorker):
 #        self.logger.info("Tracking " + str(len(object_tracker.tracked_objects)) + " Objects: " + json.dumps(object_tracker.tracked_objects))
 
         for obj in object_tracker.tracked_objects.values():
-            pos = 0
+            count = len(obj['observations'])
+            sum = 0
+            max_score = 0
+            max_id = 0
             for obs in obj['observations']:
-                if obs.score > 70:
-                    pos += 1
-            if pos > 3:
+                if obs.score > max_id:
+                    max_score = obs.score
+                    max_id = obs.id
+                sum += obs.score
+            if object_tracker.disappeared[obj['id']] == 0 and (sum / count) > 80 and count > 3:
+                obj["camera_id"] = frame.camera_id
+                obj["display_observation_id"] = max_id
                 self.write_event(obj)
 
     def handle_timeout(self):

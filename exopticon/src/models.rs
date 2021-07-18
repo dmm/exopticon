@@ -53,8 +53,8 @@ pub struct RemoveFile {
 
 use crate::schema::{
     alert_rule_cameras, alert_rules, analysis_engines, analysis_instances, camera_groups, cameras,
-    event_observations, events, notification_contacts, notifiers, observations, users, video_files,
-    video_units,
+    event_observations, events, notification_contacts, notifiers, observation_snapshots,
+    observations, users, video_files, video_units,
 };
 
 /// Full camera group model. Represents a full row returned from the
@@ -75,6 +75,15 @@ pub struct CameraGroup {
     pub inserted_at: NaiveDateTime,
     /// update time
     pub updated_at: NaiveDateTime,
+}
+
+impl CameraGroup {
+    pub fn get_snapshot_path(&self, camera_id: i32, observation_id: i64) -> String {
+        format!(
+            "{}/{}/observations/{}.jpg",
+            self.id, camera_id, observation_id
+        )
+    }
 }
 
 /// Represents a camera group creation request
@@ -916,6 +925,14 @@ pub struct Event {
     pub id: Uuid,
     /// Event tag
     pub tag: String,
+    /// Camera id
+    pub camera_id: i32,
+    /// Event start time
+    pub begin_time: DateTime<Utc>,
+    /// Event end time
+    pub end_time: DateTime<Utc>,
+    /// observation for display
+    pub display_observation_id: i64,
 }
 
 /// Represents event observation record
@@ -935,8 +952,17 @@ pub struct CreateEvent {
     pub id: Uuid,
     /// Event tag
     pub tag: String,
+    // Camera id
+    pub camera_id: i32,
     /// Observations
     pub observations: Vec<i64>,
+    /// best observation for display
+    pub display_observation_id: i64,
+}
+
+/// Fetch single Event
+pub struct FetchEvent {
+    pub event_id: Uuid,
 }
 
 /// Domain model for Events
@@ -947,12 +973,16 @@ pub struct EventModel {
     pub id: Uuid,
     /// Event tag
     pub tag: String,
+    /// Camera id
+    pub camera_id: i32,
     /// Event start time
     pub begin_time: DateTime<Utc>,
     /// Event end time
     pub end_time: DateTime<Utc>,
     /// Observations
     pub observations: Vec<i64>,
+    /// best observation for display
+    pub display_observation_id: i64,
 }
 
 /// Query Events
@@ -960,4 +990,38 @@ pub struct EventModel {
 pub struct QueryEvents {
     /// Vec of tags to match event for
     pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct QueryEventVideoSegments {
+    // Event id
+    pub event_id: Uuid,
+}
+
+#[derive(Clone, Debug)]
+pub struct GetEventFile {
+    pub event_id: Uuid,
+}
+
+#[derive(Clone, Debug)]
+pub struct EventFile {
+    pub snapshot_path: String,
+    pub video_file_path: String,
+    pub offset_msec: u64,
+}
+
+#[derive(AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
+#[table_name = "observation_snapshots"]
+pub struct ObservationSnapshot {
+    pub observation_id: i64,
+    pub snapshot_path: String,
+    pub snapshot_size: i32,
+}
+
+pub struct CreateObservationSnapshot {
+    pub observation_id: i64,
+}
+
+pub struct FetchObservationSnapshot {
+    pub observation_id: i64,
 }

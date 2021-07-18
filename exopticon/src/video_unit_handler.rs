@@ -254,6 +254,7 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
     fn handle(&mut self, msg: DeleteVideoUnitFiles, _: &mut Self::Context) -> Self::Result {
         use crate::schema;
         use crate::schema::event_observations::dsl::*;
+        use crate::schema::observation_snapshots::dsl::*;
         use crate::schema::observations::dsl::*;
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
@@ -269,6 +270,34 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
         diesel::delete(event_observations)
             .filter(
                 schema::event_observations::columns::observation_id.eq_any(
+                    observations
+                        .filter(
+                            schema::observations::columns::video_unit_id
+                                .eq(any(&msg.video_unit_ids)),
+                        )
+                        .select(schema::observations::columns::id),
+                ),
+            )
+            .execute(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        // Fetch all observation snapshots that need to be deleted
+        let snaps: Vec<String> = observation_snapshots
+            .inner_join(observations)
+            .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
+            .select(snapshot_path)
+            .load(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        for s in snaps {
+            if std::fs::remove_file(&s).is_err() {
+                error!("Failed to delete file: {}", &s);
+            }
+        }
+
+        diesel::delete(observation_snapshots)
+            .filter(
+                schema::observation_snapshots::columns::observation_id.eq_any(
                     observations
                         .filter(
                             schema::observations::columns::video_unit_id

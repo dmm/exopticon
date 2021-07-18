@@ -23,6 +23,7 @@
     "@angular/router": "~11.0.0",
     "@angular/service-worker": "^11.0.0",
     "@js-joda/core": "^1.12.0",
+    "@js-joda/extra": "^0.4",
     "@js-joda/timezone": "^2.2",
     "@ng-web-apis/common": "^1.7.0",
     "@ng-web-apis/intersection-observer": "^2.1.0",

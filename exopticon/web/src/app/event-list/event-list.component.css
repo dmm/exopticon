@@ -1,0 +1,38 @@
+.events_wrapper {
+  display: grid;
+  max-width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+  grid-gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .events_wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+.event {
+  display: grid;
+  grid-template-columns: 1fr 50px 1fr;
+  grid-template-rows: 15px repeat(3, 1fr);
+}
+
+.event > .info {
+  grid-column: 1/4;
+  grid-row: 1;
+}
+
+.event > img,
+.event > video {
+  width: 100%;
+  grid-column: 1/5;
+  grid-row: 2/5;
+}
+
+.event > .playbutton {
+  grid-column: 2/2;
+  grid-row: 2/2;
+  user-select: none;
+  z-index: 10;
+  font-size: 50px;
+}

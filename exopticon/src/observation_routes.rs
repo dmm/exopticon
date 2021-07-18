@@ -26,12 +26,19 @@ use std::fs;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
+use actix_files::NamedFile;
 use actix_web::{web, web::Data, web::Path, web::Query, Error, HttpResponse};
 use tempfile::tempdir;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
+use uuid::Uuid;
 
 use crate::app::RouteState;
 use crate::db_registry;
-use crate::models::{FetchObservation, FetchObservations, FetchVideoUnit, QueryEvents};
+use crate::models::{
+    FetchCamera, FetchCameraGroup, FetchEvent, FetchObservation, FetchObservationSnapshot,
+    FetchObservations, FetchVideoUnit, QueryEvents,
+};
 use crate::video_unit_routes::DateRange;
 
 /// Implements route the fetchs `Observation`s from the database
@@ -89,26 +96,62 @@ pub async fn fetch_observations_between(
 /// Async fetch the image corresponding to an observation
 pub async fn fetch_observation_image(observation_id: i64) -> Result<Vec<u8>, ()> {
     let db = db_registry::get_db();
-    let obs_response = db
+    let observation = db
         .send(FetchObservation { id: observation_id })
         .await
+        .map_err(|_| {
+            error!("Error Sending FetchObservation");
+        })?
         .map_err(|_| {
             error!("Error fetching FetchObservation");
         })?;
 
-    match obs_response {
-        Ok(observation) => {
-            let mut unit_response = db
-                .send(FetchVideoUnit {
-                    id: observation.video_unit_id,
-                })
-                .await
-                .map_err(|_| {
-                    error!("Failed to send FetchVideoUnit message");
-                })?
-                .map_err(|_| {
-                    error!("FetchVideoUnit db error!");
-                })?;
+    let mut unit_response = db
+        .send(FetchVideoUnit {
+            id: observation.video_unit_id,
+        })
+        .await
+        .map_err(|_| {
+            error!("Failed to send FetchVideoUnit message");
+        })?
+        .map_err(|_| {
+            error!("FetchVideoUnit db error!");
+        })?;
+
+    let camera = db
+        .send(FetchCamera {
+            id: unit_response.0.camera_id,
+        })
+        .await
+        .map_err(|_| {
+            error!("Failed to send FetchCamera message");
+        })?
+        .map_err(|_| {
+            error!("FetchCamera db error!");
+        })?;
+
+    let camera_group = db
+        .send(FetchCameraGroup {
+            id: camera.camera_group_id,
+        })
+        .await
+        .map_err(|_| {
+            error!("Failed to send FetchCameraGroup message");
+        })?
+        .map_err(|_| {
+            error!("FetchCameraGroup db error!");
+        })?;
+
+    let snapshot_filename = camera_group.get_snapshot_path(camera.id, observation.id);
+    match File::open(&snapshot_filename).await {
+        Ok(mut f) => {
+            let mut buffer = Vec::new();
+
+            // read the whole file
+            f.read_to_end(&mut buffer).await.map_err(|_| {})?;
+            Ok(buffer)
+        }
+        Err(_e) => {
             let file = unit_response.1.pop();
             if let Some(file) = file {
                 let offset = u64::try_from(observation.frame_offset).map_err(|_| {
@@ -117,7 +160,8 @@ pub async fn fetch_observation_image(observation_id: i64) -> Result<Vec<u8>, ()>
                         observation.frame_offset
                     );
                 })?;
-                let snap = match web::block(move || get_snapshot(&file.filename, offset)).await {
+                let snap = match web::block(move || get_snapshot(&file.filename, "-", offset)).await
+                {
                     Ok(jpg) => Ok(jpg),
                     Err(_) => Err(()),
                 }?;
@@ -127,22 +171,25 @@ pub async fn fetch_observation_image(observation_id: i64) -> Result<Vec<u8>, ()>
                 Err(())
             }
         }
-        Err(err) => {
-            error!("observation error: {}", err.to_string());
-            Err(())
-        }
     }
 }
 
 /// returns snapshot for given video file path and offset
-pub fn get_snapshot(path: &str, microsecond_offset: u64) -> Result<Vec<u8>, ()> {
+pub fn get_snapshot(
+    path: &str,
+    snapshot_path: &str,
+    microsecond_offset: u64,
+) -> Result<Vec<u8>, ()> {
     let offset = Duration::from_micros(microsecond_offset);
     debug!("Capturing snapshot: {} {}", &path, microsecond_offset);
     let child = Command::new("ffmpeg")
+        .arg("-y")
         .arg("-ss")
         .arg(format!("{}.{}", offset.as_secs(), offset.subsec_millis()))
         .arg("-i")
         .arg(path)
+        .arg("-vf")
+        .arg("scale=-1:480")
         .arg("-vframes")
         .arg("1")
         .arg("-vcodec")
@@ -151,7 +198,7 @@ pub fn get_snapshot(path: &str, microsecond_offset: u64) -> Result<Vec<u8>, ()> 
         .arg("2")
         .arg("-f")
         .arg("mjpeg")
-        .arg("-")
+        .arg(snapshot_path)
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|_| {
@@ -181,6 +228,39 @@ pub async fn fetch_observation_snapshot(
     }
 }
 
+/// Implements method to fetch event snapshot
+pub async fn fetch_event_snapshot(
+    event_id: Path<Uuid>,
+    _state: Data<RouteState>,
+) -> Result<NamedFile, Error> {
+    let db = db_registry::get_db();
+    let event = db
+        .send(FetchEvent {
+            event_id: event_id.into_inner(),
+        })
+        .await
+        .map_err(|_| {
+            error!("Error Sending FetchObservation");
+        })?
+        .map_err(|_| {
+            error!("Error fetching FetchObservation");
+        })?;
+
+    let observation_snapshot = db
+        .send(FetchObservationSnapshot {
+            observation_id: event.display_observation_id,
+        })
+        .await
+        .map_err(|_| {
+            error!("Error Sending FetchObservationSnapshot");
+        })?
+        .map_err(|_| {
+            error!("Error fetching FetchObservationSnapshot");
+        })?;
+
+    Ok(NamedFile::open(observation_snapshot.snapshot_path)?)
+}
+
 /// returns clip for given video file path, offset and time
 pub fn get_clip(path: &str, microsecond_offset: u64, length: Duration) -> Result<Vec<u8>, ()> {
     debug!(
@@ -204,6 +284,8 @@ pub fn get_clip(path: &str, microsecond_offset: u64, length: Duration) -> Result
         .arg(path)
         .arg("-vcodec")
         .arg("copy")
+        .arg("-movflags")
+        .arg("faststart")
         .arg("-t")
         .arg(format!("{}.{}", length.as_secs(), length.subsec_millis()))
         .arg("-avoid_negative_ts")

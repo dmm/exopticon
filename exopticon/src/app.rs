@@ -42,8 +42,8 @@ use crate::camera_routes::{
 };
 use crate::models::DbExecutor;
 use crate::observation_routes::{
-    fetch_events, fetch_observation, fetch_observation_clip, fetch_observation_snapshot,
-    fetch_observations_between,
+    fetch_event_snapshot, fetch_events, fetch_observation, fetch_observation_clip,
+    fetch_observation_snapshot, fetch_observations_between,
 };
 use crate::static_routes;
 use crate::static_routes::index;
@@ -195,8 +195,12 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                     web::resource("/observations/{id}/clip")
                         .route(web::get().to(fetch_observation_clip)),
                 )
-                // Event route
+                // Event routes
                 .service(web::resource("/events").route(web::get().to(fetch_events)))
+                .service(
+                    web::resource("/events/{event_id}/snapshot")
+                        .route(web::get().to(fetch_event_snapshot)),
+                )
                 // routes to alert rules
                 .service(
                     web::resource("/alert_rule")

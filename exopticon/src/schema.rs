@@ -108,8 +108,10 @@ table! {
     events (id) {
         id -> Uuid,
         tag -> Text,
-        inserted_at -> Timestamptz,
-        updated_at -> Timestamptz,
+        camera_id -> Int4,
+        begin_time -> Timestamptz,
+        end_time -> Timestamptz,
+        display_observation_id -> Int8,
     }
 }
 
@@ -131,6 +133,14 @@ table! {
         password -> Nullable<Varchar>,
         inserted_at -> Timestamptz,
         updated_at -> Timestamptz,
+    }
+}
+
+table! {
+    observation_snapshots (observation_id) {
+        observation_id -> Int8,
+        snapshot_path -> Text,
+        snapshot_size -> Int4,
     }
 }
 
@@ -207,6 +217,9 @@ joinable!(analysis_subscriptions -> cameras (camera_id));
 joinable!(cameras -> camera_groups (camera_group_id));
 joinable!(event_observations -> events (event_id));
 joinable!(event_observations -> observations (observation_id));
+joinable!(events -> cameras (camera_id));
+joinable!(events -> observations (display_observation_id));
+joinable!(observation_snapshots -> observations (observation_id));
 joinable!(observations -> video_units (video_unit_id));
 joinable!(subscription_masks -> analysis_subscriptions (analysis_subscription_id));
 joinable!(video_files -> video_units (video_unit_id));
@@ -225,6 +238,7 @@ allow_tables_to_appear_in_same_query!(
     events,
     notification_contacts,
     notifiers,
+    observation_snapshots,
     observations,
     subscription_masks,
     users,

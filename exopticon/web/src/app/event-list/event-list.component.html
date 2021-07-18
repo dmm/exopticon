@@ -1,11 +1,32 @@
 <h2>Events</h2>
-<ul class="events">
-  <li *ngFor="let event of events$ | async">
-    {{ event.id }}
-    {{ event.tag }}
+<div class="events_wrapper">
+  <div *ngFor="let event of events$ | async; let index = index" class="event">
+    <div class="info">
+      {{ event.tag }}
+      {{ event.beginTime }}
+      {{ event.endTime }}
+    </div>
     <img
-      *ngIf="event.observations.length > 0"
-      src="/v1/observations/{{ event.observations[0] }}/snapshot"
+      *ngIf="selectedEvent != index"
+      src="/v1/events/{{ event.id }}/snapshot"
     />
-  </li>
-</ul>
+    <div
+      class="playbutton"
+      *ngIf="selectedEvent != index"
+      (click)="onEventClick(index)"
+    >
+      &#9654;
+    </div>
+    <video
+      controls
+      autoplay
+      loop
+      *ngIf="selectedEvent == index && event.observations.length > 0"
+    >
+      <source
+        src="/v1/observations/{{ event.observations[0] }}/clip#t=-5"
+        type="video/mp4"
+      />
+    </video>
+  </div>
+</div>

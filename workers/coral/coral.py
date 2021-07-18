@@ -64,7 +64,7 @@ class CoralWorker(ExopticonWorker):
     def handle_frame(self, frame):
         image = frame.image
         offset = [0, 0]
-        important_labels = ["person", "car", "truck", "dog"]
+        important_labels = ["person", "dog"]
 
         detections = []
 

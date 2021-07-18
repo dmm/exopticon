@@ -327,7 +327,9 @@ class ExopticonWorker(object):
         event_model = {
             "id": event['id'],
             "tag": event['label'],
-            "observations": list(map(lambda a: a.id, event['observations']))
+            "cameraId": event['camera_id'],
+            "observations": list(map(lambda a: a.id, event['observations'])),
+            "displayObservationId": event['display_observation_id']
         }
         event_dict = {'Event': event_model}
         serialized = json.dumps(event_dict)
