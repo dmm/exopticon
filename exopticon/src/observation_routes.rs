@@ -23,6 +23,7 @@
 
 use std::convert::TryFrom;
 use std::fs;
+use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -36,8 +37,8 @@ use uuid::Uuid;
 use crate::app::RouteState;
 use crate::db_registry;
 use crate::models::{
-    FetchCamera, FetchCameraGroup, FetchEvent, FetchObservation, FetchObservationSnapshot,
-    FetchObservations, FetchVideoUnit, QueryEvents,
+    EventFile, FetchCamera, FetchCameraGroup, FetchEvent, FetchObservation,
+    FetchObservationSnapshot, FetchObservations, FetchVideoUnit, GetEventFile, QueryEvents,
 };
 use crate::video_unit_routes::DateRange;
 
@@ -277,7 +278,6 @@ pub fn get_clip(path: &str, microsecond_offset: u64, length: Duration) -> Result
     debug!("File Path: {:?}", file_path);
     let offset = Duration::from_micros(microsecond_offset);
     let child = Command::new("ffmpeg")
-        .arg("-noaccurate_seek")
         .arg("-ss")
         .arg(format!("{}.{}", offset.as_secs(), offset.subsec_millis()))
         .arg("-i")
@@ -303,6 +303,141 @@ pub fn get_clip(path: &str, microsecond_offset: u64, length: Duration) -> Result
         error!("Failed to read clip file.");
     })?;
     Ok(contents)
+}
+
+/// Route the fetch video for event
+fn get_event_clip(event_files: EventFile) -> Result<Vec<u8>, ()> {
+    if event_files.files.is_empty() {
+        error!("Failed to find event files!");
+        return Err(());
+    }
+
+    // mp4 must be written to a file so create a temp dir
+    let dir = tempdir().map_err(|_| {
+        error!("failed to make tempdir");
+    })?;
+    let output_file_path = dir.path().join("output.mp4");
+    let edit_list_path = dir.path().join("edit_list.txt");
+    let mut edit_list = std::fs::File::create(edit_list_path.clone()).map_err(|e| {
+        error!("Error opening edit list: {}", e);
+    })?;
+
+    // Handle first file
+    writeln!(&mut edit_list, "file {}", event_files.files[0].0).map_err(|e| {
+        error!("Error opening edit list: {}", e);
+    })?;
+    let offset_micros = u64::try_from(event_files.files[0].1).map_err(|e| {
+        error!("Failed to convert offset: {}", e);
+    })?;
+    let offset = Duration::from_micros(offset_micros);
+    let offset_secs: f64 = conv::ValueFrom::value_from(offset.as_secs()).map_err(|e| {
+        error!("Failed converting offset secs to f64: {}", e);
+    })?;
+    let offset_subsecs: f64 = conv::ValueFrom::value_from(offset.subsec_nanos()).map_err(|e| {
+        error!("Failed converting offset subsecs to f64: {}", e);
+    })?;
+    writeln!(
+        &mut edit_list,
+        "inpoint {}",
+        offset_secs + offset_subsecs / 1_000_000_000.0
+    )
+    .map_err(|e| {
+        error!("Error opening edit list: {}", e);
+    })?;
+
+    if event_files.files.len() > 2 {
+        let files = event_files.files[1..event_files.files.len() - 1]
+            .iter()
+            .peekable();
+        // Handle non-first and non-last files
+        for f in files {
+            writeln!(&mut edit_list, "file {}", f.0).map_err(|e| {
+                error!("Error opening edit list: {}", e);
+            })?;
+        }
+    }
+
+    // Handle last file
+    if event_files.files.len() > 1 {
+        if let Some(f) = event_files.files[1..].last() {
+            writeln!(&mut edit_list, "file {}", f.0).map_err(|e| {
+                error!("Error opening edit list: {}", e);
+            })?;
+            let offset_conv: u64 = conv::ValueFrom::value_from(f.2).map_err(|e| {
+                error!("Failed to convert offset: {}", e);
+            })?;
+            let last_offset = Duration::from_micros(offset_conv);
+            let last_offset_secs: f64 = conv::ValueFrom::value_from(last_offset.as_secs())
+                .map_err(|e| {
+                    error!("Failed converting offset secs to f64: {}", e);
+                })?;
+            let last_offset_subsecs: f64 = conv::ValueFrom::value_from(offset.subsec_nanos())
+                .map_err(|e| {
+                    error!("Failed converting offset subsecs to f64: {}", e);
+                })?;
+
+            writeln!(
+                &mut edit_list,
+                "outpoint {}",
+                last_offset_secs + last_offset_subsecs / 1_000_000_000.0
+            )
+            .map_err(|e| {
+                error!("Error opening edit list: {}", e);
+            })?;
+        }
+    }
+
+    let edit_list_contents =
+        fs::read_to_string(&edit_list_path).expect("Something went wrong reading the file");
+
+    debug!("Edit list contents: {}", edit_list_contents);
+
+    let child = Command::new("ffmpeg")
+        .arg("-f")
+        .arg("concat")
+        .arg("-safe")
+        .arg("0")
+        .arg("-i")
+        .arg(edit_list_path)
+        .arg("-c")
+        .arg("copy")
+        .arg("-movflags")
+        .arg("faststart")
+        .arg("-avoid_negative_ts")
+        .arg("make_zero")
+        .arg(&output_file_path)
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to launch");
+
+    child.wait_with_output().map_err(|_| {
+        error!("failed to wait on child");
+    })?;
+
+    let contents = fs::read(output_file_path).map_err(|_| {
+        error!("Failed to read clip file.");
+    })?;
+    Ok(contents)
+}
+
+pub async fn fetch_event_clip(
+    event_id: Path<Uuid>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, Error> {
+    let event_files = state
+        .db
+        .send(GetEventFile {
+            event_id: event_id.into_inner(),
+        })
+        .await?;
+
+    match event_files {
+        Ok(event_files) => match web::block(move || get_event_clip(event_files)).await {
+            Ok(clip) => Ok(HttpResponse::Ok().content_type("video/webm").body(clip)),
+            Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        },
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
 }
 
 /// Async fetch the clip corresponding to an observation
@@ -357,8 +492,11 @@ pub async fn fetch_observation_clip(
 }
 
 /// Route to query events
-pub async fn fetch_events(state: Data<RouteState>) -> Result<HttpResponse, Error> {
-    let db_response = state.db.send(QueryEvents { tags: Vec::new() }).await?;
+pub async fn fetch_events(
+    query: web::Query<QueryEvents>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, Error> {
+    let db_response = state.db.send(query.into_inner()).await?;
 
     match db_response {
         Ok(events) => Ok(HttpResponse::Ok().json(events)),

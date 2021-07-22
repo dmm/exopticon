@@ -206,6 +206,7 @@ impl AnalysisActor {
     }
 
     /// Processes the analysis worker message
+    #[allow(clippy::too_many_lines)]
     fn message_to_action(&mut self, msg: AnalysisWorkerMessage, ctx: &mut Context<Self>) {
         match msg {
             AnalysisWorkerMessage::Log { level, message } => {

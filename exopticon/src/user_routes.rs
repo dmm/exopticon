@@ -18,10 +18,11 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use actix_identity::Identity;
 use actix_web::{web::Data, web::Json, Error, HttpResponse};
 
 use crate::app::RouteState;
-use crate::models::CreateUser;
+use crate::models::{CreateUser, FetchUser};
 
 /// We have to pass by value to satisfy the actix route interface.
 #[allow(clippy::needless_pass_by_value)]
@@ -49,4 +50,24 @@ pub async fn create_user(
         Ok(slim_user) => Ok(HttpResponse::Ok().json(slim_user)),
         Err(err) => Ok(HttpResponse::InternalServerError().json(err.to_string())),
     }
+}
+
+/// Implements route to fetch current user, returns future returning
+/// current user or error.
+pub async fn fetch_current_user(
+    id: Identity,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, Error> {
+    if let Some(id) = id.identity() {
+        if let Ok(user_id) = id.parse::<i32>() {
+            let db_response = state.db.send(FetchUser { user_id }).await?;
+
+            match db_response {
+                Ok(slim_user) => return Ok(HttpResponse::Ok().json(slim_user)),
+                Err(err) => return Ok(HttpResponse::InternalServerError().json(err.to_string())),
+            }
+        };
+    };
+
+    Ok(HttpResponse::InternalServerError().into())
 }

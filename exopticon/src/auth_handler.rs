@@ -24,7 +24,7 @@ use diesel::prelude::*;
 use serde::Deserialize;
 
 use crate::errors::ServiceError;
-use crate::models::{DbExecutor, SlimUser, User};
+use crate::models::{DbExecutor, FetchUser, SlimUser, User};
 
 /// Represents data for an authentication attempt
 #[derive(Debug, Deserialize)]
@@ -66,5 +66,28 @@ impl Handler<AuthData> for DbExecutor {
             }
         }
         mismatch_error
+    }
+}
+
+impl Message for FetchUser {
+    type Result = Result<SlimUser, ServiceError>;
+}
+
+impl Handler<FetchUser> for DbExecutor {
+    type Result = Result<SlimUser, ServiceError>;
+
+    fn handle(&mut self, msg: FetchUser, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::users::dsl::users;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        let item = users
+            .find(msg.user_id)
+            .get_result::<User>(conn)
+            .map_err(|error| {
+                error!("Unable to load users! {}", error);
+                ServiceError::InternalServerError
+            })?;
+
+        Ok(item.into())
     }
 }

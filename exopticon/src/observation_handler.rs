@@ -31,7 +31,11 @@ use crate::observation_routes::get_snapshot;
 
 use actix::{Handler, Message};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use diesel::{self, prelude::*, sql_types::Timestamp};
+use diesel::{
+    self,
+    prelude::*,
+    sql_types::{BigInt, Text, Timestamp},
+};
 
 impl Message for CreateObservations {
     type Result = Result<Vec<Observation>, ServiceError>;
@@ -268,9 +272,11 @@ impl Message for QueryEvents {
 impl Handler<QueryEvents> for DbExecutor {
     type Result = Result<Vec<EventModel>, ServiceError>;
 
-    fn handle(&mut self, _msg: QueryEvents, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: QueryEvents, _: &mut Self::Context) -> Self::Result {
         use crate::schema::event_observations::dsl::*;
         use crate::schema::events::dsl::*;
+
+        let page_size = 100;
 
         let now = Utc::now();
         let start = match now.checked_sub_signed(Duration::hours(12)) {
@@ -280,9 +286,25 @@ impl Handler<QueryEvents> for DbExecutor {
 
         let conn: &PgConnection = &self.0.get().unwrap();
         conn.transaction(|| {
-            let event1: Vec<Event> = events
+            let mut query = events.into_boxed();
+
+            if let Some(beg_time) = msg.begin_time {
+                query = query.filter(begin_time.gt(beg_time));
+
+                if let Some(endo_time) = msg.end_time {
+                    query = query.filter(end_time.lt(endo_time));
+                }
+            } else {
+                query = query.filter(begin_time.gt(&start));
+            }
+
+            if let Some(page) = msg.page {
+                query = query.offset(page * page_size);
+            }
+
+            let event1: Vec<Event> = query
                 .order(begin_time.desc())
-                .filter(begin_time.gt(&start))
+                .limit(page_size)
                 .load(conn)
                 .map_err(|_error| ServiceError::InternalServerError)?;
 
@@ -309,6 +331,16 @@ impl Handler<QueryEvents> for DbExecutor {
     }
 }
 
+#[derive(Debug, QueryableByName)]
+struct EventSlice {
+    #[sql_type = "Text"]
+    pub filename: String,
+    #[sql_type = "BigInt"]
+    pub start_offset: i64,
+    #[sql_type = "BigInt"]
+    pub end_offset: i64,
+}
+
 impl Message for GetEventFile {
     type Result = Result<EventFile, ServiceError>;
 }
@@ -317,35 +349,37 @@ impl Handler<GetEventFile> for DbExecutor {
     type Result = Result<EventFile, ServiceError>;
 
     fn handle(&mut self, msg: GetEventFile, _: &mut Self::Context) -> Self::Result {
-        use crate::schema::camera_groups::dsl::*;
-        use crate::schema::cameras::dsl::*;
-        use crate::schema::event_observations::dsl::*;
-        use crate::schema::events::dsl::*;
-        use crate::schema::observations::dsl::*;
-        use crate::schema::video_files::dsl::*;
-        use crate::schema::video_units::dsl::*;
+        let query = r#"
+            SELECT vf.filename AS filename,
+            MIN(ob.frame_offset) AS start_offset,
+            MAX(ob.frame_offset) AS end_offset
+            FROM event_observations eo
+            INNER JOIN observations ob
+              ON eo.observation_id = ob.id
+            INNER JOIN video_units vu
+              ON ob.video_unit_id = vu.id
+            INNER JOIN video_files vf
+              ON vf.video_unit_id = vu.id
+            WHERE eo.event_id = $1
+            GROUP BY vu.id, vf.filename
+            ORDER BY vu.begin_time asc
+            "#;
 
         let conn: &PgConnection = &self.0.get().unwrap();
         conn.transaction(|| {
-            let camera_storage_path = events
-                .inner_join(cameras.inner_join(camera_groups))
-                .select(crate::schema::camera_groups::dsl::storage_path)
-                .filter(crate::schema::events::dsl::id.eq(msg.event_id))
-                .first::<String>(conn)?;
-
-            let file_details = event_observations
-                .inner_join(observations.inner_join(video_units.inner_join(video_files)))
-                .select((
-                    crate::schema::observations::frame_offset,
-                    crate::schema::video_files::filename,
-                ))
-                .filter(crate::schema::event_observations::dsl::event_id.eq(msg.event_id))
-                .first::<(i64, String)>(conn)?;
+            let event_files: Vec<EventSlice> = diesel::sql_query(query)
+                .bind::<diesel::pg::types::sql_types::Uuid, _>(msg.event_id)
+                .load(conn)
+                .map_err(|error| {
+                    error!("Failed to fetch event files {}", error);
+                    ServiceError::InternalServerError
+                })?;
 
             Ok(EventFile {
-                snapshot_path: format!("{}/snapshots/{}.jpg", camera_storage_path, msg.event_id),
-                video_file_path: file_details.1,
-                offset_msec: file_details.0 as u64,
+                files: event_files
+                    .iter()
+                    .map(|e| (e.filename.clone(), e.start_offset, e.end_offset))
+                    .collect(),
             })
         })
     }
@@ -411,8 +445,13 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
                     "{}/snapshots/{}.jpg",
                     camera_storage_path, msg.observation_id
                 );
-                if get_snapshot(&file_details.1, &path, file_details.0 as u64).is_err() {
+                let offset: u64 = conv::ValueFrom::value_from(file_details.0).map_err(|e| {
+                    error!("Failed to convert offset: {}", e);
+                    ServiceError::InternalServerError
+                })?;
+                if get_snapshot(&file_details.1, &path, offset).is_err() {
                     error!("Failed to create snapshot!");
+                    return Err(ServiceError::InternalServerError);
                 }
             }
 
@@ -424,10 +463,15 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
                 }
             };
 
+            let snapshot_file_size: i32 = conv::ValueFrom::value_from(x).map_err(|e| {
+                error!("Failed to convert snapshot size: {}", e);
+                ServiceError::InternalServerError
+            })?;
+
             let snapshot = ObservationSnapshot {
                 observation_id: msg.observation_id,
-                snapshot_path: new_snapshot_path.clone(),
-                snapshot_size: x as i32,
+                snapshot_path: new_snapshot_path,
+                snapshot_size: snapshot_file_size,
             };
 
             diesel::insert_into(observation_snapshots)

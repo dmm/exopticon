@@ -42,12 +42,12 @@ use crate::camera_routes::{
 };
 use crate::models::DbExecutor;
 use crate::observation_routes::{
-    fetch_event_snapshot, fetch_events, fetch_observation, fetch_observation_clip,
-    fetch_observation_snapshot, fetch_observations_between,
+    fetch_event_clip, fetch_event_snapshot, fetch_events, fetch_observation,
+    fetch_observation_clip, fetch_observation_snapshot, fetch_observations_between,
 };
 use crate::static_routes;
 use crate::static_routes::index;
-use crate::user_routes::create_user;
+use crate::user_routes::{create_user, fetch_current_user};
 use crate::video_unit_routes::{fetch_video_unit, fetch_video_units_between};
 use crate::ws_session::{WsSerialization, WsSession};
 
@@ -162,6 +162,7 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .service(web::resource("/video_units/{id}").route(web::get().to(fetch_video_unit)))
                 // routes to user
                 .service(web::resource("/users").route(web::post().to(create_user)))
+                .service(web::resource("/users/me").route(web::get().to(fetch_current_user)))
                 // routes to analysis_engine
                 .service(
                     web::resource("/analysis_engines")
@@ -200,6 +201,9 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .service(
                     web::resource("/events/{event_id}/snapshot")
                         .route(web::get().to(fetch_event_snapshot)),
+                )
+                .service(
+                    web::resource("/events/{event_id}/clip").route(web::get().to(fetch_event_clip)),
                 )
                 // routes to alert rules
                 .service(

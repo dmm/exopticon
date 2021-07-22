@@ -19,7 +19,6 @@
 
 import copy
 import cv2
-import msgpack
 import numpy as np
 import struct
 import sys

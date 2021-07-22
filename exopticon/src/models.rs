@@ -949,6 +949,7 @@ pub struct EventObservation {
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateEvent {
+    /// id of new event
     pub id: Uuid,
     /// Event tag
     pub tag: String,
@@ -962,6 +963,7 @@ pub struct CreateEvent {
 
 /// Fetch single Event
 pub struct FetchEvent {
+    /// event id
     pub event_id: Uuid,
 }
 
@@ -988,40 +990,57 @@ pub struct EventModel {
 /// Query Events
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct QueryEvents {
-    /// Vec of tags to match event for
-    pub tags: Vec<String>,
+    /// timestamp to begin search
+    pub begin_time: Option<DateTime<Utc>>,
+    /// timestamp to end search
+    pub end_time: Option<DateTime<Utc>>,
+    /// page
+    pub page: Option<i64>,
 }
 
-#[derive(Clone, Debug)]
-pub struct QueryEventVideoSegments {
-    // Event id
-    pub event_id: Uuid,
-}
-
+/// Fetch video files associated with Event
 #[derive(Clone, Debug)]
 pub struct GetEventFile {
+    /// event id
     pub event_id: Uuid,
 }
 
+/// File used by Event and bounds within file
 #[derive(Clone, Debug)]
 pub struct EventFile {
-    pub snapshot_path: String,
-    pub video_file_path: String,
-    pub offset_msec: u64,
+    /// tuple representing video filename, start offset, and end
+    /// offset in file. The start offset is only meaningful in the
+    /// first file. and the end offset is only meaningful in the last
+    /// file.
+    pub files: Vec<(String, i64, i64)>,
 }
 
+/// Represents image snapshot of observation
 #[derive(AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
 #[table_name = "observation_snapshots"]
 pub struct ObservationSnapshot {
+    /// id of observation represented
     pub observation_id: i64,
+    /// filename of jpg
     pub snapshot_path: String,
+    /// size in bytes of snapshot file
     pub snapshot_size: i32,
 }
 
+/// Request to create observation snapshot
 pub struct CreateObservationSnapshot {
+    /// observation id
     pub observation_id: i64,
 }
 
+/// Request to fetch observation snapshot details
 pub struct FetchObservationSnapshot {
+    /// observation id
     pub observation_id: i64,
+}
+
+/// Request to fetch user details
+pub struct FetchUser {
+    /// id of user to fetch
+    pub user_id: i32,
 }

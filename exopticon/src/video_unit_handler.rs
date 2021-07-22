@@ -26,6 +26,7 @@ use crate::models::{
 };
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
+use uuid::Uuid;
 
 /// A segment of video
 type VideoSegment = (VideoUnit, VideoFile);
@@ -254,6 +255,7 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
     fn handle(&mut self, msg: DeleteVideoUnitFiles, _: &mut Self::Context) -> Self::Result {
         use crate::schema;
         use crate::schema::event_observations::dsl::*;
+        use crate::schema::events::dsl::*;
         use crate::schema::observation_snapshots::dsl::*;
         use crate::schema::observations::dsl::*;
         use crate::schema::video_files::dsl::*;
@@ -295,6 +297,15 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
             }
         }
 
+        // Fetch all events to be deleted
+        let old_events = events
+            .inner_join(schema::event_observations::table)
+            .inner_join(schema::observations::table)
+            .select(schema::events::columns::id)
+            .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
+            .load::<Uuid>(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
         diesel::delete(observation_snapshots)
             .filter(
                 schema::observation_snapshots::columns::observation_id.eq_any(
@@ -306,6 +317,10 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
                         .select(schema::observations::columns::id),
                 ),
             )
+            .execute(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        diesel::delete(events.filter(schema::events::columns::id.eq(any(&old_events))))
             .execute(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
