@@ -1,10 +1,41 @@
-<h2>Events</h2>
-<div class="events_wrapper">
+<!--
+    Exopticon - A free video surveillance system.
+    Copyright (C) 2021 David Matthew Mattli <dmm@mattli.us>
+
+    This file is part of Exopticon.
+
+    Exopticon is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Exopticon is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<div class="top-bar">
+  <h2>Events</h2>
+  <div class="date">{{ now.toLocalDate().toString() }}</div>
+  <button type="button" class="refresh" (click)="refreshEvents()">
+    &#10227;
+  </button>
+  <button type="button" class="minus" (click)="addDuration(1)">&#8592;</button>
+  <button type="button" class="today" (click)="resetDuration()">&#8593;</button>
+  <button type="button" class="plus" (click)="addDuration(-1)">&#8594;</button>
+</div>
+<div class="events_wrapper" *ngIf="state === eventListState.Loading">
+  Loading...
+</div>
+<div class="events-wrapper">
   <div *ngFor="let event of events$ | async; let index = index" class="event">
     <div class="info">
       {{ event.tag }}
-      {{ event.beginTime }}
-      {{ event.endTime }}
+      {{ (event.interval.toDuration().toMillis() / 1000).toFixed(1) }}s
     </div>
     <img
       *ngIf="selectedEvent != index"
@@ -23,10 +54,7 @@
       loop
       *ngIf="selectedEvent == index && event.observations.length > 0"
     >
-      <source
-        src="/v1/observations/{{ event.observations[0] }}/clip#t=-5"
-        type="video/mp4"
-      />
+      <source src="/v1/events/{{ event.id }}/clip" type="video/mp4" />
     </video>
   </div>
 </div>
