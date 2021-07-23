@@ -199,7 +199,7 @@ pub fn get_snapshot(
         .arg("2")
         .arg("-f")
         .arg("mjpeg")
-        .arg(snapshot_path)
+        .arg(snapshot_path.clone())
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|_| {
@@ -210,7 +210,7 @@ pub fn get_snapshot(
         error!("failed to wait on child");
     })?;
 
-    if output.stdout.is_empty() {
+    if snapshot_path == "-" && output.stdout.is_empty() {
         Err(())
     } else {
         Ok(output.stdout)
