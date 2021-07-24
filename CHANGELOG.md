@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.4
+2021-07-24
+
+### Fixes
+
+- Add RELEASE_VERSION env to pull step (a05417bbd918e215036601aa7f94b95e35aad3cf)
+
 ## 0.18.3
 2021-07-24
 
