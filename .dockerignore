@@ -4,3 +4,5 @@ exopticon/web/node_modules/
 docker/
 Dockerfile
 .gitlab-ci.yml
+CHANGELOG.md
+release_info

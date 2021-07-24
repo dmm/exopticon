@@ -109,18 +109,12 @@ deploy:
       -f docker-compose.db.yml \
       -f docker-compose.yml \
       -f docker-compose.cuda.yml \
-      -e RELEASE_VERSION \
       pull
     - >
       docker-compose \
       -f docker-compose.db.yml \
       -f docker-compose.yml \
       -f docker-compose.cuda.yml \
-      -e RELEASE_VERSION \
-      -e EXOPTICON_DB_PATH \
-      -e EXOPTICON_VIDEO_PATH \
-      -e EXOPTICON_POSTGRES_PASSWORD \
-      -e COMPOSE_PROJECT_NAME \
       up -d --force-recreate
   only:
   - master
