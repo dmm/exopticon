@@ -101,6 +101,7 @@ deploy:
     - apk add docker-compose
     - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
+    - . release_info
     - cd docker/
     - docker-compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
     - >
