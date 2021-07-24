@@ -106,6 +106,7 @@ deploy:
   script:
     - . release_info
     - cd docker/
+    - printf "RELEASE_VERSION=%s\\n" "$RELEASE_VERSION" >> .env.prod
     - printf "EXOPTICON_DB_PATH=%s\\n" "$EXOPTICON_DB_PATH" >> .env.prod
     - printf "EXOPTICON_VIDEO_PATH=%s\\n" "$EXOPTICON_VIDEO_PATH" >> .env.prod
     - printf "RUST_LOG=info\\n" >> .env.prod
