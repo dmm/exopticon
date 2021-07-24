@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.3
+2021-07-24
+
+### Fixes
+
+- Load release_info during deploy and add docker/ to dockerignore (596ed6e48168783d067668f21d31175eba5557e2)
+
 ## 0.18.2
 2021-07-24
 
