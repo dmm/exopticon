@@ -10,7 +10,7 @@ services:
       - /dev/bus/usb:/dev/bus/usb
       - /dev/apex_0:/dev/apex_0
     device_cgroup_rules:
-      - 'a 189:*  rwm'
+      - 'a 189:* rwm'
     volumes:
       - $EXOPTICON_VIDEO_PATH:/video
       - /dev/bus/usb:/dev/bus/usb
