@@ -84,19 +84,35 @@ release:
 deploy:
   stage: deploy
   image: kroniak/ssh-client
-  script:
+  variables:
+    DOCKER_HOST: "$PROD_DOCKER_HOST"
+    EXOPTICON_DB_PATH: "/video/main/db"
+    EXOPTICON_VIDEO_PATH: "/video/main/video"
+    EXOPTICON_POSTGRES_PASSWORD: "$PROD_PG_PASS"
+    COMPOSE_PROJECT_NAME: "exprod"
+  before_script:
     - . release_info
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - printf "%s" "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
     - printf "%s" "$SSH_DEPLOYMENT_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
-    - ssh $DEPLOY_HOST "docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY"
-    - ssh $DEPLOY_HOST "docker pull $CI_REGISTRY_IMAGE:v$RELEASE_VERSION"
-    - ssh $DEPLOY_HOST "docker stop exopticon-prod" || true
-    - ssh $DEPLOY_HOST "docker rm exopticon-prod" || true
-    - ssh $DEPLOY_HOST "find /dev/ -name nvidia* -exec printf '--device={} ' \;" >> cuda_args
-    - ssh $DEPLOY_HOST "find /usr/lib/x86_64-linux-gnu/ -maxdepth 1 \( -name libcuda* -o -name libnvidia* -o -name libnvcuvid* \) -not -type d -exec printf '-v {}:{}:ro ' \;" >> cuda_args
-    - ssh $DEPLOY_HOST docker run -d --name exopticon-prod --restart always --env DATABASE_URL=$DATABASE_URL --env ROOT_URL=$ROOT_URL --env SECRET_KEY=$SECRET_KEY --env EXOPTICON_HWACCEL_METHOD=cuda $(cat cuda_args) -v "/var/run/postgresql:/var/run/postgresql" -v "/video:/video" -p 3000:3000 $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
+    # Configure docker
+    - apk add docker-compose
+    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+  script:
+    - cd docker/
+    - docker-compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
+    - >
+      docker-compose \
+      -f docker-compose.db.yml \
+      -f docker-compose.yml \
+      -f docker-compose.cuda.yml \
+      -e RELEASE_VERSION \
+      -e EXOPTICON_DB_PATH \
+      -e EXOPTICON_VIDEO_PATH \
+      -e EXOPTICON_POSTGRES_PASSWORD \
+      -e COMPOSE_PROJECT_NAME \
+      up -d --force-recreate
   only:
   - master
