@@ -6,6 +6,9 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
     restart: always
+    ports:
+      - 0.0.0.0:3000:3000
+      - 3001:3001
     devices:
       - /dev/bus/usb:/dev/bus/usb
       - /dev/apex_0:/dev/apex_0
