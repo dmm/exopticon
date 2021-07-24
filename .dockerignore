@@ -2,3 +2,5 @@ target
 exopticon/web/dist/
 exopticon/web/node_modules/
 exopticon/docker/
+Dockerfile
+.gitlab-ci.yml

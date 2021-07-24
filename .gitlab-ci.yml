@@ -83,7 +83,7 @@ release:
 
 deploy:
   stage: deploy
-  image: kroniak/ssh-client
+  image: docker:latest
   variables:
     DOCKER_HOST: "$PROD_DOCKER_HOST"
     EXOPTICON_DB_PATH: "/video/main/db"
