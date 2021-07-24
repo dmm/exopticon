@@ -105,11 +105,7 @@ deploy:
     - cd docker/
     - echo version is $RELEASE_VERSION
     - >
-      docker-compose \
-      -f docker-compose.db.yml \
-      -f docker-compose.yml \
-      -f docker-compose.cuda.yml \
-      pull
+      docker-compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
     - >
       docker-compose \
       -f docker-compose.db.yml \
