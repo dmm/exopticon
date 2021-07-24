@@ -2,6 +2,36 @@
 
 <!--- next entry here -->
 
+## 0.18.0
+2021-07-24
+
+### Features
+
+- Add event worker and endpoint (3da1ced5c7928570ae6be4268d1bf4ec52daf77f)
+- Add Event api and event-list component. (d0c95ab646be5f4d57887ef4aafcb30c1d1b9c74)
+- Add event api routes. (9bdb6db5a490e1a3390fb573cca5dfa695cdb117)
+- Add EventList component (bcf379fa3b76f2cf1503ebe84bf8d9b81e0bc417)
+- EventList: lock events to 16:9 ratio and show timestamps (56ffd43b127a2c7f1b156efe99c557e9d9028835)
+
+### Fixes
+
+- Add benchmark tests (31dcc2fe3432e684757e6090eba7b7457d9990f0)
+- prevent creation of duplicate AnalysisSupervisors (135df35eea35687b99da1a990cc5b1a37b8f1ea2)
+- update frigate version and fix coral analysis (57aec64cd566b53088a59a94e7a32b0966f8a1d6)
+- take frame before scheduling future (1ec1f09beb50ef224f654bdf23df29e905289677)
+- Update frigate submodule (5a21d73317ec3c877dfbbfa98633b70989256a3f)
+- correct ports in metric docker-compose.yml's (d6d3e18920aa317690f610292c391161c8816617)
+- Add analysis_offset to CameraFrame (c7ed2e62467ee8f5917c62eaeeef8880f26883b7)
+- Update frigate submodule (bf84cad88da4794a3dae689bbf41cce1a908878c)
+- format web code (cb69ec8dab02c7bd14255ea29efcaddb9e53a713)
+- Add User service (5960a795b6f8af5b3db3a32e776a43a440b1a514)
+- Make event views a fixed 16:9 aspect ratio. (b967b698801fc077e5493ff2929621ffb8ab0e91)
+- Change label for top events button. (51eef9c9177c1e08aa62667d31d8c76511a58377)
+- get_snapshot, only fail on empty stdout when writing to stdout. (a857dfd9ff011624ee06493b10d53e69df790210)
+- Delete all events without EventObservation children (7fd38cb5a27e62bab322a773b76d136aa0f9198a)
+- Add license header (0d22559a0563d387d84c24c3ff664741fc1b6b1e)
+- Fix formatting (9db70ba2814320f680b8fbb4d45b98dd989aee5e)
+
 ## 0.17.0
 2021-04-19
 
