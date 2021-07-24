@@ -156,7 +156,6 @@ impl Handler<FetchVideoUnit> for DbExecutor {
     type Result = Result<VideoUnitTuple, ServiceError>;
 
     fn handle(&mut self, msg: FetchVideoUnit, _: &mut Self::Context) -> Self::Result {
-        //        use schema::{video_files, video_units};
         use crate::schema::video_units::dsl::*;
         let conn: &PgConnection = &self.0.get().unwrap();
 
@@ -297,15 +296,6 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
             }
         }
 
-        // Fetch all events to be deleted
-        let old_events = events
-            .inner_join(schema::event_observations::table)
-            .inner_join(schema::observations::table)
-            .select(schema::events::columns::id)
-            .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
-            .load::<Uuid>(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
-
         diesel::delete(observation_snapshots)
             .filter(
                 schema::observation_snapshots::columns::observation_id.eq_any(
@@ -318,6 +308,15 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
                 ),
             )
             .execute(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        // Fetch all events to be deleted
+        let old_events = events
+            .left_outer_join(schema::event_observations::table)
+            .inner_join(schema::observations::table)
+            .select(schema::events::columns::id)
+            .filter(schema::event_observations::columns::observation_id.is_null())
+            .load::<Uuid>(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
         diesel::delete(events.filter(schema::events::columns::id.eq(any(&old_events))))
