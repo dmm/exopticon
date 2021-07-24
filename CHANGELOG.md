@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.18.5
+2021-07-24
+
+### Fixes
+
+- Print value of RELEASE_VERSION in deploy (3c820b346dbe33f285cdfc94b0faf3a1fce48811)
+- Remove explicit env params and add to dockerignore (36432aa7633528ae27a6f479bdecdc785593f6b8)
+
 ## 0.18.4
 2021-07-24
 
