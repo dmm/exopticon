@@ -2,6 +2,23 @@
 
 <!--- next entry here -->
 
+## 0.18.6
+2021-07-24
+
+### Fixes
+
+- unquote RELEASE_VERSION (3d23372e0fee28d467610335722081b8180259aa)
+- Disable all build stages except deploy (ab95f432e0d286552a1598e4fe871ffb83d0ff40)
+- Move pull command to single line (10d485fdcced11fd2fc546b12748f0c93d8beee8)
+- Pass env to docker-compose as env-file (0991766ef4c07a764ae6c1330165947250a154e9)
+- Add RELEASE_VERSION to env file (975b675c6ae7403b3b7937fa80d20cbe27700e59)
+- fix device rule formatting, remove extra space (61bdefb91250519b0d7f9969a1951345d8f29ccb)
+- Add exported ports to docker-compose.yml (6b26771e8624763eaff5399fef0eb5d114e0c455)
+- Pass RUST_LOG envs to docker container (ff02da3d90053b6c7af1ebd6d6ef604296114ab1)
+- Pass RUST_LOG env variable (78f47a650504ed9ee913c34c9446b9eb7692cccc)
+- reenable build stages (ac90875f4faba2671ee383198bfb1d985e1a3757)
+- Add analysis_engines to migrations so they cleanly apply (8d5c20e1d323bdb49537f8820c384e72b82a8aac)
+
 ## 0.18.5
 2021-07-24
 
