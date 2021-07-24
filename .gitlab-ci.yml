@@ -103,6 +103,7 @@ deploy:
   script:
     - . release_info
     - cd docker/
+    - echo "version is $RELEASE_VERSION"
     - >
       docker-compose \
       -f docker-compose.db.yml \
