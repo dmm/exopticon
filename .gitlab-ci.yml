@@ -65,7 +65,7 @@ build-image:
 
 release:
   stage: release
-  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.19.0
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
   script:
   - rm -f release_info
   - mv build_info release_info
