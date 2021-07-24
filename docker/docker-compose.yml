@@ -5,10 +5,10 @@ services:
     image: dmattli/exopticon:v${RELEASE_VERSION}
     environment:
       - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
+      - RUST_LOG
       - ROOT_URL
       - EXOPTICON_NAME
       - EXOPTICON_SHORT_NAME
-
     restart: always
     ports:
       - 0.0.0.0:3000:3000
