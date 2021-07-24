@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.2
+2021-07-24
+
+### Fixes
+
+- Switch deploy image and add .gitlab-ci.yml to dockerignore. (83e1c15e539aa80c2a4b67dbbe43ff2994af5655)
+
 ## 0.18.1
 2021-07-24
 
