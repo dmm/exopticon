@@ -18,7 +18,6 @@ import { HttpClient } from "@angular/common/http";
  * You should have received a copy of the GNU General Public License
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 import { Injectable } from "@angular/core";
 import { ZoneId } from "@js-joda/core";
 import "@js-joda/timezone";
