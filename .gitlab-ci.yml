@@ -103,7 +103,13 @@ deploy:
   script:
     - . release_info
     - cd docker/
-    - docker-compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
+    - >
+      docker-compose \
+      -f docker-compose.db.yml \
+      -f docker-compose.yml \
+      -f docker-compose.cuda.yml \
+      -e RELEASE_VERSION \
+      pull
     - >
       docker-compose \
       -f docker-compose.db.yml \
