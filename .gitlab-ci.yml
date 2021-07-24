@@ -90,6 +90,9 @@ deploy:
     EXOPTICON_VIDEO_PATH: "/video/main/video"
     EXOPTICON_POSTGRES_PASSWORD: "$PROD_PG_PASS"
     COMPOSE_PROJECT_NAME: "exprod"
+    ROOT_URL: "https://exopticon.mattli.us"
+    EXOPTICON_NAME: "exopticon"
+    EXOPTICON_SHORT_NAME: "exopticon"
   before_script:
     - . release_info
     - mkdir -p ~/.ssh
@@ -103,14 +106,15 @@ deploy:
   script:
     - . release_info
     - cd docker/
+    - printf "EXOPTICON_DB_PATH=%s\\n" "$EXOPTICON_DB_PATH" >> .env.prod
+    - printf "EXOPTICON_VIDEO_PATH=%s\\n" "$EXOPTICON_VIDEO_PATH" >> .env.prod
+    - printf "RUST_LOG=info\\n" >> .env.prod
+    - printf "ROOT_URL=%s\\n" "$ROOT_URL" >> .env.prod
+    - printf "EXOPTICON_NAME=%s\\n" "$EXOPTICON_NAME" >> .env.prod
+    - printf "EXOPTICON_SHORT_NAME=%s\\n" "$EXOPTICON_SHORT_NAME" >> .env.prod
+    - printf "COMPOSE_PROJECT_NAME=%s\\n" "$COMPOSE_PROJECT_NAME" >> .env.prod
     - echo version is $RELEASE_VERSION
-    - >
-      docker-compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
-    - >
-      docker-compose \
-      -f docker-compose.db.yml \
-      -f docker-compose.yml \
-      -f docker-compose.cuda.yml \
-      up -d --force-recreate
+    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
+    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml up -d --force-recreate
   only:
   - master
