@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.1
+2021-07-24
+
+### Fixes
+
+- Initial docker-compose deploy implementation (52ac03b9ccb14d09eff2f49e45863cb0b7249625)
+
 ## 0.18.0
 2021-07-24
 
