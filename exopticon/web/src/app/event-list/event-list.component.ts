@@ -20,7 +20,7 @@
 
 import { Component, OnInit } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
-import { ZonedDateTime } from "@js-joda/core";
+import { DateTimeFormatter, Instant, ZonedDateTime } from "@js-joda/core";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
 import { Event, EventService } from "../event.service";
@@ -68,6 +68,11 @@ export class EventListComponent implements OnInit {
       });
     });
     this.refreshEvents();
+  }
+
+  formatInstant(instant: Instant): string {
+    let d: ZonedDateTime = ZonedDateTime.ofInstant(instant, this.now.zone());
+    return d.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
   }
 
   refreshEvents(): void {

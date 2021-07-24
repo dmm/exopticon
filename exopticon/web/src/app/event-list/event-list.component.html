@@ -21,15 +21,22 @@
 <div class="top-bar">
   <div class="title">
     <h2>Events</h2>
-    <div class="date">{{ now.toLocalDate().toString() }}</div>
+    <div class="date">
+      {{ now.toLocalDate().toString() }}
+      {{ now.toLocalDate().dayOfWeek().name() }}
+    </div>
   </div>
   <div class="navigation">
     <button type="button" class="refresh" (click)="refreshEvents()">
       REFRESH
     </button>
-    <button type="button" class="minus" (click)="addDuration(1)">PREV DAY</button>
+    <button type="button" class="minus" (click)="addDuration(1)">
+      PREV DAY
+    </button>
     <button type="button" class="today" (click)="resetDuration()">TODAY</button>
-    <button type="button" class="plus" (click)="addDuration(-1)">NEXT DAY</button>
+    <button type="button" class="plus" (click)="addDuration(-1)">
+      NEXT DAY
+    </button>
   </div>
 </div>
 <div class="events_wrapper" *ngIf="state === eventListState.Loading">
@@ -37,20 +44,22 @@
 </div>
 <div class="events-wrapper">
   <div *ngFor="let event of events$ | async; let index = index" class="event">
+    <div class="info">
+      {{ formatInstant(event.beginTime) }}
+      {{ event.tag }}
+      {{ (event.interval.toDuration().toMillis() / 1000).toFixed(1) }}s
+    </div>
+
     <div class="ratio">
-      <div class="info">
-        {{ event.tag }}
-        {{ (event.interval.toDuration().toMillis() / 1000).toFixed(1) }}s
-      </div>
       <img
         *ngIf="selectedEvent != index"
         src="/v1/events/{{ event.id }}/snapshot"
-        />
+      />
       <div
         class="playbutton"
         *ngIf="selectedEvent != index"
         (click)="onEventClick(index)"
-        >
+      >
         &#9654;
       </div>
       <video
@@ -58,7 +67,7 @@
         autoplay
         loop
         *ngIf="selectedEvent == index && event.observations.length > 0"
-        >
+      >
         <source src="/v1/events/{{ event.id }}/clip" type="video/mp4" />
       </video>
     </div>
