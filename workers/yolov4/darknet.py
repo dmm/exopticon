@@ -476,11 +476,17 @@ class Yolo4Worker(ExopticonWorker):
 
     def handle_frame(self, frame):
 #        detections = def detect_image(net, meta, im, thresh=.5, hier_thresh=.5, nms=.45, debug= False):
+        important_labels = ["person", "dog"]
         detections = detect_image(self.netMain, self.metaMain, frame.image)
         count = len(detections)
         observations = []
 
         for det in detections:
+            label = det[0].decode("utf-8")
+
+            if label not in important_labels:
+                continue
+
             bounds = det[2]
             ul_x = int(bounds[0] - bounds[2]/2)
             ul_y = int(bounds[1] - bounds[3]/2)
@@ -490,7 +496,7 @@ class Yolo4Worker(ExopticonWorker):
                 "videoUnitId": frame.video_unit_id,
                 "frameOffset": frame.offset,
                 "tag": "object",
-                "details": det[0].decode("utf-8"),
+                "details": label,
                 "score": int(det[1] * 100),
                 "ulX": max(int(ul_x), 0),
                 "ulY": max(int(ul_y), 0),
