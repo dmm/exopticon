@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.8
+2021-07-25
+
+### Fixes
+
+- restrict yolo worker to person and dog labels (21ce1439edc614c472680ee78d5cb400c80da338)
+
 ## 0.18.7
 2021-07-25
 
