@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.7
+2021-07-25
+
+### Fixes
+
+- Insert event analysis instance (20354ee76558f07492a7711251ef830008c09726)
+
 ## 0.18.6
 2021-07-24
 
