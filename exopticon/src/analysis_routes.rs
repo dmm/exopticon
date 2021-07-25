@@ -36,6 +36,7 @@ pub enum AnalysisType {
     Motion = 1,
     Yolo = 2,
     Coral = 3,
+    Event = 4,
 }
 
 #[derive(Deserialize, Serialize)]
