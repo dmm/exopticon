@@ -192,11 +192,11 @@ use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware::Logger, App, HttpServer};
 use actix_web_prom::PrometheusMetrics;
 use base64::{decode, encode};
-use chrono::Duration;
 use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use rand::Rng;
+use time::Duration;
 
 use std::{env, thread};
 

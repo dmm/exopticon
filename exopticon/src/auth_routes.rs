@@ -49,7 +49,11 @@ pub async fn login(
             id.remember(slim_user.id.to_string());
             Ok(HttpResponse::Ok().into())
         }
-        Ok(Err(_)) | Err(_) => Ok(HttpResponse::InternalServerError().finish()),
+        Err(_) => Ok(HttpResponse::InternalServerError().finish()),
+        Ok(Err(e)) => {
+            error!("Error during login: {}", e);
+            Ok(HttpResponse::InternalServerError().finish())
+        }
     }
 }
 

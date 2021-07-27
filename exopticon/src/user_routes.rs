@@ -22,6 +22,7 @@ use actix_identity::Identity;
 use actix_web::{web::Data, web::Json, Error, HttpResponse};
 
 use crate::app::RouteState;
+use crate::errors::ServiceError;
 use crate::models::{CreateUser, FetchUser};
 
 /// We have to pass by value to satisfy the actix route interface.
@@ -44,7 +45,8 @@ pub async fn create_user(
             password: create_user.password.clone(),
             timezone: create_user.timezone.clone(),
         })
-        .await?;
+        .await
+        .map_err(|_| ServiceError::InternalServerError)?;
 
     match db_response {
         Ok(slim_user) => Ok(HttpResponse::Ok().json(slim_user)),
@@ -60,7 +62,11 @@ pub async fn fetch_current_user(
 ) -> Result<HttpResponse, Error> {
     if let Some(id) = id.identity() {
         if let Ok(user_id) = id.parse::<i32>() {
-            let db_response = state.db.send(FetchUser { user_id }).await?;
+            let db_response = state
+                .db
+                .send(FetchUser { user_id })
+                .await
+                .map_err(|_| ServiceError::InternalServerError)?;
 
             match db_response {
                 Ok(slim_user) => return Ok(HttpResponse::Ok().json(slim_user)),

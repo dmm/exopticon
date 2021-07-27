@@ -21,16 +21,17 @@
 // We have to pass by value to satisfy the actix route interface.
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::{web::Data, web::Json, web::Path, Error, HttpResponse};
+use actix_web::{web::Data, web::Json, web::Path, HttpResponse};
 
 use crate::app::RouteState;
+use crate::errors::ServiceError;
 use crate::models::{CreateCameraGroup, FetchAllCameraGroup, FetchCameraGroup, UpdateCameraGroup};
 
 /// Route to create new camera group
 pub async fn create_camera_group(
     camera_group_request: Json<CreateCameraGroup>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state.db.send(camera_group_request.into_inner()).await?;
 
     match db_response {
@@ -44,7 +45,7 @@ pub async fn update_camera_group(
     path: Path<i32>,
     camera_group_request: Json<UpdateCameraGroup>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let camera_group_update = UpdateCameraGroup {
         id: path.into_inner(),
         ..camera_group_request.into_inner()
@@ -61,7 +62,7 @@ pub async fn update_camera_group(
 pub async fn fetch_camera_group(
     path: Path<i32>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchCameraGroup {
@@ -76,7 +77,9 @@ pub async fn fetch_camera_group(
 }
 
 /// Route to fetch all camera groups
-pub async fn fetch_all_camera_groups(state: Data<RouteState>) -> Result<HttpResponse, Error> {
+pub async fn fetch_all_camera_groups(
+    state: Data<RouteState>,
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state.db.send(FetchAllCameraGroup {}).await?;
 
     match db_response {

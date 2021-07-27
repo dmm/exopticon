@@ -19,10 +19,11 @@
  */
 
 use actix::registry::SystemService;
-use actix_web::{web::Data, web::Json, web::Path, Error, HttpResponse};
+use actix_web::{web::Data, web::Json, web::Path, HttpResponse};
 
 use crate::analysis_supervisor::{AnalysisSupervisor, SyncAnalysisActors};
 use crate::app::RouteState;
+use crate::errors::ServiceError;
 use crate::models::{
     CreateAnalysisEngine, CreateAnalysisInstanceModel, DeleteAnalysisEngine,
     DeleteAnalysisInstanceModel, FetchAnalysisEngine, FetchAnalysisInstanceModel,
@@ -54,7 +55,7 @@ pub struct FetchAnalysisConfiguration {
 pub async fn create_analysis_engine(
     analysis_engine_request: Json<CreateAnalysisEngine>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let analysis_engine = state
         .db
         .send(analysis_engine_request.into_inner())
@@ -67,7 +68,7 @@ pub async fn create_analysis_engine(
 pub async fn fetch_analysis_engine(
     path: Path<i32>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let analysis_engine = state
         .db
         .send(FetchAnalysisEngine {
@@ -82,7 +83,7 @@ pub async fn update_analysis_engine(
     path: Path<i32>,
     analysis_engine_request: Json<UpdateAnalysisEngine>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let analysis_engine_update = UpdateAnalysisEngine {
         id: path.into_inner(),
         ..analysis_engine_request.into_inner()
@@ -97,7 +98,7 @@ pub async fn update_analysis_engine(
 pub async fn delete_analysis_engine(
     path: Path<i32>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     state
         .db
         .send(DeleteAnalysisEngine {
@@ -112,7 +113,7 @@ pub async fn delete_analysis_engine(
 pub async fn create_analysis_instance(
     analysis_instance_request: Json<CreateAnalysisInstanceModel>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let new_analysis_instance = state
         .db
         .send(analysis_instance_request.into_inner())
@@ -129,7 +130,7 @@ pub async fn create_analysis_instance(
 pub async fn fetch_analysis_instance(
     path: Path<i32>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let analysis_instance = state
         .db
         .send(FetchAnalysisInstanceModel {
@@ -145,7 +146,7 @@ pub async fn update_analysis_instance(
     path: Path<i32>,
     analysis_instance_update: Json<UpdateAnalysisInstanceModel>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let updated_instance = state
         .db
         .send(UpdateAnalysisInstanceModel {
@@ -165,7 +166,7 @@ pub async fn update_analysis_instance(
 pub async fn delete_analysis_instance(
     path: Path<i32>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     state
         .db
         .send(DeleteAnalysisInstanceModel {
@@ -183,7 +184,7 @@ pub async fn delete_analysis_instance(
 pub async fn fetch_analysis_configuration(
     path: Path<i32>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let analysis_configuration = state
         .db
         .send(FetchAnalysisConfiguration {
@@ -197,7 +198,7 @@ pub async fn update_analysis_configuration(
     path: Path<i32>,
     analysis_configuration: Json<AnalysisConfiguration>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let analysis_configuration = state
         .db
         .send(AnalysisConfiguration {

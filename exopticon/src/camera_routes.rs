@@ -23,7 +23,7 @@
 
 use actix::SystemService;
 use actix_http::ResponseBuilder;
-use actix_web::{http::StatusCode, web::Data, web::Json, web::Path, Error, HttpResponse};
+use actix_web::{http::StatusCode, web::Data, web::Json, web::Path, HttpResponse};
 use std::time::Duration;
 use tokio::time::delay_for;
 
@@ -31,6 +31,7 @@ use onvif::camera::{DeviceDateAndTime, NtpSettings};
 
 use crate::app::RouteState;
 use crate::capture_supervisor::{CaptureSupervisor, SyncCaptureActors};
+use crate::errors::ServiceError;
 use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
 
 #[derive(Debug)]
@@ -79,7 +80,7 @@ impl From<onvif::error::Error> for CameraError {
 pub async fn create_camera(
     camera_request: Json<CreateCamera>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let camera = state.db.send(camera_request.into_inner()).await??;
 
     CaptureSupervisor::from_registry().do_send(SyncCaptureActors {});
@@ -92,7 +93,7 @@ pub async fn update_camera(
     path: Path<i32>,
     camera_request: Json<UpdateCamera>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let camera_update = UpdateCamera {
         id: path.into_inner(),
         ..camera_request.into_inner()
@@ -106,7 +107,10 @@ pub async fn update_camera(
 }
 
 /// Route to fetch specific camera by camera id
-pub async fn fetch_camera(path: Path<i32>, state: Data<RouteState>) -> Result<HttpResponse, Error> {
+pub async fn fetch_camera(
+    path: Path<i32>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, ServiceError> {
     let camera = state
         .db
         .send(FetchCamera {
@@ -117,20 +121,23 @@ pub async fn fetch_camera(path: Path<i32>, state: Data<RouteState>) -> Result<Ht
 }
 
 /// Route to fetch all cameras
-pub async fn fetch_all_cameras(state: Data<RouteState>) -> Result<HttpResponse, Error> {
+pub async fn fetch_all_cameras(state: Data<RouteState>) -> Result<HttpResponse, ServiceError> {
     let cameras = state.db.send(FetchAllCamera {}).await??;
 
     Ok(HttpResponse::Ok().json(cameras))
 }
 
 /// Discovery cameras using ONVIF discovery
-pub async fn discover() -> Result<HttpResponse, Error> {
+pub async fn discover() -> Result<HttpResponse, ServiceError> {
     onvif::discovery::probe(Duration::new(5, 0)).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 /// Returns current time of specified camera
-pub async fn fetch_time(path: Path<i32>, state: Data<RouteState>) -> Result<HttpResponse, Error> {
+pub async fn fetch_time(
+    path: Path<i32>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, ServiceError> {
     let camera = state
         .db
         .send(FetchCamera {
@@ -162,7 +169,7 @@ pub async fn set_time(
     path: Path<i32>,
     datetime: Json<DeviceDateAndTime>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchCamera {
@@ -189,7 +196,10 @@ pub async fn set_time(
 }
 
 /// Returns current ntp settings of camera
-pub async fn fetch_ntp(path: Path<i32>, state: Data<RouteState>) -> Result<HttpResponse, Error> {
+pub async fn fetch_ntp(
+    path: Path<i32>,
+    state: Data<RouteState>,
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchCamera {
@@ -216,7 +226,7 @@ pub async fn set_ntp(
     path: Path<i32>,
     ntp_settings: Json<NtpSettings>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchCamera {
@@ -269,7 +279,7 @@ pub async fn ptz_relative_move(
     x: f32,
     y: f32,
     zoom: f32,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state.db.send(FetchCamera { id: camera_id }).await?;
 
     let camera = match db_response {
@@ -326,7 +336,7 @@ pub async fn ptz_relative(
     path: Path<i32>,
     movement: Json<PtzMovement>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let ntp = movement.into_inner();
     ptz_relative_move(state, path.into_inner(), ntp.x, ntp.y, ntp.zoom).await
 }
@@ -342,7 +352,7 @@ pub async fn ptz_relative(
 pub async fn ptz_direction(
     path: Path<(i32, String)>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let (x, y) = match path.1.as_ref() {
         "left" => (-0.1, 0.0),
         "right" => (0.1, 0.0),
@@ -351,5 +361,5 @@ pub async fn ptz_direction(
         _ => return Ok(HttpResponse::BadRequest().finish()),
     };
 
-    ptz_relative_move(state, path.0, x, y, 0.0).await
+    ptz_relative_move(state, path.into_inner().0, x, y, 0.0).await
 }

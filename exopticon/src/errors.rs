@@ -56,3 +56,21 @@ impl From<diesel::result::Error> for ServiceError {
         Self::InternalServerError
     }
 }
+
+impl From<actix::MailboxError> for ServiceError {
+    fn from(_: actix::MailboxError) -> Self {
+        Self::InternalServerError
+    }
+}
+
+impl From<std::io::Error> for ServiceError {
+    fn from(_: std::io::Error) -> Self {
+        Self::InternalServerError
+    }
+}
+
+impl From<()> for ServiceError {
+    fn from(_: ()) -> Self {
+        Self::InternalServerError
+    }
+}

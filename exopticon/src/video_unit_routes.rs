@@ -21,11 +21,12 @@
 // We have to pass by value to satisfy the actix route interface.
 #![allow(clippy::needless_pass_by_value)]
 
-use actix_web::{web::Data, web::Path, web::Query, Error, HttpResponse};
+use actix_web::{web::Data, web::Path, web::Query, HttpResponse};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::app::RouteState;
+use crate::errors::ServiceError;
 use crate::models::{FetchBetweenVideoUnit, FetchVideoUnit};
 
 /// Implements route that fetches a single `VideoUnit` specified by id.
@@ -38,7 +39,7 @@ use crate::models::{FetchBetweenVideoUnit, FetchVideoUnit};
 pub async fn fetch_video_unit(
     path: Path<Uuid>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchVideoUnit {
@@ -75,7 +76,7 @@ pub async fn fetch_video_units_between(
     camera_id: Path<i32>,
     range: Query<DateRange>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchBetweenVideoUnit {

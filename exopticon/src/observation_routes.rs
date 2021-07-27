@@ -36,6 +36,7 @@ use uuid::Uuid;
 
 use crate::app::RouteState;
 use crate::db_registry;
+use crate::errors::ServiceError;
 use crate::models::{
     EventFile, FetchCamera, FetchCameraGroup, FetchEvent, FetchObservation,
     FetchObservationSnapshot, FetchObservations, FetchVideoUnit, GetEventFile, QueryEvents,
@@ -50,7 +51,7 @@ use crate::video_unit_routes::DateRange;
 pub async fn fetch_observation(
     observation_id: Path<i64>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchObservation {
@@ -78,7 +79,7 @@ pub async fn fetch_observations_between(
     camera_id: Path<i32>,
     range: Query<DateRange>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
         .send(FetchObservations {
@@ -221,7 +222,7 @@ pub fn get_snapshot(
 pub async fn fetch_observation_snapshot(
     observation_id: Path<i64>,
     _state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, ServiceError> {
     let res = fetch_observation_image(observation_id.into_inner()).await;
     match res {
         Ok(snap) => Ok(HttpResponse::Ok().content_type("image/jpeg").body(snap)),
@@ -233,7 +234,7 @@ pub async fn fetch_observation_snapshot(
 pub async fn fetch_event_snapshot(
     event_id: Path<Uuid>,
     _state: Data<RouteState>,
-) -> Result<NamedFile, Error> {
+) -> Result<NamedFile, ServiceError> {
     let db = db_registry::get_db();
     let event = db
         .send(FetchEvent {
@@ -306,7 +307,7 @@ pub fn get_clip(path: &str, microsecond_offset: u64, length: Duration) -> Result
 }
 
 /// Route the fetch video for event
-fn get_event_clip(event_files: EventFile) -> Result<Vec<u8>, ()> {
+fn get_event_clip(event_files: EventFile) -> Result<NamedFile, ()> {
     if event_files.files.is_empty() {
         error!("Failed to find event files!");
         return Err(());
@@ -414,29 +415,29 @@ fn get_event_clip(event_files: EventFile) -> Result<Vec<u8>, ()> {
         error!("failed to wait on child");
     })?;
 
-    let contents = fs::read(output_file_path).map_err(|_| {
-        error!("Failed to read clip file.");
-    })?;
-    Ok(contents)
+    Ok(NamedFile::open(output_file_path).map_err(|_| ())?)
 }
 
 pub async fn fetch_event_clip(
     event_id: Path<Uuid>,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> Result<NamedFile, Error> {
     let event_files = state
         .db
         .send(GetEventFile {
             event_id: event_id.into_inner(),
         })
-        .await?;
+        .await
+        .map_err(|_| ServiceError::InternalServerError)?;
 
     match event_files {
         Ok(event_files) => match web::block(move || get_event_clip(event_files)).await {
-            Ok(clip) => Ok(HttpResponse::Ok().content_type("video/webm").body(clip)),
-            Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+            Ok(clip) => Ok(clip),
+            Err(_err) => Err(actix_web::error::ErrorInternalServerError(
+                "Error reading clip",
+            )),
         },
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(_err) => Err(actix_web::error::ErrorBadRequest("Error reading clip")),
     }
 }
 
@@ -462,7 +463,8 @@ pub async fn fetch_observation_clip(
         .send(FetchObservation {
             id: observation_id.into_inner(),
         })
-        .await?;
+        .await
+        .map_err(|_| ServiceError::InternalServerError)?;
 
     match obs_response {
         Ok(observation) => {
@@ -471,7 +473,9 @@ pub async fn fetch_observation_clip(
                 .send(FetchVideoUnit {
                     id: observation.video_unit_id,
                 })
-                .await??;
+                .await
+                .map_err(|_| ServiceError::InternalServerError)??;
+
             let file = unit_response.1.pop();
             if let Some(file) = file {
                 let offset = u64::try_from(observation.frame_offset).map_err(|_| {
@@ -496,7 +500,11 @@ pub async fn fetch_events(
     query: web::Query<QueryEvents>,
     state: Data<RouteState>,
 ) -> Result<HttpResponse, Error> {
-    let db_response = state.db.send(query.into_inner()).await?;
+    let db_response = state
+        .db
+        .send(query.into_inner())
+        .await
+        .map_err(|_| ServiceError::InternalServerError)?;
 
     match db_response {
         Ok(events) => Ok(HttpResponse::Ok().json(events)),
