@@ -66,7 +66,7 @@ RUN cd ffmpeg && ./configure \
      && apt-get update \
      && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
      && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max python3-pycoral edgetpu-compiler python3-gi \
+        libedgetpu1-max=16.0 python3-pycoral edgetpu-compiler python3-gi \
      && apt-get clean \
      && rm -rf /var/lib/apt/lists/*
 
@@ -177,7 +177,7 @@ RUN apt-get -qq update \
     && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
     && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
     && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=15.0 python3-pycoral \
+        libedgetpu1-max=16.0 python3-pycoral \
     && rm -rf /var/lib/apt/lists/* \ # /wheels \
     && (apt-get autoremove -y; apt-get autoclean -y)
 
