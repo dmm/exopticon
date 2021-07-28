@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.18.9
+2021-07-28
+
+### Fixes
+
+- Update to actix_web 3 (3ab080a3f352d5fb0259eccc88d4b9c382408745)
+- Bump libedgeputmax1 version to 16.0 (0820f0e773c44c9bfad60f1622469957248f507c)
+- Specify cargo-make version to install (62ea3592e943fbe5153d854f5d63234e3e0d94d2)
+- roll cargo-make version back to 0.32.13 to fix build (26790d52daee271b275cda8b5ecafb82523e27b3)
+
 ## 0.18.8
 2021-07-25
 
