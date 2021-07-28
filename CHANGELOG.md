@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.10
+2021-07-28
+
+### Fixes
+
+- Update rust deps (ffcb29ab50a5a27792a1e2f90af310ec375263c8)
+
 ## 0.18.9
 2021-07-28
 
