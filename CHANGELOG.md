@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.18.11
+2021-08-02
+
+### Fixes
+
+- Create slim docker image (8cbd471c9bd89e43e4e3bc33d3061e20ac27838f)
+- merge dockerignore (bd593456748025f95550c56dc10033e9ee73656e)
+
 ## 0.18.10
 2021-07-28
 
