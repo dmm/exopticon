@@ -1,15 +1,11 @@
 target
 exopticon/web/dist/
 exopticon/web/node_modules/
-<<<<<<< Updated upstream
 docker/
 Dockerfile
 .gitlab-ci.yml
 CHANGELOG.md
 release_info
-=======
-exopticon/docker/
 exopticon/core
 core
 Dockerfile
->>>>>>> Stashed changes
