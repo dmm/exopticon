@@ -139,13 +139,73 @@ RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
 
 RUN cargo make --profile release build-release
 
+FROM debian:buster-slim AS exopticon-slim
+
+WORKDIR /exopticon
+
+USER root
+
+ENV FLASK_ENV=development
+ENV DEBIAN_FRONTEND=noninteractive
+# Install packages for apt repo
+RUN apt-get -qq update \
+# ffmpeg and runtime deps
+  && apt-get install --no-install-recommends -y \
+  libpq5 libturbojpeg0 ffmpeg python3-opencv \
+
+# Add Coral tpu repository and install python libraries
+    && apt-get -qq install --no-install-recommends -y \
+    gnupg wget unzip tzdata python3-gi \
+    && apt-get -qq install --no-install-recommends -y \
+        python3-pip \
+    && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
+    && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
+    && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
+        libedgetpu1-max=16.0 python3-pycoral \
+    && apt-get purge -y python3-setuptools python3-pip python3-wheel gnupg wget unzip mono-runtime \
+
+# Add imutils and numpy
+    && apt-get install --no-install-recommends -y \
+      python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
+    && pip3 install imutils numpy \
+   && apt-get purge -y python3-setuptools python3-pip python3-wheel \
+
+# clean up
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \ # /wheels \
+    && (apt-get autoremove -y; apt-get autoclean -y)
+
+# configure run user
+RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
+RUN chown exopticon:exopticon /exopticon
+
+COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
+
+COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/assets/workers ./workers
+
+ENV EXOPTICONWORKERS=/exopticon/workers/
+ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
+ENV PATH=/exopticon:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+USER exopticon:plugdev
+
+ENTRYPOINT /exopticon/exopticon
+
 FROM dmattli/debian-cuda:10.0-buster-runtime AS exopticon-runtime
 
 WORKDIR /exopticon
 
 USER root
 
-RUN apt-get update && apt-get install --no-install-recommends -y \
+ENV FLASK_ENV=development
+ENV DEBIAN_FRONTEND=noninteractive
+# Install packages for apt repo
+RUN apt-get -qq update \
+# ffmpeg
+  && apt-get install --no-install-recommends -y \
   libturbojpeg0 bzip2 \
   libbz2-1.0 libc6 \
   libcurl4 libevent-2.1-6 libffi6 \
@@ -158,41 +218,36 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   python3-opencv \
   # ffmpeg runtime deps
   libxcb-shape0 libxcb-xfixes0 \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
 
 # Add Coral tpu repository and install python libraries
-ENV FLASK_ENV=development
-ENV DEBIAN_FRONTEND=noninteractive
-# Install packages for apt repo
-RUN apt-get -qq update \
-#    && apt-get upgrade -y \
     && apt-get -qq install --no-install-recommends -y \
     gnupg wget unzip tzdata python3-gi \
     && apt-get -qq install --no-install-recommends -y \
         python3-pip \
-#    && pip3 install -U /wheels/*.whl \
     && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
     && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
     && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
     && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
         libedgetpu1-max=16.0 python3-pycoral \
+    && apt-get purge -y python3-setuptools python3-pip python3-wheel gnupg wget unzip mono-runtime \
+
+# Add imutils and numpy
+    && apt-get install --no-install-recommends -y \
+      python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
+    && pip3 install imutils numpy \
+   && apt-get purge -y python3-setuptools python3-pip python3-wheel \
+
+# clean up
+    && apt-get autoremove -y \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \ # /wheels \
     && (apt-get autoremove -y; apt-get autoclean -y)
-
-RUN apt-get update && apt-get install --no-install-recommends -y \
-      python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
-    && pip3 install msgpack imutils numpy \
-    && apt-get purge -y python3-setuptools python3-pip python3-wheel \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
 
 # configure run user
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
 RUN chown exopticon:exopticon /exopticon
 
-FROM exopticon-runtime
+FROM exopticon-runtime AS exopticon-cuda
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
 

@@ -52,10 +52,16 @@ build-image:
   - echo "RELEASE_VERSION=$(cat .next-version)" >> build_info
   - . build_info
   - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+  # Build cuda image
   - docker build -t $CI_REGISTRY_IMAGE:v$RELEASE_VERSION .
   - docker build -t $CI_REGISTRY_IMAGE:latest .
   - docker push $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
   - docker push $CI_REGISTRY_IMAGE:latest
+  # Build slim image
+  - docker build --target exopticon-slim -t $CI_REGISTRY_IMAGE:v$RELEASE_VERSION-slim .
+  - docker build --target exopticon-slim -t $CI_REGISTRY_IMAGE:latest-slim .
+  - docker push $CI_REGISTRY_IMAGE:v$RELEASE_VERSION-slim
+  - docker push $CI_REGISTRY_IMAGE:latest-slim
 
   artifacts:
      paths:
