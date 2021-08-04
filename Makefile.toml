@@ -1,0 +1,18 @@
+
+[env]
+CARGO_MAKE_RUN_CLIPPY = true
+CARGO_MAKE_CLIPPY_ALLOW_FAIL = false
+CARGO_MAKE_RUN_CHECK_FORMAT = true
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+
+[tasks.clippy-ci-flow]
+condition = { env_set = [
+  "CARGO_MAKE_RUN_CLIPPY",
+] }
+
+[tasks.check-format-ci-flow]
+category = "CI"
+condition = { env_set = [
+  "CARGO_MAKE_RUN_CHECK_FORMAT",
+] }
+

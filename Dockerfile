@@ -8,7 +8,7 @@ ENV CXX=g++-7
 RUN echo 'deb-src http://http.debian.net/debian buster main contrib non-free' > /etc/apt/sources.list.d/src.list
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # Exopticon Build Dependencies
-  libturbojpeg0-dev bzip2 \
+  libturbojpeg0-dev bzip2 unzip \
   dpkg-dev file imagemagick libbz2-dev libc6-dev \
   libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
   libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
@@ -83,6 +83,13 @@ RUN rm /usr/bin/gcc /usr/bin/g++ \
     && ln -s /usr/bin/gcc-7 /usr/bin/gcc \
     && ln -s /usr/bin/g++-7 /usr/bin/g++
 
+# Install cargo-make
+RUN mkdir cm && cd cm \
+  && curl -L https://github.com/sagiegurari/cargo-make/releases/download/0.35.0/cargo-make-v0.35.0-x86_64-unknown-linux-musl.zip > cargo-make.zip \
+  && echo "429c60665b20d43c6492045539add3f41a6339a0fb83d3d7d5bb66f926ccff36  cargo-make.zip" | sha256sum -c \
+  && unzip cargo-make.zip && cp cargo-make-*/cargo-make /usr/local/bin/cargo-make \
+  && cd .. && rm -r cm/
+
 RUN mkdir /cargo && mkdir /rust
 RUN chown 1000:1000 /cargo /rust
 
@@ -98,8 +105,8 @@ ENV RUST_HOME=/rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && /cargo/bin/rustup toolchain install 1.47.0 \
   && /cargo/bin/rustup default 1.47.0 \
-  && /cargo/bin/rustup component add clippy \
-  && /cargo/bin/cargo install --force --version 0.32.13 cargo-make
+  && /cargo/bin/rustup component add clippy
+#RUN /cargo/bin/cargo uninstall --force cargo-make
 
 RUN pip3 install msgpack imutils numpy dvc[s3]==1.11.16
 RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
@@ -137,7 +144,7 @@ COPY --chown=exopticon:exopticon . ./
 RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
       workers/coral/data/ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite
 
-RUN cargo make --profile release build-release
+RUN cargo make --profile release ci-flow
 
 FROM debian:buster-slim AS exopticon-slim
 
