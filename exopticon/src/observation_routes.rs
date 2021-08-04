@@ -200,7 +200,7 @@ pub fn get_snapshot(
         .arg("2")
         .arg("-f")
         .arg("mjpeg")
-        .arg(snapshot_path.clone())
+        .arg(snapshot_path)
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|_| {
