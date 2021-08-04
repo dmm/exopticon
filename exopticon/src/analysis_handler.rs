@@ -21,6 +21,7 @@
 use actix::{Handler, Message};
 use chrono::NaiveDateTime;
 use diesel::*;
+use diesel::{dsl::any, sql_types::Integer};
 
 use crate::analysis_routes::{AnalysisConfiguration, AnalysisType, FetchAnalysisConfiguration};
 use crate::errors::ServiceError;
@@ -525,6 +526,12 @@ impl Handler<FetchAnalysisConfiguration> for DbExecutor {
     }
 }
 
+#[derive(Debug, QueryableByName)]
+struct UnusedInstance {
+    #[sql_type = "Integer"]
+    pub analysis_instance_id: i32,
+}
+
 impl Message for AnalysisConfiguration {
     type Result = Result<Self, ServiceError>;
 }
@@ -692,6 +699,43 @@ impl Handler<AnalysisConfiguration> for DbExecutor {
                     )?;
                 }
             }
+
+            // Disable analysis instances without subscriptions
+            let query = r#"
+                SELECT ai.id AS analysis_instance_id
+                FROM analysis_instances ai
+                LEFT OUTER JOIN analysis_subscriptions sub
+                  ON ai.id = sub.analysis_instance_id
+                WHERE sub.id IS NULL;
+                "#;
+
+            let unused_instances: Vec<UnusedInstance> =
+                diesel::sql_query(query).load(conn).map_err(|error| {
+                    error!("Failed to fetch unused analysis instances {}", error);
+                    ServiceError::InternalServerError
+                })?;
+            let unused_instance_ids: Vec<i32> = unused_instances
+                .into_iter()
+                .map(|a| a.analysis_instance_id)
+                .collect();
+
+            diesel::update(analysis_instances)
+                .filter(crate::schema::analysis_instances::dsl::id.ne(any(&unused_instance_ids)))
+                .set(crate::schema::analysis_instances::dsl::enabled.eq(true))
+                .execute(conn)
+                .map_err(|error| {
+                    error!("Failed to update analysis instances {}", error);
+                    ServiceError::InternalServerError
+                })?;
+
+            diesel::update(analysis_instances)
+                .filter(crate::schema::analysis_instances::dsl::id.eq(any(&unused_instance_ids)))
+                .set(crate::schema::analysis_instances::dsl::enabled.eq(false))
+                .execute(conn)
+                .map_err(|error| {
+                    error!("Failed to update analysis instances {}", error);
+                    ServiceError::InternalServerError
+                })?;
 
             Ok(msg)
         })
