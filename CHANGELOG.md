@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.18.12
+2021-08-05
+
+### Fixes
+
+- Disable unused analysis instances (dadaa9dfa24c9d7454ccc389f9938f7c2610661f)
+- Remove unnecessary clone() (ba6a592f72b394f0400b8cf357234f4c9f854fde)
+- Reconfigure cargo-make to run clippy and check formatting (59d1a7521c8ee18c63a934463a69af1dcbf0daf0)
+- run build-release in ci-flow (3f11e0dd8b25a7d6982a778b80a46179d4a41414)
+
 ## 0.18.11
 2021-08-02
 
