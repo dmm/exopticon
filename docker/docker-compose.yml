@@ -6,16 +6,13 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
       - RUST_LOG
-      - ROOT_URL
+      - ROOT_URL="https://${DOMAIN}"
       - EXOPTICON_NAME
       - EXOPTICON_SHORT_NAME
     restart: always
-    ports:
-      - 0.0.0.0:3000:3000
-      - 3001:3001
-    devices:
-      - /dev/bus/usb:/dev/bus/usb
-      - /dev/apex_0:/dev/apex_0
+    ports: []
+    devices: []
+#      - /dev/apex_0:/dev/apex_0
     device_cgroup_rules:
       - 'a 189:* rwm'
     volumes:

@@ -5,21 +5,19 @@ services:
     build:
       context: ..
       target: development
-    depends_on:
-      - db
     environment:
       - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
       - ROOT_URL
       - EXOPTICON_NAME
       - EXOPTICON_SHORT_NAME
+      - RUST_LOG
     ports:
       - 0.0.0.0:3002:3000
-      - 3001:3001
     restart: always
     device_cgroup_rules:
       - 'a 189:* rwm'
-    devices:
-      - /dev/apex_0:/dev/apex_0
+    devices: []
+#      - /dev/apex_0:/dev/apex_0
     volumes:
       - cargo_home:/cargo
       - target:/exopticon/target

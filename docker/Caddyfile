@@ -1,0 +1,10 @@
+{$DOMAIN}:{$PORT} {
+  # Use the ACME HTTP-01 challenge to get a cert for the configured domain.
+ tls {$LETSENCRYPT_EMAIL}
+
+  basicauth /metrics {
+      prometheus {$METRICS_AUTH_HASH}
+  }
+
+  reverse_proxy exopticon:3000
+}
