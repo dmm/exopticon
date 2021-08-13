@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.14
+2021-08-13
+
+### Fixes
+
+- Expose port 3000 in docker-compose (40881b721567a0ec9ce7acdd817bbfaf4d69d373)
+
 ## 0.18.13
 2021-08-13
 
