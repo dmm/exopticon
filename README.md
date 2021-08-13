@@ -4,6 +4,25 @@
 1. Pre-install requirements
 * Network layout
 * Install docker and docker-compose
+* Create udev rule
+
+If you're using the coral tpu, you'll have to add a udev rule to set
+the correct permissions on the device. On Debian create a file called
+/etc/udev/rules.d/60-coral.rules:
+
+```
+SUBSYSTEM=="usb",ATTRS{idVendor}=="1a6e",GROUP="plugdev",MODE="0666"
+SUBSYSTEM=="usb",ATTRS{idVendor}=="18d1",GROUP="plugdev",MODE="0666"
+```
+
+Then run
+
+```
+# udevadm control --reload
+```
+
+as root to load the rule.
+
 2. Fetch the sources
 
 ```bash

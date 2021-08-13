@@ -7,10 +7,12 @@ services:
       target: development
     environment:
       - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
-      - ROOT_URL
+      - ROOT_URL="https://${DOMAIN}"
+      - DOMAIN
       - EXOPTICON_NAME
       - EXOPTICON_SHORT_NAME
       - RUST_LOG
+      - EXOPTICON_METRICS_ENABLED
     ports:
       - 0.0.0.0:3002:3000
     restart: always

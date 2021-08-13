@@ -3,7 +3,6 @@ version: '2.4'
 services:
   caddy:
     image: caddy:2
-    container_name: caddy
     restart: always
     ports:
       - 80:80  # Needed for the ACME HTTP-01 challenge.

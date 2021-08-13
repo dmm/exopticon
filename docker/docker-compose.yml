@@ -7,8 +7,10 @@ services:
       - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
       - RUST_LOG
       - ROOT_URL="https://${DOMAIN}"
+      - DOMAIN
       - EXOPTICON_NAME
       - EXOPTICON_SHORT_NAME
+      - EXOPTICON_METRICS_ENABLED
     restart: always
     ports: []
     devices: []

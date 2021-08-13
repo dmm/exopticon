@@ -198,7 +198,8 @@ use dotenv::dotenv;
 use rand::Rng;
 use time::Duration;
 
-use std::{env, thread};
+use std::collections::HashMap;
+use std::env;
 
 use crate::app::RouteState;
 use crate::models::{CreateCameraGroup, CreateUser};
@@ -318,21 +319,25 @@ fn main() {
         .expect("Invalid SECRET_KEY env var provided. Must be 32bytes encoded as base64");
 
     // Initialize prometheus metrics
-    let prometheus = PrometheusMetrics::new("exopticon", Some("/metrics"), None);
-    prom_registry::set_metrics(prometheus.clone());
+    let prometheus_endpoint: Option<&str> = if let Ok(val) = env::var("EXOPTICON_METRICS_ENABLED") {
+        if &val == "true" {
+            Some("/metrics")
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
-    thread::spawn(move || {
-        let mut sys = System::new("metrics");
-        let srv = HttpServer::new(move || App::new().wrap(prometheus.clone()))
-            .bind("0.0.0.0:3001")
-            .expect("Could not bind to 0.0.0.0:3000")
-            .run();
-        sys.block_on(srv)
-            .expect("Failed to block on metrics server");
-    });
+    let hostname = env::var("DOMAIN").unwrap_or_else(|_| "exopticon".to_string());
+    let mut labels = HashMap::new();
+    labels.insert("instance".to_string(), hostname);
+    let prometheus = PrometheusMetrics::new("exopticon", prometheus_endpoint, Some(labels));
+    prom_registry::set_metrics(prometheus.clone());
 
     HttpServer::new(move || {
         App::new()
+            .wrap(prometheus.clone())
             .data(RouteState {
                 db: route_db_address.clone(),
             })
