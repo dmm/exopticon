@@ -2,6 +2,15 @@
 
 <!--- next entry here -->
 
+## 0.18.13
+2021-08-13
+
+### Fixes
+
+- Remove empty lines in continuation (06eb71264c503aa98469611ca80392caf39de99d)
+- switch docker-composer.web to Caddy (c630420283952c06e0e63d3817adb05eb43a5f16)
+- Add env var to enable metrics (ae38f37cff688d69314359a17781cdf70220a564)
+
 ## 0.18.12
 2021-08-05
 
