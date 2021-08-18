@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.15
+2021-08-18
+
+### Fixes
+
+- Include snapshot size when calculating video unit size (569272a853c4efe749e7f81e58a2c721f6ab0095)
+
 ## 0.18.14
 2021-08-13
 
