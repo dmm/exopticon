@@ -268,7 +268,7 @@ pub struct OutputVideoUnit {
 }
 
 /// Full video unit model, represents entire database row
-#[derive(Identifiable, Associations, Serialize, Queryable)]
+#[derive(Identifiable, Associations, Serialize, Queryable, Clone)]
 #[serde(rename_all = "camelCase")]
 #[belongs_to(Camera)]
 #[table_name = "video_units"]
@@ -422,11 +422,9 @@ pub struct FetchOldVideoUnitFile {
 }
 
 /// Represents request to delete video units
-pub struct DeleteVideoUnitFiles {
+pub struct DeleteVideoUnits {
     /// vec of ids of video units to delete
     pub video_unit_ids: Vec<Uuid>,
-    /// vec of id of video files to delete
-    pub video_file_ids: Vec<i32>,
 }
 
 /// Represents a request to fetch empty video files, video files
@@ -1016,8 +1014,9 @@ pub struct EventFile {
 }
 
 /// Represents image snapshot of observation
-#[derive(AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
+#[derive(Associations, AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
 #[table_name = "observation_snapshots"]
+#[belongs_to(Observation)]
 pub struct ObservationSnapshot {
     /// id of observation represented
     pub observation_id: i64,

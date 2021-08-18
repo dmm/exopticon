@@ -22,22 +22,16 @@ use std::time::Duration;
 
 use actix::fut::wrap_future;
 use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
-use futures::future::FutureExt;
 
-use crate::models::{
-    Camera, DbExecutor, DeleteVideoUnitFiles, FetchCameraGroupFiles, FileExecutor, RemoveFile,
-    VideoFile, VideoUnit,
-};
+use crate::models::{DbExecutor, DeleteVideoUnits, FetchCameraGroupFiles, VideoUnit};
 
 /// A video unit/video file pair with the corresponding camera
-type VideoUnitPair = (Camera, (VideoUnit, VideoFile));
+type VideoUnitPair = (VideoUnit, i64);
 
 /// File deletion actor state
 pub struct FileDeletionActor {
     /// id of camera group this actor will deletion excess files for
     camera_group_id: i32,
-    /// Address of file actor
-    fs_actor: Addr<FileExecutor>,
     /// Address of database worker
     db_addr: Addr<DbExecutor>,
 }
@@ -56,14 +50,9 @@ impl Actor for FileDeletionActor {
 
 impl FileDeletionActor {
     /// Returns newly initialized `FileDeletionActor`
-    pub const fn new(
-        camera_group_id: i32,
-        fs_actor: Addr<FileExecutor>,
-        db_addr: Addr<DbExecutor>,
-    ) -> Self {
+    pub const fn new(camera_group_id: i32, db_addr: Addr<DbExecutor>) -> Self {
         Self {
             camera_group_id,
-            fs_actor,
             db_addr,
         }
     }
@@ -78,68 +67,42 @@ impl FileDeletionActor {
         let max_size_bytes = max_size * 1024 * 1024;
         let mut delete_amount: i64 = current_size - max_size_bytes;
         let mut video_unit_ids = Vec::new();
-        let mut video_file_ids = Vec::new();
 
         debug!(
-            "FileDeletionActor {}: Handling {} files, max_size: {}, current_size: {}, \
-             delete amount: {}",
+            "FileDeletionActor {}: Handling {} files, max_size: {}MiB, current_size: {}MiB, \
+             delete amount: {}MiB",
             self.camera_group_id,
             files.len(),
-            max_size_bytes,
-            current_size,
-            delete_amount
+            max_size_bytes / 1024 / 1024,
+            current_size / 1024 / 1024,
+            delete_amount / 1024 / 1024
         );
 
-        for (_camera, (video_unit, video_file)) in files {
+        for (video_unit, video_unit_size) in files {
             if delete_amount <= 0 {
                 break;
             }
-
-            delete_amount -= i64::from(video_file.size);
+            delete_amount -= video_unit_size;
             video_unit_ids.push(video_unit.id);
-            video_file_ids.push(video_file.id);
-            debug!(
-                "file_deletion_actor({}): removing file: {}, size: {}",
-                self.camera_group_id, video_file.filename, video_file.size
-            );
-
-            let fut_db = self.db_addr.clone();
-            let fut = self.fs_actor.send(RemoveFile {
-                path: video_file.filename.clone(),
-            });
-            let actor_fut =
-                wrap_future(fut).map(move |res, _actor: &mut Self, ctx: &mut Context<Self>| {
-                    match res {
-                        Ok(Ok(())) => {
-                            let fut2 = fut_db
-                                .send(DeleteVideoUnitFiles {
-                                    video_unit_ids: vec![video_unit.id],
-                                    video_file_ids: vec![video_file.id],
-                                })
-                                .map(|_| ());
-                            ctx.spawn(wrap_future(fut2));
-                        }
-                        Ok(Err(err)) => {
-                            if err.kind() == std::io::ErrorKind::NotFound {
-                                info!("Attempted to delete non-existent file: {}", &video_file.id);
-                                let fut2 = fut_db
-                                    .send(DeleteVideoUnitFiles {
-                                        video_unit_ids: vec![video_unit.id],
-                                        video_file_ids: vec![video_file.id],
-                                    })
-                                    .map(|_| ());
-                                ctx.spawn(wrap_future(fut2));
-                            } else {
-                                panic!("Failed to delete file!");
-                            }
-                        }
-                        Err(err) => {
-                            panic!("Other error occured when deleting file! {}", err);
-                        }
-                    }
-                });
-            ctx.spawn(actor_fut);
         }
+
+        let fut = self.db_addr.send(DeleteVideoUnits { video_unit_ids });
+        ctx.spawn(
+            wrap_future(fut).map(move |res, _actor: &mut Self, ctx: &mut Context<Self>| {
+                match res {
+                    Ok(Ok(())) => {}
+                    Ok(Err(err)) => {
+                        error!("Error deleting video units! {}", err);
+                    }
+                    Err(err) => {
+                        error!("Error deleting video units! {}", err);
+                        panic!("Failed to delete!");
+                    }
+                }
+
+                ctx.notify_later(StartWork {}, Duration::from_millis(5000));
+            }),
+        );
     }
 }
 
@@ -171,7 +134,6 @@ impl Handler<StartWork> for FileDeletionActor {
                         actor.camera_group_id
                     );
                 }
-                ctx.notify_later(StartWork {}, Duration::from_millis(5000));
             });
 
         ctx.spawn(fut);

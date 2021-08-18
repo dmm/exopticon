@@ -22,14 +22,14 @@ use crate::errors::ServiceError;
 use crate::models::{
     Camera, CameraGroup, CameraGroupAndCameras, CreateCameraGroup, DbExecutor, FetchAllCameraGroup,
     FetchAllCameraGroupAndCameras, FetchCameraGroup, FetchCameraGroupFiles, UpdateCameraGroup,
-    VideoFile, VideoUnit,
+    VideoUnit,
 };
 use crate::schema::camera_groups::dsl::*;
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
 
 /// A segment of video paired with the source camera
-type CameraVideoSegment = (Camera, (VideoUnit, VideoFile));
+type CameraVideoSegment = (VideoUnit, i64);
 
 impl Message for CreateCameraGroup {
     type Result = Result<CameraGroup, ServiceError>;
@@ -156,9 +156,11 @@ impl Handler<FetchCameraGroupFiles> for DbExecutor {
     fn handle(&mut self, msg: FetchCameraGroupFiles, _: &mut Self::Context) -> Self::Result {
         use crate::schema::camera_groups;
         use crate::schema::cameras::dsl::*;
+        use crate::schema::observation_snapshots::dsl::*;
+        use crate::schema::observations::dsl::*;
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
-        use diesel::dsl::sum;
+        use diesel::dsl::{any, sum};
 
         let conn: &PgConnection = &self.0.get().unwrap();
 
@@ -167,6 +169,20 @@ impl Handler<FetchCameraGroupFiles> for DbExecutor {
             .filter(camera_groups::columns::id.eq(msg.camera_group_id))
             .first(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
+
+        let current_observation_snapshot_size = observation_snapshots
+            .select(sum(snapshot_size))
+            .inner_join(observations.inner_join(video_units.inner_join(cameras)))
+            .filter(camera_group_id.eq(msg.camera_group_id))
+            .first(conn)
+            .map(|result| match result {
+                Some(val) => val,
+                None => 0,
+            })
+            .map_err(|error| {
+                error!("current snapshot size error: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         let current_size = video_files
             .select(sum(size))
@@ -178,17 +194,66 @@ impl Handler<FetchCameraGroupFiles> for DbExecutor {
                 Some(val) => val,
                 None => 0,
             })
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("video file size error: {}", error);
+                ServiceError::InternalServerError
+            })?
+            + current_observation_snapshot_size;
 
-        let files = cameras
-            .inner_join(video_units.inner_join(video_files))
+        let units: Vec<(Camera, VideoUnit)> = cameras
+            .inner_join(video_units)
             .filter(camera_group_id.eq(msg.camera_group_id))
-            .filter(size.gt(0))
             .order(begin_time.asc())
             .limit(msg.count)
             .load(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("video unit error: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
-        Ok((max_size, current_size, files))
+        let mut unitgroups = Vec::new();
+
+        for unitpair in &units {
+            let file_size: i64 = video_files
+                .filter(crate::schema::video_files::columns::video_unit_id.eq(unitpair.1.id))
+                .select(sum(size))
+                .first(conn)
+                .map(|result| match result {
+                    Some(val) => val,
+                    None => 0,
+                })
+                .map_err(|error| {
+                    error!("owned video files error: {}", error);
+                    ServiceError::InternalServerError
+                })?;
+
+            let obs: Vec<i64> = observations
+                .select(crate::schema::observations::columns::id)
+                .filter(crate::schema::observations::columns::video_unit_id.eq(unitpair.1.id))
+                .load(conn)
+                .map_err(|error| {
+                    error!("owned observations error: {}", error);
+                    ServiceError::InternalServerError
+                })?;
+
+            let snap_size: i64 = observation_snapshots
+                .select(sum(snapshot_size))
+                .filter(observation_id.eq(any(&obs)))
+                .first(conn)
+                .map(|result| match result {
+                    Some(val) => val,
+                    None => 0,
+                })
+                .map_err(|error| {
+                    error!("observation snapshot size error: {}", error);
+                    ServiceError::InternalServerError
+                })?;
+
+            let video_unit_size: i64 = snap_size + file_size as i64;
+
+            unitgroups.push((unitpair.1.clone(), video_unit_size));
+        }
+
+        Ok((max_size, current_size, unitgroups))
     }
 }

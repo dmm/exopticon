@@ -20,9 +20,9 @@
 
 use crate::errors::ServiceError;
 use crate::models::{
-    Camera, CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor,
-    DeleteVideoUnitFiles, FetchBetweenVideoUnit, FetchOldVideoUnitFile, FetchVideoUnit,
-    Observation, UpdateVideoFile, UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
+    Camera, CreateVideoFile, CreateVideoUnit, CreateVideoUnitFile, DbExecutor, DeleteVideoUnits,
+    FetchBetweenVideoUnit, FetchOldVideoUnitFile, FetchVideoUnit, Observation, UpdateVideoFile,
+    UpdateVideoUnit, UpdateVideoUnitFile, VideoFile, VideoUnit,
 };
 use actix::{Handler, Message};
 use diesel::{self, prelude::*};
@@ -244,14 +244,14 @@ impl Handler<FetchOldVideoUnitFile> for DbExecutor {
     }
 }
 
-impl Message for DeleteVideoUnitFiles {
+impl Message for DeleteVideoUnits {
     type Result = Result<(), ServiceError>;
 }
 
-impl Handler<DeleteVideoUnitFiles> for DbExecutor {
+impl Handler<DeleteVideoUnits> for DbExecutor {
     type Result = Result<(), ServiceError>;
-
-    fn handle(&mut self, msg: DeleteVideoUnitFiles, _: &mut Self::Context) -> Self::Result {
+    #[allow(clippy::too_many_lines)]
+    fn handle(&mut self, msg: DeleteVideoUnits, _: &mut Self::Context) -> Self::Result {
         use crate::schema;
         use crate::schema::event_observations::dsl::*;
         use crate::schema::events::dsl::*;
@@ -262,13 +262,42 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
         use diesel::dsl::any;
         let conn: &PgConnection = &self.0.get().unwrap();
 
-        diesel::delete(
-            video_files.filter(schema::video_files::columns::id.eq(any(&msg.video_file_ids))),
+        // fetch video files to be deleted
+        let files: Vec<String> = video_files
+            .inner_join(video_units)
+            .filter(schema::video_files::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
+            .select(filename)
+            .load(conn)
+            .map_err(|_error| ServiceError::InternalServerError)?;
+
+        for f in files {
+            debug!("Deleting file: {}", f);
+            match std::fs::remove_file(&f) {
+                Ok(_) => {}
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        error!("Failed to delete file because it is missing: {}", f);
+                    } else {
+                        error!("Failed to delete file for other reasons...");
+                    }
+                }
+            }
+        }
+
+        // Delete video files owned by video units
+        let video_delete_count = diesel::delete(
+            video_files
+                .filter(schema::video_files::columns::video_unit_id.eq(any(&msg.video_unit_ids))),
         )
         .execute(conn)
-        .map_err(|_error| ServiceError::InternalServerError)?;
+        .map_err(|error| {
+            error!("Error deleting video file rows: {}", error);
+            ServiceError::InternalServerError
+        })?;
 
-        diesel::delete(event_observations)
+        debug!("Deleted {} video files!", video_delete_count);
+
+        let observation_delete_count = diesel::delete(event_observations)
             .filter(
                 schema::event_observations::columns::observation_id.eq_any(
                     observations
@@ -282,6 +311,8 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
             .execute(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
+        debug!("Observation delete count: {}", observation_delete_count);
+
         // Fetch all observation snapshots that need to be deleted
         let snaps: Vec<String> = observation_snapshots
             .inner_join(observations)
@@ -291,12 +322,13 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
             .map_err(|_error| ServiceError::InternalServerError)?;
 
         for s in snaps {
+            debug!("Deleting snapshot: {}", &s);
             if std::fs::remove_file(&s).is_err() {
                 error!("Failed to delete file: {}", &s);
             }
         }
 
-        diesel::delete(observation_snapshots)
+        let snapshot_delete_count = diesel::delete(observation_snapshots)
             .filter(
                 schema::observation_snapshots::columns::observation_id.eq_any(
                     observations
@@ -310,7 +342,10 @@ impl Handler<DeleteVideoUnitFiles> for DbExecutor {
             .execute(conn)
             .map_err(|_error| ServiceError::InternalServerError)?;
 
+        debug!("Deleted {} snapshots.", snapshot_delete_count);
+
         // Fetch all events to be deleted
+        debug!("Deleting events!");
         let old_events = events
             .left_outer_join(schema::event_observations::table)
             .inner_join(schema::observations::table)
