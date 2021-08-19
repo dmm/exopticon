@@ -72,11 +72,11 @@ RUN cd ffmpeg && ./configure \
 
 # install node.js and npm
 RUN mkdir /node && cd /node \
-    && wget https://nodejs.org/dist/v12.16.2/node-v12.16.2-linux-x64.tar.xz -O node.tar.xz \
+    && wget https://nodejs.org/dist/v14.17.5/node-v14.17.5-linux-x64.tar.xz -O node.tar.xz \
     && tar xf node.tar.xz \
     && mv node*/* . \
     && rm -rf node.tar.xz
-ENV PATH=$PATH:/node/bin
+ENV PATH=/node/bin:$PATH
 
 # configure gcc-7 as default for CUDA
 RUN rm /usr/bin/gcc /usr/bin/g++ \
