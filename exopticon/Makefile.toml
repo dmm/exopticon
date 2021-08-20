@@ -6,7 +6,7 @@ script = [
 cd web/
 npm install
 npm run check-format
-npm run ng build -- --prod --configuration=production
+npm run ng build -- --configuration=production
 '''
 ]
 
