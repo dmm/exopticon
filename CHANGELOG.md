@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.18.16
+2021-08-20
+
+### Fixes
+
+- Upgrade to node 14 (73c0a7d72de01a0529097db864929afa30b0307a)
+- upgrade to Angular 12 (12f71bfe3dec1396b5a3056ff1f31fad2f8f681a)
+- Update dependencies (69ee76af78aa8c10a3ea7c2d98d7639de602ab96)
+- Remove redundant --prod argument (cbd1a467439dd96f45103b3bb54dabf9c175371f)
+
 ## 0.18.15
 2021-08-18
 
