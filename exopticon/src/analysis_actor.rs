@@ -32,6 +32,7 @@ use actix::fut::wrap_future;
 use actix::prelude::*;
 use base64::STANDARD_NO_PAD;
 use bytes::BytesMut;
+use chrono::Utc;
 use futures::sink::SinkExt;
 use log::Level;
 use serde::Deserialize;
@@ -42,7 +43,7 @@ use uuid::Uuid;
 use crate::fair_queue::FairQueue;
 use crate::models::{
     AnalysisSubscriptionModel, CreateObservation, CreateObservationSnapshot, CreateObservations,
-    DbExecutor, SubscriptionMask,
+    DbExecutor, Observation, SubscriptionMask,
 };
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, SubscriptionSubject, WsCameraServer,
@@ -230,29 +231,53 @@ impl AnalysisActor {
             }
             AnalysisWorkerMessage::Observation(observations) => {
                 if let Some(mut frame) = self.last_frame.take() {
-                    let fut = self.db_address.send(CreateObservations { observations });
-                    ctx.spawn(wrap_future(fut).map(|result, actor: &mut Self, _ctx| {
-                        let offset = match frame.source {
-                            FrameSource::Camera {
-                                camera_id: _,
-                                analysis_offset,
-                            }
-                            | FrameSource::AnalysisEngine {
-                                analysis_engine_id: _,
-                                analysis_offset,
-                            } => analysis_offset,
-                            FrameSource::Playback { id } => {
-                                panic!("Playback is not a valid analysis source {}", id);
-                            }
-                        };
-                        if let Ok(Ok(new_observations)) = result {
-                            frame.source = FrameSource::AnalysisEngine {
-                                analysis_engine_id: actor.id,
-                                analysis_offset: offset,
-                            };
+                    let new_obs: Vec<Observation> = observations
+                        .iter()
+                        .map(|o| Observation {
+                            id: 0,
+                            frame_offset: o.frame_offset,
+                            tag: o.tag.clone(),
+                            details: o.details.clone(),
+                            score: o.score,
+                            ul_x: o.ul_x,
+                            ul_y: o.ul_y,
+                            lr_x: o.lr_x,
+                            lr_y: o.lr_y,
+                            inserted_at: Utc::now(),
+                            video_unit_id: o.video_unit_id,
+                        })
+                        .collect();
 
-                            frame.observations = new_observations;
-                            WsCameraServer::from_registry().do_send(frame);
+                    let offset = match frame.source {
+                        FrameSource::Camera {
+                            camera_id: _,
+                            analysis_offset,
+                        }
+                        | FrameSource::AnalysisEngine {
+                            analysis_engine_id: _,
+                            analysis_offset,
+                        } => analysis_offset,
+                        FrameSource::Playback { id } => {
+                            panic!("Playback is not a valid analysis source {}", id);
+                        }
+                    };
+                    frame.source = FrameSource::AnalysisEngine {
+                        analysis_engine_id: self.id,
+                        analysis_offset: offset,
+                    };
+
+                    frame.observations = new_obs;
+                    WsCameraServer::from_registry().do_send(frame);
+
+                    let new_creates = observations
+                        .into_iter()
+                        .filter(|x| x.tag != "motion")
+                        .collect();
+                    let fut = self.db_address.send(CreateObservations {
+                        observations: new_creates,
+                    });
+                    ctx.spawn(wrap_future(fut).map(|result, _actor: &mut Self, _ctx| {
+                        if let Ok(Ok(_)) = result {
                         } else {
                             error!("Error inserting observations!")
                         }
