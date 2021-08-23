@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.17
+2021-08-23
+
+### Fixes
+
+- stop saving motion observations to db (2e845e09a9fae3b3c2c31e7830458406c4472770)
+
 ## 0.18.16
 2021-08-20
 
