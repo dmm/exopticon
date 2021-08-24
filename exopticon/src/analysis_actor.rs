@@ -231,23 +231,6 @@ impl AnalysisActor {
             }
             AnalysisWorkerMessage::Observation(observations) => {
                 if let Some(mut frame) = self.last_frame.take() {
-                    let new_obs: Vec<Observation> = observations
-                        .iter()
-                        .map(|o| Observation {
-                            id: 0,
-                            frame_offset: o.frame_offset,
-                            tag: o.tag.clone(),
-                            details: o.details.clone(),
-                            score: o.score,
-                            ul_x: o.ul_x,
-                            ul_y: o.ul_y,
-                            lr_x: o.lr_x,
-                            lr_y: o.lr_y,
-                            inserted_at: Utc::now(),
-                            video_unit_id: o.video_unit_id,
-                        })
-                        .collect();
-
                     let offset = match frame.source {
                         FrameSource::Camera {
                             camera_id: _,
@@ -265,23 +248,40 @@ impl AnalysisActor {
                         analysis_engine_id: self.id,
                         analysis_offset: offset,
                     };
+                    // If these are motion observations, pass on
+                    // without saving to db.
+                    if observations.iter().any(|o| o.tag == "motion") {
+                        let new_obs: Vec<Observation> = observations
+                            .iter()
+                            .map(|o| Observation {
+                                id: 0,
+                                frame_offset: o.frame_offset,
+                                tag: o.tag.clone(),
+                                details: o.details.clone(),
+                                score: o.score,
+                                ul_x: o.ul_x,
+                                ul_y: o.ul_y,
+                                lr_x: o.lr_x,
+                                lr_y: o.lr_y,
+                                inserted_at: Utc::now(),
+                                video_unit_id: o.video_unit_id,
+                            })
+                            .collect();
 
-                    frame.observations = new_obs;
-                    WsCameraServer::from_registry().do_send(frame);
-
-                    let new_creates = observations
-                        .into_iter()
-                        .filter(|x| x.tag != "motion")
-                        .collect();
-                    let fut = self.db_address.send(CreateObservations {
-                        observations: new_creates,
-                    });
-                    ctx.spawn(wrap_future(fut).map(|result, _actor: &mut Self, _ctx| {
-                        if let Ok(Ok(_)) = result {
-                        } else {
-                            error!("Error inserting observations!")
-                        }
-                    }));
+                        frame.observations = new_obs;
+                        WsCameraServer::from_registry().do_send(frame);
+                    } else {
+                        // save to db first then pass on
+                        let fut = self.db_address.send(CreateObservations { observations });
+                        ctx.spawn(wrap_future(fut).map(|result, _actor: &mut Self, _ctx| {
+                            if let Ok(Ok(new_observations)) = result {
+                                frame.observations = new_observations;
+                                WsCameraServer::from_registry().do_send(frame);
+                            } else {
+                                error!("Error inserting observations!")
+                            }
+                        }));
+                    }
                 }
             }
             AnalysisWorkerMessage::FrameReport { tag: _, jpeg } => {
