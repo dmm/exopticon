@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.18.18
+2021-08-24
+
+### Fixes
+
+- persist non-motion observations before forwarding (5aa547fe4251c35cb6ec26d2bbe405d79df47526)
+
 ## 0.18.17
 2021-08-23
 
