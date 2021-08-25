@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.19.1
+2021-08-25
+
+### Fixes
+
+- Set first_pts when creating output file (3a1d728b785fc059b758cab534c52c59e7c9f59d)
+
 ## 0.19.0
 2021-08-25
 
