@@ -1,6 +1,13 @@
 {$DOMAIN}:{$PORT} {
-  # Use the ACME HTTP-01 challenge to get a cert for the configured domain.
- tls {$LETSENCRYPT_EMAIL}
+
+  basicauth /dbmetrics {
+      prometheus {$METRICS_AUTH_HASH}
+  }
+
+ handle_path /dbmetrics {
+     rewrite * /metrics
+     reverse_proxy dbmetrics:9187
+ }
 
   basicauth /metrics {
       prometheus {$METRICS_AUTH_HASH}

@@ -13,3 +13,9 @@ services:
       - type: bind
         source: ${EXOPTICON_DB_PATH}
         target: /var/lib/postgresql/data
+  dbmetrics:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db?sslmode=disable
+      PG_EXPORTER_INCLUDE_DATABASES: postgres

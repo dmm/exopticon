@@ -12,6 +12,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     environment:
       - DOMAIN
+      - PORT
       - EMAIL
       - METRICS_AUTH_HASH
 
