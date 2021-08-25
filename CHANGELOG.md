@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.19.0
+2021-08-25
+
+### Features
+
+- Add postgres metrics at /dbmetrics route (2e661681c7f307e113ff2a4a7715b8179c9705b4)
+
 ## 0.18.18
 2021-08-24
 
