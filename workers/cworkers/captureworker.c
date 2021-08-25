@@ -507,6 +507,7 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
         if (out->fcx == NULL && (pkt->flags & AV_PKT_FLAG_KEY)) {
                 // Open file
                 ex_init_output(out);
+                out->first_pts = pkt->pts;
                 char *fn = generate_output_name(output_directory, get_time());
                 struct timespec begin_time;
                 clock_gettime(CLOCK_REALTIME, &begin_time);
