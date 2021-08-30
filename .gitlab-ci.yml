@@ -99,6 +99,7 @@ deploy:
     ROOT_URL: "https://exopticon.mattli.us"
     EXOPTICON_NAME: "exopticon"
     EXOPTICON_SHORT_NAME: "exopticon"
+    EXOPTICON_METRICS_ENABLED: "true"
   before_script:
     - . release_info
     - mkdir -p ~/.ssh
