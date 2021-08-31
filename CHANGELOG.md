@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.19.3
+2021-08-31
+
+### Fixes
+
+- add metrics flag to .env.prod (c4b379aeb9c6c74c711c0f8558a2e48f8e4ff748)
+
 ## 0.19.2
 2021-08-31
 
