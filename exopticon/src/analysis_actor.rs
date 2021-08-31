@@ -230,6 +230,9 @@ impl AnalysisActor {
                 self.push_frame(ctx);
             }
             AnalysisWorkerMessage::Observation(observations) => {
+                self.metrics
+                    .observation_count
+                    .inc_by(observations.len() as u64);
                 if let Some(mut frame) = self.last_frame.take() {
                     let offset = match frame.source {
                         FrameSource::Camera {
@@ -311,6 +314,8 @@ impl AnalysisActor {
                 )
             }
             AnalysisWorkerMessage::Event(event) => {
+                self.metrics.event_count.inc_by(1);
+
                 let db = self.db_address.clone();
                 let fut = async move {
                     let ob_id = event.display_observation_id;

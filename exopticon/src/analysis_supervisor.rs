@@ -34,6 +34,8 @@ use crate::{db_registry, ws_camera_server::Unsubscribe};
 pub struct AnalysisMetrics {
     pub process_count: IntCounterVec,
     pub restart_count: IntCounterVec,
+    pub observation_count: IntCounterVec,
+    pub event_count: IntCounterVec,
 }
 
 impl AnalysisMetrics {
@@ -58,6 +60,24 @@ impl AnalysisMetrics {
                 &["analysis_id", "analysis_name"],
             )
             .expect("Unable to create analysis metric"),
+            observation_count: IntCounterVec::new(
+                opts!(
+                    "analysis_observation_count",
+                    "Number of observations by analysis instance"
+                )
+                .namespace("exopticon"),
+                &["analysis_id", "analysis_name"],
+            )
+            .expect("Unable to create analysis metric"),
+            event_count: IntCounterVec::new(
+                opts!(
+                    "analysis_event_count",
+                    "Number of events by analysis instance"
+                )
+                .namespace("exopticon"),
+                &["analysis_id", "analysis_name"],
+            )
+            .expect("Unable to create analysis metric"),
         }
     }
 
@@ -69,6 +89,12 @@ impl AnalysisMetrics {
             restart_count: self
                 .restart_count
                 .with_label_values(&[&actor_id.to_string(), actor_name]),
+            observation_count: self
+                .observation_count
+                .with_label_values(&[&actor_id.to_string(), actor_name]),
+            event_count: self
+                .event_count
+                .with_label_values(&[&actor_id.to_string(), actor_name]),
         }
     }
 
@@ -79,6 +105,12 @@ impl AnalysisMetrics {
         registry
             .register(Box::new(self.restart_count.clone()))
             .map_err(|_| ())?;
+        registry
+            .register(Box::new(self.observation_count.clone()))
+            .map_err(|_| ())?;
+        registry
+            .register(Box::new(self.event_count.clone()))
+            .map_err(|_| ())?;
 
         Ok(())
     }
@@ -88,6 +120,8 @@ impl AnalysisMetrics {
 pub struct AnalysisActorMetrics {
     pub process_count: IntCounter,
     pub restart_count: IntCounter,
+    pub observation_count: IntCounter,
+    pub event_count: IntCounter,
 }
 
 #[derive(Serialize, Deserialize)]
