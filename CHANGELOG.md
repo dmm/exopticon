@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.20.0
+2021-08-31
+
+### Features
+
+- Add observation and event count metrics (068f9c72cf7e1468e449248f116d068b985bc2da)
+- Add frame_count metric to CaptureActor (ac85bf76b5281a051aa15a78160483b6e74295f0)
+
+### Fixes
+
+- Switch analysis actors to AnalysisActorMetrics (e4ebd2e821fd965f3bf9c06acc5d72517ee8612b)
+- change second if let into else (908491222bdc3141cd55d865b392968f62e5e481)
+
 ## 0.19.3
 2021-08-31
 
