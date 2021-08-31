@@ -194,19 +194,16 @@ impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
                     for (engine, instance, addr) in actor.actors.values_mut() {
                         let actor_metrics =
                             actor.metrics.get_actor_metrics(instance.id, &instance.name);
+
                         if addr.is_none() && instance.enabled {
                             info!("Restarting analysis actor id: {}", instance.id);
                             let new_addr = Self::start_actor(engine, instance, actor_metrics);
                             *addr = Some(new_addr);
-                            return;
-                        }
-
-                        if let Some(addr2) = addr {
+                        } else if let Some(addr2) = addr {
                             if !addr2.connected() && instance.enabled {
                                 info!("Restarting analysis actor id: {}", instance.id);
                                 let new_addr = Self::start_actor(engine, instance, actor_metrics);
                                 *addr = Some(new_addr);
-                                return;
                             }
                         }
                     }
