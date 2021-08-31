@@ -222,6 +222,12 @@ impl Handler<SyncCaptureActors> for CaptureSupervisor {
                 with_ctx(|actor: &mut Self, _| {
                     for g in groups {
                         for c in g.1 {
+                            actor
+                                .metrics
+                                .restart_count
+                                .with_label_values(&[&c.id.to_string(), &c.name])
+                                .inc_by(0);
+
                             let storage_path = g.0.storage_path.clone();
                             actor.workers.push((storage_path, c, None));
                         }
