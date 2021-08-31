@@ -2,6 +2,17 @@
 
 <!--- next entry here -->
 
+## 0.21.0
+2021-08-31
+
+### Features
+
+- Add frame skipped metrics to AnalysisActor (13e321caf285e81b3400723cf7216fd7f26fce03)
+
+### Fixes
+
+- initialize capture actor restart count to zero (179bd332ce18e0fb8a749e558b38eb2b176ccba4)
+
 ## 0.20.0
 2021-08-31
 
