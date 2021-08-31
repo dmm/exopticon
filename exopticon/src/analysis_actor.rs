@@ -49,7 +49,7 @@ use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, SubscriptionSubject, WsCameraServer,
 };
 use crate::{
-    analysis_supervisor::{AnalysisMetrics, StopAnalysisActor},
+    analysis_supervisor::{AnalysisActorMetrics, StopAnalysisActor},
     models::CreateEvent,
 };
 
@@ -171,7 +171,7 @@ pub struct AnalysisActor {
     /// Address of database actor
     pub db_address: Addr<DbExecutor>,
     /// metrics
-    pub metrics: AnalysisMetrics,
+    pub metrics: AnalysisActorMetrics,
 }
 
 impl AnalysisActor {
@@ -183,7 +183,7 @@ impl AnalysisActor {
         max_fps: i32,
         subscriptions: Vec<AnalysisSubscriptionModel>,
         db_address: Addr<DbExecutor>,
-        metrics: AnalysisMetrics,
+        metrics: AnalysisActorMetrics,
     ) -> Self {
         let mut sub_map = HashMap::new();
         for s in subscriptions {
@@ -369,10 +369,7 @@ impl AnalysisActor {
             }
         }
 
-        self.metrics
-            .process_count
-            .with_label_values(&[&self.id.to_string(), ""])
-            .inc_by(1);
+        self.metrics.process_count.inc_by(1);
 
         // Take ownership of the worker's stdin. If any of the below
         // conditionals fail this will be dropped, closing stdin. That
@@ -495,11 +492,7 @@ impl Handler<StartWorker> for AnalysisActor {
         let fut = wrap_future::<_, Self>(worker).map(|_status, actor, ctx| {
             info!("Analysis actor {}: analysis worker died...", actor.id);
 
-            actor
-                .metrics
-                .restart_count
-                .with_label_values(&[&actor.id.to_string(), ""])
-                .inc_by(1);
+            actor.metrics.restart_count.inc_by(1);
 
             // Restart worker in five seconds
             ctx.notify_later(StartWorker {}, Duration::new(5, 0));

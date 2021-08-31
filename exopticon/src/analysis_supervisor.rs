@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
-use prometheus::{opts, IntCounterVec, Registry};
+use prometheus::{opts, IntCounter, IntCounterVec, Registry};
 
 use crate::models::{AnalysisEngine, AnalysisSubscriptionModel, FetchAllAnalysisModel};
 use crate::prom_registry;
@@ -31,7 +31,6 @@ use crate::ws_camera_server::{Subscribe, WsCameraServer};
 use crate::{analysis_actor::AnalysisActor, models::AnalysisInstanceModel};
 use crate::{db_registry, ws_camera_server::Unsubscribe};
 
-#[derive(Clone)]
 pub struct AnalysisMetrics {
     pub process_count: IntCounterVec,
     pub restart_count: IntCounterVec,
@@ -46,7 +45,7 @@ impl AnalysisMetrics {
                     "Number of frames processed by analysis instance"
                 )
                 .namespace("exopticon"),
-                &["instance_id", "instance_name"],
+                &["analysis_id", "analysis_name"],
             )
             .expect("Unable to create analysis metric"),
 
@@ -56,9 +55,20 @@ impl AnalysisMetrics {
                     "Number of unplanned restarts by analysis instance"
                 )
                 .namespace("exopticon"),
-                &["instance_id", "instance_name"],
+                &["analysis_id", "analysis_name"],
             )
             .expect("Unable to create analysis metric"),
+        }
+    }
+
+    pub fn get_actor_metrics(&self, actor_id: i32, actor_name: &str) -> AnalysisActorMetrics {
+        AnalysisActorMetrics {
+            process_count: self
+                .process_count
+                .with_label_values(&[&actor_id.to_string(), actor_name]),
+            restart_count: self
+                .restart_count
+                .with_label_values(&[&actor_id.to_string(), actor_name]),
         }
     }
 
@@ -72,6 +82,12 @@ impl AnalysisMetrics {
 
         Ok(())
     }
+}
+
+#[derive(Clone)]
+pub struct AnalysisActorMetrics {
+    pub process_count: IntCounter,
+    pub restart_count: IntCounter,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -176,19 +192,21 @@ impl Handler<RestartAnalysisActor> for AnalysisSupervisor {
             critical_section::<Self, _>(async move {
                 with_ctx(|actor: &mut Self, ctx: &mut Context<Self>| {
                     for (engine, instance, addr) in actor.actors.values_mut() {
+                        let actor_metrics =
+                            actor.metrics.get_actor_metrics(instance.id, &instance.name);
                         if addr.is_none() && instance.enabled {
                             info!("Restarting analysis actor id: {}", instance.id);
-                            let new_addr =
-                                Self::start_actor(engine, instance, actor.metrics.clone());
+                            let new_addr = Self::start_actor(engine, instance, actor_metrics);
                             *addr = Some(new_addr);
+                            return;
                         }
 
                         if let Some(addr2) = addr {
                             if !addr2.connected() && instance.enabled {
                                 info!("Restarting analysis actor id: {}", instance.id);
-                                let new_addr =
-                                    Self::start_actor(engine, instance, actor.metrics.clone());
+                                let new_addr = Self::start_actor(engine, instance, actor_metrics);
                                 *addr = Some(new_addr);
+                                return;
                             }
                         }
                     }
@@ -243,7 +261,7 @@ impl AnalysisSupervisor {
     pub fn start_actor(
         engine: &AnalysisEngine,
         new_actor: &AnalysisInstanceModel,
-        metrics: AnalysisMetrics,
+        metrics: AnalysisActorMetrics,
     ) -> Addr<AnalysisActor> {
         info!("Starting analysis actor id: {}", new_actor.id);
         let actor = AnalysisActor::new(
