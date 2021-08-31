@@ -512,8 +512,12 @@ impl Handler<CameraFrame> for AnalysisActor {
 
     fn handle(&mut self, msg: CameraFrame, ctx: &mut Context<Self>) -> Self::Result {
         // Enqueue received frame
-        self.frame_queue
-            .push_back(SubscriptionSubject::from(&msg), msg);
+        if self
+            .frame_queue
+            .push_back(SubscriptionSubject::from(&msg), msg)
+        {
+            self.metrics.skip_count.inc();
+        }
 
         self.push_frame(ctx);
     }

@@ -36,6 +36,7 @@ pub struct AnalysisMetrics {
     pub restart_count: IntCounterVec,
     pub observation_count: IntCounterVec,
     pub event_count: IntCounterVec,
+    pub skip_count: IntCounterVec,
 }
 
 impl AnalysisMetrics {
@@ -78,6 +79,15 @@ impl AnalysisMetrics {
                 &["analysis_id", "analysis_name"],
             )
             .expect("Unable to create analysis metric"),
+            skip_count: IntCounterVec::new(
+                opts!(
+                    "analysis_skip_count",
+                    "Number of frames skipped by analysis instance"
+                )
+                .namespace("exopticon"),
+                &["analysis_id", "analysis_name"],
+            )
+            .expect("Unable to create analysis metric"),
         }
     }
 
@@ -95,6 +105,9 @@ impl AnalysisMetrics {
             event_count: self
                 .event_count
                 .with_label_values(&[&actor_id.to_string(), actor_name]),
+            skip_count: self
+                .skip_count
+                .with_label_values(&[&actor_id.to_string(), actor_name]),
         }
     }
 
@@ -111,6 +124,9 @@ impl AnalysisMetrics {
         registry
             .register(Box::new(self.event_count.clone()))
             .map_err(|_| ())?;
+        registry
+            .register(Box::new(self.skip_count.clone()))
+            .map_err(|_| ())?;
 
         Ok(())
     }
@@ -122,6 +138,7 @@ pub struct AnalysisActorMetrics {
     pub restart_count: IntCounter,
     pub observation_count: IntCounter,
     pub event_count: IntCounter,
+    pub skip_count: IntCounter,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -61,10 +61,20 @@ where
 
     /// Pushes an item on the queue. If an item with the given key
     /// already exists, it is replaced.
-    pub fn push_back(&mut self, key: K, item: V) {
+    ///
+    /// Returns true if replacing existing value
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - key of value to push
+    /// * `item` - item to push into queue
+    ///
+    pub fn push_back(&mut self, key: K, item: V) -> bool {
         if self.items.insert(key.clone(), item).is_none() {
             self.queue.push_back(key);
+            return false;
         }
+        true
     }
 
     /// Pop an item from the front of the queue. Returns `None` if the
