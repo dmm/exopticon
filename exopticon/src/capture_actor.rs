@@ -38,7 +38,7 @@ use tokio::process::{ChildStdin, Command};
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
-use crate::capture_supervisor::StopCaptureWorker;
+use crate::capture_supervisor::{CaptureActorMetrics, StopCaptureWorker};
 use crate::db_registry;
 use crate::models::{CreateVideoUnitFile, UpdateVideoUnitFile};
 use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
@@ -133,6 +133,8 @@ pub struct CaptureActor {
     pub stdin: Option<ChildStdin>,
     /// State of CaptureActor
     state: CaptureState,
+    /// CaptureActor metrics
+    metrics: CaptureActorMetrics,
 }
 
 impl CaptureActor {
@@ -142,6 +144,7 @@ impl CaptureActor {
         stream_url: String,
         storage_path: String,
         capture_start: Instant,
+        metrics: CaptureActorMetrics,
     ) -> Self {
         Self {
             camera_id,
@@ -154,6 +157,7 @@ impl CaptureActor {
             filename: None,
             stdin: None,
             state: CaptureState::Running,
+            metrics,
         }
     }
 
@@ -229,6 +233,7 @@ impl CaptureActor {
                 unscaled_width,
                 unscaled_height,
             } => {
+                self.metrics.frame_count.inc();
                 WsCameraServer::from_registry().do_send(CameraFrame {
                     camera_id: self.camera_id,
                     jpeg,
