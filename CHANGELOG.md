@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.19.2
+2021-08-31
+
+### Fixes
+
+- enabled metrics in prod (2f5a78b10138a15f936298cdce97f43ed3623d2b)
+
 ## 0.19.1
 2021-08-25
 
