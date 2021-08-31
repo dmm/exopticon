@@ -99,7 +99,6 @@ deploy:
     ROOT_URL: "https://exopticon.mattli.us"
     EXOPTICON_NAME: "exopticon"
     EXOPTICON_SHORT_NAME: "exopticon"
-    EXOPTICON_METRICS_ENABLED: "true"
   before_script:
     - . release_info
     - mkdir -p ~/.ssh
@@ -121,6 +120,7 @@ deploy:
     - printf "EXOPTICON_NAME=%s\\n" "$EXOPTICON_NAME" >> .env.prod
     - printf "EXOPTICON_SHORT_NAME=%s\\n" "$EXOPTICON_SHORT_NAME" >> .env.prod
     - printf "COMPOSE_PROJECT_NAME=%s\\n" "$COMPOSE_PROJECT_NAME" >> .env.prod
+    - printf "EXOPTICON_METRICS_ENABLED=true\\n" >> .env.prod 
     - echo version is $RELEASE_VERSION
     - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
     - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml up -d --force-recreate
