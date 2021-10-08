@@ -2,7 +2,11 @@ version: '2.4'
 
 services:
   exopticon:
-    image: dmattli/exopticon:v${RELEASE_VERSION}
+    build:
+      context: .
+      dockerfile: Dockerfile.coral
+      args:
+        - RELEASE_VERSION=${RELEASE_VERSION}
     environment:
       - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
       - RUST_LOG

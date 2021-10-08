@@ -1,0 +1,75 @@
+ARG RELEASE_VERSION
+
+
+FROM dmattli/debian-cuda:10.0-buster-runtime AS ffmpeg
+
+USER root
+
+# Install nvdec headers
+RUN apt-get update \
+    && apt-get -y install git build-essential \
+    && git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git \
+    && cd nv-codec-headers \
+    && make \
+    && make install
+
+# Build ffmpeg
+RUN echo 'deb-src http://http.debian.net/debian buster main contrib non-free' > /etc/apt/sources.list.d/src.list \
+    && apt-get update && apt-get -y build-dep ffmpeg git \
+    && git clone https://github.com/FFmpeg/FFmpeg -b master ffmpeg \
+    && cd ffmpeg && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
+
+RUN cd ffmpeg && ./configure \
+       --disable-sdl2 \
+       --disable-alsa \
+       --disable-xlib \
+       --disable-sndio \
+       --disable-libxcb \
+       --disable-libxcb-shm \
+       --disable-libxcb-xfixes \
+       --disable-libxcb-shape \
+       --disable-libass \
+       --enable-cuvid \
+       --enable-nvdec \
+       --enable-gpl \
+       --enable-vaapi \
+       --enable-libfreetype \
+       --enable-libmp3lame \
+       --enable-libopus \
+       --enable-libtheora \
+       --enable-libvorbis \
+       --enable-libvpx \
+       --enable-libx264 \
+       --enable-shared \
+    && make -j`getconf _NPROCESSORS_ONLN` \
+    && make install
+
+FROM dmattli/exopticon:v${RELEASE_VERSION} AS exopticon
+FROM dmattli/debian-cuda:10.0-buster-runtime
+
+USER root
+
+# configure run user
+RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
+
+
+COPY --chown=exopticon:exopticon --from=exopticon /exopticon .
+
+COPY --chown=exopticon:exopticon --from=exopticon /exopticon/workers ./workers
+
+RUN chown exopticon:exopticon /exopticon
+
+# Copy ffmpeg libraries
+RUN mkdir -p /usr/local/lib /usr/local/bin \
+  && apt-get install $(apt-cache depends ffmpeg | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ')
+COPY --from=ffmpeg /usr/local/lib/lib* /usr/local/lib/
+COPY --from=ffmpeg /usr/local/bin /usr/local/bin
+
+ENV EXOPTICONWORKERS=/exopticon/workers/
+ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
+ENV PATH=/exopticon:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+USER exopticon:plugdev
+
+ENTRYPOINT /exopticon/exopticon
