@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.21.1
+2021-10-25
+
+### Fixes
+
+- Add file deletion logging (d96a49e483ca58f394e209a9ebfb776e1bb355a4)
+
 ## 0.21.0
 2021-08-31
 
