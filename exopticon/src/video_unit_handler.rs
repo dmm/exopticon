@@ -362,7 +362,10 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
                 ServiceError::InternalServerError
             })?;
 
-        debug!("Event Observation delete count: {}", event_observation_delete_count);
+        debug!(
+            "Event Observation delete count: {}",
+            event_observation_delete_count
+        );
 
         diesel::delete(events.filter(schema::events::columns::id.eq(any(&old_events))))
             .execute(conn)
