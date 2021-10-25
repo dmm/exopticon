@@ -300,28 +300,6 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
 
         debug!("Deleted {} video files!", video_delete_count);
 
-        let observation_delete_count = diesel::delete(event_observations)
-            .filter(
-                schema::event_observations::columns::observation_id.eq_any(
-                    observations
-                        .filter(
-                            schema::observations::columns::video_unit_id
-                                .eq(any(&msg.video_unit_ids)),
-                        )
-                        .select(schema::observations::columns::id),
-                ),
-            )
-            .execute(conn)
-            .map_err(|error| {
-                error!(
-                    "Failed to fetch the number of obervations to delete: {}",
-                    error
-                );
-                ServiceError::InternalServerError
-            })?;
-
-        debug!("Observation delete count: {}", observation_delete_count);
-
         // Fetch all observation snapshots that need to be deleted
         let snaps: Vec<String> = observation_snapshots
             .inner_join(observations)
@@ -372,6 +350,19 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
                 error!("Failed to fetch db events to be deleted: {}", error);
                 ServiceError::InternalServerError
             })?;
+
+        let event_observation_delete_count = diesel::delete(event_observations)
+            .filter(schema::event_observations::columns::event_id.eq(any(&old_events)))
+            .execute(conn)
+            .map_err(|error| {
+                error!(
+                    "Failed to fetch the number of event obervations to delete: {}",
+                    error
+                );
+                ServiceError::InternalServerError
+            })?;
+
+        debug!("Event Observation delete count: {}", event_observation_delete_count);
 
         diesel::delete(events.filter(schema::events::columns::id.eq(any(&old_events))))
             .execute(conn)
