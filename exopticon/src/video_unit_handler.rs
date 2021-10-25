@@ -268,7 +268,10 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
             .filter(schema::video_files::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
             .select(filename)
             .load(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to fetch files to delete: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         for f in files {
             debug!("Deleting file: {}", f);
@@ -278,7 +281,7 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
                     if err.kind() == std::io::ErrorKind::NotFound {
                         error!("Failed to delete file because it is missing: {}", f);
                     } else {
-                        error!("Failed to delete file for other reasons...");
+                        error!("Failed to delete file for other reasons... {}", err);
                     }
                 }
             }
@@ -309,7 +312,13 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
                 ),
             )
             .execute(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!(
+                    "Failed to fetch the number of obervations to delete: {}",
+                    error
+                );
+                ServiceError::InternalServerError
+            })?;
 
         debug!("Observation delete count: {}", observation_delete_count);
 
@@ -319,7 +328,10 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
             .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
             .select(snapshot_path)
             .load(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to fetch observations to delete: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         for s in snaps {
             debug!("Deleting snapshot: {}", &s);
@@ -340,36 +352,50 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
                 ),
             )
             .execute(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("failed to fetch number of snapshots to delete: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         debug!("Deleted {} snapshots.", snapshot_delete_count);
 
         // Fetch all events to be deleted
-        debug!("Deleting events!");
         let old_events = events
             .left_outer_join(schema::event_observations::table)
             .inner_join(schema::observations::table)
             .select(schema::events::columns::id)
             .filter(schema::event_observations::columns::observation_id.is_null())
             .load::<Uuid>(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to fetch db events to be deleted: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         diesel::delete(events.filter(schema::events::columns::id.eq(any(&old_events))))
             .execute(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to delete old db events: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         diesel::delete(
             observations
                 .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids))),
         )
         .execute(conn)
-        .map_err(|_error| ServiceError::InternalServerError)?;
+        .map_err(|error| {
+            error!("Failed to delete db observations: {}", error);
+            ServiceError::InternalServerError
+        })?;
 
         diesel::delete(
             video_units.filter(schema::video_units::columns::id.eq(any(msg.video_unit_ids))),
         )
         .execute(conn)
-        .map_err(|_error| ServiceError::InternalServerError)?;
+        .map_err(|error| {
+            error!("Failed to delete db video_units: {}", error);
+            ServiceError::InternalServerError
+        })?;
 
         Ok(())
     }

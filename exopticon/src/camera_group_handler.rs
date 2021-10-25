@@ -168,7 +168,13 @@ impl Handler<FetchCameraGroupFiles> for DbExecutor {
             .select(max_storage_size)
             .filter(camera_groups::columns::id.eq(msg.camera_group_id))
             .first(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!(
+                    "failed to fetch max size of files in camera group: {}",
+                    error
+                );
+                ServiceError::InternalServerError
+            })?;
 
         let current_observation_snapshot_size = observation_snapshots
             .select(sum(snapshot_size))
