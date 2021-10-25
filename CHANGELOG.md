@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.21.3
+2021-10-25
+
+### Fixes
+
+- Remove all event_observations attached to deleted events. (42e5edaaafb2f1e5ab5e7c6da543e6011d0c8c58)
+- formatting (040cf03b5faaaa00e29c41f284fc638dc18e0378)
+
 ## 0.21.2
 2021-10-25
 
