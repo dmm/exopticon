@@ -110,7 +110,7 @@ RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
 
 RUN cargo make --profile release ci-flow
 
-FROM debian:buster-slim AS exopticon
+FROM debian:buster-slim AS exopticon-runtime
 
 WORKDIR /exopticon
 
@@ -120,25 +120,16 @@ ENV FLASK_ENV=development
 ENV DEBIAN_FRONTEND=noninteractive
 # Install packages for apt repo
 RUN apt-get -qq update \
-# ffmpeg and runtime deps
+# ffmpeg
   && apt-get install --no-install-recommends -y \
-  libpq5 libturbojpeg0 ffmpeg python3-opencv \
-# Add Coral tpu repository and install python libraries.net core
-    && apt-get -qq install --no-install-recommends -y \
-    gnupg wget unzip tzdata python3-gi \
-    && apt-get -qq install --no-install-recommends -y \
-        python3-pip \
-    && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-    && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
-    && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
-    && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=16.0 python3-pycoral \
-    && apt-get purge -y python3-setuptools python3-pip python3-wheel gnupg wget unzip mono-runtime \
+  ffmpeg
+
 # Add imutils and numpy
-    && apt-get install --no-install-recommends -y \
-      python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
+RUN apt-get install --no-install-recommends -y \
+    python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
     && pip3 install imutils numpy \
-   && apt-get purge -y python3-setuptools python3-pip python3-wheel \
+    && apt-get purge -y python3-setuptools python3-pip python3-wheel \
+
 # clean up
     && apt-get autoremove -y \
     && apt-get clean \
@@ -148,6 +139,8 @@ RUN apt-get -qq update \
 # configure run user
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
 RUN chown exopticon:exopticon /exopticon
+
+FROM exopticon-runtime AS exopticon-cuda
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
 
