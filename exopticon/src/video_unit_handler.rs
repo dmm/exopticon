@@ -366,6 +366,7 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
             .inner_join(schema::observations::table)
             .select(schema::events::columns::id)
             .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
+            .or_filter(schema::event_observations::columns::observation_id.is_null())
             .load::<Uuid>(conn)
             .map_err(|error| {
                 error!("Failed to fetch db events to be deleted: {}", error);
