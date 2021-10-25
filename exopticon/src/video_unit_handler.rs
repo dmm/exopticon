@@ -359,12 +359,13 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
 
         debug!("Deleted {} snapshots.", snapshot_delete_count);
 
-        // Fetch all events to be deleted
+        // Fetch all events to be deleted:  All events with
+        // observations attached to video units marked for deletion
         let old_events = events
             .left_outer_join(schema::event_observations::table)
             .inner_join(schema::observations::table)
             .select(schema::events::columns::id)
-            .filter(schema::event_observations::columns::observation_id.is_null())
+            .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
             .load::<Uuid>(conn)
             .map_err(|error| {
                 error!("Failed to fetch db events to be deleted: {}", error);
