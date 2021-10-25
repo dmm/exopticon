@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.21.2
+2021-10-25
+
+### Fixes
+
+- Delete all events attached to old video units (cfc8a7d834b09993d52d11d67e108e9227162d08)
+- Also delete events without associated observations (bff501aba291b3d0e681d40f8c6ae9df230a1081)
+
 ## 0.21.1
 2021-10-25
 
