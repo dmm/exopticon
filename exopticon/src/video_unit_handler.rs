@@ -268,7 +268,10 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
             .filter(schema::video_files::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
             .select(filename)
             .load(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to fetch files to delete: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         for f in files {
             debug!("Deleting file: {}", f);
@@ -278,7 +281,7 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
                     if err.kind() == std::io::ErrorKind::NotFound {
                         error!("Failed to delete file because it is missing: {}", f);
                     } else {
-                        error!("Failed to delete file for other reasons...");
+                        error!("Failed to delete file for other reasons... {}", err);
                     }
                 }
             }
@@ -297,29 +300,16 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
 
         debug!("Deleted {} video files!", video_delete_count);
 
-        let observation_delete_count = diesel::delete(event_observations)
-            .filter(
-                schema::event_observations::columns::observation_id.eq_any(
-                    observations
-                        .filter(
-                            schema::observations::columns::video_unit_id
-                                .eq(any(&msg.video_unit_ids)),
-                        )
-                        .select(schema::observations::columns::id),
-                ),
-            )
-            .execute(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
-
-        debug!("Observation delete count: {}", observation_delete_count);
-
         // Fetch all observation snapshots that need to be deleted
         let snaps: Vec<String> = observation_snapshots
             .inner_join(observations)
             .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
             .select(snapshot_path)
             .load(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to fetch observations to delete: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         for s in snaps {
             debug!("Deleting snapshot: {}", &s);
@@ -340,36 +330,68 @@ impl Handler<DeleteVideoUnits> for DbExecutor {
                 ),
             )
             .execute(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("failed to fetch number of snapshots to delete: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         debug!("Deleted {} snapshots.", snapshot_delete_count);
 
-        // Fetch all events to be deleted
-        debug!("Deleting events!");
+        // Fetch all events to be deleted:  All events with
+        // observations attached to video units marked for deletion
         let old_events = events
             .left_outer_join(schema::event_observations::table)
             .inner_join(schema::observations::table)
             .select(schema::events::columns::id)
-            .filter(schema::event_observations::columns::observation_id.is_null())
+            .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids)))
+            .or_filter(schema::event_observations::columns::observation_id.is_null())
             .load::<Uuid>(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to fetch db events to be deleted: {}", error);
+                ServiceError::InternalServerError
+            })?;
+
+        let event_observation_delete_count = diesel::delete(event_observations)
+            .filter(schema::event_observations::columns::event_id.eq(any(&old_events)))
+            .execute(conn)
+            .map_err(|error| {
+                error!(
+                    "Failed to fetch the number of event obervations to delete: {}",
+                    error
+                );
+                ServiceError::InternalServerError
+            })?;
+
+        debug!(
+            "Event Observation delete count: {}",
+            event_observation_delete_count
+        );
 
         diesel::delete(events.filter(schema::events::columns::id.eq(any(&old_events))))
             .execute(conn)
-            .map_err(|_error| ServiceError::InternalServerError)?;
+            .map_err(|error| {
+                error!("Failed to delete old db events: {}", error);
+                ServiceError::InternalServerError
+            })?;
 
         diesel::delete(
             observations
                 .filter(schema::observations::columns::video_unit_id.eq(any(&msg.video_unit_ids))),
         )
         .execute(conn)
-        .map_err(|_error| ServiceError::InternalServerError)?;
+        .map_err(|error| {
+            error!("Failed to delete db observations: {}", error);
+            ServiceError::InternalServerError
+        })?;
 
         diesel::delete(
             video_units.filter(schema::video_units::columns::id.eq(any(msg.video_unit_ids))),
         )
         .execute(conn)
-        .map_err(|_error| ServiceError::InternalServerError)?;
+        .map_err(|error| {
+            error!("Failed to delete db video_units: {}", error);
+            ServiceError::InternalServerError
+        })?;
 
         Ok(())
     }

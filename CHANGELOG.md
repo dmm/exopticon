@@ -2,6 +2,29 @@
 
 <!--- next entry here -->
 
+## 0.21.3
+2021-10-25
+
+### Fixes
+
+- Remove all event_observations attached to deleted events. (42e5edaaafb2f1e5ab5e7c6da543e6011d0c8c58)
+- formatting (040cf03b5faaaa00e29c41f284fc638dc18e0378)
+
+## 0.21.2
+2021-10-25
+
+### Fixes
+
+- Delete all events attached to old video units (cfc8a7d834b09993d52d11d67e108e9227162d08)
+- Also delete events without associated observations (bff501aba291b3d0e681d40f8c6ae9df230a1081)
+
+## 0.21.1
+2021-10-25
+
+### Fixes
+
+- Add file deletion logging (d96a49e483ca58f394e209a9ebfb776e1bb355a4)
+
 ## 0.21.0
 2021-08-31
 
