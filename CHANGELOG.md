@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.21.4
+2021-11-11
+
+### Fixes
+
+- Add importlib-metadata package to fix dvc install (730a036d2461a3ad99b2f6963b5de7dd5f6542b0)
+
 ## 0.21.3
 2021-10-25
 
