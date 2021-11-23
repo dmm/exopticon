@@ -75,10 +75,10 @@ build_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/darknet
 asset_dir=${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/assets/workers/yolov4/data
 mkdir ${build_dir} || true
 cd ${build_dir}
-cmake ${CARGO_MAKE_WORKING_DIRECTORY}/yolov4/darknet
+cmake -DBUILD_USELIB_TRACK=OFF -DENABLE_VCPKG_INTEGRATION=OFF -DENABLE_OPENCV=OFF ${CARGO_MAKE_WORKING_DIRECTORY}/yolov4/darknet
 make -j4
 mkdir -p ${asset_dir} || true
-cp ${build_dir}/libdark.so ${asset_dir}
+cp ${build_dir}/libdarknet.so ${asset_dir}/libdark.so
 '''
 ]
 

@@ -1,15 +1,15 @@
-FROM dmattli/debian-cuda:10.0-buster-devel AS exopticon-build
+FROM dmattli/debian-cuda:latest-devel AS exopticon-build
 WORKDIR /exopticon
 
-ENV CC=gcc-7
-ENV CXX=g++-7
+ENV CC=gcc-10
+ENV CXX=g++-10
 
 # Install system packages
 RUN echo 'deb-src http://http.debian.net/debian buster main contrib non-free' > /etc/apt/sources.list.d/src.list
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # Exopticon Build Dependencies
   libturbojpeg0-dev bzip2 unzip \
-  dpkg-dev file imagemagick libbz2-dev libc6-dev \
+  dpkg-dev file imagemagick libz3-dev libc6-dev \
   libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
   libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
   libkrb5-dev liblzma-dev libmagickcore-dev libmagickwand-dev\
@@ -20,45 +20,46 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   curl python3-pil python3-lxml \
   python3 python3-dev python3-pip python3-setuptools python3-wheel \
   git libopencv-dev python3-opencv python3-scipy cmake \
-# ffmpeg \
+# ffmpeg
+  ffmpeg libavformat-dev libswscale-dev libavutil-dev libavcodec-dev \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# Install nvdec headers
-RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git \
-    && cd nv-codec-headers \
-    && make \
-    && make install
+# # Install nvdec headers
+# RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git \
+#     && cd nv-codec-headers \
+#     && make \
+#     && make install
 
-# Build ffmpeg
-RUN apt-get update && apt-get -y build-dep ffmpeg \
-    && git clone https://github.com/FFmpeg/FFmpeg -b master ffmpeg \
-    && cd ffmpeg && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
+# # Build ffmpeg
+# RUN apt-get update && apt-get -y build-dep ffmpeg \
+#     && git clone https://github.com/FFmpeg/FFmpeg -b master ffmpeg \
+#     && cd ffmpeg && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
 
-RUN cd ffmpeg && ./configure \
-       --disable-sdl2 \
-       --disable-alsa \
-       --disable-xlib \
-       --disable-sndio \
-       --disable-libxcb \
-       --disable-libxcb-shm \
-       --disable-libxcb-xfixes \
-       --disable-libxcb-shape \
-       --disable-libass \
-       --enable-cuvid \
-       --enable-nvdec \
-       --enable-gpl \
-       --enable-vaapi \
-       --enable-libfreetype \
-       --enable-libmp3lame \
-       --enable-libopus \
-       --enable-libtheora \
-       --enable-libvorbis \
-       --enable-libvpx \
-       --enable-libx264 \
-       --enable-shared \
-    && make -j`getconf _NPROCESSORS_ONLN` \
-    && make install
+# RUN cd ffmpeg && ./configure \
+#        --disable-sdl2 \
+#        --disable-alsa \
+#        --disable-xlib \
+#        --disable-sndio \
+#        --disable-libxcb \
+#        --disable-libxcb-shm \
+#        --disable-libxcb-xfixes \
+#        --disable-libxcb-shape \
+#        --disable-libass \
+#        --enable-cuvid \
+#        --enable-nvdec \
+#        --enable-gpl \
+#        --enable-vaapi \
+#        --enable-libfreetype \
+#        --enable-libmp3lame \
+#        --enable-libopus \
+#        --enable-libtheora \
+#        --enable-libvorbis \
+#        --enable-libvpx \
+#        --enable-libx264 \
+#        --enable-shared \
+#     && make -j`getconf _NPROCESSORS_ONLN` \
+#     && make install
 
 # Add Coral tpu repository and install python libraries
  RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
@@ -77,11 +78,6 @@ RUN mkdir /node && cd /node \
     && mv node*/* . \
     && rm -rf node.tar.xz
 ENV PATH=/node/bin:$PATH
-
-# configure gcc-7 as default for CUDA
-RUN rm /usr/bin/gcc /usr/bin/g++ \
-    && ln -s /usr/bin/gcc-7 /usr/bin/gcc \
-    && ln -s /usr/bin/g++-7 /usr/bin/g++
 
 # Install cargo-make
 RUN mkdir cm && cd cm \
@@ -113,11 +109,11 @@ RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
 
 ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
-ENV PATH=/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:/home/exopticon/.local/bin/:$PATH
-ENV CUDA_HOME=/usr/local/cuda-10.0
-ENV CUDA_PATH=/usr/local/cuda-10.0/bin
-ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-10.0
-ENV CUDACXX=/usr/local/cuda-10.0/bin/nvcc
+ENV CUDA_HOME=/usr/local/cuda-11.5
+ENV CUDA_PATH=/usr/local/cuda-11.5/bin
+ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-11.5
+ENV CUDACXX=/usr/local/cuda-11.5/bin/nvcc
+ENV PATH=$CUDA_PATH:/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:/home/exopticon/.local/bin/:$PATH
 
 WORKDIR /exopticon
 
@@ -198,8 +194,7 @@ USER exopticon:plugdev
 
 ENTRYPOINT /exopticon/exopticon
 
-FROM dmattli/debian-cuda:10.0-buster-runtime AS exopticon-runtime
-
+FROM dmattli/debian-cuda:latest AS exopticon-runtime
 WORKDIR /exopticon
 
 USER root
@@ -212,16 +207,16 @@ RUN apt-get -qq update \
   && apt-get install --no-install-recommends -y \
   libturbojpeg0 bzip2 \
   libbz2-1.0 libc6 \
-  libcurl4 libevent-2.1-6 libffi6 \
+  libcurl4 libevent-2.1-7 libffi7 \
   libgdbm6 libgeoip1 libglib2.0 \
   libkrb5-3 liblzma5 libmagickcore-6.q16-6 libmagickwand-6.q16-6 \
   libncurses5 libncursesw5 libpng16-16 libpq5 \
-  libreadline5 libsqlite3-0 libssl1.1 libwebp6 \
+  libreadline8 libsqlite3-0 libssl1.1 libwebp6 \
   libxml2 libxslt1.1 libyaml-0-2 \
   zlib1g libturbojpeg0 \
   python3-opencv \
   # ffmpeg runtime deps
-  libxcb-shape0 libxcb-xfixes0 \
+  ffmpeg \
 
 # Add Coral tpu repository and install python libraries
     && apt-get -qq install --no-install-recommends -y \
@@ -258,9 +253,9 @@ COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exo
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/assets/workers ./workers
 
 # Copy ffmpeg libraries
-RUN mkdir -p /usr/local/lib /usr/local/bin \
-  && apt-get install $(apt-cache depends ffmpeg | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ')
-COPY --from=exopticon-build /usr/local/lib/lib* /usr/local/lib/
+#RUN mkdir -p /usr/local/lib /usr/local/bin \
+#  && apt-get install $(apt-cache depends ffmpeg | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ')
+#COPY --from=exopticon-build /usr/local/lib/lib* /usr/local/lib/
 COPY --from=exopticon-build /usr/local/bin /usr/local/bin
 
 ENV EXOPTICONWORKERS=/exopticon/workers/
