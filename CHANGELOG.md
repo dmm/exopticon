@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.21.5
+2021-11-23
+
+### Fixes
+
+- Move library args to end of command to appease linker (268894ba0868789a2fb9358555e4a379e3074d62)
+- Upgrade to bullseye image (6009a9bef702071cca24d85ba6c821c20aa6e80c)
+
 ## 0.21.4
 2021-11-11
 
