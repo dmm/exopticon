@@ -8,16 +8,18 @@ CC ?= clang
 
 # so we can run make outside of Cargo
 CARGO_PROFILE ?= debug
-OUTDIR ?= ../../target/$(CARGO_PROFILE)
-CARGO_TARGET_DIR ?= $(OUT_DIR)/../../..
-EXSERIAL_LIB= $(CARGO_TARGET_DIR)/libexserial.a
+OUTDIR ?= ../../target/assets
+CARGO_TARGET_DIR ?= ../../target
+EXSERIAL_LIB= $(CARGO_TARGET_DIR)/$(CARGO_PROFILE)/libexserial.a
 EXSERIAL_FLAGS= -L$(CARGO_TARGET_DIR) -ldl -lpthread $(EXSERIAL_LIB)
-EXWORKER_BINDIR ?= ../dist/cworkers
+EXWORKER_BINDIR ?= $(OUTDIR)/workers/cworkers
 
 all: ${EXWORKER_BINDIR}/captureworker ${EXWORKER_BINDIR}/playbackworker
 
 development: captureworker.c exvid.c $(EXSERIAL_LIB)
-	${CC}  -O0 -g $(mycflags) $(devcflags) $(CFLAGS) captureworker.c -o ${EXWORKER_BINDIR}/captureworker $(EXSERIAL_FLAGS) $(LIBRARIES)
+	mkdir -p ${EXWORKER_BINDIR}
+	${CC} -O0 -g $(mycflags) $(CFLAGS) captureworker.c exvid.c -o ${EXWORKER_BINDIR}/captureworker $(EXSERIAL_FLAGS) $(LIBRARIES)
+
 
 ${EXWORKER_BINDIR}/playbackworker: playbackworker.c $(EXSERIAL_LIB)
 	mkdir -p ${EXWORKER_BINDIR}
