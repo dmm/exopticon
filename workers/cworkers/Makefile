@@ -10,7 +10,7 @@ CC ?= clang
 CARGO_PROFILE ?= debug
 OUTDIR ?= ../../target/assets
 CARGO_TARGET_DIR ?= ../../target
-EXSERIAL_LIB= $(CARGO_TARGET_DIR)/$(CARGO_PROFILE)/libexserial.a
+EXSERIAL_LIB= $(CARGO_TARGET_DIR)/libexserial.a
 EXSERIAL_FLAGS= -L$(CARGO_TARGET_DIR) -ldl -lpthread $(EXSERIAL_LIB)
 EXWORKER_BINDIR ?= $(OUTDIR)/workers/cworkers
 
