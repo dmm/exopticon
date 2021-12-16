@@ -9,7 +9,7 @@ CC ?= clang
 # so we can run make outside of Cargo
 CARGO_PROFILE ?= debug
 OUTDIR ?= ../../target/assets
-CARGO_TARGET_DIR ?= ../../target
+CARGO_TARGET_DIR ?= ../../target/debug
 EXSERIAL_LIB= $(CARGO_TARGET_DIR)/libexserial.a
 EXSERIAL_FLAGS= -L$(CARGO_TARGET_DIR) -ldl -lpthread $(EXSERIAL_LIB)
 EXWORKER_BINDIR ?= $(OUTDIR)/workers/cworkers
