@@ -43,6 +43,12 @@ struct in_context {
 
         struct timespec   last_frame_time;
         struct timespec  interrupt_time;
+
+        // Encoder contexts
+        int            encoder_initialized;
+        AVCodec        *encoder_codec;
+        AVCodecContext *encoder_ccx;
+        AVCodecContext *encoder_scaled_ccx;
 };
 
 struct out_context {

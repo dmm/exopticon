@@ -425,13 +425,36 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
         return resizedFrame;
 }
 
-int send_scaled_frame(AVFrame *frame, const int64_t offset, const int width, const int height)
+int send_scaled_jpeg(AVPacket *jpeg_pkt, const int64_t offset, const int width, const int height, const int unscaled_width, const int unscaled_height)
 {
         struct FrameMessage message;
-        message.unscaled_height = frame->height;
-        message.unscaled_width = frame->width;
+        message.unscaled_height = unscaled_height;
+        message.unscaled_width = unscaled_width;
         message.offset = offset;
 
+        message.jpeg = jpeg_pkt->buf->data;
+        message.jpeg_size = jpeg_pkt->buf->size;
+
+        send_scaled_frame_message(&message, height);
+        return 0;
+}
+
+int send_full_jpeg(AVPacket *jpeg_pkt, const int64_t offset, const int unscaled_width, const int unscaled_height)
+{
+        struct FrameMessage message;
+        message.unscaled_height = unscaled_height;
+        message.unscaled_width = unscaled_width;
+        message.offset = offset;
+
+        message.jpeg = jpeg_pkt->buf->data;
+        message.jpeg_size = jpeg_pkt->buf->size;
+
+        send_frame_message(&message);
+        return 0;
+}
+
+int send_scaled_frame(AVFrame *frame, const int64_t offset, const int width, const int height)
+{
         AVPacket jpeg_pkt;
         av_init_packet(&jpeg_pkt);
 
@@ -440,10 +463,8 @@ int send_scaled_frame(AVFrame *frame, const int64_t offset, const int width, con
 
         // jpeg encode frame
         encode_jpeg(scaledFrame, &jpeg_pkt);
-        message.jpeg = jpeg_pkt.buf->data;
-        message.jpeg_size = jpeg_pkt.buf->size;
 
-        send_scaled_frame_message(&message, scaledFrame->height);
+        send_scaled_jpeg(&jpeg_pkt, offset, width, height, frame->width, frame->height);
 
         av_freep(&(scaledFrame->data));
         av_frame_free(&scaledFrame);
@@ -453,11 +474,6 @@ int send_scaled_frame(AVFrame *frame, const int64_t offset, const int width, con
 
 int send_full_frame(AVFrame *frame, const int64_t offset)
 {
-        struct FrameMessage message;
-        message.unscaled_height = frame->height;
-        message.unscaled_width = frame->width;
-        message.offset = offset;
-
         AVPacket jpeg_pkt;
         av_init_packet(&jpeg_pkt);
 
@@ -466,10 +482,8 @@ int send_full_frame(AVFrame *frame, const int64_t offset)
 
         // jpeg encode frame
         encode_jpeg(scaledFrame, &jpeg_pkt);
-        message.jpeg = jpeg_pkt.buf->data;
-        message.jpeg_size = jpeg_pkt.buf->size;
 
-        send_frame_message(&message);
+        send_full_jpeg(&jpeg_pkt, offset, frame->width, frame->height);
 
         av_freep(&(scaledFrame->data));
         av_frame_free(&scaledFrame);
@@ -524,6 +538,25 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
         return 0;
 }
 
+static enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
+                                        const enum AVPixelFormat *pix_fmts) {
+        const enum AVPixelFormat *p;
+
+        // touch ctx to prevent an unused parameter warning
+        (void)(ctx);
+
+        for (p = pix_fmts; *p != -1; p++) {
+                if (*p == AV_PIX_FMT_CUDA || *p == AV_PIX_FMT_VAAPI || *p == AV_PIX_FMT_QSV) {
+                        av_log(NULL, AV_LOG_INFO, "Selecting pixel format: %s",  av_get_pix_fmt_name(*p));
+                        return *p;
+                }
+        }
+
+        av_log(NULL, AV_LOG_INFO, "Failed to get HW surface format.\n");
+        return AV_PIX_FMT_NONE;
+}
+
+
 int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
 {
         // Make sure packet is video
@@ -554,27 +587,112 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                                                          in->st->time_base,
                                                          microsecond);
 
-        // retrieve data from gpu, if necessary
-        if (is_hwaccel_pix_fmt(frame->format)) {
-                sw_frame = av_frame_alloc();
-                if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0) {
-                        fprintf(stderr, "Error transferring the data to system memory\n");
-                        goto cleanup;
+        // Aquire jpeg frame
+
+        // Hardware jpeg encode
+        if (in->hw_accel_type == AV_HWDEVICE_TYPE_QSV) {
+                int ret = 0;
+                if (!in->encoder_initialized) {
+                        if (!(in->encoder_codec = avcodec_find_encoder_by_name("mjpeg_qsv"))) {
+                                fprintf(stderr, "Could not find encoder '%s'\n", "mjpeg_qsv");
+
+                                goto error;
+                        }
+
+                        // Initialize the scaled jpeg context
+                        if (!(in->encoder_scaled_ccx = avcodec_alloc_context3(in->encoder_codec))) {
+                                goto error;
+                        }
+                        // we need a frame so that we can initialize the encoder's codec
+                        //in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
+                        in->encoder_scaled_ccx->pix_fmt = in->ccx->pix_fmt;
+                        in->encoder_scaled_ccx->time_base = (AVRational){1, 25}; // unused
+                        in->encoder_scaled_ccx->width = frame->width;
+                        in->encoder_scaled_ccx->height = frame->height;
+
+                        if ((ret = avcodec_open2(in->encoder_scaled_ccx, in->encoder_codec, NULL)) < 0) {
+                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
+                                        av_err2str(ret));
+                                goto error;
+                        }
+
+                        // Initialize the full jpeg context
+                        if (!(in->encoder_ccx = avcodec_alloc_context3(in->encoder_codec))) {
+                                goto error;
+                        }
+                        // we need a frame so that we can initialize the encoder's codec
+                        //in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
+                        in->encoder_ccx->pix_fmt = in->ccx->pix_fmt;
+                        in->encoder_ccx->time_base = (AVRational){1, 25}; // unused
+                        in->encoder_ccx->width = 854;
+                        in->encoder_ccx->height = 480;
+
+                        if ((ret = avcodec_open2(in->encoder_ccx, in->encoder_codec, NULL)) < 0) {
+                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
+                                        av_err2str(ret));
+                                goto error;
+                        }
+
+                        in->encoder_initialized = 1;
                 }
-                send_full_frame(sw_frame, offset_microseconds);
-                send_scaled_frame(sw_frame, offset_microseconds, 640, 360);
+                AVPacket enc_pkt;
+                av_init_packet(&enc_pkt);
+                enc_pkt.data = NULL;
+                enc_pkt.size = 0;
+
+                // Send scaled frame
+                if ((ret = avcodec_send_frame(in->encoder_scaled_ccx, frame)) < 0) {
+                        fprintf(stderr, "Error code: %s\n", av_err2str(ret));
+                        goto error;
+                }
+                while (1) {
+                        ret = avcodec_receive_packet(in->encoder_scaled_ccx, &enc_pkt);
+                        if (ret)
+                                break;
+                        enc_pkt.stream_index = 0;
+                        send_scaled_jpeg(&enc_pkt, offset_microseconds, in->encoder_ccx->width, in->encoder_ccx->height, frame->width, frame->height);
+                        av_packet_unref(&enc_pkt);
+                }
+
+                // Send full frame
+                if ((ret = avcodec_send_frame(in->encoder_ccx, frame)) < 0) {
+                        fprintf(stderr, "Error code: %s\n", av_err2str(ret));
+                        goto error;
+                }
+                while (1) {
+                        ret = avcodec_receive_packet(in->encoder_ccx, &enc_pkt);
+                        if (ret)
+                                break;
+                        enc_pkt.stream_index = 0;
+                        send_full_jpeg(&enc_pkt, offset_microseconds, frame->width, frame->height);
+                        av_packet_unref(&enc_pkt);
+                }
         } else {
-                send_full_frame(frame, offset_microseconds);
-                send_scaled_frame(frame, offset_microseconds, 640, 360);
-
+                // software jpeg encode
+                // retrieve data from gpu, if necessary
+                if (is_hwaccel_pix_fmt(frame->format)) {
+                        sw_frame = av_frame_alloc();
+                        if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0) {
+                                fprintf(stderr, "Error transferring the data to system memory\n");
+                                goto cleanup;
+                        }
+                        send_full_frame(sw_frame, offset_microseconds);
+                        send_scaled_frame(sw_frame, offset_microseconds, 848, 480);
+                } else {
+                        send_full_frame(frame, offset_microseconds);
+                        send_scaled_frame(frame, offset_microseconds, 848, 480);
+                }
         }
-
 
 
 cleanup:
         av_frame_free(&sw_frame);
         av_frame_free(&frame);
         return 0;
+error:
+        av_frame_free(&sw_frame);
+        av_frame_free(&frame);
+        return 1;
 }
 
 int main(int argc, char *argv[])
