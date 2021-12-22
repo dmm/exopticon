@@ -621,7 +621,7 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                                 goto error;
                         }
                         // we need a frame so that we can initialize the encoder's codec
-                        //in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
+                        in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
                         in->encoder_ccx->pix_fmt = in->ccx->pix_fmt;
                         in->encoder_ccx->time_base = (AVRational){1, 25}; // unused
                         in->encoder_ccx->width = 854;
@@ -667,6 +667,84 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                         send_full_jpeg(&enc_pkt, offset_microseconds, frame->width, frame->height);
                         av_packet_unref(&enc_pkt);
                 }
+        } else if (in->hw_accel_type == AV_HWDEVICE_TYPE_VAAPI) {
+                int ret = 0;
+                if (!in->encoder_initialized) {
+                        if (!(in->encoder_codec = avcodec_find_encoder_by_name("mjpeg_vaapi"))) {
+                                fprintf(stderr, "Could not find encoder '%s'\n", "mjpeg_vaapi");
+
+                                goto error;
+                        }
+
+                        // Initialize the scaled jpeg context
+                        if (!(in->encoder_scaled_ccx = avcodec_alloc_context3(in->encoder_codec))) {
+                                goto error;
+                        }
+                        // we need a frame so that we can initialize the encoder's codec
+                        in->encoder_scaled_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
+                        in->encoder_scaled_ccx->pix_fmt = in->ccx->pix_fmt;
+                        in->encoder_scaled_ccx->time_base = (AVRational){1, 25}; // unused
+                        in->encoder_scaled_ccx->width = 854;
+                        in->encoder_scaled_ccx->height = 480;
+
+                        if ((ret = avcodec_open2(in->encoder_scaled_ccx, in->encoder_codec, NULL)) < 0) {
+                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
+                                        av_err2str(ret));
+                                goto error;
+                        }
+
+                        // Initialize the full jpeg context
+                        if (!(in->encoder_ccx = avcodec_alloc_context3(in->encoder_codec))) {
+                                goto error;
+                        }
+                        // we need a frame so that we can initialize the encoder's codec
+                        in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
+                        in->encoder_ccx->pix_fmt = in->ccx->pix_fmt;
+                        in->encoder_ccx->time_base = (AVRational){1, 25}; // unused
+                        in->encoder_ccx->width = frame->width;
+                        in->encoder_ccx->height = frame->height;
+
+                        if ((ret = avcodec_open2(in->encoder_ccx, in->encoder_codec, NULL)) < 0) {
+                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
+                                        av_err2str(ret));
+                                goto error;
+                        }
+
+                        in->encoder_initialized = 1;
+                }
+                AVPacket enc_pkt;
+                av_init_packet(&enc_pkt);
+                enc_pkt.data = NULL;
+                enc_pkt.size = 0;
+
+                // Send scaled frame
+                if ((ret = avcodec_send_frame(in->encoder_scaled_ccx, frame)) < 0) {
+                        fprintf(stderr, "Error code: %s\n", av_err2str(ret));
+                        goto error;
+                }
+                while (1) {
+                        ret = avcodec_receive_packet(in->encoder_scaled_ccx, &enc_pkt);
+                        if (ret)
+                                break;
+                        enc_pkt.stream_index = 0;
+                        send_scaled_jpeg(&enc_pkt, offset_microseconds, in->encoder_ccx->width, in->encoder_ccx->height, frame->width, frame->height);
+                        av_packet_unref(&enc_pkt);
+                }
+
+                // Send full frame
+                if ((ret = avcodec_send_frame(in->encoder_ccx, frame)) < 0) {
+                        fprintf(stderr, "Error code: %s\n", av_err2str(ret));
+                        goto error;
+                }
+                while (1) {
+                        ret = avcodec_receive_packet(in->encoder_ccx, &enc_pkt);
+                        if (ret)
+                                break;
+                        enc_pkt.stream_index = 0;
+                        send_full_jpeg(&enc_pkt, offset_microseconds, frame->width, frame->height);
+                        av_packet_unref(&enc_pkt);
+                }
+
         } else {
                 // software jpeg encode
                 // retrieve data from gpu, if necessary

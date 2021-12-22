@@ -125,7 +125,7 @@ int ex_init_input(struct in_context *c) {
 
 static int hw_decoder_init(struct in_context *c, const enum AVHWDeviceType type) {
         int err =  av_hwdevice_ctx_create(&c->hw_device_ctx, type,
-                                      NULL, NULL, 0);
+                                      "/dev/dri/renderD128", NULL, 0);
         if (err < 0) {
                 av_log(NULL, AV_LOG_ERROR, "Failed to create specified HW device. %s\n", av_err2str(err));
                 return err;
@@ -218,6 +218,13 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         }
         c->st = c->fcx->streams[c->stream_index];
 
+        // intel quicksync hw accel doesn't support h264 baseline, so
+        // use software decoding instead.
+        if (c->codecpar->profile == FF_PROFILE_H264_BASELINE) {
+                av_log(NULL, AV_LOG_INFO, "VAAPI hw accel selected but stream is h264 Baseline. Using software decoding instead.");
+                c->hw_accel_type = AV_HWDEVICE_TYPE_NONE;
+        }
+
 
         // Initialize codec
         if (c->hw_accel_type == AV_HWDEVICE_TYPE_NONE) {
@@ -281,6 +288,40 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                 }
                 // initialize jpeg encoder context
                 c->encoder_codec = avcodec_find_encoder_by_name("mjpeg_qsv");
+                c->encoder_ccx = avcodec_alloc_context3(c->encoder_codec);
+
+        } else if (c->hw_accel_type == AV_HWDEVICE_TYPE_VAAPI) {
+                c->codec = avcodec_find_decoder_by_name("h264");
+                if (c->codec == NULL) {
+                        return_value = 4;
+                        goto cleanup;
+                }
+                c->ccx = avcodec_alloc_context3(c->codec);
+                if (c->ccx == NULL) {
+                        return_value = 5;
+                        goto cleanup;
+                }
+
+                int avcodec_ret = avcodec_parameters_to_context(c->ccx, c->codecpar);
+                if (avcodec_ret < 0) {
+                        av_log(NULL, AV_LOG_FATAL, "Failed to copy codec pars to context");
+                        return_value = 6;
+                        goto cleanup;
+                }
+
+                c->ccx->opaque = c;
+                c->ccx->get_format = get_hw_format;
+
+                if (hw_decoder_init(c, c->hw_accel_type) == 0) {
+                        av_log(NULL, AV_LOG_INFO, "HW decoder successfully initialized!\n");
+                } else {
+                        av_log(NULL, AV_LOG_ERROR, "HW decoder failed!!\n");
+                        return_value = 8;
+                        goto cleanup;
+                }
+
+                // initialize jpeg encoder context
+                c->encoder_codec = avcodec_find_encoder_by_name("mjpeg_vaapi");
                 c->encoder_ccx = avcodec_alloc_context3(c->encoder_codec);
         }
 
