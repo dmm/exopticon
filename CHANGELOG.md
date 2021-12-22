@@ -2,6 +2,20 @@
 
 <!--- next entry here -->
 
+## 0.22.0
+2021-12-22
+
+### Features
+
+- Add vaapi hw accelerated codecs to captureworker (d13c03e8395a10202b9ab62a2f5b26b1348a94e7)
+
+### Fixes
+
+- fix library ordering in cworkers Makefile (cde8b0aeee7c1792c05c5ca63bdeefc482965509)
+- fix EXSERIAL_LIB path (aa0404df9f92c877f0a94073efd966dce19ed003)
+- Implement qsv transcoding (9df140cb18a9b719cdd41a91f080fc300f979673)
+- Fix default CARGO_TARGET_DIR (07ea40c37f3bdb8175380c5883eded173d8b3d0e)
+
 ## 0.21.5
 2021-11-23
 
