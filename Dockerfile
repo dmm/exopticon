@@ -5,7 +5,7 @@ ENV CC=gcc-10
 ENV CXX=g++-10
 
 # Install system packages
-RUN echo 'deb-src http://http.debian.net/debian buster main contrib non-free' > /etc/apt/sources.list.d/src.list
+RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # Exopticon Build Dependencies
   libturbojpeg0-dev bzip2 unzip \
@@ -144,7 +144,7 @@ RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
 
 RUN cargo make --profile release ci-flow
 
-FROM debian:buster-slim AS exopticon-slim
+FROM debian:bullseye-slim AS exopticon-slim
 
 WORKDIR /exopticon
 
@@ -223,7 +223,6 @@ RUN apt-get -qq update \
   ffmpeg \
   # hwaccel
   intel-media-va-driver-non-free i965-va-driver-shaders \
-
 
 # Add Coral tpu repository and install python libraries
     && apt-get -qq install --no-install-recommends -y \
