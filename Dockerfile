@@ -153,6 +153,7 @@ USER root
 ENV FLASK_ENV=development
 ENV DEBIAN_FRONTEND=noninteractive
 # Install packages for apt repo
+RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
 RUN apt-get -qq update \
 # ffmpeg and runtime deps
   && apt-get install --no-install-recommends -y \
@@ -206,6 +207,7 @@ USER root
 ENV FLASK_ENV=development
 ENV DEBIAN_FRONTEND=noninteractive
 # Install packages for apt repo
+RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
 RUN apt-get -qq update \
 # ffmpeg
   && apt-get install --no-install-recommends -y \
