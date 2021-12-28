@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   git libopencv-dev python3-opencv python3-scipy cmake \
 # ffmpeg
   ffmpeg libavformat-dev libswscale-dev libavutil-dev libavcodec-dev \
+  # hwaccel
+  intel-media-va-driver-non-free i965-va-driver-shaders \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -170,8 +172,10 @@ RUN apt-get -qq update \
     && apt-get install --no-install-recommends -y \
       python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
     && pip3 install imutils numpy \
-   && apt-get purge -y python3-setuptools python3-pip python3-wheel \
-# clean up
+    && apt-get purge -y python3-setuptools python3-pip python3-wheel \
+    # hwaccel
+    intel-media-va-driver-non-free i965-va-driver-shaders \
+    # clean up
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \ # /wheels \
@@ -217,6 +221,9 @@ RUN apt-get -qq update \
   python3-opencv \
   # ffmpeg runtime deps
   ffmpeg \
+  # hwaccel
+  intel-media-va-driver-non-free i965-va-driver-shaders \
+
 
 # Add Coral tpu repository and install python libraries
     && apt-get -qq install --no-install-recommends -y \
