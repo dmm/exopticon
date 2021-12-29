@@ -291,7 +291,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                 c->encoder_ccx = avcodec_alloc_context3(c->encoder_codec);
 
         } else if (c->hw_accel_type == AV_HWDEVICE_TYPE_VAAPI) {
-                c->codec = avcodec_find_decoder_by_name("h264");
+                c->codec = avcodec_find_decoder(c->codecpar->codec_id);
                 if (c->codec == NULL) {
                         return_value = 4;
                         goto cleanup;
