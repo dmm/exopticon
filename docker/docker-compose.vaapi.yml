@@ -1,0 +1,8 @@
+version: '2.4'
+
+services:
+  exopticon:
+    environment:
+      - EXOPTICON_HWACCEL_METHOD="vaapi"
+    devices:
+      - /dev/dri/renderD128
