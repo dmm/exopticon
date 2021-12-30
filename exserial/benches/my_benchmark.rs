@@ -58,8 +58,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     group.bench_function("bincode deserialize frame", |b| {
         b.iter(|| {
-            let _frame: CameraFrame =
-                deserialize(black_box(&serialized)).expect("Deserialization failed!");
+            let _frame: Result<CameraFrame, bincode::Error> = deserialize(black_box(&serialized));
         })
     });
 }

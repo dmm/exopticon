@@ -15,5 +15,13 @@ categories = ["web-programming"]
 [dependencies]
 exserial = { path = "../exserial" }
 
+[dev-dependencies]
+criterion = "0.3"
+tempfile = "3.1.0"
+
 [build-dependencies]
 exserial = { path = "../exserial" }
+
+[[bench]]
+name = "captureworker_benchmark"
+harness = false
