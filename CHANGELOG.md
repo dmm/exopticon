@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.22.1
+2021-12-30
+
+### Fixes
+
+- Add vaapi hwaccel libraries to runtime images (2db7cf88f11d4f23156b981dd74c4f5235809a60)
+- Add non-free repo (acf0d35538fa7c0c30856a0fe83639bcff1ffc40)
+- Add non-free repo (1db3e1266ba3330c7c8683eb15bc8c5cbc82cc15)
+- dynamically select codec when using vaapi (c1bbe6c9c98fbeb8055c55b49a427d39073c40c8)
+- Add initial captureworker benchmarks (e3a5d5708a1b9754e2e0b72efa805926bd3beafc)
+- Add docker-compose overlay for vaapi (f160afb8a89e71a6123d2908540de2550ab7d26d)
+- Fix exserial benchmarks (58cfec59f92ef246bda70d5ec307ac8e738f932b)
+
 ## 0.22.0
 2021-12-22
 
