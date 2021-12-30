@@ -4361,7 +4361,9 @@ dependencies = [
 name = "workers"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "exserial",
+ "tempfile 3.2.0",
 ]
 
 [[package]]
