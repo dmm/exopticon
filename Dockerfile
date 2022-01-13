@@ -158,6 +158,8 @@ RUN apt-get -qq update \
 # ffmpeg and runtime deps
   && apt-get install --no-install-recommends -y \
   libpq5 libturbojpeg0 ffmpeg python3-opencv \
+# hwaccel
+  intel-media-va-driver-non-free i965-va-driver-shaders \
 # Add Coral tpu repository and install python libraries
     && apt-get -qq install --no-install-recommends -y \
     gnupg wget unzip tzdata python3-gi \
@@ -174,8 +176,6 @@ RUN apt-get -qq update \
       python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
     && pip3 install imutils numpy \
     && apt-get purge -y python3-setuptools python3-pip python3-wheel \
-    # hwaccel
-    intel-media-va-driver-non-free i965-va-driver-shaders \
     # clean up
     && apt-get autoremove -y \
     && apt-get clean \
