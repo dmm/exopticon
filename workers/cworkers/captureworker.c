@@ -425,7 +425,7 @@ AVFrame* scale_frame(AVFrame *input, int width, int height)
         return resizedFrame;
 }
 
-int send_scaled_jpeg(AVPacket *jpeg_pkt, const int64_t offset, const int width, const int height, const int unscaled_width, const int unscaled_height)
+int send_scaled_jpeg(AVPacket *jpeg_pkt, const int64_t offset, __attribute__ ((unused)) const int width, const int height, const int unscaled_width, const int unscaled_height)
 {
         struct FrameMessage message;
         message.unscaled_height = unscaled_height;
