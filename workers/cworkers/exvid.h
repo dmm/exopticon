@@ -21,6 +21,8 @@
 #define EXVID_H
 
 #include <libavcodec/avcodec.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
 #include <libavutil/error.h>
@@ -30,25 +32,33 @@
 #define EX_TIMEOUT_MS 5000
 
 struct in_context {
-        AVFormatContext   *fcx;
-        AVInputFormat     *fmt;
-        AVCodecContext    *ccx;
-        AVCodecParameters *codecpar;
-        AVCodec           *codec;
-        AVStream          *st;
-        int               stream_index;
-        enum AVPixelFormat hw_pix_fmt;
+        AVFormatContext     *fcx;
+        AVInputFormat       *fmt;
+        AVCodecContext      *ccx;
+        AVCodecParameters   *codecpar;
+        AVCodec             *codec;
+        AVStream            *st;
+        int                 stream_index;
+        enum AVPixelFormat  hw_pix_fmt;
         enum AVHWDeviceType hw_accel_type;
-        AVBufferRef       *hw_device_ctx;
+        AVBufferRef         *hw_device_ctx;
 
-        struct timespec   last_frame_time;
-        struct timespec  interrupt_time;
+        int scaled_height;
+        int scaled_width;
+
+        struct timespec     last_frame_time;
+        struct timespec     interrupt_time;
 
         // Encoder contexts
         int            encoder_initialized;
         AVCodec        *encoder_codec;
         AVCodecContext *encoder_ccx;
         AVCodecContext *encoder_scaled_ccx;
+
+        // Contexts for hwaccel scaling
+        AVFilterGraph  *filter_graph;
+        AVFilterContext *buffersrc_ctx;
+        AVFilterContext *buffersink_ctx;
 };
 
 struct out_context {
@@ -68,6 +78,7 @@ int ex_init(void(*)(void *, int, const char *, va_list));
 
 int ex_init_input(struct in_context *context);
 int ex_open_input_stream(const char *url, struct in_context *context);
+int ex_init_input_filters(struct in_context *c, char *filters_desc);
 int ex_read_frame(struct in_context *c, AVPacket *pkt);
 int ex_free_input(struct in_context *c);
 

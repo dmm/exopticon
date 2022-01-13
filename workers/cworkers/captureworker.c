@@ -538,27 +538,11 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
         return 0;
 }
 
-static enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
-                                        const enum AVPixelFormat *pix_fmts) {
-        const enum AVPixelFormat *p;
-
-        // touch ctx to prevent an unused parameter warning
-        (void)(ctx);
-
-        for (p = pix_fmts; *p != -1; p++) {
-                if (*p == AV_PIX_FMT_CUDA || *p == AV_PIX_FMT_VAAPI || *p == AV_PIX_FMT_QSV) {
-                        av_log(NULL, AV_LOG_INFO, "Selecting pixel format: %s",  av_get_pix_fmt_name(*p));
-                        return *p;
-                }
-        }
-
-        av_log(NULL, AV_LOG_INFO, "Failed to get HW surface format.\n");
-        return AV_PIX_FMT_NONE;
-}
-
 
 int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
 {
+        char filter_str[500];
+
         // Make sure packet is video
         if (pkt->stream_index != in->stream_index) {
                 return 0;
@@ -624,8 +608,8 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                         in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
                         in->encoder_ccx->pix_fmt = in->ccx->pix_fmt;
                         in->encoder_ccx->time_base = (AVRational){1, 25}; // unused
-                        in->encoder_ccx->width = 854;
-                        in->encoder_ccx->height = 480;
+                        in->encoder_ccx->width = in->scaled_width;
+                        in->encoder_ccx->height = in->scaled_height;
 
                         if ((ret = avcodec_open2(in->encoder_ccx, in->encoder_codec, NULL)) < 0) {
                                 fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
@@ -710,6 +694,10 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                                 goto error;
                         }
 
+                        snprintf(filter_str, sizeof(filter_str), "format=vaapi,scale_vaapi=w=%d:h=%d",
+                                 in->scaled_width, in->scaled_height);
+                        ex_init_input_filters(in, filter_str);
+
                         in->encoder_initialized = 1;
                 }
                 AVPacket enc_pkt;
@@ -718,18 +706,38 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                 enc_pkt.size = 0;
 
                 // Send scaled frame
-                if ((ret = avcodec_send_frame(in->encoder_scaled_ccx, frame)) < 0) {
-                        fprintf(stderr, "Error code: %s\n", av_err2str(ret));
+
+                // push frame into filter graph
+                ret = av_buffersrc_add_frame_flags(in->buffersrc_ctx, frame, AV_BUFFERSRC_FLAG_KEEP_REF | AV_BUFFERSRC_FLAG_PUSH);
+                if (ret < 0) {
+                        fprintf(stderr, "Error pushing frame into filter graph %s\n", av_err2str(ret));
                         goto error;
                 }
-                while (1) {
-                        ret = avcodec_receive_packet(in->encoder_scaled_ccx, &enc_pkt);
-                        if (ret)
-                                break;
-                        enc_pkt.stream_index = 0;
-                        send_scaled_jpeg(&enc_pkt, offset_microseconds, in->encoder_ccx->width, in->encoder_ccx->height, frame->width, frame->height);
-                        av_packet_unref(&enc_pkt);
+                int ret2;
+                AVFrame *fl_frame = av_frame_alloc();
+                while ((ret = av_buffersink_get_frame(in->buffersink_ctx, fl_frame)) >= 0) {
+                                if ((ret2 = avcodec_send_frame(in->encoder_scaled_ccx, fl_frame)) < 0) {
+                                        fprintf(stderr, "Error code: %s\n", av_err2str(ret));
+                                                av_frame_unref(fl_frame);
+                                        ret = ret2;
+                                        goto error;
+                                }
+
+                                while (1) {
+                                        ret2 = avcodec_receive_packet(in->encoder_scaled_ccx, &enc_pkt);
+                                        if (ret2) {
+                                                av_packet_unref(&enc_pkt);
+                                                av_frame_unref(fl_frame);
+                                                break;
+                                        }
+                                        enc_pkt.stream_index = 0;
+                                        send_scaled_jpeg(&enc_pkt, offset_microseconds, in->encoder_ccx->width, in->encoder_ccx->height, frame->width, frame->height);
+                                        av_packet_unref(&enc_pkt);
+
+                                }
                 }
+                av_frame_unref(fl_frame);
+                av_frame_free(&fl_frame);
 
                 // Send full frame
                 if ((ret = avcodec_send_frame(in->encoder_ccx, frame)) < 0) {

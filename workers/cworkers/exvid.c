@@ -32,7 +32,7 @@
 #include "exvid.h"
 
 static int64_t timespec_to_ms_interval(const struct timespec beg,
-                                const struct timespec end)
+                                       const struct timespec end)
 {
         const int64_t billion = 1E9;
         const int64_t million = 1E6;
@@ -99,9 +99,9 @@ static int interrupt_cb(void *ctx)
         int eof = pfd.revents & POLLHUP;
 
         /*
-           if the interval is greater than the timeout or if EOF is
-           set on stdin, return 1. Erlang/Elixir set EOF to indicate
-           that the process should close.
+          if the interval is greater than the timeout or if EOF is
+          set on stdin, return 1. Erlang/Elixir set EOF to indicate
+          that the process should close.
         */
         return (interval > EX_TIMEOUT_MS || eof);
 }
@@ -124,18 +124,45 @@ int ex_init_input(struct in_context *c) {
 }
 
 static int hw_decoder_init(struct in_context *c, const enum AVHWDeviceType type) {
-        int err =  av_hwdevice_ctx_create(&c->hw_device_ctx, type,
-                                      "/dev/dri/renderD128", NULL, 0);
+        AVBufferRef* hw_frames_ref;
+        AVHWFramesContext *frames_ctx = NULL;
+        int err;
+
+        err =  av_hwdevice_ctx_create(&c->hw_device_ctx, type,
+                                          "/dev/dri/renderD128", NULL, 0);
         if (err < 0) {
                 av_log(NULL, AV_LOG_ERROR, "Failed to create specified HW device. %s\n", av_err2str(err));
                 return err;
         }
 
+        if (!(hw_frames_ref = av_hwframe_ctx_alloc(c->hw_device_ctx))) {
+                av_log(NULL, AV_LOG_ERROR, "Failed to allocate hw_frame_ctx\n");
+                return err;
+
+        }
+
+        frames_ctx = (AVHWFramesContext*)(hw_frames_ref->data);
+        frames_ctx->format = AV_PIX_FMT_VAAPI;
+        frames_ctx->width = 1920;
+        frames_ctx->height = 1080;
+        frames_ctx->initial_pool_size = 10;
+        frames_ctx->sw_format = AV_PIX_FMT_NV12;
+
+        err = av_hwframe_ctx_init(hw_frames_ref);
+        if (err < 0) {
+                av_log(NULL, AV_LOG_ERROR, "Failed to initialize hw frames context %s\n", av_err2str(err));
+                return err;
+
+        }
+
         c->ccx->hw_device_ctx = av_buffer_ref(c->hw_device_ctx);
-        if (!c->ccx->hw_device_ctx) {
+        c->ccx->hw_frames_ctx = av_buffer_ref(hw_frames_ref);
+        if (!c->ccx->hw_frames_ctx) {
                 av_log(NULL, AV_LOG_ERROR, "Failed to create hw device reference.");
                 err = 1;
         }
+
+        av_buffer_unref(&hw_frames_ref);
 
         return err;
 }
@@ -311,6 +338,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
 
                 c->ccx->opaque = c;
                 c->ccx->get_format = get_hw_format;
+                c->ccx->pix_fmt = AV_PIX_FMT_VAAPI;
 
                 if (hw_decoder_init(c, c->hw_accel_type) == 0) {
                         av_log(NULL, AV_LOG_INFO, "HW decoder successfully initialized!\n");
@@ -319,6 +347,8 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                         return_value = 8;
                         goto cleanup;
                 }
+
+
 
                 // initialize jpeg encoder context
                 c->encoder_codec = avcodec_find_encoder_by_name("mjpeg_vaapi");
@@ -331,9 +361,120 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                 goto cleanup;
         }
 
+        // calculate width of scaled image
+        c->scaled_height = 480;
+        double scaled = 480;
+        double full = c->ccx->height;
+        double scale = full / scaled;
+        c->scaled_width = ((double)c->ccx->width) / scale;
+
         return return_value;
 cleanup:
         return return_value;
+}
+
+int ex_init_input_filters(struct in_context *c, char *filters_desc)
+{
+        int ret = 0;
+        char args[512];
+        const AVFilter *buffersrc, *buffersink;
+        AVFilterInOut  *outputs = avfilter_inout_alloc();
+        AVFilterInOut  *inputs = avfilter_inout_alloc();
+        AVRational time_base = c->fcx->streams[c->stream_index]->time_base;
+
+        if( !(buffersrc = avfilter_get_by_name("buffer")) ) {
+                av_log(NULL, AV_LOG_ERROR, "Failed to find filter 'buffer'\n");
+                ret = 1;
+                goto cleanup;
+        }
+
+        if( !(buffersink = avfilter_get_by_name("buffersink")) ) {
+                av_log(NULL, AV_LOG_ERROR, "Failed to find filter 'buffersink'\n");
+                ret = 1;
+                goto cleanup;
+        }
+
+        c->filter_graph = avfilter_graph_alloc();
+
+        if (!outputs || !inputs || !c->filter_graph) {
+                av_log(NULL, AV_LOG_ERROR, "Unable to allocate memory for the filter!\n");
+                ret = 1;
+                goto cleanup;
+        }
+
+        // prepare filer source
+        snprintf(args, sizeof(args),
+                 "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=1/1",
+                 c->ccx->width, c->ccx->height, AV_PIX_FMT_VAAPI,
+                 time_base.num, time_base.den);
+
+        ret = avfilter_graph_create_filter(&c->buffersrc_ctx, buffersrc, "in",
+                                           args, NULL, c->filter_graph);
+        if (ret < 0) {
+                av_log(NULL, AV_LOG_ERROR, "Cannot create buffersrc_ctx\n");
+                goto cleanup;
+        }
+
+        outputs->name       = av_strdup("in");
+        outputs->filter_ctx = c->buffersrc_ctx;
+        outputs->pad_idx    = 0;
+        outputs->next       = NULL;
+
+        // Initialize buffersrc with hw frames context
+        AVBufferSrcParameters *par = av_buffersrc_parameters_alloc();
+        if (!par) {
+                av_log(NULL, AV_LOG_ERROR, "Unable to allocate buffersrc parameters\n");
+                goto cleanup;
+        }
+
+        par->hw_frames_ctx = c->encoder_scaled_ccx->hw_frames_ctx;
+
+        ret = av_buffersrc_parameters_set(c->buffersrc_ctx, par);
+        if (ret < 0) {
+                av_log(NULL, AV_LOG_ERROR, "Unable to initialize buffersrc with hw context\n");
+                goto cleanup;
+        }
+        av_free(par);
+
+        /* buffer video sink: to terminate the filter chain. */
+        ret = avfilter_graph_create_filter(&c->buffersink_ctx, buffersink, "out",
+                                           NULL, NULL, c->filter_graph);
+        if (ret < 0) {
+                av_log(NULL, AV_LOG_ERROR, "Cannot create buffer sink\n");
+                goto cleanup;
+        }
+
+        inputs->name       = av_strdup("out");
+        inputs->filter_ctx = c->buffersink_ctx;
+        inputs->pad_idx    = 0;
+        inputs->next       = NULL;
+
+        if ((ret = avfilter_graph_parse_ptr(c->filter_graph, filters_desc,
+                                            &inputs, &outputs, NULL)) < 0) {
+                av_log(NULL, AV_LOG_ERROR, "Cannot parse filters_desc\n");
+                goto cleanup;
+        }
+
+        for (unsigned int i=0; i<c->filter_graph->nb_filters; i++) {
+
+                if (!(c->filter_graph->filters[i]->hw_device_ctx = av_buffer_ref(c->hw_device_ctx))) {
+                        av_log(NULL, AV_LOG_ERROR, "Failed to allocate memory for hw_device_ctx\n");
+                        ret = 1;
+                        goto cleanup;
+                }
+        }
+
+
+        if ((ret = avfilter_graph_config(c->filter_graph, NULL)) < 0) {
+                av_log(NULL, AV_LOG_ERROR, "Cannot config graph\n");
+                goto cleanup;
+        }
+
+cleanup:
+        avfilter_inout_free(&inputs);
+        avfilter_inout_free(&outputs);
+
+        return ret;
 }
 
 int ex_read_frame(struct in_context *c, AVPacket *pkt)
@@ -376,7 +517,11 @@ int ex_free_input(struct in_context *c)
                 avcodec_free_context(&c->ccx);
         }
 
+        avcodec_parameters_free(&c->codecpar);
+
         av_buffer_unref(&c->hw_device_ctx);
+
+        avfilter_graph_free(&c->filter_graph);
 
         return 0;
 }
@@ -427,7 +572,7 @@ int ex_open_output_stream(struct in_context *in,
                         }
                         out_stream->codecpar->codec_tag = 0;
 
-//                        out_stream->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+                        //                        out_stream->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
                         out_stream->time_base = in_stream->time_base;
                 }
         }
@@ -546,7 +691,7 @@ cleanup:
         return ret;
 }
 
- int ex_write_output_packet(struct out_context *c,
+int ex_write_output_packet(struct out_context *c,
                            AVRational time_base,
                            AVPacket *pkt)
 {
