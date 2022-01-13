@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.22.2
+2022-01-13
+
+### Fixes
+
+- remove unnecessary quotes around vaapi (f3fe481125cedd80d661e3318e99951fbfce4b39)
+- Install libavfiler dev files in build stage (84171a9c0aa83bd4257b7bece193ba67c6677b34)
+- Link against libavfiler in Makefile (fe2a7e7bd6569fe2c471160e4f3b7aa210801139)
+- Add __attribute__ ((unused)) to fix warning. (a8eef11f7beb4ad2644745a1e6882038e555c6d1)
+- Use vaapi scaling filter when using vaapi hw accel. (59dbfb32313a458fc53154c338c11de55734e760)
+- Add va-driver packages to slim image (bfc96139e81dc0350b3397f7ced89e2118052445)
+- Add EXOPTICON_HWACCEL_METHOD default to .env (a90bf966825a792a944a2d35a96f544a980903c3)
+
 ## 0.22.1
 2021-12-30
 
