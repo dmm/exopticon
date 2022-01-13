@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   python3 python3-dev python3-pip python3-setuptools python3-wheel \
   git libopencv-dev python3-opencv python3-scipy cmake \
 # ffmpeg
-  ffmpeg libavformat-dev libswscale-dev libavutil-dev libavcodec-dev \
+  ffmpeg libavformat-dev libswscale-dev libavutil-dev libavcodec-dev libavfilter-dev \
   # hwaccel
   intel-media-va-driver-non-free i965-va-driver-shaders \
   && apt-get clean \
