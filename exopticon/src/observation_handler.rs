@@ -392,6 +392,7 @@ impl Message for CreateObservationSnapshot {
 impl Handler<CreateObservationSnapshot> for DbExecutor {
     type Result = Result<ObservationSnapshot, ServiceError>;
 
+    #[allow(clippy::too_many_lines)]
     fn handle(&mut self, msg: CreateObservationSnapshot, _: &mut Self::Context) -> Self::Result {
         use crate::schema::observation_snapshots::dsl::*;
 
@@ -429,7 +430,7 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
                 };
 
                 let rows_inserted = diesel::insert_into(observation_snapshots)
-                    .values(snapshot.clone())
+                    .values(snapshot)
                     .on_conflict_do_nothing()
                     .execute(conn)
                     .map_err(|error| {
