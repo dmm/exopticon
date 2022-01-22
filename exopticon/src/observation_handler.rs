@@ -422,6 +422,34 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
                 use crate::schema::video_files::dsl::*;
                 use crate::schema::video_units::dsl::*;
 
+                let snapshot = ObservationSnapshot {
+                    observation_id: msg.observation_id,
+                    snapshot_path: "".to_string(),
+                    snapshot_size: 0,
+                };
+
+                let rows_inserted = diesel::insert_into(observation_snapshots)
+                    .values(snapshot.clone())
+                    .on_conflict_do_nothing()
+                    .execute(conn)
+                    .map_err(|error| {
+                        error!("Failed to insert empty observaton_snapshot: {}", error);
+                        ServiceError::InternalServerError
+                    })?;
+
+                if 0 == rows_inserted {
+                    // The snapshot was already inserted
+                    use crate::schema::observation_snapshots::dsl::*;
+                    info!(
+                        "Tried to create already created snapshot {}",
+                        msg.observation_id
+                    );
+                    let snapshot = observation_snapshots
+                        .filter(observation_id.eq(msg.observation_id))
+                        .first::<ObservationSnapshot>(conn)?;
+                    return Ok(snapshot);
+                }
+
                 let camera_storage_path = observations
                     .inner_join(video_units.inner_join(cameras.inner_join(camera_groups)))
                     .select(crate::schema::camera_groups::dsl::storage_path)
@@ -468,19 +496,22 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
                 ServiceError::InternalServerError
             })?;
 
+            diesel::update(observation_snapshots.filter(observation_id.eq(msg.observation_id)))
+                .set((
+                    snapshot_path.eq(new_snapshot_path.clone()),
+                    snapshot_size.eq(snapshot_file_size),
+                ))
+                .execute(conn)
+                .map_err(|error| {
+                    error!("Failed to update observaton_snapshot: {}", error);
+                    ServiceError::InternalServerError
+                })?;
+
             let snapshot = ObservationSnapshot {
                 observation_id: msg.observation_id,
                 snapshot_path: new_snapshot_path,
                 snapshot_size: snapshot_file_size,
             };
-
-            diesel::insert_into(observation_snapshots)
-                .values(snapshot.clone())
-                .execute(conn)
-                .map_err(|error| {
-                    error!("Failed to insert observaton_snapshot: {}", error);
-                    ServiceError::InternalServerError
-                })?;
 
             Ok(snapshot)
         })
