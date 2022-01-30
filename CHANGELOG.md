@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.22.3
+2022-01-30
+
+### Fixes
+
+- use new syntax for nvidia container toolkit (b80cdae2dfea91282f2e6f5796c44b26d9006acc)
+- Add 'npm install' so initial build works (c0cd38ce52d7ede2980b0ec2a0a9c0125cef6d22)
+- Check if observation snapshots exist before creation (111bbb7132a0e41f844e263b02cf451519717467)
+- appease clippy (8c5ebae0e010575b1469d9797946865e52d902fd)
+
 ## 0.22.2
 2022-01-13
 
