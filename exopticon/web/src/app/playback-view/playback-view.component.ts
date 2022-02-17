@@ -223,7 +223,7 @@ export class PlaybackViewComponent implements OnInit {
       viewEndTime
     ).toMillis();
     let displayOffsetMillis = Duration.between(this.viewStartTime, time)
-      .plusDuration(offsetDuration)
+      .plus(offsetDuration)
       .toMillis();
 
     return (displayOffsetMillis / displayMillis) * 1000;
