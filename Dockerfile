@@ -75,7 +75,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 # install node.js and npm
 RUN mkdir /node && cd /node \
-    && wget https://nodejs.org/dist/v14.17.5/node-v14.17.5-linux-x64.tar.xz -O node.tar.xz \
+    && wget https://nodejs.org/dist/v16.14.0/node-v16.14.0-linux-x64.tar.xz -O node.tar.xz \
     && tar xf node.tar.xz \
     && mv node*/* . \
     && rm -rf node.tar.xz
