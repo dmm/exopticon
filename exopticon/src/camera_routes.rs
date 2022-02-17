@@ -72,6 +72,7 @@ impl From<onvif::error::Error> for CameraError {
             onvif::error::Error::Unauthorized => Self::new("Camera access unauthorized. Check camera username/password."),
             onvif::error::Error::InvalidResponse => Self::new("Camera returned an invalid response. This is a bug in the onvif library or the camera."),
             onvif::error::Error::InvalidArgument => Self::new("An invalid argument was provided. This is an exopticon bug.."),
+            onvif::error::Error::IO(_error) => Self::new("IO error connecting to camera...")
         }
     }
 }

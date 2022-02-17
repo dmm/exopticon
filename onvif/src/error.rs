@@ -20,30 +20,27 @@
 
 //! Onvif api error
 
+use thiserror::Error;
+
 /// Onvif Error
-#[derive(Debug)]
+#[allow(clippy::nonstandard_macro_braces)]
+#[derive(Error, Debug)]
 pub enum Error {
-    /// Connection to remote device failed
+    #[error("Connection to remote device failed")]
     ConnectionFailed,
-    /// Operation required authentication and this failed
+
+    #[error("Operation required authentication and this failed")]
     Unauthorized,
-    /// The remote device returned an invalid response
+
+    #[error("The remote device returned an invalid response")]
     InvalidResponse,
-    /// An invalid argument was provided
+
+    #[error("An invalid argument was provided")]
     InvalidArgument,
-}
 
-impl std::error::Error for Error {}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::ConnectionFailed => write!(f, "Connection failed!"),
-            Self::Unauthorized => write!(f, "Unauthorized"),
-            Self::InvalidResponse => write!(f, "Invalid Response from device"),
-            Self::InvalidArgument => write!(f, "Invalid argument provided"),
-        }
-    }
+    /// Represents all other cases of `std::io::Error`
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
 }
 
 impl From<hyper::error::Error> for Error {

@@ -20,7 +20,7 @@
 
 //! Onvif device discovery
 use std::io;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::time::timeout;
@@ -91,9 +91,7 @@ impl ProbeServer {
             Uuid::new_v4()
         );
 
-        let remote_addr = "239.255.255.250:3702"
-            .parse::<SocketAddr>()
-            .expect("Invalid probe address");
+        let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(239, 255, 255, 250)), 3702);
 
         // Send discovery request
         match self
@@ -123,10 +121,8 @@ impl ProbeServer {
 
 /// Returns number of discovered devices
 pub async fn probe(timeout: Duration) -> Result<usize, io::Error> {
-    let local_addr: SocketAddr = "0.0.0.0:0".parse().expect("Invalid local address");
-    let socket = UdpSocket::bind(&local_addr)
-        .await
-        .expect("Create socket failed");
+    let local_addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+    let socket = UdpSocket::bind(&local_addr).await?;
 
     let mut p = ProbeServer {
         socket,
