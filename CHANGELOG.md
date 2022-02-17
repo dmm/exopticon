@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.22.4
+2022-02-17
+
+### Fixes
+
+- Remove keep file. (ba0eec6db577013db25413be680e2e396ba2b272)
+- Upgrade to Angular 13 (90d709f2a71fb8389ef3d2ef1f03cdd27184edb5)
+- update packages. (407ffecaf4d63036d4fb49c3b76012da59b04c5a)
+- Update node to v16 (e770536af8ff398417713e9851496cd5543eb8db)
+- Remove empty lines in continuation (1c9977b6751ac0c4798ef046005ca00f8dd1aabd)
+- remove unused npm dependency (66851b356312c9da09bfda0c31bf124e8342700b)
+- Update js-joda (60885735fa75b78dfa9f33f8f4e4ca3130214b96)
+
 ## 0.22.3
 2022-01-30
 
