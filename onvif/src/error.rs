@@ -23,7 +23,6 @@
 use thiserror::Error;
 
 /// Onvif Error
-#[allow(clippy::nonstandard_macro_braces)]
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Connection to remote device failed")]
