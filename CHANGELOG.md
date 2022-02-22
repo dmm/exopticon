@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.22.5
+2022-02-22
+
+### Fixes
+
+- Add thiserror and eliminate panics (230d3a7645f54b6f9e80510b4195a0f76b17f1a3)
+- Upgrade thiserror to appease clippy (28254d933817c11cd2bc04baee7ca2572d2f3516)
+
 ## 0.22.4
 2022-02-17
 
