@@ -309,6 +309,14 @@ int send_frame(const AVFrame *frame, struct timespec begin_time, int64_t first_p
         return 0;
 }
 
+int send_eof()
+{
+        char *filename = "";
+        char *iso_end_time = "1970-01-01T00:00:00Z";
+        send_end_file_message(filename, iso_end_time);
+        return 0;
+}
+
 int handle_packet(struct PlayerState *state, int64_t ms_offset, int playback_rate)
 {
         /*
@@ -489,6 +497,7 @@ int main(int argc, char *argv[])
                 av_init_packet(&player.pkt);
                 count++;
         }
+        send_eof();
 
 cleanup:
         avcodec_close(player.ccx);

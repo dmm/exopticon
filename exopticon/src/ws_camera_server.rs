@@ -207,7 +207,7 @@ impl WsCameraServer {
         if let Some(subscription) = self.subscriptions.get(&subject) {
             let sub_count = subscription.len();
             for client in subscription.iter() {
-                if client.do_send(frame.to_owned()).is_err() {
+                if client.do_send(frame.clone()).is_err() {
                     debug!(
                         "Send failed for {} {:?}, {} subscribers",
                         &frame.camera_id, &frame.resolution, sub_count

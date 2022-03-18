@@ -36,7 +36,7 @@ use chrono::Utc;
 use futures::sink::SinkExt;
 use log::Level;
 use serde::Deserialize;
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
@@ -151,6 +151,8 @@ pub struct AnalysisActor {
     pub arguments: Vec<String>,
     /// frame sources
     pub subscriptions: HashMap<SubscriptionSubject, AnalysisSubscriptionModel>,
+    /// worker process
+    pub worker: Option<Child>,
     /// stdin of worker process
     pub worker_stdin: Option<
         tokio_util::codec::FramedWrite<
@@ -195,6 +197,7 @@ impl AnalysisActor {
             executable_name,
             arguments,
             subscriptions: sub_map,
+            worker: None,
             worker_stdin: None,
             frames_requested: 0,
             last_frame: None,
@@ -281,7 +284,7 @@ impl AnalysisActor {
                                 frame.observations = new_observations;
                                 WsCameraServer::from_registry().do_send(frame);
                             } else {
-                                error!("Error inserting observations!")
+                                error!("Error inserting observations!");
                             }
                         }));
                     }
@@ -311,7 +314,7 @@ impl AnalysisActor {
                     avg / 1000,
                     min / 1000,
                     max / 1000
-                )
+                );
             }
             AnalysisWorkerMessage::Event(event) => {
                 self.metrics.event_count.inc_by(1);
@@ -398,7 +401,7 @@ impl AnalysisActor {
 
                     let task = async move {
                         if let Err(err) = framed_stdin.send(bytes::Bytes::from(serialized)).await {
-                            error!("Analysis Worker: Failed to write frame: {}", err)
+                            error!("Analysis Worker: Failed to write frame: {}", err);
                         };
                         framed_stdin
                     };
@@ -494,16 +497,47 @@ impl Handler<StartWorker> for AnalysisActor {
             .expect("Failed to open stdin on worker child.");
         let framed_stdin = length_delimited::Builder::new().new_write(stdin);
         self.worker_stdin = Some(framed_stdin);
-        let fut = wrap_future::<_, Self>(worker).map(|_status, actor, ctx| {
-            info!("Analysis actor {}: analysis worker died...", actor.id);
+        self.worker = Some(worker);
 
-            actor.metrics.restart_count.inc_by(1);
+        ctx.notify_later(CheckWorker {}, Duration::new(15, 0));
+    }
+}
 
-            // Restart worker in five seconds
-            ctx.notify_later(StartWorker {}, Duration::new(5, 0));
-        });
+#[derive(Message)]
+#[rtype(result = "()")]
+struct CheckWorker;
 
-        ctx.spawn(fut);
+impl Handler<CheckWorker> for AnalysisActor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: CheckWorker, ctx: &mut Context<Self>) -> Self::Result {
+        debug!("Checking analysis worker...");
+
+        if let Some(mut worker) = self.worker.take() {
+            match worker.try_wait() {
+                Ok(Some(_)) => {
+                    // worker has died
+                }
+                Ok(None) => {
+                    // Worker is still alive, return so we don't restart it.
+                    ctx.notify_later(CheckWorker {}, Duration::new(15, 0));
+                    self.worker = Some(worker);
+                    return;
+                }
+                Err(err) => {
+                    error!("Error checking child: {}", err);
+                }
+            }
+        }
+
+        // Worker has died or isn't running yet...
+        info!("Analysis actor {}: analysis worker died...", self.id);
+        self.worker = None;
+        self.worker_stdin = None;
+        self.metrics.restart_count.inc_by(1);
+
+        // Restart worker in five seconds
+        ctx.notify_later(StartWorker {}, Duration::new(5, 0));
     }
 }
 

@@ -66,7 +66,7 @@ fn generate_password_digest(password: &str, offset: Duration) -> Result<Password
 /// Returns security block as a String. If username or password are
 /// blank the String returned is also blank.
 fn generate_security_block(username: &str, password: &str) -> Result<String, Error> {
-    if username == "" && password == "" {
+    if username.is_empty() && password.is_empty() {
         return Ok(String::new());
     }
 

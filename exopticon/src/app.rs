@@ -59,6 +59,7 @@ pub struct RouteState {
 
 // /// We have to pass by value to satisfy the actix route interface.
 #[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::unused_async)]
 /// Route to return a websocket session using messagepack serialization
 pub async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
     debug!("Starting websocket session...");
@@ -67,6 +68,7 @@ pub async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResp
 
 /// We have to pass by value to satisfy the actix route interface.
 #[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::unused_async)]
 /// Route to return a websocket session using json serialization
 pub async fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
     debug!("Starting json websocket session...");

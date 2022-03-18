@@ -167,7 +167,7 @@ pub async fn fetch_observation_image(observation_id: i64) -> Result<Vec<u8>, ()>
                     Ok(jpg) => Ok(jpg),
                     Err(_) => Err(()),
                 }?;
-                Ok(snap)
+                snap
             } else {
                 error!("video unit db failed");
                 Err(())
@@ -415,7 +415,7 @@ fn get_event_clip(event_files: EventFile) -> Result<NamedFile, ()> {
         error!("failed to wait on child");
     })?;
 
-    Ok(NamedFile::open(output_file_path).map_err(|_| ())?)
+    NamedFile::open(output_file_path).map_err(|_| ())
 }
 
 pub async fn fetch_event_clip(
@@ -432,7 +432,10 @@ pub async fn fetch_event_clip(
 
     match event_files {
         Ok(event_files) => match web::block(move || get_event_clip(event_files)).await {
-            Ok(clip) => Ok(clip),
+            Ok(Ok(clip)) => Ok(clip),
+            Ok(Err(_err)) => Err(actix_web::error::ErrorInternalServerError(
+                "Error reading clip",
+            )),
             Err(_err) => Err(actix_web::error::ErrorInternalServerError(
                 "Error reading clip",
             )),
@@ -448,7 +451,9 @@ async fn get_observation_clip(
     length: Duration,
 ) -> Result<Vec<u8>, ()> {
     match web::block(move || get_clip(&filename, frame_offset, length)).await {
-        Ok(mp4) => Ok(mp4),
+        Ok(Ok(mp4)) => Ok(mp4),
+        Ok(Err(_err)) => Err(()),
+
         Err(_) => Err(()),
     }
 }
@@ -478,14 +483,17 @@ pub async fn fetch_observation_clip(
 
             let file = unit_response.1.pop();
             if let Some(file) = file {
-                let offset = u64::try_from(observation.frame_offset).map_err(|_| {
-                    HttpResponse::InternalServerError().body(format!(
-                        "Invalid offset in observation: {}",
-                        observation.frame_offset,
-                    ))
-                })?;
-                let snap =
-                    get_observation_clip(file.filename, offset, Duration::from_secs(5)).await?;
+                let offset = u64::try_from(observation.frame_offset)
+                    .map_err(|_| {
+                        HttpResponse::InternalServerError().body(format!(
+                            "Invalid offset in observation: {}",
+                            observation.frame_offset,
+                        ))
+                    })
+                    .map_err(|_| ServiceError::InternalServerError)?;
+                let snap = get_observation_clip(file.filename, offset, Duration::from_secs(5))
+                    .await
+                    .map_err(|_| ServiceError::InternalServerError)?;
                 Ok(HttpResponse::Ok().content_type("video/webm").body(snap))
             } else {
                 Ok(HttpResponse::InternalServerError().body("video unit db failed"))

@@ -22,10 +22,10 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix::SystemService;
-use actix_http::ResponseBuilder;
+use actix_http::body::BoxBody;
 use actix_web::{http::StatusCode, web::Data, web::Json, web::Path, HttpResponse};
 use std::time::Duration;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use onvif::camera::{DeviceDateAndTime, NtpSettings};
 
@@ -57,7 +57,7 @@ impl std::fmt::Display for CameraError {
 
 impl actix_web::error::ResponseError for CameraError {
     fn error_response(&self) -> HttpResponse {
-        ResponseBuilder::new(self.status_code()).body(self.msg.clone())
+        HttpResponse::new(self.status_code()).set_body(BoxBody::new(self.msg.clone()))
     }
 
     fn status_code(&self) -> StatusCode {
@@ -306,7 +306,7 @@ pub async fn ptz_relative_move(
         }
 
         // wait
-        delay_for(Duration::from_millis(500)).await;
+        sleep(Duration::from_millis(500)).await;
 
         // stop continuous move
         let con = onvif_cam.stop(&camera.ptz_profile_token).await;

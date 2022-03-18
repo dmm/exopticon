@@ -18,7 +18,9 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use actix::{registry::SystemService, Actor, ActorFuture, Addr, AsyncContext, Context, WrapFuture};
+use actix::{
+    registry::SystemService, Actor, ActorFutureExt, Addr, AsyncContext, Context, WrapFuture,
+};
 
 use crate::alert_actor::AlertActor;
 use crate::analysis_supervisor::AnalysisSupervisor;

@@ -25,7 +25,7 @@ use std::time::Instant;
 use actix::fut::wrap_future;
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
 use url::Url;
 
 use crate::db_registry;
@@ -158,7 +158,7 @@ impl AlertActor {
         // Wait for one second then fetch image. We do this because
         // the frame may not have been written yet.  This has to be
         // fixed to allow trick playing live video as well.
-        delay_for(Duration::new(2, 0)).await;
+        sleep(Duration::new(2, 0)).await;
         let image = match fetch_observation_image(o.id).await {
             Ok(img) => Some(img),
             Err(_) => None,
@@ -192,10 +192,7 @@ impl Handler<CameraFrame> for AlertActor {
             }
             FrameSource::Playback { id: _id } => {
                 // We shouldn't get frames from a playback actor...
-                error!(
-                    "Received frame from invalid playback source! {:?}",
-                    msg.source
-                );
+                error!("Received frame from invalid playback msg! {:?}", msg.source);
                 return;
             }
             FrameSource::AnalysisEngine {

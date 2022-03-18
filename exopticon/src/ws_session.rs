@@ -22,8 +22,8 @@
 #![allow(clippy::empty_enum)]
 
 use actix::{
-    Actor, ActorContext, ActorFuture, AsyncContext, Handler, Message, StreamHandler, SystemService,
-    WrapFuture,
+    Actor, ActorContext, ActorFutureExt, AsyncContext, Handler, Message, StreamHandler,
+    SystemService, WrapFuture,
 };
 use actix_web_actors::ws;
 use base64::STANDARD_NO_PAD;

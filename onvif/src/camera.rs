@@ -191,9 +191,7 @@ impl Camera {
     pub fn url(&self) -> String {
         format!(
             "http://{}:{}{}",
-            self.host,
-            self.port.to_string(),
-            "/onvif/device_service",
+            self.host, self.port, "/onvif/device_service",
         )
     }
 

@@ -21,7 +21,7 @@
 use std::time::Duration;
 
 use actix::fut::wrap_future;
-use actix::{Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
+use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
 
 use crate::models::{DbExecutor, DeleteVideoUnits, FetchCameraGroupFiles, VideoUnit};
 

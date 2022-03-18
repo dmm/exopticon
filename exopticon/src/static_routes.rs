@@ -28,16 +28,17 @@ use std::collections::BTreeMap;
 use std::env;
 use std::str::from_utf8;
 
-use actix_web::{body::Body, web::Path, HttpRequest, HttpResponse};
+use actix_web::{web::Path, HttpRequest, HttpResponse};
 use handlebars::Handlebars;
 use rust_embed::RustEmbed;
 
 /// Fetches static index file, returns `HttpResponse`
-pub fn index(_req: HttpRequest) -> HttpResponse {
+#[allow(clippy::unused_async)]
+pub async fn index(_req: HttpRequest) -> HttpResponse {
     match Asset::get("index.html") {
         Some(content) => HttpResponse::Ok()
             .content_type("text/html")
-            .body(Body::from_slice(content.as_ref())),
+            .body(content.into_owned()),
         None => HttpResponse::NotFound().body("404 Not Found"),
     }
 }
@@ -51,7 +52,8 @@ struct Asset;
 /// # Arguments
 /// `req` - file request
 ///
-pub fn fetch_static_file(tail: Path<String>) -> HttpResponse {
+#[allow(clippy::unused_async)]
+pub async fn fetch_static_file(tail: Path<String>) -> HttpResponse {
     debug!("Fetching static file: {}", tail);
 
     let path = tail.into_inner();
@@ -59,7 +61,7 @@ pub fn fetch_static_file(tail: Path<String>) -> HttpResponse {
     match Asset::get(&path) {
         Some(content) => HttpResponse::Ok()
             .content_type(mime_guess::from_path(path).first_or_octet_stream().as_ref())
-            .body(Body::from_slice(content.as_ref())),
+            .body(content.into_owned()),
         None => HttpResponse::NotFound().body("404 Not Found"),
     }
 }
@@ -69,7 +71,8 @@ pub fn fetch_static_file(tail: Path<String>) -> HttpResponse {
 /// # Arguments
 /// `req` - file request
 ///
-pub fn fetch_webmanifest(_req: HttpRequest) -> HttpResponse {
+#[allow(clippy::unused_async)]
+pub async fn fetch_webmanifest(_req: HttpRequest) -> HttpResponse {
     error!("Calling fetch_webmanifest!");
     let handlebars = Handlebars::new();
     let mut data = BTreeMap::new();
@@ -100,7 +103,7 @@ pub fn fetch_webmanifest(_req: HttpRequest) -> HttpResponse {
 
             HttpResponse::Ok()
                 .content_type("application/json")
-                .body(Body::from_slice(manifest.as_ref()))
+                .body(manifest)
         }
 
         None => HttpResponse::NotFound().body("404 Not Found"),

@@ -24,16 +24,17 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Duration;
 use std::time::Instant;
 
 use actix::{
-    fut::wrap_future, registry::SystemService, Actor, ActorContext, ActorFuture, AsyncContext,
+    fut::wrap_future, registry::SystemService, Actor, ActorContext, ActorFutureExt, AsyncContext,
     Context, Handler, Message, StreamHandler,
 };
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use exserial::models::CaptureMessage;
-use tokio::io::AsyncWriteExt;
+use tokio::process::Child;
 use tokio::process::{ChildStdin, Command};
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
@@ -129,6 +130,8 @@ pub struct CaptureActor {
     pub offset: i64,
     /// filename currently being captured
     pub filename: Option<String>,
+    /// worker process
+    pub worker: Option<Child>,
     /// stdin of worker process
     pub stdin: Option<ChildStdin>,
     /// State of CaptureActor
@@ -155,6 +158,7 @@ impl CaptureActor {
             video_file_id: None,
             offset: 0,
             filename: None,
+            worker: None,
             stdin: None,
             state: CaptureState::Running,
             metrics,
@@ -198,7 +202,7 @@ impl CaptureActor {
         // Check if log
         match msg {
             CaptureMessage::Log { message } => {
-                debug!("Capture worker {} log message: {}", self.camera_id, message)
+                debug!("Capture worker {} log message: {}", self.camera_id, message);
             }
             CaptureMessage::Frame {
                 jpeg,
@@ -270,10 +274,10 @@ impl CaptureActor {
                         |result, actor, _ctx| match result {
                             Ok(Ok((_video_unit, video_file))) => {
                                 actor.video_file_id = Some(video_file.id);
-                                actor.filename = Some(filename)
+                                actor.filename = Some(filename);
                             }
                             Ok(Err(e)) => {
-                                panic!("Error inserting video unit: db handler error {}", e)
+                                panic!("Error inserting video unit: db handler error {}", e);
                             }
                             Err(e) => panic!("Error inserting video unit: message error {}", e),
                         },
@@ -360,34 +364,10 @@ impl Handler<StartWorker> for CaptureActor {
         self.stdin = Some(child.stdin.take().expect("Failed to open stdin"));
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
         Self::add_stream(framed_stream, ctx);
-        let fut = wrap_future::<_, Self>(child).map(|_status, actor, ctx| {
-            // Change this to an error when we can't distinguish
-            // between intentional and unintentional exits.
-            debug!("CaptureWorker {}: capture process died...", actor.camera_id);
 
-            // Close file if open
-            if let Some(filename) = &actor.filename {
-                debug!(
-                    "CaptureActor {}: capture process died, closing file: {}",
-                    actor.camera_id, &filename
-                );
-                actor.close_file(ctx, filename, Utc::now());
-                actor.filename = None;
-            }
-            match actor.state {
-                CaptureState::Running => {
-                    debug!("Shutting down running captureworker...");
-                    actor.stdin = None;
-                    ctx.terminate();
-                }
-                CaptureState::Shutdown => {
-                    debug!("Shutting down captureworker...");
-                    actor.stdin = None;
-                    ctx.terminate();
-                }
-            }
-        });
-        ctx.spawn(fut);
+        self.worker = Some(child);
+
+        ctx.notify_later(CheckWorker {}, Duration::new(15, 0));
     }
 }
 
@@ -400,13 +380,63 @@ impl Handler<StopCaptureWorker> for CaptureActor {
             self.camera_id
         );
         self.state = CaptureState::Shutdown;
-        match &mut self.stdin {
-            Some(stdin) => {
-                stdin.shutdown();
-            }
-            None => {}
-        }
+
         self.stdin = None;
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+struct CheckWorker;
+
+impl Handler<CheckWorker> for CaptureActor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: CheckWorker, ctx: &mut Context<Self>) -> Self::Result {
+        debug!("Checking capture worker...");
+        ctx.notify_later(CheckWorker {}, Duration::new(15, 0));
+
+        if let Some(mut worker) = self.worker.take() {
+            match worker.try_wait() {
+                Ok(Some(_)) => {
+                    // worker has died
+                }
+                Ok(None) => {
+                    // Worker is still alive, return so the actor stays alive.
+                    self.worker = Some(worker);
+                    return;
+                }
+                Err(err) => {
+                    error!("Error checking child: {}", err);
+                }
+            }
+        }
+
+        // Change this to an error when we can't distinguish
+        // between intentional and unintentional exits.
+        debug!("CaptureWorker {}: capture process died...", self.camera_id);
+
+        // Close file if open
+        if let Some(filename) = &self.filename {
+            debug!(
+                "CaptureSelf {}: capture process died, closing file: {}",
+                self.camera_id, &filename
+            );
+            self.close_file(ctx, filename, Utc::now());
+            self.filename = None;
+        }
+        match self.state {
+            CaptureState::Running => {
+                debug!("Shutting down running captureworker...");
+                self.stdin = None;
+                ctx.terminate();
+            }
+            CaptureState::Shutdown => {
+                debug!("Shutting down captureworker...");
+                self.stdin = None;
+                ctx.terminate();
+            }
+        }
     }
 }
 

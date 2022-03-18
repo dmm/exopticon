@@ -187,10 +187,11 @@ mod ws_session;
 
 use crate::models::DbExecutor;
 use actix::prelude::*;
-use actix_http::cookie::SameSite;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
+use actix_web::cookie::SameSite;
+use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
-use actix_web_prom::PrometheusMetrics;
+use actix_web_prom::PrometheusMetricsBuilder;
 use base64::{decode, encode};
 use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
@@ -217,10 +218,7 @@ embed_migrations!("migrations/");
 /// * `address` - The address of the `DbExecutor`
 ///
 
-fn add_user(
-    sys: &mut actix::SystemRunner,
-    address: &Addr<DbExecutor>,
-) -> Result<bool, std::io::Error> {
+async fn add_user(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
     let username = Input::new()
         .with_prompt("Enter username for initial user")
         .interact()?;
@@ -236,7 +234,7 @@ fn add_user(
         timezone: String::from("UTC"),
     });
 
-    match sys.block_on(fut2) {
+    match fut2.await {
         Ok(_) => (),
         Err(err) => {
             error!("Error creating user! {}", err);
@@ -256,10 +254,7 @@ fn add_user(
 /// * `address` - The address of the `DbExecutor`
 ///
 
-fn add_camera_group(
-    sys: &mut actix::SystemRunner,
-    address: &Addr<DbExecutor>,
-) -> Result<bool, std::io::Error> {
+async fn add_camera_group(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
     let storage_path = Input::new()
         .with_prompt("Enter storage path for recorded video")
         .interact()?;
@@ -273,7 +268,7 @@ fn add_camera_group(
         storage_path,
         max_storage_size,
     });
-    match sys.block_on(fut) {
+    match fut.await {
         Ok(_) => (),
         Err(err) => {
             error!("Error creating camera group! {}", err);
@@ -283,13 +278,12 @@ fn add_camera_group(
     Ok(true)
 }
 
-fn main() {
+#[actix_web::main]
+async fn main() {
     env_logger::init();
 
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-    let mut sys = actix::System::new("Exopticon");
 
     // create db connection pool
     let manager = ConnectionManager::<PgConnection>::new(database_url);
@@ -319,43 +313,21 @@ fn main() {
         .expect("Invalid SECRET_KEY env var provided. Must be 32bytes encoded as base64");
 
     // Initialize prometheus metrics
-    let prometheus_endpoint: Option<&str> = if let Ok(val) = env::var("EXOPTICON_METRICS_ENABLED") {
-        if &val == "true" {
-            Some("/metrics")
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
     let hostname = env::var("DOMAIN").unwrap_or_else(|_| "exopticon".to_string());
     let mut labels = HashMap::new();
     labels.insert("instance".to_string(), hostname);
-    let prometheus = PrometheusMetrics::new("exopticon", prometheus_endpoint, Some(labels));
-    prom_registry::set_metrics(prometheus.clone());
+    let mut prometheus_builder = PrometheusMetricsBuilder::new("exopticon");
+    if let Ok(val) = env::var("EXOPTICON_METRICS_ENABLED") {
+        if &val == "true" {
+            prometheus_builder = prometheus_builder.endpoint("/metrics");
+        }
+    }
 
-    HttpServer::new(move || {
-        App::new()
-            .wrap(prometheus.clone())
-            .data(RouteState {
-                db: route_db_address.clone(),
-            })
-            .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(&secret)
-                    .name("id")
-                    .path("/")
-                    .max_age_time(Duration::days(7)) // just for testing
-                    .secure(true)
-                    .same_site(SameSite::Strict),
-            ))
-            // setup builtin logger to get nice logging for each request
-            .wrap(Logger::default())
-            .configure(app::generate_config)
-    })
-    .bind("0.0.0.0:3000")
-    .expect("Can not bind to '0.0.0.0:3000'")
-    .run();
+    let prometheus = prometheus_builder
+        .const_labels(labels)
+        .build()
+        .expect("failed to build prometheus");
+    prom_registry::set_metrics(prometheus.clone());
 
     let mut mode = ExopticonMode::Run;
     let mut add_user_flag = false;
@@ -381,26 +353,48 @@ fn main() {
         mode = ExopticonMode::Standby;
     }
 
+    let arbiter = actix::Arbiter::new();
     let root_supervisor = RootSupervisor::new(mode, db_address);
 
     RootSupervisor::start_in_arbiter(
-        actix::System::current().arbiter(),
+        &arbiter.handle(),
         move |_ctx: &mut Context<RootSupervisor>| root_supervisor,
     );
 
-    if add_user_flag && add_user(&mut sys, &setup_address).is_err() {
-        error!("Error creating user!");
-        return;
-    }
-
-    if add_camera_group_flag && add_camera_group(&mut sys, &setup_address).is_err() {
-        error!("Error creating camera group!");
-        return;
-    }
-
     if add_user_flag || add_camera_group_flag {
+        if add_user_flag && add_user(&setup_address).await.is_err() {
+            error!("Error creating user!");
+            return;
+        }
+
+        if add_camera_group_flag && add_camera_group(&setup_address).await.is_err() {
+            error!("Error creating camera group!");
+            return;
+        }
         return;
     }
 
-    sys.run().expect("Unable to run actix system.");
+    HttpServer::new(move || {
+        App::new()
+            .wrap(prometheus.clone())
+            .app_data(Data::new(RouteState {
+                db: route_db_address.clone(),
+            }))
+            .wrap(IdentityService::new(
+                CookieIdentityPolicy::new(&secret)
+                    .name("id")
+                    .path("/")
+                    .max_age_secs(Duration::days(7).whole_seconds()) // just for testing
+                    .secure(true)
+                    .same_site(SameSite::Strict),
+            ))
+            // setup builtin logger to get nice logging for each request
+            .wrap(Logger::default())
+            .configure(app::generate_config)
+    })
+    .bind("0.0.0.0:3000")
+    .expect("Can not bind to '0.0.0.0:3000'")
+    .run()
+    .await
+    .expect("Http server exited");
 }

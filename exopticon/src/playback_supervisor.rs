@@ -56,6 +56,7 @@ pub struct StopPlayback {
 }
 
 /// Represents playback supervisor
+#[derive(Default)]
 pub struct PlaybackSupervisor {
     /// hash map of playback actors
     actors: HashMap<u64, Addr<PlaybackActor>>,
@@ -63,14 +64,6 @@ pub struct PlaybackSupervisor {
 
 impl Actor for PlaybackSupervisor {
     type Context = Context<Self>;
-}
-
-impl Default for PlaybackSupervisor {
-    fn default() -> Self {
-        Self {
-            actors: HashMap::new(),
-        }
-    }
 }
 
 impl SystemService for PlaybackSupervisor {}
@@ -98,7 +91,7 @@ impl Handler<StartPlayback> for PlaybackSupervisor {
             "Created playback actor: {}, actors len: {}",
             msg.id,
             self.actors.len()
-        )
+        );
     }
 }
 

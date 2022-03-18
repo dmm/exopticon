@@ -1014,7 +1014,9 @@ pub struct EventFile {
 }
 
 /// Represents image snapshot of observation
-#[derive(Associations, AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable)]
+#[derive(
+    Associations, AsChangeset, Clone, Debug, Deserialize, Serialize, Queryable, Insertable,
+)]
 #[table_name = "observation_snapshots"]
 #[belongs_to(Observation)]
 pub struct ObservationSnapshot {

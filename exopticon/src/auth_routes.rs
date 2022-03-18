@@ -23,14 +23,15 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use std::pin::Pin;
-use std::task::{Context, Poll};
 
 use actix_identity::{Identity, RequestIdentity};
 use actix_service::{Service, Transform};
 use actix_web::{
     dev::ServiceRequest, dev::ServiceResponse, http, web::Data, web::Json, Error, HttpResponse,
+    Responder,
 };
-use futures::future::{ok, Future, Ready};
+use futures::future::{ok, Future, LocalBoxFuture, Ready};
+use futures::FutureExt;
 use qstring::QString;
 
 use crate::app::RouteState;
@@ -41,31 +42,33 @@ pub async fn login(
     auth_data: Json<AuthData>,
     id: Identity,
     state: Data<RouteState>,
-) -> Result<HttpResponse, Error> {
+) -> impl Responder {
     let slim_user = state.db.send(auth_data.into_inner()).await;
 
     match slim_user {
         Ok(Ok(slim_user)) => {
             id.remember(slim_user.id.to_string());
-            Ok(HttpResponse::Ok().into())
+            HttpResponse::Ok().into()
         }
-        Err(_) => Ok(HttpResponse::InternalServerError().finish()),
+        Err(_) => HttpResponse::InternalServerError().finish(),
         Ok(Err(e)) => {
             error!("Error during login: {}", e);
-            Ok(HttpResponse::InternalServerError().finish())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-pub fn check_login(id: Identity) -> HttpResponse {
+#[allow(clippy::unused_async)]
+pub async fn check_login(id: Identity) -> impl Responder {
     match id.identity() {
-        None => HttpResponse::NotFound().into(),
-        Some(_) => HttpResponse::Ok().into(),
+        None => HttpResponse::NotFound().finish(),
+        Some(_) => HttpResponse::Ok().finish(),
     }
 }
 
 /// Route to make logout attempt
-pub fn logout(id: Identity) -> HttpResponse {
+#[allow(clippy::unused_async)]
+pub async fn logout(id: Identity) -> HttpResponse {
     id.forget();
     HttpResponse::Ok().into()
 }
@@ -76,14 +79,12 @@ pub struct WebAuth;
 // Middleware factory is `Transform` trait from actix-service crate
 // `S` - type of the next service
 // `B` - type of response's body
-impl<S, B> Transform<S> for WebAuth
+impl<S> Transform<S, ServiceRequest> for WebAuth
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
     S::Future: 'static,
-    B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse;
     type Error = Error;
     type InitError = ();
     type Transform = WebAuthMiddleware<S>;
@@ -101,45 +102,42 @@ pub struct WebAuthMiddleware<S> {
 }
 
 #[allow(clippy::type_complexity)]
-impl<S, B> Service for WebAuthMiddleware<S>
+impl<S> Service<ServiceRequest> for WebAuthMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
     S::Future: 'static,
-    B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse;
     type Error = Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    //    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(cx)
-    }
+    actix_web::dev::forward_ready!(service);
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         if let Some(user_id) = req.get_identity() {
             let user_id = user_id
                 .parse::<i32>()
                 .expect("user_id should always be a i32");
             info!("authenticated user id: {}", user_id);
-            Box::pin(self.service.call(req))
+            self.service.call(req).boxed_local()
         } else if req.path() == "/login" {
-            Box::pin(self.service.call(req))
+            self.service.call(req).boxed_local()
         } else {
-            Box::pin(async {
+            async {
                 let rpath = req.path().to_string();
                 let qs = QString::from(req.query_string());
                 let path = qs.get("redirect_uri").unwrap_or(&rpath);
                 Ok(req.into_response(
                     HttpResponse::Found()
-                        .header(
+                        .append_header((
                             http::header::LOCATION,
                             format!("/login?redirect_path={}", path),
-                        )
-                        .finish()
-                        .into_body(),
+                        ))
+                        .finish(),
                 ))
-            })
+            }
+            .boxed_local()
         }
     }
 }
@@ -150,14 +148,12 @@ pub struct Auth;
 // Middleware factory is `Transform` trait from actix-service crate
 // `S` - type of the next service
 // `B` - type of response's body
-impl<S, B> Transform<S> for Auth
+impl<S> Transform<S, ServiceRequest> for Auth
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
     S::Future: 'static,
-    B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse;
     type Error = Error;
     type InitError = ();
     type Transform = AuthMiddleware<S>;
@@ -175,22 +171,18 @@ pub struct AuthMiddleware<S> {
 }
 
 #[allow(clippy::type_complexity)]
-impl<S, B> Service for AuthMiddleware<S>
+impl<S> Service<ServiceRequest> for AuthMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
     S::Future: 'static,
-    B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(cx)
-    }
+    actix_web::dev::forward_ready!(service);
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         if let Some(user_id) = req.get_identity() {
             let user_id = user_id
                 .parse::<i32>()
@@ -203,9 +195,7 @@ where
                 Ok(result)
             })
         } else {
-            Box::pin(async move {
-                Ok(req.into_response(HttpResponse::Unauthorized().finish().into_body()))
-            })
+            Box::pin(async move { Ok(req.into_response(HttpResponse::Unauthorized().finish())) })
         }
     }
 }

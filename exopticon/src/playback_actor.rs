@@ -22,10 +22,9 @@ use std::env;
 use std::path::PathBuf;
 use std::process::Stdio;
 
-use actix::fut::wrap_future;
 use actix::{
-    Actor, ActorContext, ActorFuture, AsyncContext, Context, Handler, Message, Recipient,
-    StreamHandler, SystemService,
+    Actor, ActorContext, AsyncContext, Context, Handler, Message, Recipient, StreamHandler,
+    SystemService,
 };
 use bytes::BytesMut;
 use exserial::models::CaptureMessage;
@@ -185,6 +184,26 @@ impl StreamHandler<Result<BytesMut, std::io::Error>> for PlaybackActor {
                 self.offset += 1;
             }
 
+            Ok(CaptureMessage::EndFile {
+                filename: _,
+                end_time: _,
+            }) => {
+                // playback worker signaled end of file
+                debug!("Playback Worker for {} died!", self.video_file_path);
+
+                // Notify WsSession that we are done
+                if self
+                    .target_address
+                    .try_send(WsMessage::PlaybackEnd { id: self.id })
+                    .is_err()
+                {
+                    error!("Error sending PlaybackEnd");
+                }
+
+                // Notify supervisor that we are done.
+                PlaybackSupervisor::from_registry().do_send(StopPlayback { id: self.id });
+            }
+
             Ok(_) => {
                 error!("playback worker sent invalid message type");
             }
@@ -226,23 +245,23 @@ impl Handler<StartWorker> for PlaybackActor {
             .expect("Failed to open stdout of playback worker.");
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
         Self::add_stream(framed_stream, ctx);
-        let fut = wrap_future(child).map(|_status, actor: &mut Self, _ctx| {
-            debug!("Playback Worker for {} died!", actor.video_file_path);
+        // let fut = wrap_future(child.wait()).map(|_status, actor: &mut Self, _ctx| {
+        //     debug!("Playback Worker for {} died!", actor.video_file_path);
 
-            // Notify WsSession that we are done
-            if actor
-                .target_address
-                .try_send(WsMessage::PlaybackEnd { id: actor.id })
-                .is_err()
-            {
-                error!("Error sending PlaybackEnd");
-            }
+        //     // Notify WsSession that we are done
+        //     if actor
+        //         .target_address
+        //         .try_send(WsMessage::PlaybackEnd { id: actor.id })
+        //         .is_err()
+        //     {
+        //         error!("Error sending PlaybackEnd");
+        //     }
 
-            // Notify supervisor that we are done.
-            PlaybackSupervisor::from_registry().do_send(StopPlayback { id: actor.id });
-        });
+        //     // Notify supervisor that we are done.
+        //     PlaybackSupervisor::from_registry().do_send(StopPlayback { id: actor.id });
+        // });
 
-        ctx.spawn(fut);
+        //        ctx.spawn(fut);
     }
 }
 
