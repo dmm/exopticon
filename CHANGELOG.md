@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.22.6
+2022-03-18
+
+### Fixes
+
+- Update to Rust 1.58.0 (15ed260d817377fef9b35959ed02bbcd25cdd426)
+- Update to actix-web 4 (4817c7cd8574f57d19cedacc1162899093e5cabf)
+
 ## 0.22.5
 2022-02-22
 
