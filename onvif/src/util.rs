@@ -24,7 +24,7 @@ use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use hyper::{Body, Client, Request};
 use rand::Rng;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 
 use crate::error::Error;
 

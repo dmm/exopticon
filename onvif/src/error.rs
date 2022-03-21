@@ -42,9 +42,9 @@ pub enum Error {
     IO(#[from] std::io::Error),
 }
 
-impl From<hyper::error::Error> for Error {
+impl From<hyper::Error> for Error {
     #[must_use]
-    fn from(_err: hyper::error::Error) -> Self {
+    fn from(_err: hyper::Error) -> Self {
         Self::ConnectionFailed
     }
 }
