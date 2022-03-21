@@ -2,6 +2,15 @@
 
 <!--- next entry here -->
 
+## 0.22.7
+2022-03-21
+
+### Fixes
+
+- remove telegram actor (f952b7f370298aa0f595ff79f9f526adc318d925)
+- Update tokio to v1 (579f5a8079cbfb8de6b9688e54cac7e0ae9dcd63)
+- update Cargo.lock (58c7f803cb6fd5b14839ccc34a78fe5911fe6ab4)
+
 ## 0.22.6
 2022-03-18
 
