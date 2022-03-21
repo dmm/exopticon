@@ -25,13 +25,10 @@ use std::time::Instant;
 use actix::fut::wrap_future;
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
-use tokio::time::{sleep, Duration};
 use url::Url;
 
 use crate::db_registry;
 use crate::models::{AlertRule, AlertRuleModel, FetchAllAlertRule, Observation};
-use crate::notifier_supervisor::{NotifierSupervisor, SendNotification};
-use crate::observation_routes::fetch_observation_image;
 use crate::ws_camera_server::{
     CameraFrame, FrameSource, Subscribe, SubscriptionSubject, WsCameraServer,
 };
@@ -136,39 +133,17 @@ impl AlertActor {
     }
 
     /// Send a notification
-    async fn send_notification(rule: AlertRule, o: Observation) {
+    async fn send_notification(_rule: AlertRule, o: Observation) {
         debug!("Sending notification for observation: {}", o.id);
         let url = match Self::generate_observation_url(&o) {
             Some(url) => url.to_string(),
             None => "".to_string(),
         };
 
-        let message = Some(format!(
+        let _message = Some(format!(
             "Alert! Alert!\n {} detected with {}% certainty {}",
             o.details, o.score, url
         ));
-
-        NotifierSupervisor::from_registry().do_send(SendNotification {
-            notifier_id: rule.notifier_id,
-            contact_group: rule.contact_group.clone(),
-            message: message.clone(),
-            attachment: None,
-        });
-
-        // Wait for one second then fetch image. We do this because
-        // the frame may not have been written yet.  This has to be
-        // fixed to allow trick playing live video as well.
-        sleep(Duration::new(2, 0)).await;
-        let image = match fetch_observation_image(o.id).await {
-            Ok(img) => Some(img),
-            Err(_) => None,
-        };
-        NotifierSupervisor::from_registry().do_send(SendNotification {
-            notifier_id: rule.notifier_id,
-            contact_group: rule.contact_group.clone(),
-            message: None,
-            attachment: image,
-        });
     }
 }
 
