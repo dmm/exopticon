@@ -23,19 +23,24 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use std::pin::Pin;
+use std::rc::Rc;
 
+use actix::fut::Ready;
+use actix_http::body::EitherBody;
 use actix_identity::{Identity, RequestIdentity};
 use actix_service::{Service, Transform};
 use actix_web::{
     dev::ServiceRequest, dev::ServiceResponse, http, web::Data, web::Json, Error, HttpResponse,
     Responder,
 };
-use futures::future::{ok, Future, LocalBoxFuture, Ready};
-use futures::FutureExt;
+use chrono::{Duration, Utc};
+use futures::future::{ok, Future, LocalBoxFuture};
 use qstring::QString;
+use rand::Rng;
 
 use crate::app::RouteState;
 use crate::auth_handler::AuthData;
+use crate::models::{CreateUserSession, FetchUserSession};
 
 /// Route to make login attempt
 pub async fn login(
@@ -47,7 +52,29 @@ pub async fn login(
 
     match slim_user {
         Ok(Ok(slim_user)) => {
-            id.remember(slim_user.id.to_string());
+            // authn successful create user session
+            let session_key = base64::encode(&rand::thread_rng().gen::<[u8; 32]>());
+            let valid_time = Duration::days(7);
+            let expiration = match Utc::now().checked_add_signed(valid_time) {
+                None => {
+                    error!("Expiration time out of bounds!");
+                    return HttpResponse::InternalServerError().finish();
+                }
+                Some(time) => time,
+            };
+
+            let _session = state
+                .db
+                .send(CreateUserSession {
+                    name: "".to_string(),
+                    user_id: slim_user.id,
+                    session_key: session_key.clone(),
+                    is_token: false,
+                    expiration,
+                })
+                .await;
+            //            id.remember(slim_user.id.to_string());
+            id.remember(session_key);
             HttpResponse::Ok().into()
         }
         Err(_) => HttpResponse::InternalServerError().finish(),
@@ -59,10 +86,17 @@ pub async fn login(
 }
 
 #[allow(clippy::unused_async)]
-pub async fn check_login(id: Identity) -> impl Responder {
+pub async fn check_login(id: Identity, state: Data<RouteState>) -> impl Responder {
     match id.identity() {
         None => HttpResponse::NotFound().finish(),
-        Some(_) => HttpResponse::Ok().finish(),
+        Some(session_key) => {
+            let session = state.db.send(FetchUserSession { session_key }).await;
+
+            match session {
+                Ok(Ok(_)) => HttpResponse::Ok().finish(),
+                Ok(Err(_)) | Err(_) => HttpResponse::NotFound().finish(),
+            }
+        }
     }
 }
 
@@ -79,35 +113,39 @@ pub struct WebAuth;
 // Middleware factory is `Transform` trait from actix-service crate
 // `S` - type of the next service
 // `B` - type of response's body
-impl<S> Transform<S, ServiceRequest> for WebAuth
+impl<S, B> Transform<S, ServiceRequest> for WebAuth
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
+    B: 'static,
 {
-    type Response = ServiceResponse;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
     type Transform = WebAuthMiddleware<S>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(WebAuthMiddleware { service })
+        ok(WebAuthMiddleware {
+            service: Rc::new(service),
+        })
     }
 }
 
 /// struct representing authentication middleware for user facing routes
 pub struct WebAuthMiddleware<S> {
     /// current service to check authentication for
-    service: S,
+    service: Rc<S>,
 }
 
 #[allow(clippy::type_complexity)]
-impl<S> Service<ServiceRequest> for WebAuthMiddleware<S>
+impl<S, B> Service<ServiceRequest> for WebAuthMiddleware<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
+    B: 'static,
 {
-    type Response = ServiceResponse;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     //    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -115,30 +153,47 @@ where
     actix_web::dev::forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        if let Some(user_id) = req.get_identity() {
-            let user_id = user_id
-                .parse::<i32>()
-                .expect("user_id should always be a i32");
-            info!("authenticated user id: {}", user_id);
-            self.service.call(req).boxed_local()
-        } else if req.path() == "/login" {
-            self.service.call(req).boxed_local()
-        } else {
-            async {
-                let rpath = req.path().to_string();
-                let qs = QString::from(req.query_string());
+        let svc = self.service.clone();
+
+        // pull 'identity' and 'db' out of req before we consume it
+        let state: &Data<RouteState> = req.app_data().unwrap();
+        let db = state.db.clone();
+        let identity = req.get_identity();
+        Box::pin(async move {
+            // Determine if user is logged in
+            let user_id = if let Some(session_key) = identity {
+                let session = db.send(FetchUserSession { session_key }).await;
+
+                match session {
+                    Ok(Ok(session)) => {
+                        let user_id = session.user_id;
+                        info!("authenticated user id: {}", user_id);
+                        Some(user_id)
+                    }
+                    Ok(Err(_)) | Err(_) => None,
+                }
+            } else {
+                None
+            };
+
+            if None == user_id && req.path() != "/login" {
+                let (request, _pl) = req.into_parts();
+                let rpath = request.path().to_string();
+                let qs = QString::from(request.query_string());
                 let path = qs.get("redirect_uri").unwrap_or(&rpath);
-                Ok(req.into_response(
-                    HttpResponse::Found()
-                        .append_header((
-                            http::header::LOCATION,
-                            format!("/login?redirect_path={}", path),
-                        ))
-                        .finish(),
-                ))
+                let response: HttpResponse<EitherBody<B>> = HttpResponse::Found()
+                    .append_header((
+                        http::header::LOCATION,
+                        format!("/login?redirect_path={}", path),
+                    ))
+                    .finish()
+                    .map_into_right_body();
+                Ok(ServiceResponse::new(request, response))
+            } else {
+                // user is authenticated or request is for "/login"
+                svc.call(req).await.map(ServiceResponse::map_into_left_body)
             }
-            .boxed_local()
-        }
+        })
     }
 }
 
@@ -148,54 +203,78 @@ pub struct Auth;
 // Middleware factory is `Transform` trait from actix-service crate
 // `S` - type of the next service
 // `B` - type of response's body
-impl<S> Transform<S, ServiceRequest> for Auth
+impl<S, B> Transform<S, ServiceRequest> for Auth
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
+    B: 'static,
 {
-    type Response = ServiceResponse;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
     type Transform = AuthMiddleware<S>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(AuthMiddleware { service })
+        ok(AuthMiddleware {
+            service: Rc::new(service),
+        })
     }
 }
 
 /// Struct implementing authentication middleware for api routes
 pub struct AuthMiddleware<S> {
     /// service to check authentication for
-    service: S,
+    service: Rc<S>,
 }
 
 #[allow(clippy::type_complexity)]
-impl<S> Service<ServiceRequest> for AuthMiddleware<S>
+impl<S, B> Service<ServiceRequest> for AuthMiddleware<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
+    B: 'static,
 {
-    type Response = ServiceResponse;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     actix_web::dev::forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        if let Some(user_id) = req.get_identity() {
-            let user_id = user_id
-                .parse::<i32>()
-                .expect("user_id should always be a i32");
-            info!("authenticated user id: {}", user_id);
-            let fut = self.service.call(req);
-            Box::pin(async move {
-                let result = fut.await?;
+        debug!("Before webauth middleware!");
+        let svc = self.service.clone();
 
-                Ok(result)
-            })
-        } else {
-            Box::pin(async move { Ok(req.into_response(HttpResponse::Unauthorized().finish())) })
-        }
+        // pull 'identity' and 'db' out of req before we consume it
+        let state: &Data<RouteState> = req.app_data().unwrap();
+        let db = state.db.clone();
+        let identity = req.get_identity();
+        Box::pin(async move {
+            // Determine if user is logged in
+            let user_id = if let Some(session_key) = identity {
+                let session = db.send(FetchUserSession { session_key }).await;
+
+                match session {
+                    Ok(Ok(session)) => {
+                        let user_id = session.user_id;
+                        info!("authenticated user id: {}", user_id);
+                        Some(user_id)
+                    }
+                    Ok(Err(_)) | Err(_) => None,
+                }
+            } else {
+                None
+            };
+
+            if None == user_id {
+                let (request, _pl) = req.into_parts();
+                let response: HttpResponse<EitherBody<B>> =
+                    HttpResponse::Unauthorized().finish().map_into_right_body();
+                Ok(ServiceResponse::new(request, response))
+            } else {
+                // user is authenticated
+                svc.call(req).await.map(ServiceResponse::map_into_left_body)
+            }
+        })
     }
 }

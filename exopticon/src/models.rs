@@ -54,7 +54,7 @@ pub struct RemoveFile {
 use crate::schema::{
     alert_rule_cameras, alert_rules, analysis_engines, analysis_instances, camera_groups, cameras,
     event_observations, events, notification_contacts, notifiers, observation_snapshots,
-    observations, users, video_files, video_units,
+    observations, user_sessions, users, video_files, video_units,
 };
 
 /// Full camera group model. Represents a full row returned from the
@@ -1044,4 +1044,47 @@ pub struct FetchObservationSnapshot {
 pub struct FetchUser {
     /// id of user to fetch
     pub user_id: i32,
+}
+
+/// User login session or token
+#[derive(Associations, Insertable, Serialize, Queryable, Clone)]
+#[belongs_to(User)]
+pub struct UserSession {
+    /// user session id
+    pub id: i32,
+    /// user session name
+    pub name: String,
+    /// id of user associated with session
+    pub user_id: i32,
+    /// session key value
+    pub session_key: String,
+    /// flag indicating where it is an api token or user session
+    pub is_token: bool,
+    /// Expiration timestamp
+    pub expiration: DateTime<Utc>,
+    /// session create timestamp
+    pub inserted_at: DateTime<Utc>,
+}
+
+/// Request to create new user session
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[serde(rename_all = "camelCase")]
+#[table_name = "user_sessions"]
+pub struct CreateUserSession {
+    /// user session name
+    pub name: String,
+    /// id of user associated with session
+    pub user_id: i32,
+    /// session key value
+    pub session_key: String,
+    /// flag indicating where it is an api token or user session
+    pub is_token: bool,
+    /// Expiration timestamp
+    pub expiration: DateTime<Utc>,
+}
+
+/// Request to fetch user session
+pub struct FetchUserSession {
+    /// session key of session to fetch
+    pub session_key: String,
 }

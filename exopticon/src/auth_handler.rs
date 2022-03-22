@@ -20,11 +20,14 @@
 
 use actix::{Handler, Message};
 use bcrypt::verify;
+use chrono::Utc;
 use diesel::prelude::*;
 use serde::Deserialize;
 
 use crate::errors::ServiceError;
-use crate::models::{DbExecutor, FetchUser, SlimUser, User};
+use crate::models::{
+    CreateUserSession, DbExecutor, FetchUser, FetchUserSession, SlimUser, User, UserSession,
+};
 
 /// Represents data for an authentication attempt
 #[derive(Debug, Deserialize)]
@@ -89,5 +92,53 @@ impl Handler<FetchUser> for DbExecutor {
             })?;
 
         Ok(item.into())
+    }
+}
+
+impl Message for CreateUserSession {
+    type Result = Result<UserSession, ServiceError>;
+}
+
+impl Handler<CreateUserSession> for DbExecutor {
+    type Result = Result<UserSession, ServiceError>;
+
+    fn handle(&mut self, msg: CreateUserSession, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::user_sessions::dsl::user_sessions;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        diesel::insert_into(user_sessions)
+            .values(&msg)
+            .get_result(conn)
+            .map_err(|error| {
+                error!("Failed to insert user session: {}", error);
+                ServiceError::InternalServerError
+            })
+    }
+}
+
+impl Message for FetchUserSession {
+    type Result = Result<UserSession, ServiceError>;
+}
+
+impl Handler<FetchUserSession> for DbExecutor {
+    type Result = Result<UserSession, ServiceError>;
+
+    fn handle(&mut self, msg: FetchUserSession, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::user_sessions::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        // remove expired sessions
+        diesel::delete(user_sessions.filter(expiration.lt(Utc::now()))).execute(conn)?;
+
+        let s = user_sessions
+            .filter(session_key.eq(msg.session_key))
+            .filter(expiration.gt(Utc::now()))
+            .first(conn)
+            .map_err(|error| {
+                error!("Error fetching user session: {}", error);
+                ServiceError::InternalServerError
+            })?;
+
+        Ok(s)
     }
 }

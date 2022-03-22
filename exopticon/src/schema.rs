@@ -174,6 +174,18 @@ table! {
 }
 
 table! {
+    user_sessions (id) {
+        id -> Int4,
+        name -> Text,
+        user_id -> Int4,
+        session_key -> Text,
+        is_token -> Bool,
+        expiration -> Timestamptz,
+        inserted_at -> Timestamptz,
+    }
+}
+
+table! {
     users (id) {
         id -> Int4,
         username -> Varchar,
@@ -222,6 +234,7 @@ joinable!(events -> observations (display_observation_id));
 joinable!(observation_snapshots -> observations (observation_id));
 joinable!(observations -> video_units (video_unit_id));
 joinable!(subscription_masks -> analysis_subscriptions (analysis_subscription_id));
+joinable!(user_sessions -> users (user_id));
 joinable!(video_files -> video_units (video_unit_id));
 joinable!(video_units -> cameras (camera_id));
 
@@ -241,6 +254,7 @@ allow_tables_to_appear_in_same_query!(
     observation_snapshots,
     observations,
     subscription_masks,
+    user_sessions,
     users,
     video_files,
     video_units,

@@ -186,11 +186,9 @@ use actix_web::cookie::SameSite;
 use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
-use base64::{decode, encode};
 use dialoguer::{Input, PasswordInput};
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
-use rand::Rng;
 use time::Duration;
 
 use std::collections::HashMap;
@@ -300,11 +298,7 @@ async fn main() {
     let db_address = address.clone();
     let route_db_address = address.clone();
     let setup_address = address;
-    // secret is a random 32 character long base 64 string
-    let secret_string: String =
-        env::var("SECRET_KEY").unwrap_or_else(|_| encode(&rand::thread_rng().gen::<[u8; 32]>()));
-    let secret = decode(&secret_string)
-        .expect("Invalid SECRET_KEY env var provided. Must be 32bytes encoded as base64");
+    let secret: [u8; 32] = [0; 32];
 
     // Initialize prometheus metrics
     let hostname = env::var("DOMAIN").unwrap_or_else(|_| "exopticon".to_string());
@@ -378,7 +372,7 @@ async fn main() {
                 CookieIdentityPolicy::new(&secret)
                     .name("id")
                     .path("/")
-                    .max_age_secs(Duration::days(7).whole_seconds()) // just for testing
+                    .max_age_secs(Duration::days(7).whole_seconds())
                     .secure(true)
                     .same_site(SameSite::Strict),
             ))
