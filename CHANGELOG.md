@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.22.8
+2022-03-26
+
+### Fixes
+
+- implement server-side sessions (e01761dd7c7763bee417f79ed821affc2f7be5d1)
+
 ## 0.22.7
 2022-03-21
 
