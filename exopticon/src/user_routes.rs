@@ -23,7 +23,7 @@ use actix_web::{web::Data, web::Json, Error, HttpResponse};
 
 use crate::app::RouteState;
 use crate::errors::ServiceError;
-use crate::models::{CreateUser, FetchUser};
+use crate::models::{CreateUser, FetchUser, FetchUserSession};
 
 /// We have to pass by value to satisfy the actix route interface.
 #[allow(clippy::needless_pass_by_value)]
@@ -60,20 +60,31 @@ pub async fn fetch_current_user(
     id: Identity,
     state: Data<RouteState>,
 ) -> Result<HttpResponse, Error> {
-    if let Some(id) = id.identity() {
-        if let Ok(user_id) = id.parse::<i32>() {
-            let db_response = state
-                .db
-                .send(FetchUser { user_id })
-                .await
-                .map_err(|_| ServiceError::InternalServerError)?;
+    let user_id = match id.identity() {
+        None => return Ok(HttpResponse::NotFound().finish()),
+        Some(session_key) => {
+            let session = state.db.send(FetchUserSession { session_key }).await;
 
-            match db_response {
-                Ok(slim_user) => return Ok(HttpResponse::Ok().json(slim_user)),
-                Err(err) => return Ok(HttpResponse::InternalServerError().json(err.to_string())),
+            match session {
+                Ok(Ok(user_session)) => user_session.user_id,
+                Ok(Err(_)) | Err(_) => {
+                    error!("Failed to fetch user session");
+                    return Ok(HttpResponse::NotFound().finish());
+                }
             }
-        };
+        }
     };
 
-    Ok(HttpResponse::InternalServerError().into())
+    let db_response = state.db.send(FetchUser { user_id }).await.map_err(|err| {
+        error!("Failed to fetch user: {}", err);
+        ServiceError::InternalServerError
+    })?;
+
+    match db_response {
+        Ok(slim_user) => Ok(HttpResponse::Ok().json(slim_user)),
+        Err(err) => {
+            error!("Failed to fetch user: {}", err);
+            Ok(HttpResponse::InternalServerError().json(err.to_string()))
+        }
+    }
 }
