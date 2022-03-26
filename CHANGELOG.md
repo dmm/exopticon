@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.22.9
+2022-03-26
+
+### Fixes
+
+- fix /v1/user/me route (a77bcec3e02cb7d4749992817c399b11cc497272)
+
 ## 0.22.8
 2022-03-26
 
