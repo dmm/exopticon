@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.23.0
+2022-03-29
+
+### Features
+
+- Add personal access token routes (950488bcd0b321e355039277a9709b6b27ff7142)
+
 ## 0.22.9
 2022-03-26
 
