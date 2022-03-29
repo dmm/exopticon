@@ -27,12 +27,15 @@ use std::rc::Rc;
 
 use actix::fut::Ready;
 use actix_http::body::EitherBody;
+use actix_http::Payload;
 use actix_identity::{Identity, RequestIdentity};
 use actix_service::{Service, Transform};
+use actix_web::error::ErrorUnauthorized;
 use actix_web::{
     dev::ServiceRequest, dev::ServiceResponse, http, web::Data, web::Json, Error, HttpResponse,
     Responder,
 };
+use actix_web::{FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::future::{ok, Future, LocalBoxFuture};
 use qstring::QString;
@@ -40,7 +43,10 @@ use rand::Rng;
 
 use crate::app::RouteState;
 use crate::auth_handler::AuthData;
-use crate::models::{CreateUserSession, FetchUserSession};
+use crate::models::{
+    CreateUserSession, CreateUserToken, DeleteUserSession, FetchUser, FetchUserSession,
+    FetchUserTokens, SlimUser,
+};
 
 /// Route to make login attempt
 pub async fn login(
@@ -101,10 +107,115 @@ pub async fn check_login(id: Identity, state: Data<RouteState>) -> impl Responde
 }
 
 /// Route to make logout attempt
-#[allow(clippy::unused_async)]
-pub async fn logout(id: Identity) -> HttpResponse {
+pub async fn logout(id: Identity, state: Data<RouteState>) -> HttpResponse {
+    let ret = match id.identity() {
+        None => HttpResponse::NotFound().finish(),
+        Some(session_key) => match state.db.send(DeleteUserSession { session_key }).await {
+            Ok(Ok(_)) => HttpResponse::Ok().finish(),
+            Ok(Err(_)) | Err(_) => HttpResponse::NotFound().finish(),
+        },
+    };
+
     id.forget();
-    HttpResponse::Ok().into()
+    ret
+}
+
+/// Route to return personal access tokens
+pub async fn fetch_personal_access_tokens(user: SlimUser, state: Data<RouteState>) -> HttpResponse {
+    let db = state.db.clone();
+
+    match db.send(FetchUserTokens { user_id: user.id }).await {
+        Ok(Ok(tokens)) => HttpResponse::Ok().json(tokens),
+        Ok(Err(err)) => {
+            error!("Error fetching personal access tokens: {}", err);
+            HttpResponse::NotFound().finish()
+        }
+        Err(err) => {
+            error!("Error fetching personal access tokens: {}", err);
+            HttpResponse::NotFound().finish()
+        }
+    }
+}
+
+/// Route the create personal access token
+pub async fn create_personal_access_token(
+    req: Json<CreateUserToken>,
+    user: SlimUser,
+    state: Data<RouteState>,
+) -> HttpResponse {
+    let db = state.db.clone();
+    let session_key = base64::encode(&rand::thread_rng().gen::<[u8; 32]>());
+    let create_user_session = CreateUserSession {
+        name: req.name.clone(),
+        user_id: user.id,
+        session_key,
+        is_token: true,
+        expiration: req.expiration,
+    };
+
+    match db.send(create_user_session).await {
+        Ok(Ok(token)) => HttpResponse::Ok().json(token),
+        Ok(Err(err)) => {
+            error!("Error fetching personal access tokens: {}", err);
+            HttpResponse::NotFound().finish()
+        }
+        Err(err) => {
+            error!("Error fetching personal access tokens: {}", err);
+            HttpResponse::NotFound().finish()
+        }
+    }
+}
+
+impl FromRequest for SlimUser {
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self, Error>>>>;
+
+    fn from_request(req: &HttpRequest, pl: &mut Payload) -> Self::Future {
+        let fut = Identity::from_request(req, pl);
+        let state: &Data<RouteState> = req.app_data().unwrap();
+        let db = state.db.clone();
+
+        let header_key = match req.headers().get("PRIVATE-KEY") {
+            Some(header) => match header.to_str() {
+                Ok(val) => {
+                    info!("Matched private-key header!");
+                    Some(val.to_string())
+                }
+                Err(_) => None,
+            },
+            None => None,
+        };
+
+        Box::pin(async move {
+            let cookie_key = fut.await?.identity();
+
+            // if PRIVATE-KEY header exists, use it, otherwise try a cookie
+            let session_key = match header_key {
+                Some(key) => Some(key),
+                None => cookie_key,
+            };
+
+            let user_id = if let Some(session_key) = session_key {
+                let session = db.send(FetchUserSession { session_key }).await;
+
+                match session {
+                    Ok(Ok(session)) => {
+                        let user_id = session.user_id;
+                        info!("authenticated user id: {}", user_id);
+                        Ok(user_id)
+                    }
+                    Ok(Err(_)) | Err(_) => Err(ErrorUnauthorized("unauthorized")),
+                }
+            } else {
+                Err(ErrorUnauthorized("unauthorized"))
+            }?;
+
+            match db.send(FetchUser { user_id }).await {
+                Ok(Ok(user)) => Ok(user),
+                Ok(Err(_)) | Err(_) => Err(ErrorUnauthorized("unauthorized")),
+            }
+        })
+    }
 }
 
 /// Struct implementing Authentication middleware for api
@@ -249,9 +360,21 @@ where
         let state: &Data<RouteState> = req.app_data().unwrap();
         let db = state.db.clone();
         let identity = req.get_identity();
+
+        // if PRIVATE-KEY header exists, use it, otherwise try a cookie
+        let identity2 = match req.headers().get("PRIVATE-KEY") {
+            Some(header) => match header.to_str() {
+                Ok(val) => {
+                    info!("Matched private-key header!");
+                    Some(val.to_string())
+                }
+                Err(_) => identity,
+            },
+            None => identity,
+        };
         Box::pin(async move {
             // Determine if user is logged in
-            let user_id = if let Some(session_key) = identity {
+            let user_id = if let Some(session_key) = identity2 {
                 let session = db.send(FetchUserSession { session_key }).await;
 
                 match session {

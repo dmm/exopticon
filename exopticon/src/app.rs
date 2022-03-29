@@ -32,7 +32,10 @@ use crate::analysis_routes::{
     fetch_analysis_instance, update_analysis_configuration, update_analysis_engine,
     update_analysis_instance,
 };
-use crate::auth_routes::{check_login, login, logout, Auth, WebAuth};
+use crate::auth_routes::{
+    check_login, create_personal_access_token, fetch_personal_access_tokens, login, logout, Auth,
+    WebAuth,
+};
 use crate::camera_group_routes::{
     create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
 };
@@ -105,6 +108,12 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .wrap(Auth)
                 .service(web::resource("/ws").route(web::get()).to(ws_route))
                 .service(web::resource("/ws_json").route(web::get().to(ws_json_route)))
+                // personal access token routes
+                .service(
+                    web::resource("/personal_access_tokens")
+                        .route(web::get().to(fetch_personal_access_tokens))
+                        .route(web::post().to(create_personal_access_token)),
+                )
                 // routes to camera_group
                 .service(
                     web::resource("/camera_groups")

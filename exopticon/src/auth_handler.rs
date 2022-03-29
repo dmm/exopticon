@@ -26,7 +26,8 @@ use serde::Deserialize;
 
 use crate::errors::ServiceError;
 use crate::models::{
-    CreateUserSession, DbExecutor, FetchUser, FetchUserSession, SlimUser, User, UserSession,
+    CreateUserSession, DbExecutor, DeleteUserSession, FetchUser, FetchUserSession, FetchUserTokens,
+    SlimAccessToken, SlimUser, User, UserSession,
 };
 
 /// Represents data for an authentication attempt
@@ -140,5 +141,47 @@ impl Handler<FetchUserSession> for DbExecutor {
             })?;
 
         Ok(s)
+    }
+}
+
+impl Message for DeleteUserSession {
+    type Result = Result<(), ServiceError>;
+}
+
+impl Handler<DeleteUserSession> for DbExecutor {
+    type Result = Result<(), ServiceError>;
+
+    fn handle(&mut self, msg: DeleteUserSession, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::user_sessions::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        diesel::delete(user_sessions.filter(session_key.eq(msg.session_key))).execute(conn)?;
+        Ok(())
+    }
+}
+
+impl Message for FetchUserTokens {
+    type Result = Result<Vec<SlimAccessToken>, ServiceError>;
+}
+
+impl Handler<FetchUserTokens> for DbExecutor {
+    type Result = Result<Vec<SlimAccessToken>, ServiceError>;
+
+    fn handle(&mut self, msg: FetchUserTokens, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::user_sessions::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        let sessions = user_sessions
+            .filter(user_id.eq(msg.user_id))
+            .filter(is_token.eq(true))
+            .load::<UserSession>(conn)
+            .map_err(|error| {
+                error!("Error fetching user tokens: {}", error);
+                ServiceError::InternalServerError
+            })?;
+
+        let tokens: Vec<SlimAccessToken> = sessions.iter().map(SlimAccessToken::from).collect();
+
+        Ok(tokens)
     }
 }

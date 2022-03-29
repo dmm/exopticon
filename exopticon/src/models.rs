@@ -1088,3 +1088,49 @@ pub struct FetchUserSession {
     /// session key of session to fetch
     pub session_key: String,
 }
+
+/// Delete user session
+pub struct DeleteUserSession {
+    /// token value to delete
+    pub session_key: String,
+}
+
+/// Access Token model to return to user
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SlimAccessToken {
+    /// user session id
+    pub id: i32,
+    /// user session name
+    pub name: String,
+    /// id of user associated with session
+    pub user_id: i32,
+    /// Expiration timestamp
+    pub expiration: DateTime<Utc>,
+}
+
+impl From<&UserSession> for SlimAccessToken {
+    fn from(session: &UserSession) -> Self {
+        Self {
+            id: session.id,
+            name: session.name.clone(),
+            user_id: session.user_id,
+            expiration: session.expiration,
+        }
+    }
+}
+
+/// Request to fetch user's tokens
+pub struct FetchUserTokens {
+    pub user_id: i32,
+}
+
+/// Request to create personal access token
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateUserToken {
+    /// user id of token owner
+    pub user_id: i32,
+    /// name of new token
+    pub name: String,
+    /// expiration timestamp of new token
+    pub expiration: DateTime<Utc>,
+}
