@@ -22,7 +22,8 @@ button {
   font-size: 14px;
 }
 
-.new-token, .active-tokens {
+.new-token,
+.active-tokens {
   border: 1px solid #0f0;
 }
 

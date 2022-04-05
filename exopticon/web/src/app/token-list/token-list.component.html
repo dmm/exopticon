@@ -18,52 +18,50 @@
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-    <h2>Personal Access Tokens</h2>
+<h2>Personal Access Tokens</h2>
 
-    <div class="main">
-      <div class="show-token" *ngIf="newToken">
-        Your new personal access token: <input readonly type="text" value="{{newToken}}" /> <button type="button" (click)="copyToken()">Copy Token</button>
-        <p>Make sure to save it. You won't be able to access it again</p>
-      </div>
+<div class="main">
+  <div class="show-token" *ngIf="newToken">
+    Your new personal access token:
+    <input readonly type="text" value="{{ newToken }}" />
+    <button type="button" (click)="copyToken()">Copy Token</button>
+    <p>Make sure to save it. You won't be able to access it again</p>
+  </div>
 
-      <div class="new-token">
-        <h3>Create New Token</h3>
-        <div *ngIf="error">{{ error }}</div>
+  <div class="new-token">
+    <h3>Create New Token</h3>
+    <div *ngIf="error">{{ error }}</div>
 
-        <form>
-          <label>Token Name:</label>
-          <input [(ngModel)]="tokenName" name="name" size="15"/>
+    <form>
+      <label>Token Name:</label>
+      <input [(ngModel)]="tokenName" name="name" size="15" />
 
-          <label>Token Expiration:</label>
-          <input [(ngModel)]="tokenExpiration" type="date" name="expiration"/>
+      <label>Token Expiration:</label>
+      <input [(ngModel)]="tokenExpiration" type="date" name="expiration" />
 
-          <button type="submit" (click)="onSubmit()">
-            Create New Token
-          </button>
-        </form>
-      </div>
+      <button type="submit" (click)="onSubmit()">Create New Token</button>
+    </form>
+  </div>
 
-      <div class="active-tokens">
-        <h3>Active Tokens</h3>
-        <table>
-          <thead>
-            <th>Token name</th>
-            <th>Expires</th>
-            <th></th>
-          </thead>
-          <tr
-            *ngFor="let token of tokens$ | async"
-            >
-            <td>
-              {{ token.name }}
-            </td>
-            <td>
-              {{ token.expiration }}
-            </td>
-            <td>
-              <button type="button" (click)="onDelete(token.id)">Revoke</button>
-            </td>
-          </tr>
-        </table>
-      </div>
-    </div>
+  <div class="active-tokens">
+    <h3>Active Tokens</h3>
+    <table>
+      <thead>
+        <th>Token name</th>
+        <th>Expires</th>
+        <th></th>
+      </thead>
+      <tr *ngFor="let token of tokens$ | async">
+        <td>
+          {{ token.name }}
+        </td>
+        <td>
+          {{ token.expiration }}
+        </td>
+        <td>
+          <button type="button" (click)="onDelete(token.id)">Revoke</button>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
