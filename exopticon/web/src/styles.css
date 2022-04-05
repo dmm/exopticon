@@ -22,5 +22,7 @@ img {
 }
 
 button {
+  border: 1px solid #0f0;
   font-size: 20pt;
+  box-shadow: 0 0 8px #0f0;
 }

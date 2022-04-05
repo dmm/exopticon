@@ -40,6 +40,8 @@ import { CameraService } from "./camera.service";
 import { EventListComponent } from "./event-list/event-list.component";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
+import { TokenListComponent } from "./token-list/token-list.component";
+import { TokenService } from "./token.service";
 import { VideoViewComponent } from "./video-view/video-view.component";
 
 @NgModule({
@@ -57,6 +59,7 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     CameraListComponent,
     CameraDetailComponent,
     EventListComponent,
+    TokenListComponent,
   ],
   imports: [
     BrowserModule,
@@ -72,6 +75,7 @@ import { VideoViewComponent } from "./video-view/video-view.component";
   providers: [
     { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
     CameraService,
+    TokenService,
   ],
   bootstrap: [AppComponent],
 })

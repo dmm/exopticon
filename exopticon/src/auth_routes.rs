@@ -155,7 +155,7 @@ pub async fn create_personal_access_token(
     };
 
     match db.send(create_user_session).await {
-        Ok(Ok(token)) => HttpResponse::Ok().json(token),
+        Ok(Ok(token)) => HttpResponse::Ok().json(token.session_key),
         Ok(Err(err)) => {
             error!("Error fetching personal access tokens: {}", err);
             HttpResponse::NotFound().finish()

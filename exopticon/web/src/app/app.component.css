@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -24,10 +24,10 @@
 
 .top-menu {
   position: relative;
-  height: 75px;
+  height: 85px;
   width: 100%;
   display: grid;
-  grid-template-columns: 75px 1fr 130px 200px 5px;
+  grid-template-columns: 75px 1fr 130px 130px 5px;
   grid-template-rows: 75px;
   font-weight: bold;
 }

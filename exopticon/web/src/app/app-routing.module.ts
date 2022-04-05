@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -28,6 +28,7 @@ import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { EventListComponent } from "./event-list/event-list.component";
 import { LoginComponent } from "./login/login.component";
 import { PlaybackViewComponent } from "./playback-view/playback-view.component";
+import { TokenListComponent } from "./token-list/token-list.component";
 
 const routes: Routes = [
   { path: "login", component: LoginComponent },
@@ -38,6 +39,7 @@ const routes: Routes = [
   { path: "cameras/:id/playback", component: PlaybackViewComponent },
   { path: "alerts/:id", component: AlertViewComponent },
   { path: "events", component: EventListComponent },
+  { path: "tokens", component: TokenListComponent },
   { path: "", redirectTo: "/camera_panel", pathMatch: "full" },
   { path: "**", redirectTo: "/camera_panel", pathMatch: "full" },
 ];

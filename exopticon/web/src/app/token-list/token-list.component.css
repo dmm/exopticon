@@ -1,0 +1,79 @@
+/*
+ * Exopticon - A free video surveillance system.
+ * Copyright (C) 2022 David Matthew Mattli <dmm@mattli.us>
+ *
+ * This file is part of Exopticon.
+ *
+ * Exopticon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Exopticon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+button {
+  font-size: 14px;
+}
+
+.new-token, .active-tokens {
+  border: 1px solid #0f0;
+}
+
+div.main {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 300px 1fr;
+}
+
+:host > h2 {
+}
+
+div.show-token > input {
+  margin-right: 10px;
+}
+
+div.main > div {
+  grid-column: 2;
+  margin-bottom: 20px;
+  padding-left: 10px;
+  padding-bottom: 10px;
+}
+
+div.new-token > form {
+  margin-left: 15px;
+  margin-right: 15px;
+
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-gap: 16px;
+}
+
+div.new-token > form > * {
+  grid-column: 1 / 3;
+}
+
+div.new-token > form > input {
+  width: 200px;
+}
+
+div.active-tokens {
+  padding-left: 10px;
+}
+
+div.active-tokens > table {
+  text-align: left;
+  border-collapse: collapse;
+  width: 100%;
+  border-spacing: 0;
+  margin-bottom: 0;
+  padding: 10px 16px;
+  line-height: 20px;
+  vertical-align: top;
+}
