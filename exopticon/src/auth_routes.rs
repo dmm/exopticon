@@ -31,6 +31,7 @@ use actix_http::Payload;
 use actix_identity::{Identity, RequestIdentity};
 use actix_service::{Service, Transform};
 use actix_web::error::ErrorUnauthorized;
+use actix_web::web::Path;
 use actix_web::{
     dev::ServiceRequest, dev::ServiceResponse, http, web::Data, web::Json, Error, HttpResponse,
     Responder,
@@ -44,8 +45,8 @@ use rand::Rng;
 use crate::app::RouteState;
 use crate::auth_handler::AuthData;
 use crate::models::{
-    CreateUserSession, CreateUserToken, DeleteUserSession, FetchUser, FetchUserSession,
-    FetchUserTokens, SlimUser,
+    CreateUserSession, CreateUserToken, DeleteUserSession, DeleteUserToken, FetchUser,
+    FetchUserSession, FetchUserTokens, SlimUser,
 };
 
 /// Route to make login attempt
@@ -155,6 +156,32 @@ pub async fn create_personal_access_token(
 
     match db.send(create_user_session).await {
         Ok(Ok(token)) => HttpResponse::Ok().json(token),
+        Ok(Err(err)) => {
+            error!("Error fetching personal access tokens: {}", err);
+            HttpResponse::NotFound().finish()
+        }
+        Err(err) => {
+            error!("Error fetching personal access tokens: {}", err);
+            HttpResponse::NotFound().finish()
+        }
+    }
+}
+
+/// Route to delete personal access token
+pub async fn delete_personal_access_token(
+    path: Path<i32>,
+    _user: SlimUser,
+    state: Data<RouteState>,
+) -> HttpResponse {
+    let db = state.db.clone();
+
+    match db
+        .send(DeleteUserToken {
+            token_id: path.into_inner(),
+        })
+        .await
+    {
+        Ok(Ok(())) => HttpResponse::Ok().finish(),
         Ok(Err(err)) => {
             error!("Error fetching personal access tokens: {}", err);
             HttpResponse::NotFound().finish()

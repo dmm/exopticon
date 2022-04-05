@@ -1134,3 +1134,10 @@ pub struct CreateUserToken {
     /// expiration timestamp of new token
     pub expiration: DateTime<Utc>,
 }
+
+/// Request to delete personal access token
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeleteUserToken {
+    /// token id
+    pub token_id: i32,
+}

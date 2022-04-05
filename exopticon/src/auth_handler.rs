@@ -26,8 +26,8 @@ use serde::Deserialize;
 
 use crate::errors::ServiceError;
 use crate::models::{
-    CreateUserSession, DbExecutor, DeleteUserSession, FetchUser, FetchUserSession, FetchUserTokens,
-    SlimAccessToken, SlimUser, User, UserSession,
+    CreateUserSession, DbExecutor, DeleteUserSession, DeleteUserToken, FetchUser, FetchUserSession,
+    FetchUserTokens, SlimAccessToken, SlimUser, User, UserSession,
 };
 
 /// Represents data for an authentication attempt
@@ -114,6 +114,23 @@ impl Handler<CreateUserSession> for DbExecutor {
                 error!("Failed to insert user session: {}", error);
                 ServiceError::InternalServerError
             })
+    }
+}
+
+impl Message for DeleteUserToken {
+    type Result = Result<(), ServiceError>;
+}
+
+impl Handler<DeleteUserToken> for DbExecutor {
+    type Result = Result<(), ServiceError>;
+
+    fn handle(&mut self, msg: DeleteUserToken, _: &mut Self::Context) -> Self::Result {
+        use crate::schema::user_sessions::dsl::*;
+        let conn: &PgConnection = &self.0.get().unwrap();
+
+        diesel::delete(user_sessions.filter(id.eq(msg.token_id))).execute(conn)?;
+
+        Ok(())
     }
 }
 
