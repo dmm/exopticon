@@ -377,7 +377,7 @@ async fn main() {
                     .same_site(SameSite::Strict),
             ))
             // setup builtin logger to get nice logging for each request
-            .wrap(Logger::default())
+            .wrap(Logger::new("%{r}a %r %s %b %{Referer}i %{User-Agent}i %T"))
             .configure(app::generate_config)
     })
     .bind("0.0.0.0:3000")
