@@ -12,8 +12,7 @@ html,
 body,
 button {
   color: #0f0;
-  background-color: black;
-  border-color: #0f0;
+  background-color: #000;
 }
 
 img {
@@ -22,7 +21,26 @@ img {
 }
 
 button {
-  border: 1px solid #0f0;
+  background-color: #040;
+  border: 1px solid #080;
   font-size: 20pt;
-  box-shadow: 0 0 8px #0f0;
+  cursor: pointer;
+}
+
+h2 {
+  text-align: center;
+  background: #040;
+  border: 1px solid #080;
+  padding: 0.2em;
+  margin: 1.5em 0 0.5em 0;
+  font-size: 11pt;
+  font-weight: bold;
+}
+
+input,
+select {
+  color: #0f0;
+  background: #333;
+  border-radius: 0;
+  border: 1px solid #080;
 }

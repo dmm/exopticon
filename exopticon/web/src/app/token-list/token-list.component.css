@@ -22,29 +22,35 @@ button {
   font-size: 14px;
 }
 
-.new-token,
-.active-tokens {
-  border: 1px solid #0f0;
+.section {
+  margin-bottom: 1em;
+  border-left: 1px solid #040;
+  border-right: 1px solid #040;
+  border-bottom: 1px solid #040;
+  padding: 0;
+  padding-bottom: 1em;
+}
+
+.section > .section-title {
+  background: #040;
+  margin: 0;
+  margin-bottom: 1em;
+  font-size: 15pt;
+  line-height: 1em;
+  border: 0;
+  border-top: 1px solid #040;
 }
 
 div.main {
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr 300px 1fr;
-}
-
-:host > h2 {
-}
-
-div.show-token > input {
-  margin-right: 10px;
+  grid-template-columns: 1fr 350px 1fr;
+  justify-items: center;
 }
 
 div.main > div {
   grid-column: 2;
-  margin-bottom: 20px;
-  padding-left: 10px;
-  padding-bottom: 10px;
+  width: 100%;
 }
 
 div.new-token > form {
@@ -64,17 +70,20 @@ div.new-token > form > input {
   width: 200px;
 }
 
-div.active-tokens {
-  padding-left: 10px;
-}
-
 div.active-tokens > table {
   text-align: left;
   border-collapse: collapse;
   width: 100%;
   border-spacing: 0;
+  margin-right: 15px;
+  margin-left: 15px;
   margin-bottom: 0;
   padding: 10px 16px;
   line-height: 20px;
   vertical-align: top;
+  overflow: scroll;
+}
+
+div.active-tokens td {
+  overflow: scroll;
 }

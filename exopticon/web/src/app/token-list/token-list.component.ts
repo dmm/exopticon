@@ -20,6 +20,7 @@
 
 import { Component, OnInit } from "@angular/core";
 import { Router } from "@angular/router";
+import { LocalDate } from "@js-joda/core";
 import { Observable } from "rxjs";
 import { Token, TokenService } from "../token.service";
 
@@ -34,6 +35,7 @@ export class TokenListComponent implements OnInit {
   error: string;
   tokens$: Observable<Token[]>;
   newToken: string;
+  minDate: LocalDate = LocalDate.now().plusDays(1);
 
   constructor(private router: Router, private tokenService: TokenService) {}
 
