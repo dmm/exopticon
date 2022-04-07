@@ -2,6 +2,22 @@
 
 <!--- next entry here -->
 
+## 0.24.0
+2022-04-07
+
+### Features
+
+- Add token delete route (456a4f19cff7f780682a56e5e81721489acfdb60)
+- Add personal access token list (eb4decd98c6888f908fc538daaab668b01b7063e)
+
+### Fixes
+
+- use 2021 (13975c8ceb7aac1d3e3ec4b26197e4ffba2c0741)
+- fix token-list formatting (96eea502c17c345e9e5f2320d6c10f210d5b6913)
+- use forwarded ip from header for logs (2a60872fa99eec407ac474ed469fff55e1938700)
+- fix css property name (5b57f7eac691908928d02b2722475f2c99b154dd)
+- change button/header styles (bf82df0184496bba45276278730d0b9a6cbc2d8c)
+
 ## 0.23.0
 2022-03-29
 
