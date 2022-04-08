@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.24.1
+2022-04-08
+
+### Fixes
+
+- fix top menu style (a6ed9086a3411c1acd64dd3d36996849acf750bc)
+- Allow camera panel to be less than viewport height (9b83c7c7ec4e98cb1b0b75ce84d5b1dd82596f58)
+- Allow touch events to toggle camera overlay (6de673d0543494c928620f3cd7571035f22528f9)
+- CameraPanel: remove unused variables, methods (52980aab56143628d94dd24b938a4d5359a29eeb)
+
 ## 0.24.0
 2022-04-07
 
