@@ -43,12 +43,7 @@ export class CameraPanelComponent implements OnInit {
   enabledCameras: Camera[];
   enabledCamerasOffset: number = 0;
   error: any;
-  selectedCameraId?: number;
-  overlayDisabledId?: number;
   private cameraVisibility: Map<number, boolean>;
-  private columns: number;
-  private rows: number;
-  private resolution: CameraResolution;
 
   constructor(
     public cameraPanelService: CameraPanelService,
@@ -58,9 +53,7 @@ export class CameraPanelComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private ngZone: NgZone
-  ) {
-    this.resolution = CameraResolution.Sd;
-  }
+  ) {}
 
   getCameras(): void {
     this.cameraService.getCameras().subscribe((cameras) => {});
@@ -91,10 +84,7 @@ export class CameraPanelComponent implements OnInit {
 
   @HostListener("window:keyup", ["$event"])
   KeyEvent(event: KeyboardEvent) {
-    console.log("keycode: " + event.keyCode);
     let offset = this.cameraPanelService.offset;
-    let cameraId = this.getKeyboardControlCameraId();
-    console.log("keyboard control camera id: " + cameraId);
     switch (event.keyCode) {
       case 78:
         // 'n'
@@ -150,38 +140,7 @@ export class CameraPanelComponent implements OnInit {
     return params;
   }
 
-  selectCameraView(cameraIndex: number) {
-    if (cameraIndex !== this.overlayDisabledId) {
-      this.selectedCameraId = cameraIndex;
-    }
-  }
-
-  deselectCameraView() {
-    this.selectedCameraId = null;
-  }
-
-  onTouchStart(cameraIndex: number) {
-    if (this.selectedCameraId === cameraIndex) {
-      this.selectedCameraId = null;
-      this.overlayDisabledId = cameraIndex;
-    } else {
-      this.selectedCameraId = cameraIndex;
-      this.overlayDisabledId = null;
-    }
-  }
-
   updateCameraViewVisibility(cameraId: number, visible: boolean) {
     this.cameraVisibility.set(cameraId, visible);
-  }
-
-  getKeyboardControlCameraId(): number {
-    return;
-    if (this.enabledCameras.length === 1) {
-      return this.enabledCameras[0].id;
-    } else if (this.selectedCameraId) {
-      return this.selectedCameraId;
-    }
-
-    return -1;
   }
 }
