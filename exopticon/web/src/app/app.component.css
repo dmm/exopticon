@@ -24,8 +24,8 @@
 
 .top-menu {
   position: relative;
-  height: 85px;
   width: 100%;
+  margin-bottom: 5px;
   display: grid;
   grid-template-columns: 75px 1fr 130px 130px 5px;
   grid-template-rows: 75px;
