@@ -219,6 +219,10 @@ export class CameraPanelService {
       this.selectedCameraId = cameraId;
       this.keyboardControlCameraId = cameraId;
       this.selectedCameraMode = SelectionMode.Touch;
+    } else if (this.selectedCameraId === cameraId) {
+      this.selectedCameraId = null;
+      this.keyboardControlCameraId = null;
+      this.selectedCameraMode = SelectionMode.Touch;
     }
   }
   mouseOver(cameraId: number) {
@@ -228,7 +232,7 @@ export class CameraPanelService {
     ) {
       // clear selected camera on second touch
       this.selectedCameraId = -1;
-    } else {
+    } else if (this.selectedCameraMode === SelectionMode.Mouse) {
       this.selectedCameraId = cameraId;
       this.keyboardControlCameraId = cameraId;
       this.selectedCameraMode = SelectionMode.Mouse;

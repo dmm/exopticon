@@ -20,6 +20,7 @@
 
 import { Component, Input, OnInit } from "@angular/core";
 import { Camera } from "../camera";
+import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
 
 @Component({
@@ -31,12 +32,26 @@ export class CameraOverlayComponent implements OnInit {
   @Input() camera: Camera;
 
   private directions = PtzDirection;
+  private ptzActivated = false;
 
-  constructor(private cameraService: CameraService) {}
+  constructor(
+    private cameraService: CameraService,
+    private cameraPanelService: CameraPanelService
+  ) {}
 
   ngOnInit() {}
 
+  handleTouch() {
+    // If the touch event was triggered by touching an overlay button, ignore
+    // the event, otherwise toggle the overlay.
+    if (!this.ptzActivated) {
+      this.cameraPanelService.touchCamera(this.camera.id);
+    }
+    this.ptzActivated = false;
+  }
+
   ptz(direction: PtzDirection) {
+    this.ptzActivated = true;
     this.cameraService.ptz(this.camera.id, direction);
   }
 }
