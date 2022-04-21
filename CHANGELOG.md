@@ -2,6 +2,15 @@
 
 <!--- next entry here -->
 
+## 0.24.2
+2022-04-21
+
+### Fixes
+
+- Update Angular to 13.3.3 (82bcf43e0cd6a24a8b04ee40bf11348328361988)
+- web audit fixes (be50c35f58bb3c03672d6c899e617cc397649a0b)
+- update web deps (3fd274f55a51dfc718a85573d9794f26dcf25c93)
+
 ## 0.24.1
 2022-04-08
 
