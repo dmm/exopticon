@@ -186,7 +186,7 @@ class EventWorker(ExopticonWorker):
 
         object_tracker.expire_old()
         object_tracker.match_and_update(frame.analysis_offset, frame.observations)
-        self.logger.info("Incoming detections: " + str(len(frame.observations)))
+        self.logger.debug("Incoming detections: " + str(len(frame.observations)))
 #        self.logger.info("Tracking " + str(len(object_tracker.tracked_objects)) + " Objects: " + json.dumps(object_tracker.tracked_objects))
 
         for obj in object_tracker.tracked_objects.values():

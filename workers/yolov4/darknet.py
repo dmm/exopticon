@@ -503,7 +503,7 @@ class Yolo4Worker(ExopticonWorker):
                 "lrX": int(lr_x),
                 "lrY": int(lr_y)
             })
-            self.logger.info("Found a " + str(det))
+            self.logger.debug("Found a " + str(det))
         if len(observations) > 0:
             self.write_observations(frame, observations)
         []

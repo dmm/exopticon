@@ -332,7 +332,7 @@ class ExopticonWorker(object):
         }
         event_dict = {'Event': event_model}
         serialized = json.dumps(event_dict)
-        self.logger.info("Writing event: " + serialized)
+        self.logger.debug("Writing event: " + serialized)
         self.__write_framed_message(serialized)
 
     def __write_framed_message(self, serialized):
