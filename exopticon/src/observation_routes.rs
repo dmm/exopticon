@@ -307,7 +307,7 @@ pub fn get_clip(path: &str, microsecond_offset: u64, length: Duration) -> Result
 }
 
 /// Route the fetch video for event
-fn get_event_clip(event_files: EventFile) -> Result<NamedFile, ()> {
+fn get_event_clip(filename: String, event_files: EventFile) -> Result<NamedFile, ()> {
     if event_files.files.is_empty() {
         error!("Failed to find event files!");
         return Err(());
@@ -317,7 +317,7 @@ fn get_event_clip(event_files: EventFile) -> Result<NamedFile, ()> {
     let dir = tempdir().map_err(|_| {
         error!("failed to make tempdir");
     })?;
-    let output_file_path = dir.path().join("output.mp4");
+    let output_file_path = dir.path().join(filename);
     let edit_list_path = dir.path().join("edit_list.txt");
     let mut edit_list = std::fs::File::create(edit_list_path.clone()).map_err(|e| {
         error!("Error opening edit list: {}", e);
@@ -419,19 +419,39 @@ fn get_event_clip(event_files: EventFile) -> Result<NamedFile, ()> {
 }
 
 pub async fn fetch_event_clip(
-    event_id: Path<Uuid>,
+    path: Path<Uuid>,
     state: Data<RouteState>,
 ) -> Result<NamedFile, Error> {
+    let event_id = path.into_inner();
+    let event = state
+        .db
+        .send(FetchEvent { event_id })
+        .await
+        .map_err(|_| ServiceError::InternalServerError)??;
+
+    let camera = state
+        .db
+        .send(FetchCamera {
+            id: event.camera_id,
+        })
+        .await
+        .map_err(|_| ServiceError::InternalServerError)??;
+
     let event_files = state
         .db
-        .send(GetEventFile {
-            event_id: event_id.into_inner(),
-        })
+        .send(GetEventFile { event_id })
         .await
         .map_err(|_| ServiceError::InternalServerError)?;
 
+    let filename = format!(
+        "{}_{}_{}.mp4",
+        event.begin_time.timestamp(),
+        camera.name,
+        event.tag
+    );
+
     match event_files {
-        Ok(event_files) => match web::block(move || get_event_clip(event_files)).await {
+        Ok(event_files) => match web::block(move || get_event_clip(filename, event_files)).await {
             Ok(Ok(clip)) => Ok(clip),
             Ok(Err(_err)) => Err(actix_web::error::ErrorInternalServerError(
                 "Error reading clip",
