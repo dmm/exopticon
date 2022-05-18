@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -25,65 +25,67 @@ use actix_web::{web::Data, web::Json, web::Path, HttpResponse};
 
 use crate::app::RouteState;
 use crate::errors::ServiceError;
-use crate::models::{CreateCameraGroup, FetchAllCameraGroup, FetchCameraGroup, UpdateCameraGroup};
+use crate::models::{
+    CreateStorageGroup, FetchAllStorageGroup, FetchStorageGroup, UpdateStorageGroup,
+};
 
-/// Route to create new camera group
-pub async fn create_camera_group(
-    camera_group_request: Json<CreateCameraGroup>,
+/// Route to create new storage group
+pub async fn create_storage_group(
+    storage_group_request: Json<CreateStorageGroup>,
     state: Data<RouteState>,
 ) -> Result<HttpResponse, ServiceError> {
-    let db_response = state.db.send(camera_group_request.into_inner()).await?;
+    let db_response = state.db.send(storage_group_request.into_inner()).await?;
 
     match db_response {
-        Ok(camera_group) => Ok(HttpResponse::Ok().json(camera_group)),
+        Ok(storage_group) => Ok(HttpResponse::Ok().json(storage_group)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
 
-/// Route to update existing camera group
-pub async fn update_camera_group(
+/// Route to update existing storage group
+pub async fn update_storage_group(
     path: Path<i32>,
-    camera_group_request: Json<UpdateCameraGroup>,
+    storage_group_request: Json<UpdateStorageGroup>,
     state: Data<RouteState>,
 ) -> Result<HttpResponse, ServiceError> {
-    let camera_group_update = UpdateCameraGroup {
+    let storage_group_update = UpdateStorageGroup {
         id: path.into_inner(),
-        ..camera_group_request.into_inner()
+        ..storage_group_request.into_inner()
     };
-    let db_response = state.db.send(camera_group_update).await?;
+    let db_response = state.db.send(storage_group_update).await?;
 
     match db_response {
-        Ok(camera_group) => Ok(HttpResponse::Ok().json(camera_group)),
+        Ok(storage_group) => Ok(HttpResponse::Ok().json(storage_group)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
 
-/// Route to fetch camera group by id
-pub async fn fetch_camera_group(
+/// Route to fetch storage group by id
+pub async fn fetch_storage_group(
     path: Path<i32>,
     state: Data<RouteState>,
 ) -> Result<HttpResponse, ServiceError> {
     let db_response = state
         .db
-        .send(FetchCameraGroup {
+        .send(FetchStorageGroup {
             id: path.into_inner(),
         })
         .await?;
 
     match db_response {
-        Ok(camera_group) => Ok(HttpResponse::Ok().json(camera_group)),
+        Ok(storage_group) => Ok(HttpResponse::Ok().json(storage_group)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }
 
-/// Route to fetch all camera groups
-pub async fn fetch_all_camera_groups(
+/// Route to fetch all storage groups
+pub async fn fetch_all_storage_groups(
     state: Data<RouteState>,
 ) -> Result<HttpResponse, ServiceError> {
-    let db_response = state.db.send(FetchAllCameraGroup {}).await?;
+    let db_response = state.db.send(FetchAllStorageGroup {}).await?;
 
     match db_response {
-        Ok(camera_groups) => Ok(HttpResponse::Ok().json(camera_groups)),
+        Ok(storage_groups) => Ok(HttpResponse::Ok().json(storage_groups)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
 }

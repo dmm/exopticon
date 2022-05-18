@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -399,14 +399,14 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
         let conn: &PgConnection = &self.0.get().unwrap();
         conn.transaction(|| {
             let new_snapshot_path = {
-                use crate::schema::camera_groups::dsl::*;
                 use crate::schema::cameras::dsl::*;
                 use crate::schema::observations::dsl::*;
+                use crate::schema::storage_groups::dsl::*;
                 use crate::schema::video_units::dsl::*;
 
                 let video_storage_path = observations
-                    .inner_join(video_units.inner_join(cameras.inner_join(camera_groups)))
-                    .select(crate::schema::camera_groups::dsl::storage_path)
+                    .inner_join(video_units.inner_join(cameras.inner_join(storage_groups)))
+                    .select(crate::schema::storage_groups::dsl::storage_path)
                     .filter(crate::schema::observations::dsl::id.eq(msg.observation_id))
                     .first::<String>(conn)?;
 
@@ -417,9 +417,9 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
             };
 
             {
-                use crate::schema::camera_groups::dsl::*;
                 use crate::schema::cameras::dsl::*;
                 use crate::schema::observations::dsl::*;
+                use crate::schema::storage_groups::dsl::*;
                 use crate::schema::video_files::dsl::*;
                 use crate::schema::video_units::dsl::*;
 
@@ -452,8 +452,8 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
                 }
 
                 let camera_storage_path = observations
-                    .inner_join(video_units.inner_join(cameras.inner_join(camera_groups)))
-                    .select(crate::schema::camera_groups::dsl::storage_path)
+                    .inner_join(video_units.inner_join(cameras.inner_join(storage_groups)))
+                    .select(crate::schema::storage_groups::dsl::storage_path)
                     .filter(crate::schema::observations::dsl::id.eq(msg.observation_id))
                     .first::<String>(conn)?;
 

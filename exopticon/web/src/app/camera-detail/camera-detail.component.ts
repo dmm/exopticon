@@ -47,7 +47,7 @@ export class CameraDetailComponent implements OnInit {
         } else {
           let cam = new Camera();
           cam.id = 0;
-          cam.cameraGroupId = 1;
+          cam.storageGroupId = 1;
           return of(cam);
         }
       })

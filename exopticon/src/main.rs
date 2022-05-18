@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -87,11 +87,11 @@ mod analysis_routes;
 /// Implements analysis supervisor
 mod analysis_supervisor;
 
-/// implements camera group api logic
-mod camera_group_handler;
+/// implements storage group api logic
+mod storage_group_handler;
 
-/// Implements camera group routes
-mod camera_group_routes;
+/// Implements storage group routes
+mod storage_group_routes;
 
 /// Implements camera api logic
 mod camera_handler;
@@ -113,7 +113,7 @@ mod errors;
 /// `FairQueue` implementation
 mod fair_queue;
 
-/// Actor that deletes excess files for a camera group
+/// Actor that deletes excess files for a storage group
 mod file_deletion_actor;
 
 /// Actor that supervises files deletion workers
@@ -195,7 +195,7 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::app::RouteState;
-use crate::models::{CreateCameraGroup, CreateUser};
+use crate::models::{CreateStorageGroup, CreateUser};
 use crate::root_supervisor::{ExopticonMode, RootSupervisor};
 
 embed_migrations!("migrations/");
@@ -236,8 +236,8 @@ async fn add_user(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
     Ok(true)
 }
 
-/// Adds a camera group. This is really only for setting up initial
-/// camera groups for boostrapping.. It should be run before the full
+/// Adds a storage group. This is really only for setting up initial
+/// storage groups for bootstrapping.. It should be run before the full
 /// system is started.
 ///
 /// # Arguments
@@ -246,7 +246,7 @@ async fn add_user(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
 /// * `address` - The address of the `DbExecutor`
 ///
 
-async fn add_camera_group(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
+async fn add_storage_group(address: &Addr<DbExecutor>) -> Result<bool, std::io::Error> {
     let storage_path = Input::new()
         .with_prompt("Enter storage path for recorded video")
         .interact()?;
@@ -255,7 +255,7 @@ async fn add_camera_group(address: &Addr<DbExecutor>) -> Result<bool, std::io::E
         .with_prompt("Enter max space used at this path, in megabytes")
         .interact()?;
 
-    let fut = address.send(CreateCameraGroup {
+    let fut = address.send(CreateStorageGroup {
         name: String::from("default"),
         storage_path,
         max_storage_size,
@@ -263,10 +263,10 @@ async fn add_camera_group(address: &Addr<DbExecutor>) -> Result<bool, std::io::E
     match fut.await {
         Ok(_) => (),
         Err(err) => {
-            error!("Error creating camera group! {}", err);
+            error!("Error creating storage group! {}", err);
         }
     }
-    println!("Created camera group!");
+    println!("Created storage group!");
     Ok(true)
 }
 
@@ -319,7 +319,7 @@ async fn main() {
 
     let mut mode = ExopticonMode::Run;
     let mut add_user_flag = false;
-    let mut add_camera_group_flag = false;
+    let mut add_storage_group_flag = false;
     // Prints each argument on a separate line
     for argument in env::args() {
         match argument.as_ref() {
@@ -330,14 +330,14 @@ async fn main() {
             "--add-user" => {
                 add_user_flag = true;
             }
-            "--add-camera-group" => {
-                add_camera_group_flag = true;
+            "--add-storage-group" => {
+                add_storage_group_flag = true;
             }
             _ => (),
         }
     }
 
-    if add_user_flag || add_camera_group_flag {
+    if add_user_flag || add_storage_group_flag {
         mode = ExopticonMode::Standby;
     }
 
@@ -349,14 +349,14 @@ async fn main() {
         move |_ctx: &mut Context<RootSupervisor>| root_supervisor,
     );
 
-    if add_user_flag || add_camera_group_flag {
+    if add_user_flag || add_storage_group_flag {
         if add_user_flag && add_user(&setup_address).await.is_err() {
             error!("Error creating user!");
             return;
         }
 
-        if add_camera_group_flag && add_camera_group(&setup_address).await.is_err() {
-            error!("Error creating camera group!");
+        if add_storage_group_flag && add_storage_group(&setup_address).await.is_err() {
+            error!("Error creating  group!");
             return;
         }
         return;

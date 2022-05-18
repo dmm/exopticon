@@ -20,7 +20,7 @@
 
 export class Camera {
   id: number;
-  cameraGroupId: number;
+  storageGroupId: number;
   name: string;
   ip: string;
   onvifPort: number;

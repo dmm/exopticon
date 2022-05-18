@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -38,8 +38,8 @@ use crate::app::RouteState;
 use crate::db_registry;
 use crate::errors::ServiceError;
 use crate::models::{
-    EventFile, FetchCamera, FetchCameraGroup, FetchEvent, FetchObservation,
-    FetchObservationSnapshot, FetchObservations, FetchVideoUnit, GetEventFile, QueryEvents,
+    EventFile, FetchCamera, FetchEvent, FetchObservation, FetchObservationSnapshot,
+    FetchObservations, FetchStorageGroup, FetchVideoUnit, GetEventFile, QueryEvents,
 };
 use crate::video_unit_routes::DateRange;
 
@@ -132,19 +132,19 @@ pub async fn fetch_observation_image(observation_id: i64) -> Result<Vec<u8>, ()>
             error!("FetchCamera db error!");
         })?;
 
-    let camera_group = db
-        .send(FetchCameraGroup {
-            id: camera.camera_group_id,
+    let storage_group = db
+        .send(FetchStorageGroup {
+            id: camera.storage_group_id,
         })
         .await
         .map_err(|_| {
-            error!("Failed to send FetchCameraGroup message");
+            error!("Failed to send FetchStorageGroup message");
         })?
         .map_err(|_| {
-            error!("FetchCameraGroup db error!");
+            error!("FetchStorageGroup db error!");
         })?;
 
-    let snapshot_filename = camera_group.get_snapshot_path(camera.id, observation.id);
+    let snapshot_filename = storage_group.get_snapshot_path(camera.id, observation.id);
     match File::open(&snapshot_filename).await {
         Ok(mut f) => {
             let mut buffer = Vec::new();

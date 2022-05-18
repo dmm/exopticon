@@ -67,20 +67,9 @@ table! {
 }
 
 table! {
-    camera_groups (id) {
-        id -> Int4,
-        name -> Varchar,
-        storage_path -> Varchar,
-        max_storage_size -> Int8,
-        inserted_at -> Timestamp,
-        updated_at -> Timestamp,
-    }
-}
-
-table! {
     cameras (id) {
         id -> Int4,
-        camera_group_id -> Int4,
+        storage_group_id -> Int4,
         name -> Varchar,
         ip -> Varchar,
         onvif_port -> Int4,
@@ -161,6 +150,17 @@ table! {
 }
 
 table! {
+    storage_groups (id) {
+        id -> Int4,
+        name -> Varchar,
+        storage_path -> Varchar,
+        max_storage_size -> Int8,
+        inserted_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+table! {
     subscription_masks (id) {
         id -> Int4,
         analysis_subscription_id -> Int4,
@@ -226,7 +226,7 @@ joinable!(alert_rules -> notifiers (notifier_id));
 joinable!(alerts -> alert_rules (alert_rule_id));
 joinable!(analysis_instances -> analysis_engines (analysis_engine_id));
 joinable!(analysis_subscriptions -> cameras (camera_id));
-joinable!(cameras -> camera_groups (camera_group_id));
+joinable!(cameras -> storage_groups (storage_group_id));
 joinable!(event_observations -> events (event_id));
 joinable!(event_observations -> observations (observation_id));
 joinable!(events -> cameras (camera_id));
@@ -245,7 +245,6 @@ allow_tables_to_appear_in_same_query!(
     analysis_engines,
     analysis_instances,
     analysis_subscriptions,
-    camera_groups,
     cameras,
     event_observations,
     events,
@@ -253,6 +252,7 @@ allow_tables_to_appear_in_same_query!(
     notifiers,
     observation_snapshots,
     observations,
+    storage_groups,
     subscription_masks,
     user_sessions,
     users,

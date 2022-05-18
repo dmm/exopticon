@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -234,7 +234,7 @@ impl Handler<FetchOldVideoUnitFile> for DbExecutor {
 
         cameras
             .inner_join(video_units.inner_join(video_files))
-            .filter(camera_group_id.eq(msg.camera_group_id))
+            .filter(storage_group_id.eq(msg.storage_group_id))
             .filter(size.gt(-1))
             .filter(begin_time.ne(end_time))
             .order(begin_time.asc())

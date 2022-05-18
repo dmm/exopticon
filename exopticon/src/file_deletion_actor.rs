@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -23,15 +23,15 @@ use std::time::Duration;
 use actix::fut::wrap_future;
 use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, WrapFuture};
 
-use crate::models::{DbExecutor, DeleteVideoUnits, FetchCameraGroupFiles, VideoUnit};
+use crate::models::{DbExecutor, DeleteVideoUnits, FetchStorageGroupFiles, VideoUnit};
 
 /// A video unit/video file pair with the corresponding camera
 type VideoUnitPair = (VideoUnit, i64);
 
 /// File deletion actor state
 pub struct FileDeletionActor {
-    /// id of camera group this actor will deletion excess files for
-    camera_group_id: i32,
+    /// id of storage group this actor will deletion excess files for
+    storage_group_id: i32,
     /// Address of database worker
     db_addr: Addr<DbExecutor>,
 }
@@ -41,8 +41,8 @@ impl Actor for FileDeletionActor {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!(
-            "FileDeletionActor: Starting for camera group: {}",
-            self.camera_group_id
+            "FileDeletionActor: Starting for storage group: {}",
+            self.storage_group_id
         );
         ctx.notify_later(StartWork {}, Duration::from_millis(100));
     }
@@ -50,9 +50,9 @@ impl Actor for FileDeletionActor {
 
 impl FileDeletionActor {
     /// Returns newly initialized `FileDeletionActor`
-    pub const fn new(camera_group_id: i32, db_addr: Addr<DbExecutor>) -> Self {
+    pub const fn new(storage_group_id: i32, db_addr: Addr<DbExecutor>) -> Self {
         Self {
-            camera_group_id,
+            storage_group_id,
             db_addr,
         }
     }
@@ -71,7 +71,7 @@ impl FileDeletionActor {
         debug!(
             "FileDeletionActor {}: Handling {} files, max_size: {}MiB, current_size: {}MiB, \
              delete amount: {}MiB",
-            self.camera_group_id,
+            self.storage_group_id,
             files.len(),
             max_size_bytes / 1024 / 1024,
             current_size / 1024 / 1024,
@@ -120,8 +120,8 @@ impl Handler<StartWork> for FileDeletionActor {
         debug!("FileDeletionActor: Starting work!");
         let fut = self
             .db_addr
-            .send(FetchCameraGroupFiles {
-                camera_group_id: self.camera_group_id,
+            .send(FetchStorageGroupFiles {
+                storage_group_id: self.storage_group_id,
                 count: 100,
             })
             .into_actor(self)
@@ -130,8 +130,8 @@ impl Handler<StartWork> for FileDeletionActor {
                     actor.handle_files(r, ctx);
                 } else {
                     error!(
-                        "Error fetching camera group files for id: {}.",
-                        actor.camera_group_id
+                        "Error fetching storage group files for id: {}.",
+                        actor.storage_group_id
                     );
                 }
             });

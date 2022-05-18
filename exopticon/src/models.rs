@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -52,20 +52,20 @@ pub struct RemoveFile {
 }
 
 use crate::schema::{
-    alert_rule_cameras, alert_rules, analysis_engines, analysis_instances, camera_groups, cameras,
+    alert_rule_cameras, alert_rules, analysis_engines, analysis_instances, cameras,
     event_observations, events, notification_contacts, notifiers, observation_snapshots,
-    observations, user_sessions, users, video_files, video_units,
+    observations, storage_groups, user_sessions, users, video_files, video_units,
 };
 
-/// Full camera group model. Represents a full row returned from the
+/// Full storage group model. Represents a full row returned from the
 /// database.
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
-#[table_name = "camera_groups"]
+#[table_name = "storage_groups"]
 #[serde(rename_all = "camelCase")]
-pub struct CameraGroup {
-    /// camera group id
+pub struct StorageGroup {
+    /// storage group id
     pub id: i32,
-    /// camera group name
+    /// storage group name
     pub name: String,
     /// full path to video storage path, e.g. /mnt/video/8/
     pub storage_path: String,
@@ -77,7 +77,7 @@ pub struct CameraGroup {
     pub updated_at: NaiveDateTime,
 }
 
-impl CameraGroup {
+impl StorageGroup {
     pub fn get_snapshot_path(&self, camera_id: i32, observation_id: i64) -> String {
         format!(
             "{}/{}/observations/{}.jpg",
@@ -86,56 +86,56 @@ impl CameraGroup {
     }
 }
 
-/// Represents a camera group creation request
+/// Represents a storage group creation request
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "camera_groups"]
-pub struct CreateCameraGroup {
-    /// camera group name
+#[table_name = "storage_groups"]
+pub struct CreateStorageGroup {
+    /// storage group name
     pub name: String,
-    /// full path to camera group storage, e.g. /mnt/video/8
+    /// full path to storage group storage, e.g. /mnt/video/8
     pub storage_path: String,
     /// maximum allowed storage size in bytes
     pub max_storage_size: i64,
 }
 
-/// Represents a camera group update request
+/// Represents a storage group update request
 #[derive(AsChangeset, Debug, Deserialize, Identifiable, Insertable)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "camera_groups"]
-pub struct UpdateCameraGroup {
-    /// id of camera group to update
+#[table_name = "storage_groups"]
+pub struct UpdateStorageGroup {
+    /// id of storage group to update
     pub id: i32,
-    /// if provided, updated name for camera group
+    /// if provided, updated name for storage group
     pub name: Option<String>,
-    /// if provided, updated storage path for camera group
+    /// if provided, updated storage path for storage group
     pub storage_path: Option<String>,
-    /// if provided, updated storage size for camera group
+    /// if provided, updated storage size for storage group
     pub max_storage_size: Option<i64>,
 }
 
-/// Represents a request to fetch a camera group
-pub struct FetchCameraGroup {
-    /// id of camera group to fetch
+/// Represents a request to fetch a storage group
+pub struct FetchStorageGroup {
+    /// id of storage group to fetch
     pub id: i32,
 }
 
-/// Represents a request to fetch all camera groups
-pub struct FetchAllCameraGroup {}
+/// Represents a request to fetch all storage groups
+pub struct FetchAllStorageGroup {}
 
 /// Represents a request to fetch all cameras groups and associated
 /// cameras
-pub struct FetchAllCameraGroupAndCameras {}
+pub struct FetchAllStorageGroupAndCameras {}
 
-/// Represents a camera group and its associated cameras
+/// Represents a storage group and its associated cameras
 #[derive(Serialize)]
-pub struct CameraGroupAndCameras(pub CameraGroup, pub Vec<Camera>);
+pub struct StorageGroupAndCameras(pub StorageGroup, pub Vec<Camera>);
 
 /// Represents a request to fetch up to `count` files from the
-/// specified camera group
-pub struct FetchCameraGroupFiles {
-    /// id of camera group to fetch associated files from
-    pub camera_group_id: i32,
+/// specified storage group
+pub struct FetchStorageGroupFiles {
+    /// id of storage group to fetch associated files from
+    pub storage_group_id: i32,
     /// maximum number of files to return
     pub count: i64,
 }
@@ -144,14 +144,14 @@ pub struct FetchCameraGroupFiles {
 #[derive(
     Identifiable, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
 )]
-#[belongs_to(CameraGroup)]
+#[belongs_to(StorageGroup)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "cameras"]
 pub struct Camera {
     /// id of camera
     pub id: i32,
-    /// id of associated camera group
-    pub camera_group_id: i32,
+    /// id of associated storage group
+    pub storage_group_id: i32,
     /// name of camera
     pub name: String,
     /// ip address associated with camera, e.g. 192.168.0.53
@@ -183,8 +183,8 @@ pub struct Camera {
 #[serde(rename_all = "camelCase")]
 #[table_name = "cameras"]
 pub struct CreateCamera {
-    /// id of camera group to associate with new camera
-    pub camera_group_id: i32,
+    /// id of storage group to associate with new camera
+    pub storage_group_id: i32,
     /// name of camera
     pub name: String,
     /// ip address associated with camera, e.g. 192.168.0.53
@@ -214,8 +214,8 @@ pub struct CreateCamera {
 pub struct UpdateCamera {
     /// id of camera to update
     pub id: i32,
-    /// if present, new camera group id
-    pub camera_group_id: Option<i32>,
+    /// if present, new storage group id
+    pub storage_group_id: Option<i32>,
     /// if present, new camera name
     pub name: Option<String>,
     /// if present, new ip address
@@ -416,7 +416,7 @@ pub struct UpdateVideoUnitFile {
 /// Represents request to fetch oldest video unit/video file pairs
 pub struct FetchOldVideoUnitFile {
     /// id of camera unit to fetch from
-    pub camera_group_id: i32,
+    pub storage_group_id: i32,
     /// number of video unit/video file pairs to fetch
     pub count: i64,
 }

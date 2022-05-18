@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -26,7 +26,7 @@ use crate::alert_actor::AlertActor;
 use crate::analysis_supervisor::AnalysisSupervisor;
 use crate::capture_supervisor::CaptureSupervisor;
 use crate::file_deletion_supervisor::{FileDeletionSupervisor, StartDeletionWorker};
-use crate::models::{CameraGroup, DbExecutor, FetchAllCameraGroup};
+use crate::models::{DbExecutor, FetchAllStorageGroup, StorageGroup};
 
 /// Enumeration of Exopticon run modes
 pub enum ExopticonMode {
@@ -75,7 +75,7 @@ impl RootSupervisor {
         debug!("starting workers!");
         let fut = self
             .db_worker
-            .send(FetchAllCameraGroup {})
+            .send(FetchAllStorageGroup {})
             .into_actor(self)
             .map(|res, act, _ctx| {
                 if let Ok(Ok(r)) = res {
@@ -86,12 +86,12 @@ impl RootSupervisor {
         ctx.spawn(fut);
     }
 
-    /// Starts deletion workers based on the `CameraGroup`s provided.
-    fn start_deletion_workers(&self, camera_groups: Vec<CameraGroup>) {
-        for c in camera_groups {
+    /// Starts deletion workers based on the `StorageGroup`s provided.
+    fn start_deletion_workers(&self, storage_groups: Vec<StorageGroup>) {
+        for c in storage_groups {
             self.deletion_supervisor.do_send(StartDeletionWorker {
                 db_addr: self.db_worker.clone(),
-                camera_group_id: c.id,
+                storage_group_id: c.id,
             });
         }
     }

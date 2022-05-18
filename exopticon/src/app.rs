@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -36,9 +36,6 @@ use crate::auth_routes::{
     check_login, create_personal_access_token, delete_personal_access_token,
     fetch_personal_access_tokens, login, logout, Auth, WebAuth,
 };
-use crate::camera_group_routes::{
-    create_camera_group, fetch_all_camera_groups, fetch_camera_group, update_camera_group,
-};
 use crate::camera_routes::{
     create_camera, discover, fetch_all_cameras, fetch_camera, fetch_ntp, fetch_time, ptz_direction,
     ptz_relative, set_ntp, set_time, update_camera,
@@ -50,6 +47,9 @@ use crate::observation_routes::{
 };
 use crate::static_routes;
 use crate::static_routes::index;
+use crate::storage_group_routes::{
+    create_storage_group, fetch_all_storage_groups, fetch_storage_group, update_storage_group,
+};
 use crate::user_routes::{create_user, fetch_current_user};
 use crate::video_unit_routes::{fetch_video_unit, fetch_video_units_between};
 use crate::ws_session::{WsSerialization, WsSession};
@@ -118,16 +118,16 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                     web::resource("/personal_access_tokens/{id}")
                         .route(web::delete().to(delete_personal_access_token)),
                 )
-                // routes to camera_group
+                // routes to storage_group
                 .service(
-                    web::resource("/camera_groups")
-                        .route(web::post().to(create_camera_group))
-                        .route(web::get().to(fetch_all_camera_groups)),
+                    web::resource("/storage_groups")
+                        .route(web::post().to(create_storage_group))
+                        .route(web::get().to(fetch_all_storage_groups)),
                 )
                 .service(
-                    web::resource("/camera_groups/{id}")
-                        .route(web::post().to(update_camera_group))
-                        .route(web::get().to(fetch_camera_group)),
+                    web::resource("/storage_groups/{id}")
+                        .route(web::post().to(update_storage_group))
+                        .route(web::get().to(fetch_storage_group)),
                 )
                 // routes to camera
                 .service(

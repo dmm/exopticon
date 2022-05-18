@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2020-2022 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -26,7 +26,7 @@ use prometheus::{opts, IntCounter, IntCounterVec, Registry};
 
 use crate::capture_actor::CaptureActor;
 use crate::db_registry;
-use crate::models::{Camera, FetchAllCameraGroupAndCameras};
+use crate::models::{Camera, FetchAllStorageGroupAndCameras};
 use crate::prom_registry;
 
 pub struct CaptureMetrics {
@@ -212,7 +212,7 @@ impl Handler<SyncCaptureActors> for CaptureSupervisor {
 
                 // Fetch cameras
                 let groups = match db_registry::get_db()
-                    .send(FetchAllCameraGroupAndCameras {})
+                    .send(FetchAllStorageGroupAndCameras {})
                     .await
                 {
                     Ok(Ok(c)) => c,

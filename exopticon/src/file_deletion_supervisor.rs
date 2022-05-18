@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+p * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -27,8 +27,8 @@ use crate::models::DbExecutor;
 pub struct StartDeletionWorker {
     /// address of database actor
     pub db_addr: Addr<DbExecutor>,
-    /// id of camera group actor is to work for
-    pub camera_group_id: i32,
+    /// id of storage group actor is to work for
+    pub storage_group_id: i32,
 }
 
 impl Message for StartDeletionWorker {
@@ -37,7 +37,7 @@ impl Message for StartDeletionWorker {
 
 /// File Deletion Supervisor actor state
 pub struct FileDeletionSupervisor {
-    /// tuple of camera group id and address of file deletion actor
+    /// tuple of storage group id and address of file deletion actor
     workers: Vec<(i32, Addr<FileDeletionActor>)>,
 }
 
@@ -50,11 +50,11 @@ impl Handler<StartDeletionWorker> for FileDeletionSupervisor {
 
     fn handle(&mut self, msg: StartDeletionWorker, _ctx: &mut Context<Self>) -> Self::Result {
         debug!(
-            "FileDeletionSupervisor: Starting worker for camera group id: {}",
-            msg.camera_group_id
+            "FileDeletionSupervisor: Starting worker for storage group id: {}",
+            msg.storage_group_id
         );
-        let id = msg.camera_group_id;
-        let address = FileDeletionActor::new(msg.camera_group_id, msg.db_addr).start();
+        let id = msg.storage_group_id;
+        let address = FileDeletionActor::new(msg.storage_group_id, msg.db_addr).start();
         self.workers.push((id, address));
     }
 }
