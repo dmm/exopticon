@@ -53,7 +53,7 @@ rmp = "^0.8"
 rmp-serde = "0.13"
 futures = "0.3"
 r2d2 = "0.8"
-rust-embed = { version = "5.9.0", features = ["interpolate-folder-path"] }
+rust-embed = { version = "6.3.0", features = ["interpolate-folder-path"] }
 tempfile = "3.1.0"
 time = { version = "0.2.23", default-features = false, features = ["std"] }
 tokio = { version = "^1.13.1", features = ["full"] }
