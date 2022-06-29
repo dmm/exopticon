@@ -66,6 +66,9 @@ mod alert_rule_handler;
 /// Alert rule routes
 mod alert_rule_routes;
 
+/// Api Application implementation
+mod api;
+
 /// Actix route specification
 mod app;
 
@@ -98,6 +101,9 @@ mod camera_handler;
 
 /// Implements camera api routes
 mod camera_routes;
+
+/// Implements database infrastructure
+mod db;
 
 /// Actor that captures video from a camera
 mod capture_actor;
@@ -187,7 +193,6 @@ use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
 use dialoguer::{Input, PasswordInput};
-use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use time::Duration;
 
@@ -278,10 +283,13 @@ async fn main() {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     // create db connection pool
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-    let pool = r2d2::Pool::builder()
-        .build(manager)
-        .expect("Failed to create pool.");
+    let db_service = crate::db::DbService::new(&database_url);
+    let pool = match db_service.clone().pool {
+        crate::db::DbServiceKind::Real(p) => p,
+        crate::db::DbServiceKind::Null(_) => {
+            panic!("Tried to start Exopticon with a null db pool!")
+        }
+    };
 
     // Run migrations
     info!("Running migrations...");
@@ -368,6 +376,7 @@ async fn main() {
             .app_data(Data::new(RouteState {
                 db: route_db_address.clone(),
             }))
+            .app_data(Data::new(db_service.clone()))
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&secret)
                     .name("id")

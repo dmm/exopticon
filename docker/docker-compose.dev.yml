@@ -7,6 +7,7 @@ services:
       target: development
     environment:
       - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
+      - TEST_DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@testdb
       - ROOT_URL="https://${DOMAIN}"
       - DOMAIN
       - EXOPTICON_NAME
@@ -26,6 +27,15 @@ services:
       - /dev/bus/usb:/dev/bus/usb
       - ..:/exopticon # map source directory for development
       - $EXOPTICON_VIDEO_PATH:/video
+  testdb:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}
+    volumes:
+      - test_db:/var/lib/postgresql/data
+
 volumes:
+  test_db:
   cargo_home:
   target:

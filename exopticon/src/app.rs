@@ -129,6 +129,8 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                         .route(web::post().to(update_storage_group))
                         .route(web::get().to(fetch_storage_group)),
                 )
+                // routes to camera groups
+                .configure(crate::api::camera_groups::config)
                 // routes to camera
                 .service(
                     web::resource("/cameras")
