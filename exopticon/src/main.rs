@@ -90,6 +90,9 @@ mod analysis_routes;
 /// Implements analysis supervisor
 mod analysis_supervisor;
 
+/// implements business logic
+mod business;
+
 /// implements storage group api logic
 mod storage_group_handler;
 
@@ -283,10 +286,10 @@ async fn main() {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     // create db connection pool
-    let db_service = crate::db::DbService::new(&database_url);
+    let db_service = crate::db::Service::new(&database_url);
     let pool = match db_service.clone().pool {
-        crate::db::DbServiceKind::Real(p) => p,
-        crate::db::DbServiceKind::Null(_) => {
+        crate::db::ServiceKind::Real(p) => p,
+        crate::db::ServiceKind::Null(_) => {
             panic!("Tried to start Exopticon with a null db pool!")
         }
     };

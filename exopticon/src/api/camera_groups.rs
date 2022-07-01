@@ -22,7 +22,7 @@ use actix_web::web::{self, Path};
 use actix_web::web::{block, Data};
 use actix_web::{web::Json, HttpResponse};
 
-use crate::db::DbService;
+use crate::db::Service;
 
 use super::UserError;
 
@@ -47,27 +47,28 @@ pub struct CreateCameraGroup {
 
 pub async fn create(
     camera_group_request: Json<CreateCameraGroup>,
-    data: Data<DbService>,
+    data: Data<Service>,
 ) -> Result<HttpResponse, UserError> {
     let db = data.into_inner();
     let req = camera_group_request.into_inner();
-    let camera_group = block(move || db.create_camera_group(&req.name, req.members)).await??;
+    let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
+    let camera_group = block(move || db.create_camera_group(camera_group)).await??;
     Ok(HttpResponse::Ok().json(camera_group))
 }
 
-pub async fn delete(id: Path<i32>, data: Data<DbService>) -> Result<HttpResponse, UserError> {
+pub async fn delete(id: Path<i32>, data: Data<Service>) -> Result<HttpResponse, UserError> {
     let db = data.into_inner();
-    db.delete_camera_group(id.into_inner())?;
+    block(move || db.delete_camera_group(id.into_inner())).await??;
     Ok(HttpResponse::Ok().finish())
 }
 
-pub async fn fetch(id: Path<i32>, data: Data<DbService>) -> Result<HttpResponse, UserError> {
+pub async fn fetch(id: Path<i32>, data: Data<Service>) -> Result<HttpResponse, UserError> {
     let db = data.into_inner();
     let camera_group = block(move || db.fetch_camera_group(id.into_inner())).await??;
     Ok(HttpResponse::Ok().json(camera_group))
 }
 
-pub async fn fetch_all(data: Data<DbService>) -> Result<HttpResponse, UserError> {
+pub async fn fetch_all(data: Data<Service>) -> Result<HttpResponse, UserError> {
     let db = data.into_inner();
     let camera_groups = block(move || db.fetch_all_camera_groups()).await??;
     Ok(HttpResponse::Ok().json(camera_groups))
@@ -90,14 +91,14 @@ mod tests {
     use actix_web::body::to_bytes;
     use actix_web::http::{self};
 
-    use crate::db::{DbService, NullDb};
+    use crate::db::{Null, Service};
 
     use super::*;
 
     #[actix_web::test]
     async fn test_fetch_nonexistant_camera_group() {
         // Arrange
-        let db = Data::new(DbService::new_null(None));
+        let db = Data::new(Service::new_null(None));
 
         // Act
         let resp = fetch_all(db).await.unwrap();
@@ -121,9 +122,7 @@ mod tests {
                 members: Vec::new(),
             },
         ];
-        let db = Data::new(DbService::new_null(Some(NullDb::new(
-            camera_groups.clone(),
-        ))));
+        let db = Data::new(Service::new_null(Some(Null::new(camera_groups.clone()))));
 
         // Act
         let res = fetch_all(db).await.unwrap();
@@ -150,7 +149,7 @@ mod tests {
                 members: Vec::new(),
             },
         ];
-        let db = DbService::new_null(Some(NullDb::new(camera_groups.clone())));
+        let db = Service::new_null(Some(Null::new(camera_groups.clone())));
 
         // Act
         delete(Path::from(1), Data::new(db.clone())).await.unwrap();
@@ -178,7 +177,7 @@ mod tests {
                 members: Vec::new(),
             },
         ];
-        let db = DbService::new_null(Some(NullDb::new(camera_groups.clone())));
+        let db = Service::new_null(Some(Null::new(camera_groups.clone())));
 
         // Act
         let del_res = delete(Path::from(3), Data::new(db.clone())).await;

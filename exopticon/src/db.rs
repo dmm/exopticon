@@ -26,30 +26,32 @@ use diesel::{self, PgConnection};
 
 use crate::api::camera_groups::CameraGroup;
 
-pub struct NullDb {
+pub struct Null {
     camera_groups: Vec<CameraGroup>,
 }
 
-impl NullDb {
-    pub fn new(camera_groups: Vec<CameraGroup>) -> NullDb {
-        NullDb { camera_groups }
+impl Null {
+    #[allow(dead_code)]
+    pub fn new(camera_groups: Vec<CameraGroup>) -> Self {
+        Self { camera_groups }
     }
 }
 
 #[derive(Default)]
-pub struct NullDbBuilder {
+pub struct NullBuilder {
     #[allow(dead_code)]
     camera_groups: Vec<CameraGroup>,
 }
 
 #[allow(dead_code)]
-impl NullDbBuilder {
+impl NullBuilder {
     pub fn new() -> Self {
-        NullDbBuilder::default()
+        Self::default()
     }
 
-    pub fn build(self) -> NullDb {
-        NullDb {
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn build(self) -> Null {
+        Null {
             camera_groups: self.camera_groups,
         }
     }
@@ -60,15 +62,15 @@ impl NullDbBuilder {
 }
 
 #[derive(Clone)]
-pub enum DbServiceKind {
+pub enum ServiceKind {
     Real(r2d2::Pool<ConnectionManager<diesel::PgConnection>>),
     #[allow(dead_code)]
-    Null(Arc<Mutex<NullDb>>),
+    Null(Arc<Mutex<Null>>),
 }
 
 #[derive(Clone)]
-pub struct DbService {
-    pub pool: DbServiceKind,
+pub struct Service {
+    pub pool: ServiceKind,
 }
 
 fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::PgConnection>> {
@@ -78,22 +80,18 @@ fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::PgConn
         .expect("Failed to create pool.")
 }
 
-impl DbService {
+impl Service {
     pub fn new(database_url: &str) -> Self {
-        DbService {
-            pool: DbServiceKind::Real(build_pool(database_url)),
+        Self {
+            pool: ServiceKind::Real(build_pool(database_url)),
         }
     }
 
     #[allow(dead_code)]
-    pub fn new_null(null_db: Option<NullDb>) -> Self {
-        let db = if let Some(d) = null_db {
-            d
-        } else {
-            NullDb::new(vec![])
-        };
-        DbService {
-            pool: DbServiceKind::Null(Arc::new(Mutex::new(db))),
+    pub fn new_null(null_db: Option<Null>) -> Self {
+        let db = null_db.map_or_else(|| NullBuilder::new().build(), |d| d);
+        Self {
+            pool: ServiceKind::Null(Arc::new(Mutex::new(db))),
         }
     }
 }
@@ -101,11 +99,11 @@ impl DbService {
 #[derive(Debug)]
 pub enum Error {
     NotFound,
-    Other(OtherDbError),
+    Other(OtherError),
 }
 
 #[derive(Debug)]
-pub enum OtherDbError {
+pub enum OtherError {
     DbPoolError {
         description: String,
         cause: r2d2::Error,
@@ -120,7 +118,7 @@ pub enum OtherDbError {
 impl From<r2d2::Error> for Error {
     #[must_use]
     fn from(err: r2d2::Error) -> Self {
-        Self::Other(OtherDbError::DbPoolError {
+        Self::Other(OtherError::DbPoolError {
             description: err.to_string(),
             cause: err,
         })
@@ -130,10 +128,10 @@ impl From<r2d2::Error> for Error {
 impl From<diesel::result::Error> for Error {
     #[must_use]
     fn from(err: diesel::result::Error) -> Self {
-        if let diesel::result::Error::NotFound = err {
-            Error::NotFound
+        if err == diesel::result::Error::NotFound {
+            Self::NotFound
         } else {
-            Self::Other(OtherDbError::DbError {
+            Self::Other(OtherError::DbError {
                 description: err.to_string(),
                 cause: err,
             })
@@ -156,7 +154,7 @@ mod tests {
     pub struct TestDb {
         base_url: String,
         name: String,
-        db: DbService,
+        db: Service,
     }
 
     impl TestDb {
@@ -179,7 +177,7 @@ mod tests {
 
             crate::embedded_migrations::run(&conn2).unwrap();
 
-            let db = DbService::new(&url.to_string());
+            let db = Service::new(&url.to_string());
             Self { base_url, name, db }
         }
     }
@@ -200,7 +198,7 @@ mod tests {
         }
     }
 
-    pub fn run_db_test(f: fn(&DbService)) {
+    pub fn run_db_test(f: fn(&Service)) {
         let testdb = TestDb::new();
 
         f(&testdb.db);
@@ -211,7 +209,7 @@ mod tests {
     #[test]
     pub fn nulldbbuilder_new_creates_empty() {
         // Arrange
-        let builder = NullDbBuilder::new();
+        let builder = NullBuilder::new();
 
         // Act
         let null_db = builder.build();
@@ -223,7 +221,7 @@ mod tests {
     #[test]
     pub fn nulldbbuilder_addcameragroup_adds() {
         // Arrange
-        let mut builder = NullDbBuilder::new();
+        let mut builder = NullBuilder::new();
         let camera_groups = vec![CameraGroup {
             id: 1,
             name: String::from("TestGroupA"),
