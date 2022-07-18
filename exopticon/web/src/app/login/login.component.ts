@@ -32,8 +32,8 @@ import { AuthService } from "../auth.service";
 })
 export class LoginComponent implements OnInit {
   loginForm = new FormGroup({
-    username: new FormControl(""),
-    password: new FormControl(""),
+    username: new FormControl<string>(""),
+    password: new FormControl<string>(""),
   });
 
   constructor(
