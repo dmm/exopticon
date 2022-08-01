@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.24.3
+2022-08-01
+
+### Fixes
+
+- remove cuda config from prod (888a26a8c5c507d38237a5411461df3d0580fcf7)
+
 ## 0.24.2
 2022-04-21
 
