@@ -122,7 +122,7 @@ deploy:
     - printf "COMPOSE_PROJECT_NAME=%s\\n" "$COMPOSE_PROJECT_NAME" >> .env.prod
     - printf "EXOPTICON_METRICS_ENABLED=true\\n" >> .env.prod 
     - echo version is $RELEASE_VERSION
-    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml pull
-    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml up -d --force-recreate
+    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml pull
+    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml up -d --force-recreate
   only:
   - master
