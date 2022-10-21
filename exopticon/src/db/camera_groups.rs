@@ -357,7 +357,7 @@ mod integration_tests {
             let ids = populate_db(db);
             let group_name = "new_group_1";
             let new_group =
-                crate::business::camera_groups::CameraGroup::new(group_name.clone(), Vec::new())
+                crate::business::camera_groups::CameraGroup::new(group_name.clone(), ids.1.clone())
                     .unwrap();
 
             // act
@@ -397,7 +397,9 @@ mod integration_tests {
                 crate::business::camera_groups::CameraGroup::new("new_group_1", ids.1).unwrap();
 
             // act
-            db.create_camera_group(new_group).unwrap();
+            let group = db.create_camera_group(new_group).unwrap();
+            db.delete_camera_group(group.id).unwrap();
+
             let groups = db.fetch_all_camera_groups().unwrap();
 
             // assert
@@ -412,16 +414,21 @@ mod integration_tests {
             // arrange
             let ids = populate_db(db);
             let name = "new_group_1";
-            let new_group =
-                crate::business::camera_groups::CameraGroup::new(name.clone(), ids.1).unwrap();
+            let new_group_1 =
+                crate::business::camera_groups::CameraGroup::new("new_group_1", ids.1.clone())
+                    .unwrap();
+            let new_group_2 =
+                crate::business::camera_groups::CameraGroup::new("new_group_2", ids.1).unwrap();
 
             // act
-            db.create_camera_group(new_group).unwrap();
+            db.create_camera_group(new_group_1).unwrap();
+            db.create_camera_group(new_group_2).unwrap();
             let groups = db.fetch_all_camera_groups().unwrap();
 
             // assert
-            assert_eq!(1, groups.len());
+            assert_eq!(2, groups.len());
             assert_eq!(name, groups[0].name);
+            assert_eq!("new_group_2", groups[1].name);
         })
     }
 }
