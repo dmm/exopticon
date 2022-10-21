@@ -2,6 +2,29 @@
 
 <!--- next entry here -->
 
+## 0.25.0
+2022-10-21
+
+### Breaking changes
+
+#### Rename camera groups to storage groups (e6916bc397f5bbe5fbb97fbdeaecaf5e66ca0eb9)
+
+remove camera group endpoints and replace with
+storage groups
+
+### Features
+
+- Implement CameraGroup api (cc96b98cbf41759fc1112472d597acd7ef861703)
+- Implement CameraGroup business logic (409b5777ef9d337fb3add323ffab624c280f32d6)
+
+### Fixes
+
+- Quiet analysis logs (3cd221a6c57bdc28b27684e89f17ee9750e2bd67)
+- give event clips a nicer filename (e2d00face6f5f1adc42e4e8648fe900cfb2e9292)
+- Upgrade to Angular 14 (ea76a1a41515bdd08c66a13206c66b04e2cd963f)
+- fix CameraGroup integration tests (31e9ecf06d037636df0e4cc4b9cedaf6bfb0db0d)
+- pin pathspec version to fix dvc (e2043da8f7721d8590b2a3d99606d9fba117db24)
+
 ## 0.24.3
 2022-08-01
 
