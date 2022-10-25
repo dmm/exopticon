@@ -89,6 +89,8 @@ export class CameraPanelService {
 
   private pageVisible: boolean = true;
 
+  private setCameraTimeout = null;
+
   constructor(
     private cameraService: CameraService,
     private videoService: VideoService
@@ -121,38 +123,45 @@ export class CameraPanelService {
     return arr;
   }
 
+  private registerSetCameras() {
+    if (this.setCameraTimeout == null) {
+      this.setCameraTimeout = setTimeout(() => this.setCameras(), 2000);
+    }
+  }
+
   private setCameras() {
-    this.cameraService.getCameras().subscribe(
-      (cameras) => {
+    this.setCameraTimeout = null;
+
+    this.cameraService
+      .getCameras()
+      .toPromise()
+      .then((cameras) => {
         this.unsortedCameras = cameras
           .filter((c) => c.enabled)
-          .map(
-            (c) => {
-              let camera = new PanelCamera();
-              camera.camera = c;
-              camera.inViewport = false;
-              camera.enabled = true;
-              return camera;
-            },
-            () => {
-              // error fetching cameras
-              setTimeout(() => this.setCameras(), 2000);
-            }
-          );
+          .map((c) => {
+            let camera = new PanelCamera();
+            camera.camera = c;
+            camera.inViewport = false;
+            camera.enabled = true;
+            return camera;
+          });
 
-        this.videoService.getErrorObservable().subscribe((error) => {
-          console.log("Caught error and restarting!");
-          // TODO: Should we implement exponential backoff? We probably
-          // need connection management in general.
-          setTimeout(() => this.setCameras(), 2000);
-        });
+        this.videoService
+          .getErrorObservable()
+          .toPromise()
+          .then(() => {
+            console.log("Caught error and restarting!");
+            // TODO: Should we implement exponential backoff? We probably
+            // need connection management in general.
+            this.registerSetCameras();
+          });
 
         this.projectCameras();
-      },
-      (err) => {
-        setTimeout(() => this.setCameras(), 2000);
-      }
-    );
+      })
+      .catch((err) => {
+        console.log(err);
+        this.registerSetCameras();
+      });
   }
 
   private projectCameras() {
