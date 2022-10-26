@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.25.1
+2022-10-26
+
+### Fixes
+
+- CameraPanel timeouts (af4d84ca024bc004dd12887ff59f1578d37026d9)
+
 ## 0.25.0
 2022-10-21
 
