@@ -1,4 +1,12 @@
-FROM dmattli/debian-cuda:latest-devel AS exopticon-build
+# dmattli/debian-cuda:11.5-bullseye-runtime-20221026
+ARG RUNTIMEBASE=dmattli/debian-cuda@sha256:1003ed585c75ffd965d5a3dfa2adf8403b5e6ad4c08265a49a5944ed0301e895
+# debian:bullseye-20221024-slim
+ARG SLIMRUNTIMEBASE=debian@sha256:76cdda8fe5eb597ef5e712e4c9a9f5f1fb119e69f353daaa7bd6d0f6e66e541d
+# dmattli/debian-cuda:11.5-bullseye-devel-20221026
+ARG DEVELBASE=dmattli/debian-cuda@sha256:ee60c2713725d5d78d157ea75dbe0059a737f345530a5074df231d79ef4a6802
+
+FROM $DEVELBASE AS exopticon-build
+
 WORKDIR /exopticon
 
 ENV CC=gcc-10
@@ -144,7 +152,7 @@ RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
 
 RUN cargo make --profile release ci-flow
 
-FROM debian:bullseye-slim AS exopticon-slim
+FROM $SLIMRUNTIMEBASE AS exopticon-slim
 
 WORKDIR /exopticon
 
@@ -199,7 +207,7 @@ USER exopticon:plugdev
 
 ENTRYPOINT /exopticon/exopticon
 
-FROM dmattli/debian-cuda:latest AS exopticon-runtime
+FROM $RUNTIMEBASE AS exopticon-runtime
 WORKDIR /exopticon
 
 USER root
