@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.25.2
+2022-11-01
+
+### Fixes
+
+- Dockerfile: Pin base images with SHA256 (c92f65e273a5817ea665506581f7da8ec03fd5c1)
+
 ## 0.25.1
 2022-10-26
 
