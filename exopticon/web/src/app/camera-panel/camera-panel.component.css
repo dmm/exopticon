@@ -18,6 +18,33 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+div.group-selector {
+  width: 100%;
+  height: 60px;
+  display: grid;
+  grid-template-columns: 100px 1fr 1fr 1fr 100px;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+div.group-selector > button {
+  font-size: 10pt;
+  max-height: 30px;
+}
+
+div.group-selector > button.prev {
+  grid-column: 1 / 1;
+}
+
+div.group-selector > div.group-name {
+  grid-column: 3 / 3;
+  text-align: center;
+}
+
+div.group-selector > button.next {
+  grid-column: 5 / 5;
+}
+
 div.panel {
   display: flex;
   flex-wrap: wrap;

@@ -1,0 +1,23 @@
+div.camera-groups {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 300px 1fr;
+  padding-top: 50px;
+}
+
+div.camera-groups > div {
+  grid-column: 2 / 2;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  padding-bottom: 5px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid;
+}
+
+div.camera-groups > div > span {
+  grid-column: 1 / 1;
+}
+
+div.camera-groups > div > button {
+  grid-column: 2 / 2;
+}

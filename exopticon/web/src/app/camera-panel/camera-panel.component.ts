@@ -42,6 +42,7 @@ export class CameraPanelComponent implements OnInit {
   cameras: Camera[];
   enabledCameras: Camera[];
   enabledCamerasOffset: number = 0;
+  fullscreen: boolean = false;
   error: any;
   private cameraVisibility: Map<number, boolean>;
 
@@ -76,6 +77,20 @@ export class CameraPanelComponent implements OnInit {
         if (params.get("res").toLowerCase() === "hd") {
           this.cameraPanelService.setResolution(CameraResolution.Hd);
         }
+      }
+
+      if (params.has("group")) {
+        this.cameraPanelService.setDesiredCameraGroup(
+          parseInt(params.get("group"), 10)
+        );
+      }
+    });
+
+    this.route.queryParamMap.subscribe((params) => {
+      if (params.has("fs") && params.get("fs") === "true") {
+        this.fullscreen = true;
+      } else {
+        this.fullscreen = false;
       }
     });
 
@@ -142,5 +157,14 @@ export class CameraPanelComponent implements OnInit {
 
   updateCameraViewVisibility(cameraId: number, visible: boolean) {
     this.cameraVisibility.set(cameraId, visible);
+  }
+
+  setCameraGroup(newGroupId: number) {
+    let route: ActivatedRoute;
+    const newUrl = this.router.createUrlTree(
+      [this.merge({ group: newGroupId }, this.route.snapshot.params)],
+      { relativeTo: route }
+    );
+    this.router.navigateByUrl(newUrl);
   }
 }

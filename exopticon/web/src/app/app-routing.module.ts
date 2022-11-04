@@ -23,6 +23,8 @@ import { RouterModule, Routes } from "@angular/router";
 import { AlertViewComponent } from "./alert-view/alert-view.component";
 import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.component";
 import { CameraDetailComponent } from "./camera-detail/camera-detail.component";
+import { CameraGroupDetailComponent } from "./camera-group-detail/camera-group-detail.component";
+import { CameraGroupListComponent } from "./camera-group-list/camera-group-list.component";
 import { CameraListComponent } from "./camera-list/camera-list.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { EventListComponent } from "./event-list/event-list.component";
@@ -37,6 +39,9 @@ const routes: Routes = [
   { path: "cameras", component: CameraListComponent },
   { path: "cameras/:id", component: CameraDetailComponent },
   { path: "cameras/:id/playback", component: PlaybackViewComponent },
+  { path: "camera_groups", component: CameraGroupListComponent },
+  { path: "camera_groups/new", component: CameraGroupDetailComponent },
+  { path: "camera_groups/:id", component: CameraGroupDetailComponent },
   { path: "alerts/:id", component: AlertViewComponent },
   { path: "events", component: EventListComponent },
   { path: "tokens", component: TokenListComponent },

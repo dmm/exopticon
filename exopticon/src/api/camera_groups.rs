@@ -56,6 +56,17 @@ pub async fn create(
     Ok(HttpResponse::Ok().json(camera_group))
 }
 
+pub async fn update(
+    camera_group_request: Json<CameraGroup>,
+    data: Data<Service>,
+) -> Result<HttpResponse, UserError> {
+    let db = data.into_inner();
+    let req = camera_group_request.into_inner();
+    let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
+    let camera_group = block(move || db.update_camera_group(req.id, camera_group)).await??;
+    Ok(HttpResponse::Ok().json(camera_group))
+}
+
 pub async fn delete(id: Path<i32>, data: Data<Service>) -> Result<HttpResponse, UserError> {
     let db = data.into_inner();
     block(move || db.delete_camera_group(id.into_inner())).await??;
@@ -80,10 +91,14 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/camera_groups")
             .route(web::get().to(fetch_all))
-            .route(web::post().to(create))
+            .route(web::post().to(create)),
+    );
+    cfg.service(
+        web::resource("/camera_groups/{id}")
+            .route(web::get().to(fetch))
+            .route(web::post().to(update))
             .route(web::delete().to(delete)),
     );
-    cfg.service(web::resource("/camera_groups/{id}").route(web::get().to(fetch)));
 }
 
 #[cfg(test)]

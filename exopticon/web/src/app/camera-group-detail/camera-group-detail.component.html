@@ -1,0 +1,68 @@
+<div class="top-buttons">
+  <button type="button" class="back" (click)="returnToCameraGroups()">
+    Back to Camera Groups
+  </button>
+  <button
+    *ngIf="groupForm.controls.id.value !== 0"
+    class="delete"
+    type="button"
+    (click)="deleteCameraGroup({ id: groupForm.controls.id.value })"
+  >
+    Delete
+  </button>
+</div>
+<form [formGroup]="groupForm">
+  <input type="hidden" formControlName="id" />
+  <div class="name">
+    <label for="name">Name: </label>
+    <input
+      id="name"
+      type="text"
+      size="10"
+      maxLength="15"
+      formControlName="name"
+    />
+  </div>
+  <div class="members" formArrayName="members">
+    <div
+      *ngFor="let member of members.controls; let i = index"
+      class="member-list"
+    >
+      <div [formGroupName]="i">
+        <button
+          type="button"
+          class="up-button"
+          (click)="memberUp({ index: i })"
+        >
+          UP
+        </button>
+        <input type="hidden" formControlName="id" />
+        <input formControlName="name" class="name" readonly />
+        <input type="checkbox" formControlName="include" class="include" />
+        <button
+          type="button"
+          class="down-button"
+          (click)="memberDown({ index: i })"
+        >
+          DOWN
+        </button>
+      </div>
+    </div>
+  </div>
+  <button
+    *ngIf="groupForm.controls.id.value !== 0"
+    type="button"
+    class="submit"
+    (click)="onSubmit()"
+  >
+    Update Camera Group
+  </button>
+  <button
+    *ngIf="groupForm.controls.id.value == 0"
+    type="button"
+    class="submit"
+    (click)="onSubmit()"
+  >
+    Create Camera Group
+  </button>
+</form>

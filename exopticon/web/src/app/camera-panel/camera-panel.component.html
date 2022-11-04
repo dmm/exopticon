@@ -17,6 +17,23 @@
     You should have received a copy of the GNU General Public License
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
+<div *ngIf="!fullscreen" class="group-selector">
+  <button
+    class="prev"
+    type="button"
+    (click)="setCameraGroup(this.cameraPanelService.prevCameraGroupId)"
+  >
+    PREV GROUP
+  </button>
+  <div class="group-name">{{ cameraPanelService.activeCameraGroupName }}</div>
+  <button
+    class="next"
+    type="button"
+    (click)="setCameraGroup(this.cameraPanelService.nextCameraGroupId)"
+  >
+    NEXT GROUP
+  </button>
+</div>
 <div class="panel" waIntersectionObserver waIntersectionThreshold="0.1">
   <div
     *ngFor="let camera of cameraPanelService.cameras; index as i"

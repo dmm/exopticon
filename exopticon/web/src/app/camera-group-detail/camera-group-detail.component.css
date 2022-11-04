@@ -1,0 +1,96 @@
+div.top-buttons {
+  display: grid;
+  grid-template-columns: 140px 1fr 140px;
+  border-top: 1px solid;
+  padding-top: 25px;
+  margin-top: 25px;
+}
+
+div.top-buttons button {
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+div.top-buttons button.back {
+  grid-column: 1 / 1;
+}
+
+div.top-buttons button.delete {
+  grid-column: 3 / 3;
+  color: red;
+}
+input {
+  font-size: 24px;
+}
+form {
+  font-size: 20pt;
+  display: grid;
+  grid-template-columns: 1fr 150px 150px 1fr;
+
+  /* top border styling */
+  border-top: 1px solid;
+  padding-top: 25px;
+  margin-top: 25px;
+}
+form * {
+  min-width: 0;
+}
+
+form > button.back {
+  grid-row: 1;
+  grid-column: 1 / span 2;
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+form > button.delete {
+  grid-row: 1;
+  grid-column: 3 / span 2;
+  margin-right: 10px;
+  margin-left: 10px;
+  color: red;
+}
+
+form > div.name {
+  grid-column: 2 / span 2;
+  grid-row: 2;
+  margin-bottom: 20px;
+}
+
+form > div.members {
+  grid-row: 3;
+  grid-column: 2 / span 2;
+}
+
+form > div.members > div {
+  width: 100%;
+  padding-bottom: 25px;
+}
+
+form > button.submit {
+  grid-column: 2 / span 2;
+  grid-row: 4;
+}
+
+div.member-list > div {
+  display: grid;
+  grid-columns: 25px 1fr 1fr 25px;
+}
+
+div.member-list > div > button.up-button {
+  grid-column: 1 / 1;
+  margin-right: 10px;
+}
+
+div.member-list > div > input.name {
+  grid-column: 2 / 2;
+}
+
+div.member-list > div > input.include {
+  grid-column: 3 / 3;
+}
+
+div.member-list > div > button.down-button {
+  grid-column: 4 / 4;
+  marign-left: 10px;
+}

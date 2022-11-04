@@ -88,7 +88,7 @@ impl Service {
                         Ok(crate::api::camera_groups::CameraGroup {
                             id: new_camera_group.id,
                             name: new_camera_group.name,
-                            members: vec![],
+                            members: group.members.clone(),
                         })
                     })
             }
@@ -100,6 +100,68 @@ impl Service {
                     name: group.name,
                     members: group.members,
                 })
+            }
+        }
+    }
+
+    pub fn update_camera_group(
+        &self,
+        id: i32,
+        group: crate::business::camera_groups::CameraGroup,
+    ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
+        match &self.pool {
+            ServiceKind::Real(pool) => {
+                let conn = pool.get()?;
+                conn.build_transaction()
+                    .serializable()
+                    .run::<_, super::Error, _>(|| {
+                        let new_camera_group: (i32, String) = diesel::update(
+                            camera_groups::table.filter(camera_groups::dsl::id.eq(id)),
+                        )
+                        .set(camera_groups::dsl::name.eq(group.name))
+                        .get_result(&conn)?;
+
+                        diesel::delete(camera_group_memberships::table)
+                            .filter(camera_group_memberships::dsl::camera_group_id.eq(id))
+                            .execute(&conn)?;
+
+                        for (pos, m) in group.members.iter().enumerate() {
+                            diesel::insert_into(camera_group_memberships::table)
+                                .values(
+                                    &(vec![(
+                                        camera_group_memberships::dsl::camera_group_id.eq(id),
+                                        camera_group_memberships::dsl::camera_id.eq(m),
+                                        camera_group_memberships::dsl::display_order.eq(
+                                            i32::try_from(pos).expect(
+                                                "Failed to convert the member position to i32",
+                                            ),
+                                        ),
+                                    )]),
+                                )
+                                .execute(&conn)?;
+                        }
+
+                        Ok(crate::api::camera_groups::CameraGroup {
+                            id: new_camera_group.0,
+                            name: new_camera_group.1,
+                            members: group.members.clone(),
+                        })
+                    })
+            }
+            ServiceKind::Null(db) => {
+                let mut data = db.lock().unwrap();
+                for g in &mut data.camera_groups {
+                    if id == g.id {
+                        g.name = group.name.clone();
+                        g.members = group.members.clone();
+                        return Ok(crate::api::camera_groups::CameraGroup {
+                            id,
+                            name: group.name.clone(),
+                            members: group.members,
+                        });
+                    }
+                }
+                Err(super::Error::NotFound)
             }
         }
     }
@@ -171,7 +233,15 @@ impl Service {
                         })
                     })
             }
-            ServiceKind::Null(_) => panic!("Not yet implemented..."),
+            ServiceKind::Null(pool) => {
+                let db = pool.lock().expect("unable to lock null db");
+                for group in &db.camera_groups {
+                    if group.id == id {
+                        return Ok(group.clone());
+                    }
+                }
+                Err(super::Error::NotFound)
+            }
         }
     }
 
@@ -262,6 +332,33 @@ mod tests {
         // Assert
         assert_eq!(1, all_groups.len());
         assert_eq!(2, all_groups[0].id);
+    }
+
+    #[test]
+    fn test_update_name() {
+        // Arrange
+        let id = 42;
+        let mut builder = NullBuilder::new();
+        builder.camera_groups(&vec![CameraGroup {
+            id,
+            name: String::from("Group1"),
+            members: Vec::new(),
+        }]);
+        let db = Service::new_null(Some(builder.build()));
+
+        // Act
+        db.update_camera_group(
+            id,
+            crate::business::camera_groups::CameraGroup {
+                name: String::from("Group2"),
+                members: Vec::new(),
+            },
+        )
+        .unwrap();
+        let new_group = db.fetch_camera_group(id).unwrap();
+
+        // Assert
+        assert_eq!(String::from("Group2"), new_group.name);
     }
 }
 

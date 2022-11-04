@@ -1,4 +1,6 @@
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
     alert_rule_cameras (id) {
         id -> Int4,
         alert_rule_id -> Int4,
@@ -6,7 +8,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     alert_rules (id) {
         id -> Int4,
         name -> Varchar,
@@ -23,7 +25,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     alerts (id) {
         id -> Int4,
         alert_rule_id -> Int4,
@@ -32,7 +34,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     analysis_engines (id) {
         id -> Int4,
         name -> Text,
@@ -43,7 +45,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     analysis_instances (id) {
         id -> Int4,
         analysis_engine_id -> Int4,
@@ -55,7 +57,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     analysis_subscriptions (id) {
         id -> Int4,
         analysis_instance_id -> Int4,
@@ -66,7 +68,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     camera_group_memberships (id) {
         id -> Int4,
         camera_group_id -> Int4,
@@ -75,14 +77,14 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     camera_groups (id) {
         id -> Int4,
         name -> Text,
     }
 }
 
-table! {
+diesel::table! {
     cameras (id) {
         id -> Int4,
         storage_group_id -> Int4,
@@ -101,7 +103,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     event_observations (id) {
         id -> Int8,
         event_id -> Uuid,
@@ -109,7 +111,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     events (id) {
         id -> Uuid,
         tag -> Text,
@@ -120,7 +122,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     notification_contacts (id) {
         id -> Int4,
         group_name -> Text,
@@ -128,7 +130,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     notifiers (id) {
         id -> Int4,
         name -> Varchar,
@@ -141,7 +143,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     observation_snapshots (observation_id) {
         observation_id -> Int8,
         snapshot_path -> Text,
@@ -149,7 +151,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     observations (id) {
         id -> Int8,
         frame_offset -> Int8,
@@ -165,7 +167,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     storage_groups (id) {
         id -> Int4,
         name -> Varchar,
@@ -176,7 +178,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     subscription_masks (id) {
         id -> Int4,
         analysis_subscription_id -> Int4,
@@ -189,7 +191,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     user_sessions (id) {
         id -> Int4,
         name -> Text,
@@ -201,7 +203,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     users (id) {
         id -> Int4,
         username -> Varchar,
@@ -212,7 +214,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     video_files (id) {
         id -> Int4,
         filename -> Varchar,
@@ -223,7 +225,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     video_units (id) {
         camera_id -> Int4,
         monotonic_index -> Int4,
@@ -235,28 +237,28 @@ table! {
     }
 }
 
-joinable!(alert_rule_cameras -> alert_rules (alert_rule_id));
-joinable!(alert_rule_cameras -> cameras (camera_id));
-joinable!(alert_rules -> analysis_instances (analysis_instance_id));
-joinable!(alert_rules -> notifiers (notifier_id));
-joinable!(alerts -> alert_rules (alert_rule_id));
-joinable!(analysis_instances -> analysis_engines (analysis_engine_id));
-joinable!(analysis_subscriptions -> cameras (camera_id));
-joinable!(camera_group_memberships -> camera_groups (camera_group_id));
-joinable!(camera_group_memberships -> cameras (camera_id));
-joinable!(cameras -> storage_groups (storage_group_id));
-joinable!(event_observations -> events (event_id));
-joinable!(event_observations -> observations (observation_id));
-joinable!(events -> cameras (camera_id));
-joinable!(events -> observations (display_observation_id));
-joinable!(observation_snapshots -> observations (observation_id));
-joinable!(observations -> video_units (video_unit_id));
-joinable!(subscription_masks -> analysis_subscriptions (analysis_subscription_id));
-joinable!(user_sessions -> users (user_id));
-joinable!(video_files -> video_units (video_unit_id));
-joinable!(video_units -> cameras (camera_id));
+diesel::joinable!(alert_rule_cameras -> alert_rules (alert_rule_id));
+diesel::joinable!(alert_rule_cameras -> cameras (camera_id));
+diesel::joinable!(alert_rules -> analysis_instances (analysis_instance_id));
+diesel::joinable!(alert_rules -> notifiers (notifier_id));
+diesel::joinable!(alerts -> alert_rules (alert_rule_id));
+diesel::joinable!(analysis_instances -> analysis_engines (analysis_engine_id));
+diesel::joinable!(analysis_subscriptions -> cameras (camera_id));
+diesel::joinable!(camera_group_memberships -> camera_groups (camera_group_id));
+diesel::joinable!(camera_group_memberships -> cameras (camera_id));
+diesel::joinable!(cameras -> storage_groups (storage_group_id));
+diesel::joinable!(event_observations -> events (event_id));
+diesel::joinable!(event_observations -> observations (observation_id));
+diesel::joinable!(events -> cameras (camera_id));
+diesel::joinable!(events -> observations (display_observation_id));
+diesel::joinable!(observation_snapshots -> observations (observation_id));
+diesel::joinable!(observations -> video_units (video_unit_id));
+diesel::joinable!(subscription_masks -> analysis_subscriptions (analysis_subscription_id));
+diesel::joinable!(user_sessions -> users (user_id));
+diesel::joinable!(video_files -> video_units (video_unit_id));
+diesel::joinable!(video_units -> cameras (camera_id));
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     alert_rule_cameras,
     alert_rules,
     alerts,

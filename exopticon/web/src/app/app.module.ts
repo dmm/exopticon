@@ -31,6 +31,8 @@ import { AppRoutingModule } from "./app-routing.module";
 import { AppComponent } from "./app.component";
 import { AuthInterceptor } from "./auth.interceptor";
 import { CameraDetailComponent } from "./camera-detail/camera-detail.component";
+import { CameraGroupDetailComponent } from "./camera-group-detail/camera-group-detail.component";
+import { CameraGroupListComponent } from "./camera-group-list/camera-group-list.component";
 import { CameraListComponent } from "./camera-list/camera-list.component";
 import { CameraOverlayComponent } from "./camera-overlay/camera-overlay.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
@@ -60,6 +62,8 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     CameraDetailComponent,
     EventListComponent,
     TokenListComponent,
+    CameraGroupListComponent,
+    CameraGroupDetailComponent,
   ],
   imports: [
     BrowserModule,
