@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.26.0
+2022-11-05
+
+### Features
+
+- Implement initial CameraGroup ui (9f44062683e22a8bbc4526bf33d2008c033893d7)
+
 ## 0.25.2
 2022-11-01
 
