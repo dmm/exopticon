@@ -104,8 +104,8 @@ deploy:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - printf "%s" "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-    - printf "%s" "$SSH_DEPLOYMENT_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
+    - printf "%s" "$SSH_DEPLOYMENT_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
   script:
     - . release_info
     - cd docker/
