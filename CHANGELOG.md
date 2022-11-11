@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.26.3
+2022-11-11
+
+### Fixes
+
+- Add pg password env to deployment (f2c0d5dc402603f77807fc8a5fc4af33341bac03)
+
 ## 0.26.2
 2022-11-11
 
