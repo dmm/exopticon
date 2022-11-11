@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.26.4
+2022-11-11
+
+### Fixes
+
+- Add cuda to deploy (87fc8fa1ae8d7f5c172f31b724b97d7506ef0a1d)
+
 ## 0.26.3
 2022-11-11
 
