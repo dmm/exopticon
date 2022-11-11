@@ -106,9 +106,6 @@ deploy:
     - printf "%s" "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
     - printf "%s" "$SSH_DEPLOYMENT_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
-    # Configure docker
-    - apk add docker-compose
-    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
     - . release_info
     - cd docker/
@@ -120,9 +117,10 @@ deploy:
     - printf "EXOPTICON_NAME=%s\\n" "$EXOPTICON_NAME" >> .env.prod
     - printf "EXOPTICON_SHORT_NAME=%s\\n" "$EXOPTICON_SHORT_NAME" >> .env.prod
     - printf "COMPOSE_PROJECT_NAME=%s\\n" "$COMPOSE_PROJECT_NAME" >> .env.prod
-    - printf "EXOPTICON_METRICS_ENABLED=true\\n" >> .env.prod 
+    - printf "EXOPTICON_METRICS_ENABLED=true\\n" >> .env.prod
+    - scp .env.prod "$DEPLOY_HOST:"
+    - scp docker-compose.db.yml docker-compose.yml "$DEPLOY_HOST:"
     - echo version is $RELEASE_VERSION
-    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml pull
-    - docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml up -d --force-recreate
+    - ssh "$DEPLOY_HOST" "docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY; docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml pull; docker-compose --env-file .env.prod -f docker-compose.db.yml -f docker-compose.yml up -d --force-recreate"
   only:
   - master
