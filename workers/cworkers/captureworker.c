@@ -538,6 +538,58 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
         return 0;
 }
 
+int init_jpeg_encoder(struct in_context *in,
+											int width,
+											int height,
+											const char* codec_name)
+{
+				int ret = 1;
+
+				if (!(in->encoder_codec = avcodec_find_encoder_by_name(codec_name))) {
+								fprintf(stderr, "Could not find encoder '%s'\n", codec_name);
+
+								goto error;
+				}
+
+				// Initialize the scaled jpeg context
+				if (!(in->encoder_scaled_ccx = avcodec_alloc_context3(in->encoder_codec))) {
+								goto error;
+				}
+				// we need a frame so that we can initialize the encoder's codec
+				//in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
+				in->encoder_scaled_ccx->pix_fmt = in->ccx->pix_fmt;
+				in->encoder_scaled_ccx->time_base = (AVRational){1, 25}; // unused
+				in->encoder_scaled_ccx->width = width;
+				in->encoder_scaled_ccx->height = height;
+
+				if ((ret = avcodec_open2(in->encoder_scaled_ccx, in->encoder_codec, NULL)) < 0) {
+								fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
+												av_err2str(ret));
+								goto error;
+				}
+
+				// Initialize the full jpeg context
+				if (!(in->encoder_ccx = avcodec_alloc_context3(in->encoder_codec))) {
+								goto error;
+				}
+				// we need a frame so that we can initialize the encoder's codec
+				in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
+				in->encoder_ccx->pix_fmt = in->ccx->pix_fmt;
+				in->encoder_ccx->time_base = (AVRational){1, 25}; // unused
+				in->encoder_ccx->width = in->scaled_width;
+				in->encoder_ccx->height = in->scaled_height;
+
+				if ((ret = avcodec_open2(in->encoder_ccx, in->encoder_codec, NULL)) < 0) {
+								fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
+												av_err2str(ret));
+								goto error;
+				}
+
+        ret = 0;
+				error:
+				return ret;
+
+}
 
 int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
 {
@@ -577,48 +629,12 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
         if (in->hw_accel_type == AV_HWDEVICE_TYPE_QSV) {
                 int ret = 0;
                 if (!in->encoder_initialized) {
-                        if (!(in->encoder_codec = avcodec_find_encoder_by_name("mjpeg_qsv"))) {
-                                fprintf(stderr, "Could not find encoder '%s'\n", "mjpeg_qsv");
-
-                                goto error;
-                        }
-
-                        // Initialize the scaled jpeg context
-                        if (!(in->encoder_scaled_ccx = avcodec_alloc_context3(in->encoder_codec))) {
-                                goto error;
-                        }
-                        // we need a frame so that we can initialize the encoder's codec
-                        //in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
-                        in->encoder_scaled_ccx->pix_fmt = in->ccx->pix_fmt;
-                        in->encoder_scaled_ccx->time_base = (AVRational){1, 25}; // unused
-                        in->encoder_scaled_ccx->width = frame->width;
-                        in->encoder_scaled_ccx->height = frame->height;
-
-                        if ((ret = avcodec_open2(in->encoder_scaled_ccx, in->encoder_codec, NULL)) < 0) {
-                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
-                                        av_err2str(ret));
-                                goto error;
-                        }
-
-                        // Initialize the full jpeg context
-                        if (!(in->encoder_ccx = avcodec_alloc_context3(in->encoder_codec))) {
-                                goto error;
-                        }
-                        // we need a frame so that we can initialize the encoder's codec
-                        in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
-                        in->encoder_ccx->pix_fmt = in->ccx->pix_fmt;
-                        in->encoder_ccx->time_base = (AVRational){1, 25}; // unused
-                        in->encoder_ccx->width = in->scaled_width;
-                        in->encoder_ccx->height = in->scaled_height;
-
-                        if ((ret = avcodec_open2(in->encoder_ccx, in->encoder_codec, NULL)) < 0) {
-                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
-                                        av_err2str(ret));
-                                goto error;
-                        }
-
+												if (init_jpeg_encoder(in, frame->width, frame->height, "mjpeg_qsv") != 0) {
+																goto error;
+												}
                         in->encoder_initialized = 1;
                 }
+
                 AVPacket enc_pkt;
                 av_init_packet(&enc_pkt);
                 enc_pkt.data = NULL;
@@ -654,45 +670,9 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
         } else if (in->hw_accel_type == AV_HWDEVICE_TYPE_VAAPI) {
                 int ret = 0;
                 if (!in->encoder_initialized) {
-                        if (!(in->encoder_codec = avcodec_find_encoder_by_name("mjpeg_vaapi"))) {
-                                fprintf(stderr, "Could not find encoder '%s'\n", "mjpeg_vaapi");
-
-                                goto error;
-                        }
-
-                        // Initialize the scaled jpeg context
-                        if (!(in->encoder_scaled_ccx = avcodec_alloc_context3(in->encoder_codec))) {
-                                goto error;
-                        }
-                        // we need a frame so that we can initialize the encoder's codec
-                        in->encoder_scaled_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
-                        in->encoder_scaled_ccx->pix_fmt = in->ccx->pix_fmt;
-                        in->encoder_scaled_ccx->time_base = (AVRational){1, 25}; // unused
-                        in->encoder_scaled_ccx->width = 854;
-                        in->encoder_scaled_ccx->height = 480;
-
-                        if ((ret = avcodec_open2(in->encoder_scaled_ccx, in->encoder_codec, NULL)) < 0) {
-                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
-                                        av_err2str(ret));
-                                goto error;
-                        }
-
-                        // Initialize the full jpeg context
-                        if (!(in->encoder_ccx = avcodec_alloc_context3(in->encoder_codec))) {
-                                goto error;
-                        }
-                        // we need a frame so that we can initialize the encoder's codec
-                        in->encoder_ccx->hw_frames_ctx = av_buffer_ref(in->ccx->hw_frames_ctx);
-                        in->encoder_ccx->pix_fmt = in->ccx->pix_fmt;
-                        in->encoder_ccx->time_base = (AVRational){1, 25}; // unused
-                        in->encoder_ccx->width = frame->width;
-                        in->encoder_ccx->height = frame->height;
-
-                        if ((ret = avcodec_open2(in->encoder_ccx, in->encoder_codec, NULL)) < 0) {
-                                fprintf(stderr, "Failed to open encode codec. Error code: %s\n",
-                                        av_err2str(ret));
-                                goto error;
-                        }
+												if (init_jpeg_encoder(in, frame->width, frame->height, "mjpeg_vaapi") != 0) {
+																goto error;
+												}
 
                         snprintf(filter_str, sizeof(filter_str), "format=vaapi,scale_vaapi=w=%d:h=%d",
                                  in->scaled_width, in->scaled_height);
@@ -716,25 +696,25 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                 int ret2;
                 AVFrame *fl_frame = av_frame_alloc();
                 while ((ret = av_buffersink_get_frame(in->buffersink_ctx, fl_frame)) >= 0) {
-                                if ((ret2 = avcodec_send_frame(in->encoder_scaled_ccx, fl_frame)) < 0) {
-                                        fprintf(stderr, "Error code: %s\n", av_err2str(ret));
-                                                av_frame_unref(fl_frame);
-                                        ret = ret2;
-                                        goto error;
-                                }
+												if ((ret2 = avcodec_send_frame(in->encoder_scaled_ccx, fl_frame)) < 0) {
+																fprintf(stderr, "Error code: %s\n", av_err2str(ret));
+																av_frame_unref(fl_frame);
+																ret = ret2;
+																goto error;
+												}
 
-                                while (1) {
-                                        ret2 = avcodec_receive_packet(in->encoder_scaled_ccx, &enc_pkt);
-                                        if (ret2) {
-                                                av_packet_unref(&enc_pkt);
-                                                av_frame_unref(fl_frame);
-                                                break;
-                                        }
-                                        enc_pkt.stream_index = 0;
-                                        send_scaled_jpeg(&enc_pkt, offset_microseconds, in->encoder_ccx->width, in->encoder_ccx->height, frame->width, frame->height);
-                                        av_packet_unref(&enc_pkt);
+												while (1) {
+																ret2 = avcodec_receive_packet(in->encoder_scaled_ccx, &enc_pkt);
+																if (ret2) {
+																				av_packet_unref(&enc_pkt);
+																				av_frame_unref(fl_frame);
+																				break;
+																}
+																enc_pkt.stream_index = 0;
+																send_scaled_jpeg(&enc_pkt, offset_microseconds, in->encoder_ccx->width, in->encoder_ccx->height, frame->width, frame->height);
+																av_packet_unref(&enc_pkt);
 
-                                }
+												}
                 }
                 av_frame_unref(fl_frame);
                 av_frame_free(&fl_frame);
