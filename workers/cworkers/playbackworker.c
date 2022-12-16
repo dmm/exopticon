@@ -124,13 +124,14 @@ static void bs_print(const char *fmt, ...)
 static void my_av_log_callback(void *avcl, int level, const char *fmt,
                                va_list vl)
 {
+				(void)avcl;
         char output_message[2048];
 
         return;
         if (av_log_get_level() < level) {
                 return;
         }
-        char *a = (char*)avcl;
+
         vsnprintf(output_message, sizeof(output_message), fmt, vl);
         output_message[(sizeof output_message) - 1] =
             '\0'; // I don't remember if vsnprintf always sets this...
@@ -417,8 +418,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "playback rate: %d\n", playback_rate);
         // Initialize ffmpeg
         av_log_set_level(AV_LOG_FATAL);
-        av_register_all();
-        avcodec_register_all();
+
         avformat_network_init();
         // End Initialize ffmpeg
 
