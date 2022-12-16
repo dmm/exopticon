@@ -494,12 +494,6 @@ int ex_send_packet(struct in_context *c, AVPacket *pkt)
         return return_value;
 }
 
-int ex_receive_frame(struct in_context *c, AVFrame *frame)
-{
-        const int receive_ret = avcodec_receive_frame(c->ccx, frame);
-        return receive_ret;
-}
-
 int ex_free_input(struct in_context *c)
 {
         if (c->fcx != NULL) {
