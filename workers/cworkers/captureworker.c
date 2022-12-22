@@ -743,10 +743,10 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                                 goto cleanup;
                         }
                         send_full_frame(sw_frame, offset_microseconds);
-                        send_scaled_frame(sw_frame, offset_microseconds, 848, 480);
+                        send_scaled_frame(sw_frame, offset_microseconds, in->scaled_width, in->scaled_height);
                 } else {
                         send_full_frame(frame, offset_microseconds);
-                        send_scaled_frame(frame, offset_microseconds, 848, 480);
+                        send_scaled_frame(frame, offset_microseconds, in->scaled_width, in->scaled_height);
                 }
         }
 
