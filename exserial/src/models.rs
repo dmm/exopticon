@@ -30,6 +30,7 @@ pub struct FrameMessage {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FrameResolution {
     /// Standard definition frame, 480p
     SD,
@@ -62,11 +63,20 @@ pub enum FrameSource {
     },
 }
 
+// #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+// #[serde(rename_all = "camelCase")]
+// #[serde(tag = "kind")]
+// pub enum PacketEncoding {
+//     /// H264 Video
+//     H264,
+// }
+
 #[derive(Debug, Deserialize, Serialize)]
+/// Message from captureworker
 pub enum CaptureMessage {
-    Log {
-        message: String,
-    },
+    /// Log
+    Log { message: String },
+    /// Full jpeg frame
     Frame {
         #[serde(with = "serde_bytes")]
         jpeg: Vec<u8>,
@@ -74,6 +84,7 @@ pub enum CaptureMessage {
         unscaled_width: i32,
         unscaled_height: i32,
     },
+    /// 480p jpeg frame
     ScaledFrame {
         #[serde(with = "serde_bytes")]
         jpeg: Vec<u8>,
@@ -81,14 +92,23 @@ pub enum CaptureMessage {
         unscaled_width: i32,
         unscaled_height: i32,
     },
+    /// Packet of compress audio/video
+    Packet {
+        /// compression codec used
+        //        encoding: PacketEncoding,
+        #[serde(with = "serde_bytes")]
+        /// compressed packet data
+        data: Vec<u8>,
+    },
+    /// New file indication
     NewFile {
         filename: String,
         begin_time: String,
     },
-    EndFile {
-        filename: String,
-        end_time: String,
-    },
+    /// File closed indication
+    EndFile { filename: String, end_time: String },
+    /// metric report
+    Metric { label: String, values: Vec<f64> },
 }
 
 #[derive(Serialize, Deserialize)]

@@ -31,14 +31,14 @@
 
 #include "exvid.h"
 
-static int64_t timespec_to_ms_interval(const struct timespec beg,
-                                       const struct timespec end)
+int64_t timespec_to_ms_interval(const struct timespec beg,
+                                const struct timespec end)
 {
         const int64_t billion = 1E9;
         const int64_t million = 1E6;
 
-        int64_t begin_time = (beg.tv_sec * billion) + beg.tv_nsec;
-        int64_t end_time = (end.tv_sec * billion) + end.tv_nsec;
+        int64_t begin_time = ((int64_t)beg.tv_sec * billion) + beg.tv_nsec;
+        int64_t end_time = ((int64_t)end.tv_sec * billion) + end.tv_nsec;
 
         return (end_time - begin_time) / million;
 }
@@ -315,7 +315,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
                 }
                 // initialize jpeg encoder context
                 c->encoder_codec = avcodec_find_encoder_by_name("mjpeg_qsv");
-                c->encoder_ccx = avcodec_alloc_context3(c->encoder_codec);
+//                c->encoder_ccx = avcodec_alloc_context3(c->encoder_codec);
 
         } else if (c->hw_accel_type == AV_HWDEVICE_TYPE_VAAPI) {
                 c->codec = avcodec_find_decoder(c->codecpar->codec_id);
@@ -352,7 +352,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
 
                 // initialize jpeg encoder context
                 c->encoder_codec = avcodec_find_encoder_by_name("mjpeg_vaapi");
-                c->encoder_ccx = avcodec_alloc_context3(c->encoder_codec);
+//                c->encoder_ccx = avcodec_alloc_context3(c->encoder_codec);
         }
 
         if (avcodec_open2(c->ccx, c->codec, NULL) < 0) {

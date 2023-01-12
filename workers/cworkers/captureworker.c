@@ -48,10 +48,32 @@
 #include "exvid.h"
 #include "mpack_frame.h"
 
+#define METRIC_SAMPLES 25 * 5
+
+enum metrics {
+        LOOP_TIME,
+        DECODE_TIME,
+        JPEG_SCALED,
+        JPEG_FULL,
+        SERIALIZE_SCALED,
+        SERIALIZE_FULL,
+        METRIC_COUNT
+};
+
+static char *metric_labels[METRIC_COUNT] = {
+        "loop_time",
+        "decode_time",
+        "scaled_jpeg_encode_time",
+        "jpeg_encode_time",
+        "scaled_jpeg_serialize_time",
+        "scaled_jpeg_serialize_time",
+};
+
 static const int MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 int64_t timespec_to_ms(const struct timespec time);
 char *timespec_to_8601(struct timespec *ts);
+void bs_log(const char *const fmt, ...);
 
 struct CameraState {
         time_t timenow, timestart;
@@ -60,28 +82,51 @@ struct CameraState {
         struct in_context in;
         struct out_context out;
 
-        AVFormatContext *ofcx;
-        AVOutputFormat *ofmt;
-        AVCodecContext *occx;
-        AVCodec *ocodec;
-        AVStream *ost;
-        int o_index;
         // Begin, End time for output file
-        struct timespec begin_time;
-        struct timespec end_time;
         char *output_directory_name;
 
-        // Begin, End time for frame
-        struct timespec frame_begin_time;
-        struct timespec frame_end_time;
-        int64_t first_pts, last_pts;
-
         AVPacket pkt;
-        AVFrame *frame;
 
-        int64_t file_size;
-        int switch_file;
+        // capture metrics
+        int metric_index;
+        double metrics[METRIC_COUNT][METRIC_SAMPLES];
+        struct timespec metric_start_time[METRIC_COUNT][METRIC_SAMPLES];
 };
+
+static void record_metric_start(struct CameraState *cam, enum metrics metric) {
+        assert(metric < METRIC_COUNT);
+        assert(cam->metric_index < METRIC_SAMPLES);
+
+        clock_gettime(CLOCK_MONOTONIC, &(cam->metric_start_time[metric][cam->metric_index]));
+}
+
+static void record_metric_end(struct CameraState *cam, enum metrics metric) {
+        assert(metric < METRIC_COUNT);
+        assert(cam->metric_index < METRIC_SAMPLES);
+
+        struct timespec end;
+        clock_gettime(CLOCK_MONOTONIC, &end);
+
+        int64_t interval_ms = timespec_to_ms_interval(cam->metric_start_time[metric][cam->metric_index],
+                                                      end);
+
+       cam->metrics[metric][cam->metric_index] = (double)interval_ms;
+}
+
+static void increment_metrics(struct CameraState *cam) {
+        assert(cam->metric_index < METRIC_SAMPLES);
+
+        cam->metric_index++;
+
+        if (cam->metric_index >= METRIC_SAMPLES) {
+                // report metrics
+                bs_log("LOOP TIME: %f, DECODE_TIME: %f, JPEG FULL: %f, JPEG SCALED: %f\n", cam->metrics[LOOP_TIME][0],
+                       cam->metrics[DECODE_TIME][0],
+                       cam->metrics[JPEG_FULL][0],
+                       cam->metrics[JPEG_SCALED][0]);
+                cam->metric_index = 0;
+        }
+}
 
 static int is_hwaccel_pix_fmt(enum AVPixelFormat pix_fmt)
 {
@@ -367,6 +412,7 @@ int64_t find_string_in_file(FILE *file, char *string)
         return pos;
 }
 
+
 int64_t timespec_to_ms(const struct timespec time)
 {
         const int64_t million = 1E6;
@@ -591,8 +637,11 @@ int init_jpeg_encoder(struct in_context *in,
 
 }
 
-int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
+int push_frame(struct CameraState *cam)
 {
+        struct in_context *in = &cam->in;
+        struct out_context *out = &cam->out;
+        AVPacket *pkt = &cam->pkt;
         char filter_str[500];
 
         // Make sure packet is video
@@ -602,6 +651,7 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
         AVFrame *frame = av_frame_alloc();
         AVFrame *sw_frame = NULL;
 
+        record_metric_start(cam, DECODE_TIME);
         int send_ret = avcodec_send_packet(in->ccx, pkt);
         if (send_ret != 0) {
                 char errbuf[200];
@@ -617,6 +667,7 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                 bs_log("Error receiving frame: %s", errbuf);
                 goto cleanup;
         }
+        record_metric_end(cam, DECODE_TIME);
         // Calculate microsecond offset from frame->pts
 
         const int64_t offset_microseconds = av_rescale_q(frame->pts - out->first_pts,
@@ -742,11 +793,20 @@ int push_frame(struct in_context *in, struct out_context *out, AVPacket *pkt)
                                 fprintf(stderr, "Error transferring the data to system memory\n");
                                 goto cleanup;
                         }
+                        record_metric_start(cam, JPEG_FULL);
                         send_full_frame(sw_frame, offset_microseconds);
+                        record_metric_end(cam, JPEG_FULL);
+
+                        record_metric_start(cam, JPEG_SCALED);
                         send_scaled_frame(sw_frame, offset_microseconds, in->scaled_width, in->scaled_height);
+                        record_metric_end(cam, JPEG_SCALED);
                 } else {
+                        record_metric_start(cam, JPEG_FULL);
                         send_full_frame(frame, offset_microseconds);
+                        record_metric_end(cam, JPEG_FULL);
+                        record_metric_start(cam, JPEG_SCALED);
                         send_scaled_frame(frame, offset_microseconds, in->scaled_width, in->scaled_height);
+                        record_metric_end(cam, JPEG_SCALED);
                 }
         }
 
@@ -765,8 +825,6 @@ int main(int argc, char *argv[])
 {
         int return_value = EXIT_SUCCESS;
         struct CameraState cam;
-        cam.ofcx = NULL;
-        cam.frame = NULL;
 
         const char *program_name = argv[0];
         const char *input_uri;
@@ -789,10 +847,8 @@ int main(int argc, char *argv[])
 
         cam.in.hw_accel_type = av_hwdevice_find_type_by_name(argv[3]);
 
-        cam.ofcx = NULL;
         cam.got_key_frame = 0;
-        cam.frame = av_frame_alloc();
-        cam.file_size = 0;
+
 
         int open_ret = ex_open_input_stream(input_uri, &cam.in);
         if (open_ret> 0) {
@@ -801,11 +857,11 @@ int main(int argc, char *argv[])
         }
 
         av_init_packet(&cam.pkt);
-        cam.switch_file = 1;
         int ret = 0;
         clock_gettime(CLOCK_MONOTONIC, &(cam.in.last_frame_time));
         while ((ret = ex_read_frame(&cam.in, &cam.pkt)) >= 0) {
                 if (cam.pkt.stream_index == cam.in.stream_index) {
+                        record_metric_start(&cam, LOOP_TIME);
                         int handle_ret = handle_output_file(&cam.in, &cam.out, &cam.pkt, cam.output_directory_name);
                         if (handle_ret != 0) {
                                 bs_log("Handle error!");
@@ -816,18 +872,21 @@ int main(int argc, char *argv[])
                                 continue;
                         }
 
-                        push_frame(&cam.in, &cam.out, &cam.pkt);
+                        push_frame(&cam);
+                        send_packet(((char*)cam.pkt.data), cam.pkt.size);
                         int write_ret = ex_write_output_packet(&cam.out, cam.in.st->time_base, &cam.pkt);
                         if (write_ret != 0) {
                                 bs_log("Write Error!");
                                 goto cleanup;
                         }
                         clock_gettime(CLOCK_MONOTONIC, &(cam.in.last_frame_time));
+                        record_metric_end(&cam, LOOP_TIME);
                 } else {
                         // handle non-video ?
                 }
                 av_packet_unref(&cam.pkt);
                 av_init_packet(&cam.pkt);
+                increment_metrics(&cam);
         }
 
         char buf[1024];
@@ -837,11 +896,6 @@ int main(int argc, char *argv[])
 cleanup:
         bs_log("Cleaning up!");
         ex_free_input(&cam.in);
-        if (cam.ofcx != NULL) {
-                ex_close_output_stream(&cam.out);
-        }
-
-        av_frame_free(&cam.frame);
 
         avformat_network_deinit();
 

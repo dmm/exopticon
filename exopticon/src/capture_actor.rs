@@ -297,6 +297,14 @@ impl CaptureActor {
                     error!("CaptureActor: Error handling close file message.");
                 }
             }
+            CaptureMessage::Packet {
+                //                encoding: _,
+                data: _,
+            } => (),
+            CaptureMessage::Metric {
+                label: _,
+                values: _,
+            } => todo!(),
         }
     }
 }

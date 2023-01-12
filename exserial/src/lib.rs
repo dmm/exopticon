@@ -102,6 +102,26 @@ pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _
     print_message(frame);
 }
 
+/// Send a packet of compressed video
+///
+/// # Safety
+///
+/// data pointer must be valid and point to an allocation `size` in
+/// length
+///
+#[no_mangle]
+pub unsafe extern "C" fn send_packet(data: *const u8, size: u64) {
+    assert!(!data.is_null());
+
+    let data_slice = slice::from_raw_parts(data, size as usize);
+    let message = CaptureMessage::Packet {
+        //        encoding: models::PacketEncoding::H264,
+        data: data_slice.to_vec(),
+    };
+
+    print_message(message);
+}
+
 /// Send a message signaling a new file was created.
 ///
 /// # Safety
@@ -183,6 +203,30 @@ pub unsafe extern "C" fn send_log_message(_level: i32, message: *const c_char) {
     let capture_message = CaptureMessage::Log { message };
 
     print_message(capture_message);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn send_metric_report(
+    label: *const c_char,
+    values: *const f64,
+    value_count: u64,
+) {
+    assert!(!values.is_null());
+    assert!(value_count > 0);
+
+    let label = {
+        assert!(!label.is_null());
+        CStr::from_ptr(label).to_string_lossy().into_owned()
+    };
+
+    let values_slice = slice::from_raw_parts(values, value_count as usize);
+
+    let message = CaptureMessage::Metric {
+        label,
+        values: values_slice.to_vec(),
+    };
+
+    print_message(message);
 }
 
 #[cfg(test)]

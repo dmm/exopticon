@@ -90,4 +90,6 @@ int ex_close_output_stream(struct out_context *c);
 int ex_write_output_packet(struct out_context *c,
                            AVRational time_base,
                            AVPacket *pkt);
+int64_t timespec_to_ms_interval(const struct timespec beg,
+                                const struct timespec end);
 #endif // EXVID_H
