@@ -425,7 +425,7 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
 
                 let snapshot = ObservationSnapshot {
                     observation_id: msg.observation_id,
-                    snapshot_path: "".to_string(),
+                    snapshot_path: String::new(),
                     snapshot_size: 0,
                 };
 
@@ -466,7 +466,7 @@ impl Handler<CreateObservationSnapshot> for DbExecutor {
                     .filter(crate::schema::observations::dsl::id.eq(msg.observation_id))
                     .first::<(i64, String)>(conn)?;
 
-                if fs::create_dir(format!("{}/snapshots/", camera_storage_path)).is_err() {
+                if fs::create_dir(format!("{camera_storage_path}/snapshots/")).is_err() {
                     // ignoring error
                 }
 

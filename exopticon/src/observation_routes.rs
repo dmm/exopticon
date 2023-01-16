@@ -162,11 +162,10 @@ pub async fn fetch_observation_image(observation_id: i64) -> Result<Vec<u8>, ()>
                         observation.frame_offset
                     );
                 })?;
-                let snap = match web::block(move || get_snapshot(&file.filename, "-", offset)).await
-                {
-                    Ok(jpg) => Ok(jpg),
-                    Err(_) => Err(()),
-                }?;
+                let snap = web::block(move || get_snapshot(&file.filename, "-", offset))
+                    .await
+                    .map_or(Err(()), Ok)?;
+
                 snap
             } else {
                 error!("video unit db failed");
@@ -224,10 +223,10 @@ pub async fn fetch_observation_snapshot(
     _state: Data<RouteState>,
 ) -> Result<HttpResponse, ServiceError> {
     let res = fetch_observation_image(observation_id.into_inner()).await;
-    match res {
-        Ok(snap) => Ok(HttpResponse::Ok().content_type("image/jpeg").body(snap)),
-        Err(_) => Ok(HttpResponse::InternalServerError().body("failed to fetch image")),
-    }
+    res.map_or(
+        Ok(HttpResponse::InternalServerError().body("failed to fetch image")),
+        |snap| Ok(HttpResponse::Ok().content_type("image/jpeg").body(snap)),
+    )
 }
 
 /// Implements method to fetch event snapshot
@@ -347,9 +346,8 @@ fn get_event_clip(filename: String, event_files: EventFile) -> Result<NamedFile,
     })?;
 
     if event_files.files.len() > 2 {
-        let files = event_files.files[1..event_files.files.len() - 1]
-            .iter()
-            .peekable();
+        let files = event_files.files[1..event_files.files.len() - 1].iter();
+
         // Handle non-first and non-last files
         for f in files {
             writeln!(&mut edit_list, "file {}", f.0).map_err(|e| {

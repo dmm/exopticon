@@ -48,7 +48,7 @@ impl error::ResponseError for UserError {
         let mut res = HttpResponse::build(self.status_code());
         res.insert_header(ContentType::json());
 
-        if let UserError::Validation(msg) = &*self {
+        if let Self::Validation(msg) = self {
             res.body(String::from(msg))
         } else {
             res.finish()
@@ -56,10 +56,10 @@ impl error::ResponseError for UserError {
     }
 
     fn status_code(&self) -> StatusCode {
-        match &*self {
-            UserError::NotFound => StatusCode::NOT_FOUND,
-            UserError::Validation(_msg) => StatusCode::UNPROCESSABLE_ENTITY,
-            UserError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+        match self {
+            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::Validation(_msg) => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

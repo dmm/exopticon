@@ -22,7 +22,6 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::time::Instant;
 
-use actix::fut::wrap_future;
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
 use url::Url;
@@ -78,22 +77,18 @@ impl AlertActor {
     fn rule_active(&self, rule: &AlertRuleModel, new_times: &HashMap<i32, Instant>) -> bool {
         //          !! IMPLEMENT CLUSTERING !!!
         let cluster_present = true;
-        let new_ready = match new_times.get(&rule.rule().id) {
-            Some(instant) => {
+        let new_ready = new_times.get(&rule.rule().id).map_or(true, |instant| {
+            let micros_since = Instant::now().duration_since(*instant).as_micros();
+            micros_since >= u128::try_from(rule.rule().cool_down_time).expect("i64 to u128 failed")
+        });
+        let ready = self
+            .fire_times
+            .get(&rule.rule().id)
+            .map_or(true, |instant| {
                 let micros_since = Instant::now().duration_since(*instant).as_micros();
                 micros_since
                     >= u128::try_from(rule.rule().cool_down_time).expect("i64 to u128 failed")
-            }
-            None => true,
-        };
-        let ready = match self.fire_times.get(&rule.rule().id) {
-            Some(instant) => {
-                let micros_since = Instant::now().duration_since(*instant).as_micros();
-                micros_since
-                    >= u128::try_from(rule.rule().cool_down_time).expect("i64 to u128 failed")
-            }
-            None => true,
-        };
+            });
 
         new_ready && ready && cluster_present
     }
@@ -133,16 +128,13 @@ impl AlertActor {
     }
 
     /// Send a notification
-    async fn send_notification(_rule: AlertRule, o: Observation) {
+    fn send_notification(_rule: &AlertRule, o: &Observation) {
         debug!("Sending notification for observation: {}", o.id);
-        let url = match Self::generate_observation_url(&o) {
-            Some(url) => url.to_string(),
-            None => "".to_string(),
-        };
+        let url = Self::generate_observation_url(o).map_or(String::new(), |url| url.to_string());
 
         let _message = Some(format!(
-            "Alert! Alert!\n {} detected with {}% certainty {}",
-            o.details, o.score, url
+            "Alert! Alert!\n {} detected with {}% certainty {url}",
+            o.details, o.score
         ));
     }
 }
@@ -150,7 +142,7 @@ impl AlertActor {
 impl Handler<CameraFrame> for AlertActor {
     type Result = ();
 
-    fn handle(&mut self, msg: CameraFrame, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CameraFrame, _ctx: &mut Self::Context) -> Self::Result {
         // Find alert rules for the source of this frame
         debug!("Got a frame...");
         let analysis_instance_id = match msg.source {
@@ -187,10 +179,7 @@ impl Handler<CameraFrame> for AlertActor {
                         if Self::rule_matches(r, msg.camera_id, o) {
                             new_fire_times.insert(r.rule().id, Instant::now());
                             debug!("Alert! Alert!");
-                            ctx.spawn(wrap_future(Self::send_notification(
-                                r.rule().clone(),
-                                o.clone(),
-                            )));
+                            Self::send_notification(r.rule(), o);
                         }
                     }
                 }

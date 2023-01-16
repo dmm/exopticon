@@ -27,7 +27,7 @@ static MAX_MEMBER_COUNT: usize = 1024;
 /// Error message when ``CameraGroup`` members exceed ``MAX_MEMBER_COUNT``
 static MAX_MEMBERS_ERROR_MESSAGE: &str = "Maximum number of CameraGroup members exceeded";
 
-#[derive(PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug)]
 #[non_exhaustive]
 pub struct CameraGroup {
     pub name: String,

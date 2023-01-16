@@ -89,10 +89,7 @@ impl Handler<FetchStorageGroup> for DbExecutor {
             .map_err(|_error| ServiceError::InternalServerError)?
             .pop();
 
-        match group {
-            None => Err(ServiceError::NotFound),
-            Some(g) => Ok(g),
-        }
+        group.ok_or(ServiceError::NotFound)
     }
 }
 
@@ -139,7 +136,7 @@ impl Handler<FetchAllStorageGroupAndCameras> for DbExecutor {
                 .load::<Camera>(conn)
                 .map_err(|_error| ServiceError::InternalServerError)?;
 
-            groups_and_cameras.push(StorageGroupAndCameras { 0: g, 1: c });
+            groups_and_cameras.push(StorageGroupAndCameras(g, c));
         }
 
         Ok(groups_and_cameras)
@@ -243,7 +240,7 @@ impl Handler<FetchStorageGroupFiles> for DbExecutor {
                 })?
                 .unwrap_or(0i64);
 
-            let video_unit_size: i64 = snap_size + file_size as i64;
+            let video_unit_size: i64 = snap_size + file_size;
 
             unitgroups.push((unitpair.1.clone(), video_unit_size));
         }

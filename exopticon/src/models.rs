@@ -79,10 +79,7 @@ pub struct StorageGroup {
 
 impl StorageGroup {
     pub fn get_snapshot_path(&self, camera_id: i32, observation_id: i64) -> String {
-        format!(
-            "{}/{}/observations/{}.jpg",
-            self.id, camera_id, observation_id
-        )
+        format!("{}/{camera_id}/observations/{observation_id}.jpg", self.id)
     }
 }
 
@@ -142,7 +139,7 @@ pub struct FetchStorageGroupFiles {
 
 /// Full camera model, represents database row
 #[derive(
-    Identifiable, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
+    Identifiable, Eq, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
 )]
 #[belongs_to(StorageGroup)]
 #[serde(rename_all = "camelCase")]
@@ -432,7 +429,7 @@ pub struct DeleteVideoUnits {
 pub struct FetchEmptyVideoFile;
 
 /// Represents an observation derived from a frame of video
-#[derive(Clone, Queryable, Associations, Identifiable, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Queryable, Associations, Identifiable, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[table_name = "observations"]
 #[belongs_to(VideoUnit)]

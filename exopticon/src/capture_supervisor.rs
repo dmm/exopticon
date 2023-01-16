@@ -117,12 +117,12 @@ impl Actor for CaptureSupervisor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
-        match self
+        if self
             .metrics
             .register(&prom_registry::get_metrics().registry)
+            .is_err()
         {
-            Ok(()) => (),
-            Err(()) => error!("Failed to register capture metrics!"),
+            error!("Failed to register capture metrics!");
         }
 
         ctx.notify(SyncCaptureActors {});

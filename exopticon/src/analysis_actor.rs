@@ -247,7 +247,7 @@ impl AnalysisActor {
                             analysis_offset,
                         } => analysis_offset,
                         FrameSource::Playback { id } => {
-                            panic!("Playback is not a valid analysis source {}", id);
+                            panic!("Playback is not a valid analysis source {id}");
                         }
                     };
                     frame.source = FrameSource::AnalysisEngine {
@@ -309,8 +309,7 @@ impl AnalysisActor {
             AnalysisWorkerMessage::TimingReport { tag, times } => {
                 let (avg, min, max) = calculate_statistics(&times);
                 debug!(
-                    "Analysis Actor got {} time report! {:.2} avg, {:.2} min, {:.2} max",
-                    tag,
+                    "Analysis Actor got {tag} time report! {:.2} avg, {:.2} min, {:.2} max",
                     avg / 1000,
                     min / 1000,
                     max / 1000
@@ -386,10 +385,10 @@ impl AnalysisActor {
             // we know there is a frame to send because of the initial
             // check. Is there a better way?
             if let Some(frame) = self.frame_queue.pop_front() {
-                let masks = match self.subscriptions.get(&SubscriptionSubject::from(&frame)) {
-                    None => Vec::new(),
-                    Some(source) => source.masks.clone(),
-                };
+                let masks = self
+                    .subscriptions
+                    .get(&SubscriptionSubject::from(&frame))
+                    .map_or(Vec::new(), |source| source.masks.clone());
                 let worker_message = AnalysisWorkerCommand::Frame {
                     frame: frame.clone(),
                     masks,

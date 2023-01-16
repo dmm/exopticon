@@ -109,8 +109,8 @@ ENV CARGO_HOME=/cargo
 ENV RUST_HOME=/rust
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-  && /cargo/bin/rustup toolchain install 1.58.0 \
-  && /cargo/bin/rustup default 1.58.0 \
+  && /cargo/bin/rustup toolchain install 1.66.1 \
+  && /cargo/bin/rustup default 1.66.1 \
   && /cargo/bin/rustup component add clippy
 #RUN /cargo/bin/cargo uninstall --force cargo-make
 

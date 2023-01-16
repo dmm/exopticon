@@ -73,7 +73,7 @@ pub async fn login(
             let _session = state
                 .db
                 .send(CreateUserSession {
-                    name: "".to_string(),
+                    name: String::new(),
                     user_id: slim_user.id,
                     session_key: session_key.clone(),
                     is_token: false,
@@ -202,25 +202,18 @@ impl FromRequest for SlimUser {
         let state: &Data<RouteState> = req.app_data().unwrap();
         let db = state.db.clone();
 
-        let header_key = match req.headers().get("PRIVATE-KEY") {
-            Some(header) => match header.to_str() {
-                Ok(val) => {
-                    info!("Matched private-key header!");
-                    Some(val.to_string())
-                }
-                Err(_) => None,
-            },
-            None => None,
-        };
+        let header_key = req.headers().get("PRIVATE-KEY").and_then(|header| {
+            header.to_str().map_or(None, |val| {
+                info!("Matched private-key header!");
+                Some(val.to_string())
+            })
+        });
 
         Box::pin(async move {
             let cookie_key = fut.await?.identity();
 
             // if PRIVATE-KEY header exists, use it, otherwise try a cookie
-            let session_key = match header_key {
-                Some(key) => Some(key),
-                None => cookie_key,
-            };
+            let session_key = header_key.map_or(cookie_key, Some);
 
             let user_id = if let Some(session_key) = session_key {
                 let session = db.send(FetchUserSession { session_key }).await;
@@ -314,7 +307,7 @@ where
                 None
             };
 
-            if None == user_id && req.path() != "/login" {
+            if user_id.is_none() && req.path() != "/login" {
                 let (request, _pl) = req.into_parts();
                 let rpath = request.path().to_string();
                 let qs = QString::from(request.query_string());
@@ -322,7 +315,7 @@ where
                 let response: HttpResponse<EitherBody<B>> = HttpResponse::Found()
                     .append_header((
                         http::header::LOCATION,
-                        format!("/login?redirect_path={}", path),
+                        format!("/login?redirect_path={path}"),
                     ))
                     .finish()
                     .map_into_right_body();
@@ -389,16 +382,16 @@ where
         let identity = req.get_identity();
 
         // if PRIVATE-KEY header exists, use it, otherwise try a cookie
-        let identity2 = match req.headers().get("PRIVATE-KEY") {
-            Some(header) => match header.to_str() {
-                Ok(val) => {
+        let identity2 = req
+            .headers()
+            .get("PRIVATE-KEY")
+            .map_or(identity.clone(), |header| {
+                header.to_str().map_or(identity, |val| {
                     info!("Matched private-key header!");
                     Some(val.to_string())
-                }
-                Err(_) => identity,
-            },
-            None => identity,
-        };
+                })
+            });
+
         Box::pin(async move {
             // Determine if user is logged in
             let user_id = if let Some(session_key) = identity2 {
@@ -416,7 +409,7 @@ where
                 None
             };
 
-            if None == user_id {
+            if user_id.is_none() {
                 let (request, _pl) = req.into_parts();
                 let response: HttpResponse<EitherBody<B>> =
                     HttpResponse::Unauthorized().finish().map_into_right_body();

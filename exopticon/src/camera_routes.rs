@@ -216,10 +216,12 @@ pub async fn fetch_ntp(
         },
         Err(_err) => return Ok(HttpResponse::NotFound().finish()),
     };
-    match camera.get_ntp().await {
-        Ok(datetime) => Ok(HttpResponse::Ok().json(datetime)),
-        Err(_) => Ok(HttpResponse::BadRequest().finish()),
-    }
+    camera
+        .get_ntp()
+        .await
+        .map_or(Ok(HttpResponse::BadRequest().finish()), |datetime| {
+            Ok(HttpResponse::Ok().json(datetime))
+        })
 }
 
 /// Returns current ntp settings of camera

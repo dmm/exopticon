@@ -308,10 +308,10 @@ fn fetch_subscriptions(
             })
             .collect();
 
-        let source = match s.2 {
-            Some(cid) => SubscriptionSubject::Camera(cid, FrameResolution::SD),
-            None => SubscriptionSubject::AnalysisEngine(s.3.expect("Referential integrity!")),
-        };
+        let source = s.2.map_or(
+            SubscriptionSubject::AnalysisEngine(s.3.expect("Referential integrity!")),
+            |cid| SubscriptionSubject::Camera(cid, FrameResolution::SD),
+        );
 
         subscriptions.push(AnalysisSubscriptionModel { source, masks: m });
     }

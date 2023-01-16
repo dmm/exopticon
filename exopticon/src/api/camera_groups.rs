@@ -29,7 +29,7 @@ use super::UserError;
 // Route Models
 
 /// `CameraGroup` api resource
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct CameraGroup {
     pub id: i32,
     pub name: String,

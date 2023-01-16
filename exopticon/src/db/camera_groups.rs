@@ -33,7 +33,7 @@ use super::{Service, ServiceKind};
 // Models
 
 #[derive(
-    Identifiable, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
+    Identifiable, Eq, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
 )]
 #[table_name = "camera_groups"]
 pub struct CameraGroup {
@@ -42,7 +42,7 @@ pub struct CameraGroup {
 }
 
 #[derive(
-    Identifiable, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
+    Identifiable, Eq, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
 )]
 #[belongs_to(CameraGroup)]
 #[table_name = "camera_group_memberships"]

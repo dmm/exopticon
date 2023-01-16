@@ -202,13 +202,10 @@ impl Actor for AnalysisSupervisor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
-        match self
-            .metrics
+        self.metrics
             .register(&prom_registry::get_metrics().registry)
-        {
-            Ok(()) => (),
-            Err(()) => error!("Failed to register analysis metrics!"),
-        }
+            .map_or_else(|_| error!("Failed to register analysis metrics!"), |_| ());
+
         ctx.notify(SyncAnalysisActors {});
         ctx.notify(RestartAnalysisActor {});
     }

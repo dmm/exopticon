@@ -35,12 +35,11 @@ use rust_embed::RustEmbed;
 /// Fetches static index file, returns `HttpResponse`
 #[allow(clippy::unused_async)]
 pub async fn index(_req: HttpRequest) -> HttpResponse {
-    match Asset::get("index.html") {
-        Some(content) => HttpResponse::Ok()
+    Asset::get("index.html").map_or(HttpResponse::NotFound().body("404 Not Found"), |content| {
+        HttpResponse::Ok()
             .content_type("text/html")
-            .body(content.into_owned()),
-        None => HttpResponse::NotFound().body("404 Not Found"),
-    }
+            .body(content.into_owned())
+    })
 }
 
 #[derive(RustEmbed)]
@@ -58,12 +57,11 @@ pub async fn fetch_static_file(tail: Path<String>) -> HttpResponse {
 
     let path = tail.into_inner();
 
-    match Asset::get(&path) {
-        Some(content) => HttpResponse::Ok()
+    Asset::get(&path).map_or(HttpResponse::NotFound().body("404 Not Found"), |content| {
+        HttpResponse::Ok()
             .content_type(mime_guess::from_path(path).first_or_octet_stream().as_ref())
-            .body(content.into_owned()),
-        None => HttpResponse::NotFound().body("404 Not Found"),
-    }
+            .body(content.into_owned())
+    })
 }
 
 /// Returns `HttpResponse` with templated webmanifest

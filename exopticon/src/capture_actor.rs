@@ -186,8 +186,8 @@ impl CaptureActor {
             ctx.spawn(
                 wrap_future::<_, Self>(fut).map(|result, _actor, _ctx| match result {
                     Ok(Ok((_video_unit, _video_file))) => {}
-                    Ok(Err(e)) => panic!("CaptureWorker: Error updating video unit: {}", e),
-                    Err(e) => panic!("CaptureWorker: Error updating video unit: {}", e),
+                    Ok(Err(e)) => panic!("CaptureWorker: Error updating video unit: {e}"),
+                    Err(e) => panic!("CaptureWorker: Error updating video unit: {e}"),
                 }),
             );
         } else {
@@ -198,6 +198,7 @@ impl CaptureActor {
     /// Processes a `CaptureMessage` from the capture worker,
     /// performing the appropriate action.
     #[allow(clippy::panic)]
+    #[allow(clippy::too_many_lines)]
     fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<Self>) {
         // Check if log
         match msg {
@@ -277,9 +278,9 @@ impl CaptureActor {
                                 actor.filename = Some(filename);
                             }
                             Ok(Err(e)) => {
-                                panic!("Error inserting video unit: db handler error {}", e);
+                                panic!("Error inserting video unit: db handler error {e}");
                             }
-                            Err(e) => panic!("Error inserting video unit: message error {}", e),
+                            Err(e) => panic!("Error inserting video unit: message error {e}"),
                         },
                     ));
                 } else {
@@ -297,14 +298,11 @@ impl CaptureActor {
                     error!("CaptureActor: Error handling close file message.");
                 }
             }
-            CaptureMessage::Packet {
-                //                encoding: _,
-                data: _,
-            } => (),
-            CaptureMessage::Metric {
+            CaptureMessage::Packet { data: _ }
+            | CaptureMessage::Metric {
                 label: _,
                 values: _,
-            } => todo!(),
+            } => (),
         }
     }
 }

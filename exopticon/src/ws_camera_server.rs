@@ -70,7 +70,7 @@ type Client = Recipient<CameraFrame>;
 
 // MESSAGES
 /// Represents a frame of video
-#[derive(Clone, Message, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Message, Serialize, Deserialize, Eq, PartialEq)]
 #[rtype(result = "()")]
 pub struct CameraFrame {
     /// id of camera that produced frame

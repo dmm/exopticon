@@ -30,7 +30,7 @@ use crate::models::{
     UpdateAnalysisEngine, UpdateAnalysisInstanceModel,
 };
 
-#[derive(PartialEq, Copy, Clone, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Copy, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AnalysisType {
     None = 0,

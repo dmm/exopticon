@@ -205,6 +205,13 @@ pub unsafe extern "C" fn send_log_message(_level: i32, message: *const c_char) {
     print_message(capture_message);
 }
 
+/// Send a metrics report
+///
+/// # Safety
+///
+/// label must be null-terminated
+///
+
 #[no_mangle]
 pub unsafe extern "C" fn send_metric_report(
     label: *const c_char,

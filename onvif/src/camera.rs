@@ -174,7 +174,7 @@ fn generate_pan_tilt_vectors(x: f32, y: f32, zoom: f32) -> String {
         x, y
     );
     let zoom_element = if zoom == 0.0 {
-        String::from("")
+        String::new()
     } else {
         format!(
             r#"<Zoom x="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
@@ -182,7 +182,7 @@ fn generate_pan_tilt_vectors(x: f32, y: f32, zoom: f32) -> String {
         )
     };
 
-    format!("{} {}", xy_element, zoom_element)
+    format!("{xy_element} {zoom_element}")
 }
 
 impl Camera {
@@ -301,9 +301,8 @@ impl Camera {
         &self,
         datetime: &DeviceDateAndTime,
     ) -> Result<Vec<u8>, Error> {
-        let utc_body = match datetime.utc_datetime {
-            None => String::new(),
-            Some(utc) => format!(
+        let utc_body = datetime.utc_datetime.map_or_else(String::new, |utc| {
+            format!(
                 r#"
             <UTCDateTime>
               <Time xmlns="http://www.onvif.org/ver10/schema">
@@ -324,8 +323,8 @@ impl Camera {
                 utc.year(),
                 utc.month(),
                 utc.day()
-            ),
-        };
+            )
+        });
         let body = format!(
             r#"
           <SetSystemDateAndTime
@@ -335,16 +334,16 @@ impl Camera {
             <Timezone>
               <TZ xmlns="http://www.onvif.org/ver10/schema">{}</TZ>
             </Timezone>
-            {}
+            {utc_body}
           </SetSystemDateAndTime>
            "#,
-            datetime.time_type, datetime.daylight_savings, datetime.timezone, utc_body,
+            datetime.time_type, datetime.daylight_savings, datetime.timezone,
         );
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
             Err(err) => return Err(err),
         };
-        let body = format!("{}{}{}", header, body, envelope_footer());
+        let body = format!("{header}{body}{}", envelope_footer());
 
         soap_request(&self.url(), body).await
     }
@@ -416,7 +415,7 @@ impl Camera {
                 Ok(h) => h,
                 Err(err) => return Err(err),
             };
-            let body = format!("{}{}{}", header, body, envelope_footer());
+            let body = format!("{header}{body}{}", envelope_footer());
 
             soap_request(&self.url(), body).await
         }
@@ -503,18 +502,18 @@ impl Camera {
             r#"
           <SetNTP xmlns="http://www.onvif.org/ver10/device/wsdl">
             <FromDHCP>{}</FromDHCP>
-            {}
+            {manual_body}
           </SetNTP>
            "#,
-            ntp_settings.from_dhcp, manual_body,
+            ntp_settings.from_dhcp,
         );
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
             Err(err) => return Err(err),
         };
-        let body = format!("{}{}{}", header, body, envelope_footer());
-        debug!("SetNTP: {}", body);
+        let body = format!("{header}{body}{}", envelope_footer());
+        debug!("SetNTP: {body}");
         soap_request(&self.url(), body).await
     }
 
@@ -528,7 +527,7 @@ impl Camera {
         let string_body = String::from_utf8(body)?;
         let doc = parser::parse(&string_body)?;
         let doc = doc.as_document();
-        debug!("SetNtp Response: {}", string_body);
+        debug!("SetNtp Response: {string_body}");
         evaluate_xpath(&doc, "//*[local-name()='SetNTPResponse'][1]")?.string();
         // If the SetNTPResponse node is present the command was a success
         Ok(())
@@ -557,18 +556,17 @@ impl Camera {
         let body = format!(
             r#"
           <RelativeMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
-            <ProfileToken>{}</ProfileToken>
-            <Translation>{}</Translation>
+            <ProfileToken>{profile_token}</ProfileToken>
+            <Translation>{ptz_vectors}</Translation>
           </RelativeMove>
            "#,
-            profile_token, ptz_vectors
         );
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
             Err(err) => return Err(err),
         };
-        let body = format!("{}{}{}", header, body, envelope_footer());
+        let body = format!("{header}{body}{}", envelope_footer());
         debug!("Relative Move: {} {}", &self.url(), body);
         soap_request(&self.url(), body).await
     }
@@ -576,7 +574,7 @@ impl Camera {
     /// parse result of relative ptz move request
     pub fn parse_relative_move(body: Vec<u8>) -> Result<(), Error> {
         let string_body = String::from_utf8(body)?;
-        debug!("RelativeMove Response: {}", string_body);
+        debug!("RelativeMove Response: {string_body}");
         let _doc = parser::parse(&string_body)?.as_document();
 
         Ok(())
@@ -615,27 +613,26 @@ impl Camera {
     ) -> Result<Vec<u8>, Error> {
         let ptz_vectors = generate_pan_tilt_vectors(x, y, zoom);
         let timeout_body = if timeout == 0.0 {
-            String::from("")
+            String::new()
         } else {
             format!(r#"<Timeout>PT{}S</Timeout>"#, timeout / 1000.0)
         };
         let body = format!(
             r#"
           <ContinuousMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
-            <ProfileToken>{}</ProfileToken>
-            <Velocity>{}</Velocity>
-            {}
+            <ProfileToken>{profile_token}</ProfileToken>
+            <Velocity>{ptz_vectors}</Velocity>
+            {timeout_body}
           </ContinuousMove>
-           "#,
-            profile_token, ptz_vectors, timeout_body
+           "#
         );
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
             Err(err) => return Err(err),
         };
-        let body = format!("{}{}{}", header, body, envelope_footer());
-        debug!("Relative Move: {} {}", &self.url(), body);
+        let body = format!("{header}{body}{}", envelope_footer());
+        debug!("Relative Move: {} {body}", &self.url());
         soap_request(&self.url(), body).await
     }
 
@@ -695,19 +692,18 @@ impl Camera {
         let body = format!(
             r#"
           <AbsoluteMove xmlns="http://www.onvif.org/ver20/ptz/wsdl">
-            <ProfileToken>{}</ProfileToken>
-            <Position>{}</Position>
+            <ProfileToken>{profile_token}</ProfileToken>
+            <Position>{ptz_vectors}</Position>
           </AbsoluteMove>
            "#,
-            profile_token, ptz_vectors,
         );
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
             Err(err) => return Err(err),
         };
-        let body = format!("{}{}{}", header, body, envelope_footer());
-        debug!("Absolute Move: {} {}", &self.url(), body);
+        let body = format!("{header}{body}{}", envelope_footer());
+        debug!("Absolute Move: {} {body}", &self.url());
         soap_request(&self.url(), body).await
     }
 
@@ -738,17 +734,16 @@ impl Camera {
         let body = format!(
             r#"
           <Stop xmlns="http://www.onvif.org/ver20/ptz/wsdl">
-            <ProfileToken>{}</ProfileToken>
+            <ProfileToken>{profile_token}</ProfileToken>
           </Stop>
            "#,
-            profile_token,
         );
 
         let header = match envelope_header(&self.username, &self.password) {
             Ok(h) => h,
             Err(err) => return Err(err),
         };
-        let body = format!("{}{}{}", header, body, envelope_footer());
+        let body = format!("{header}{body}{}", envelope_footer());
         debug!("Stop: {} {}", &self.url(), body);
         soap_request(&self.url(), body).await
     }

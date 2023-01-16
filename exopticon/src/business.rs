@@ -20,7 +20,7 @@
 
 pub mod camera_groups;
 
-#[derive(PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug)]
 pub enum Error {
     Validation(String),
 }
