@@ -23,8 +23,9 @@ use std::time::{Duration, Instant};
 use actix::prelude::*;
 use actix_interop::{critical_section, with_ctx, FutureInterop};
 use prometheus::{opts, IntCounter, IntCounterVec, Registry};
+use tokio::sync::broadcast::Sender;
 
-use crate::capture_actor::CaptureActor;
+use crate::capture_actor::{CaptureActor, VideoPacket};
 use crate::db_registry;
 use crate::models::{Camera, FetchAllStorageGroupAndCameras};
 use crate::prom_registry;
@@ -111,6 +112,7 @@ pub struct CaptureSupervisor {
     workers: Vec<(String, Camera, Option<Addr<CaptureActor>>)>,
     metrics: CaptureMetrics,
     capture_start: Instant,
+    packet_sender: Sender<VideoPacket>,
 }
 
 impl Actor for CaptureSupervisor {
@@ -130,19 +132,18 @@ impl Actor for CaptureSupervisor {
     }
 }
 
-impl Default for CaptureSupervisor {
-    fn default() -> Self {
+impl CaptureSupervisor {
+    pub fn new(packet_sender: Sender<VideoPacket>) -> Self {
         Self {
             workers: Vec::new(),
             metrics: CaptureMetrics::new(),
             capture_start: Instant::now(),
+            packet_sender,
         }
     }
 }
 
 impl Supervised for CaptureSupervisor {}
-
-impl SystemService for CaptureSupervisor {}
 
 impl Handler<RestartCaptureActors> for CaptureSupervisor {
     type Result = ();
@@ -162,6 +163,7 @@ impl Handler<RestartCaptureActors> for CaptureSupervisor {
                                 (*storage_path).to_string(),
                                 actor.capture_start,
                                 actor_metrics,
+                                actor.packet_sender.clone(),
                             )
                             .start();
                             *addr = Some(new_addr);
@@ -174,6 +176,7 @@ impl Handler<RestartCaptureActors> for CaptureSupervisor {
                                     (*storage_path).to_string(),
                                     actor.capture_start,
                                     actor_metrics,
+                                    actor.packet_sender.clone(),
                                 )
                                 .start();
                                 *addr = Some(new_addr);

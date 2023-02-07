@@ -21,7 +21,6 @@
 // We have to pass by value to satisfy the actix route interface.
 #![allow(clippy::needless_pass_by_value)]
 
-use actix::SystemService;
 use actix_http::body::BoxBody;
 use actix_web::{http::StatusCode, web::Data, web::Json, web::Path, HttpResponse};
 use std::time::Duration;
@@ -30,7 +29,7 @@ use tokio::time::sleep;
 use onvif::camera::{DeviceDateAndTime, NtpSettings};
 
 use crate::app::RouteState;
-use crate::capture_supervisor::{CaptureSupervisor, SyncCaptureActors};
+use crate::capture_supervisor::SyncCaptureActors;
 use crate::errors::ServiceError;
 use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
 
@@ -84,7 +83,7 @@ pub async fn create_camera(
 ) -> Result<HttpResponse, ServiceError> {
     let camera = state.db.send(camera_request.into_inner()).await??;
 
-    CaptureSupervisor::from_registry().do_send(SyncCaptureActors {});
+    state.capture_supervisor.do_send(SyncCaptureActors {});
 
     Ok(HttpResponse::Ok().json(camera))
 }
@@ -102,7 +101,7 @@ pub async fn update_camera(
 
     let new_camera = state.db.send(camera_update).await??;
 
-    CaptureSupervisor::from_registry().do_send(SyncCaptureActors {});
+    state.capture_supervisor.do_send(SyncCaptureActors {});
 
     Ok(HttpResponse::Ok().json(new_camera))
 }

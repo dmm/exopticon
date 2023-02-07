@@ -31,6 +31,7 @@ import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
 import { CameraResolution } from "../frame-message";
 import { VideoService } from "../video.service";
+import { WebrtcService } from "../webrtc.service";
 
 @Component({
   selector: "app-camera-panel",
@@ -50,6 +51,7 @@ export class CameraPanelComponent implements OnInit {
     public cameraPanelService: CameraPanelService,
     private cameraService: CameraService,
     public videoService: VideoService,
+    public webrtcService: WebrtcService,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
     private router: Router,
@@ -94,7 +96,8 @@ export class CameraPanelComponent implements OnInit {
       }
     });
 
-    this.videoService.connect();
+    //    this.videoService.connect();
+    this.webrtcService.connect();
   }
 
   @HostListener("window:keyup", ["$event"])
@@ -156,6 +159,7 @@ export class CameraPanelComponent implements OnInit {
   }
 
   updateCameraViewVisibility(cameraId: number, visible: boolean) {
+    console.log(`Visibility change: ${cameraId} ${visible}`);
     this.cameraVisibility.set(cameraId, visible);
   }
 

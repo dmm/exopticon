@@ -21,9 +21,12 @@
 // app.rs
 
 use actix::Addr;
+use actix_web::web::Data;
 //use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
+use tokio::sync::broadcast::Sender;
+use webrtc::ice::udp_network::UDPNetwork;
 
 use crate::alert_rule_routes::{create_alert_rule, fetch_all_alert_rules};
 use crate::analysis_routes::{
@@ -40,6 +43,8 @@ use crate::camera_routes::{
     create_camera, discover, fetch_all_cameras, fetch_camera, fetch_ntp, fetch_time, ptz_direction,
     ptz_relative, set_ntp, set_time, update_camera,
 };
+use crate::capture_actor::VideoPacket;
+use crate::capture_supervisor::CaptureSupervisor;
 use crate::models::DbExecutor;
 use crate::observation_routes::{
     fetch_event_clip, fetch_event_snapshot, fetch_events, fetch_observation,
@@ -58,17 +63,12 @@ use crate::ws_session::{WsSerialization, WsSession};
 pub struct RouteState {
     /// address of database actor
     pub db: Addr<DbExecutor>,
+    pub capture_supervisor: Addr<CaptureSupervisor>,
+    pub video_sender: Sender<VideoPacket>,
+    pub udp_network: UDPNetwork,
 }
 
 // /// We have to pass by value to satisfy the actix route interface.
-#[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::unused_async)]
-/// Route to return a websocket session using messagepack serialization
-pub async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
-    debug!("Starting websocket session...");
-    ws::start(WsSession::new(WsSerialization::MsgPack), &req, stream)
-}
-
 /// We have to pass by value to satisfy the actix route interface.
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::unused_async)]
@@ -76,6 +76,25 @@ pub async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResp
 pub async fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
     debug!("Starting json websocket session...");
     ws::start(WsSession::new(WsSerialization::Json), &req, stream)
+}
+
+/// Handshake and start WebSocket handler with heartbeats.
+async fn echo_heartbeat_ws(
+    req: HttpRequest,
+    state: Data<RouteState>,
+    stream: web::Payload,
+) -> Result<HttpResponse, Error> {
+    let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
+
+    // spawn websocket handler (and don't await it) so that the response is returned immediately
+    actix_web::rt::spawn(crate::webrtc_ws::echo_heartbeat_ws(
+        session,
+        msg_stream,
+        state.udp_network.clone(),
+        state.video_sender.subscribe(),
+    ));
+
+    Ok(res)
 }
 
 /// helper function to create and returns the app after mounting all routes/resources
@@ -106,8 +125,8 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
         .service(
             web::scope("/v1")
                 .wrap(Auth)
-                .service(web::resource("/ws").route(web::get()).to(ws_route))
                 .service(web::resource("/ws_json").route(web::get().to(ws_json_route)))
+                .service(web::resource("/ws").route(web::get().to(echo_heartbeat_ws)))
                 // personal access token routes
                 .service(
                     web::resource("/personal_access_tokens")

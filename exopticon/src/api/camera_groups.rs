@@ -87,7 +87,7 @@ pub async fn fetch_all(data: Data<Service>) -> Result<HttpResponse, UserError> {
 
 /// Route configuration for `CameraGroup`s
 pub fn config(cfg: &mut web::ServiceConfig) {
-    println!("Configuring camera groups!");
+    println!("Configuring camera groups!!");
     cfg.service(
         web::resource("/camera_groups")
             .route(web::get().to(fetch_all))
@@ -160,7 +160,7 @@ mod tests {
             },
             CameraGroup {
                 id: 2,
-                name: "group2".to_string(),
+                name: "group3".to_string(),
                 members: Vec::new(),
             },
         ];

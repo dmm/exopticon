@@ -33,6 +33,13 @@ import { Observable } from "rxjs";
 import { Camera } from "../camera";
 import { CameraResolution, WsMessage } from "../frame-message";
 import { SubscriptionSubject, VideoService } from "../video.service";
+import { WebrtcService } from "../webrtc.service";
+
+enum CameraViewStatus {
+  New,
+  Connecting,
+  Playing,
+}
 
 @Component({
   selector: "app-camera-view",
@@ -50,12 +57,19 @@ export class CameraViewComponent implements OnInit {
 
   @ViewChild("wrapperDiv") wrapperDiv: ElementRef;
 
+  @ViewChild("videoElement") videoElement: ElementRef;
+
   public status: string;
 
   private videoSubject: SubscriptionSubject;
   public frameService?: Observable<WsMessage>;
+  private mediaStream?: MediaStream = null;
+  private state: CameraViewStatus = CameraViewStatus.New;
 
-  constructor(private changeRef: ChangeDetectorRef) {}
+  constructor(
+    private changeRef: ChangeDetectorRef,
+    private webrtcService: WebrtcService
+  ) {}
 
   ngOnInit() {
     if (this.enabled) {
@@ -63,13 +77,20 @@ export class CameraViewComponent implements OnInit {
     }
   }
 
-  ngAfterViewInit() {}
+  ngAfterViewInit() {
+    if (this.state === CameraViewStatus.New) {
+      this.activate();
+      this.setMediaSource();
+      this.state = CameraViewStatus.Connecting;
+    }
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes.hasOwnProperty("enabled")) {
       if (changes["enabled"].currentValue) {
         this.activate();
       } else {
+        console.log("DEACTIVATING!");
         this.deactivate();
       }
     }
@@ -79,19 +100,43 @@ export class CameraViewComponent implements OnInit {
     }
   }
 
+  setMediaSource() {
+    if (this.mediaStream !== null) {
+      let video = this.videoElement.nativeElement as HTMLVideoElement;
+      video.srcObject = this.mediaStream;
+      video.autoplay = true;
+      this.state = CameraViewStatus.Playing;
+    }
+  }
+
   activate() {
     this.videoSubject = {
       kind: "camera",
       cameraId: this.camera.id,
       resolution: this.resolution,
     };
-    this.frameService = this.videoService.getObservable(this.videoSubject);
+    //    this.frameService = this.videoService.getObservable(this.videoSubject);
+    this.webrtcService.subscribe(this.camera.id).subscribe(
+      (m) => {
+        console.log("Got media stream!");
+        this.mediaStream = m;
+        this.setMediaSource();
+      },
+      (err) => {
+        console.log("Error in mediastream emitter! " + err);
+        this.setMediaSource();
+      }
+    );
   }
 
   deactivate() {
-    this.frameService = undefined;
+    //    this.frameService = undefined;
+    this.webrtcService.unsubscribe(this.camera.id);
   }
 
+  setStatus(event) {
+    this.status = "active";
+  }
   onVideoStatusChange(status: string) {
     setTimeout(() => {
       this.status = status;

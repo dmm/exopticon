@@ -18,14 +18,12 @@
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <div #wrapperDiv>
-  <app-video-view
-    [frameService]="frameService"
-    (status)="onVideoStatusChange($event)"
-  >
-  </app-video-view>
+  <video #videoElement (play)="setStatus($event)"></video>
+<!--
   <app-camera-overlay [camera]="camera" *ngIf="selected"></app-camera-overlay>
   <app-camera-status-overlay
     *ngIf="status !== 'active'"
     [status]="status"
   ></app-camera-status-overlay>
+-->
 </div>

@@ -40,6 +40,7 @@ export interface PlaybackSubject {
   videoUnitId: string;
   offset: number;
 }
+
 export type SubscriptionSubject =
   | AnalysisSubject
   | CameraSubject
@@ -70,13 +71,12 @@ export class VideoService {
         url = "ws:";
       }
       var pathname = parse.pathname === "/" ? "" : `/${parse.pathname}`;
-      url += `//${parse.host}${pathname}/v1/ws_json`;
+      url += `//${parse.host}${pathname}/v1/ws`;
       console.log(`websocket url: ${url}`);
     }
     if (!this.subject) {
       this.subject = webSocket(url);
     }
-
     return this.subject;
   }
 
@@ -115,6 +115,7 @@ export class VideoService {
   }
 
   public getObservable(subject: SubscriptionSubject): Observable<WsMessage> {
+    return null;
     let frameSub: WebSocketSubject<WsMessage> = (this
       .subject as unknown) as WebSocketSubject<WsMessage>;
 

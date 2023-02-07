@@ -27,7 +27,6 @@ use actix::{
 };
 use actix_web_actors::ws;
 use base64::STANDARD_NO_PAD;
-use rmp_serde::Serializer;
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -35,7 +34,6 @@ use crate::db_registry;
 use crate::fair_queue::FairQueue;
 use crate::models::{FetchVideoUnit, Observation};
 use crate::playback_supervisor::{PlaybackSupervisor, StartPlayback, StopPlayback};
-use crate::struct_map_writer::StructMapWriter;
 use crate::ws_camera_server::{
     CameraFrame, FrameResolution, FrameSource, Subscribe, SubscriptionSubject, Unsubscribe,
     WsCameraServer,
@@ -44,9 +42,6 @@ use crate::ws_camera_server::{
 /// Represents different serializations available for communicating
 /// over websockets.
 pub enum WsSerialization {
-    /// MessagePack Serialization
-    MsgPack,
-
     /// Json Serialization
     Json,
 }
@@ -214,13 +209,6 @@ impl WsSession {
     fn signal_playback_end(&mut self, ctx: &mut <Self as Actor>::Context, id: u64) {
         let message = WsMessage::PlaybackEnd { id };
         match &self.serialization {
-            WsSerialization::MsgPack => {
-                let mut se = Serializer::with(Vec::new(), StructMapWriter);
-                message
-                    .serialize(&mut se)
-                    .expect("Messagepack playback end serialization failed!");
-                ctx.binary(se.into_inner());
-            }
             WsSerialization::Json => ctx.text(
                 serde_json::to_string(&message).expect("Json playback end serialization failed!"),
             ),
@@ -238,13 +226,6 @@ impl WsSession {
             let message = WsMessage::Frame(frame);
 
             match &self.serialization {
-                WsSerialization::MsgPack => {
-                    let mut se = Serializer::with(Vec::new(), StructMapWriter);
-                    message
-                        .serialize(&mut se)
-                        .expect("Messagepack camera frame serialization failed!");
-                    ctx.binary(se.into_inner());
-                }
                 WsSerialization::Json => ctx.text(
                     serde_json::to_string(&message)
                         .expect("Json camera frame serialization failed!"),

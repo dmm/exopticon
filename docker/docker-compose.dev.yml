@@ -16,6 +16,7 @@ services:
       - EXOPTICON_METRICS_ENABLED
     ports:
       - 0.0.0.0:3002:3000
+      - "4000:4000/udp"
     restart: always
     device_cgroup_rules:
       - 'a 189:* rwm'

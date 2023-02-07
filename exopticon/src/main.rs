@@ -182,12 +182,16 @@ mod video_unit_handler;
 /// Implements routes for video units
 mod video_unit_routes;
 
+/// Implement webrtc signalling channel
+mod webrtc_ws;
+
 /// Implements camera frame pub/sub
 mod ws_camera_server;
 
 /// Implements a websocket session
 mod ws_session;
 
+use crate::capture_supervisor::CaptureSupervisor;
 use crate::models::DbExecutor;
 use actix::prelude::*;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
@@ -198,6 +202,9 @@ use actix_web_prom::PrometheusMetricsBuilder;
 use dialoguer::{Input, PasswordInput};
 use dotenv::dotenv;
 use time::Duration;
+use tokio::sync::broadcast;
+use webrtc::ice::udp_mux::{UDPMuxDefault, UDPMuxParams};
+use webrtc::ice::udp_network::UDPNetwork;
 
 use std::collections::HashMap;
 use std::env;
@@ -353,7 +360,9 @@ async fn main() {
     }
 
     let arbiter = actix::Arbiter::new();
-    let root_supervisor = RootSupervisor::new(mode, db_address);
+    let (packet_sender, _packet_receiver) = broadcast::channel(16);
+    let capture_supervisor = CaptureSupervisor::new(packet_sender.clone()).start();
+    let root_supervisor = RootSupervisor::new(mode, db_address, capture_supervisor.clone());
 
     RootSupervisor::start_in_arbiter(
         &arbiter.handle(),
@@ -373,11 +382,21 @@ async fn main() {
         return;
     }
 
+    let udp_socket = tokio::net::UdpSocket::bind(("0.0.0.0", 4000))
+        .await
+        .expect("Unable to open udp socket");
+    let udp_mux = UDPMuxDefault::new(UDPMuxParams::new(udp_socket));
+
+    let udp_network = UDPNetwork::Muxed(udp_mux);
+
     HttpServer::new(move || {
         App::new()
             .wrap(prometheus.clone())
             .app_data(Data::new(RouteState {
                 db: route_db_address.clone(),
+                capture_supervisor: capture_supervisor.clone(),
+                video_sender: packet_sender.clone(),
+                udp_network: udp_network.clone(),
             }))
             .app_data(Data::new(db_service.clone()))
             .wrap(IdentityService::new(

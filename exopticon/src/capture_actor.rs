@@ -36,6 +36,7 @@ use chrono::{DateTime, Utc};
 use exserial::models::CaptureMessage;
 use tokio::process::Child;
 use tokio::process::{ChildStdin, Command};
+use tokio::sync::broadcast::Sender;
 use tokio_util::codec::length_delimited;
 use uuid::Uuid;
 
@@ -107,6 +108,12 @@ pub struct CaptureMessage {
 }
 */
 
+#[derive(Clone)]
+pub struct VideoPacket {
+    pub camera_id: i32,
+    pub data: Vec<u8>,
+}
+
 enum CaptureState {
     Running,
     Shutdown,
@@ -138,6 +145,8 @@ pub struct CaptureActor {
     state: CaptureState,
     /// CaptureActor metrics
     metrics: CaptureActorMetrics,
+    /// Video Packet Sender
+    sender: Sender<VideoPacket>,
 }
 
 impl CaptureActor {
@@ -148,6 +157,7 @@ impl CaptureActor {
         storage_path: String,
         capture_start: Instant,
         metrics: CaptureActorMetrics,
+        sender: Sender<VideoPacket>,
     ) -> Self {
         Self {
             camera_id,
@@ -162,6 +172,7 @@ impl CaptureActor {
             stdin: None,
             state: CaptureState::Running,
             metrics,
+            sender,
         }
     }
 
@@ -298,8 +309,15 @@ impl CaptureActor {
                     error!("CaptureActor: Error handling close file message.");
                 }
             }
-            CaptureMessage::Packet { data: _ }
-            | CaptureMessage::Metric {
+            CaptureMessage::Packet { data } => {
+                if let Err(e) = self.sender.send(VideoPacket {
+                    camera_id: self.camera_id,
+                    data,
+                }) {
+                    error!("Error sending video packet: {}", e);
+                }
+            }
+            CaptureMessage::Metric {
                 label: _,
                 values: _,
             } => (),

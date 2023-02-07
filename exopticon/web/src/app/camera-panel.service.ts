@@ -174,15 +174,15 @@ export class CameraPanelService {
           this.cameraGroups.set(group.id, group);
         });
 
-        this.videoService
-          .getErrorObservable()
-          .toPromise()
-          .then(() => {
-            console.log("Caught error and restarting!");
-            // TODO: Should we implement exponential backoff? We probably
-            // need connection management in general.
-            this.registerSetCameras();
-          });
+        // this.videoService
+        //   .getErrorObservable()
+        //   .toPromise()
+        //   .then(() => {
+        //     console.log("Caught error and restarting!");
+        //     // TODO: Should we implement exponential backoff? We probably
+        //     // need connection management in general.
+        //     this.registerSetCameras();
+        //   });
 
         this.projectCameras();
       })
@@ -193,6 +193,7 @@ export class CameraPanelService {
   }
 
   private projectCameras() {
+    console.log("PROJECTING CAMERAS!");
     this.setCameraGroup(this.desiredCameraGroupId);
     let groupCameras: PanelCamera[] = new Array();
     if (this.activeCameraGroupId === 0) {
