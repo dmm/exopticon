@@ -141,7 +141,7 @@ impl SignalChannel {
             return true;
         }
 
-        return false;
+        false
     }
 
     pub fn get_subscription(&self, camera_id: i32) -> Option<&Subscription> {
@@ -231,10 +231,10 @@ impl SignalChannel {
                                     warn!("Failed to parse offer!");
                                 }
                             }
-                            Ok(SignalCommand::Answer { sdp: _ }) => {
-                                // ignore for now...
-                            }
-                            Ok(SignalCommand::Candidate { candidate: _ }) => {
+                            Ok(
+                                SignalCommand::Answer { sdp: _ }
+                                | SignalCommand::Candidate { candidate: _ },
+                            ) => {
                                 // ignore for now
                             }
                             Ok(SignalCommand::UpdateSubscriptions { subscriptions }) => {
@@ -285,6 +285,7 @@ impl SignalChannel {
 
 /// Echo text & binary messages received from the client, respond to ping messages, and monitor
 /// connection health to detect network issues and free up resources.
+#[allow(clippy::too_many_lines)]
 pub async fn echo_heartbeat_ws(
     session: actix_ws::Session,
     mut msg_stream: actix_ws::MessageStream,
@@ -296,7 +297,7 @@ pub async fn echo_heartbeat_ws(
     let pc = build_peer_connection(udp_network).await.unwrap();
     let (ice_tx, mut ice_rx) = tokio::sync::mpsc::channel::<RTCIceCandidateInit>(1);
     pc.on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
-        println!("Peer Connection State has changed: {}", s);
+        log::debug!("Peer Connection State has changed: {}", s);
 
         if s == RTCPeerConnectionState::Failed {
             // Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
@@ -322,42 +323,35 @@ pub async fn echo_heartbeat_ws(
     }));
 
     pc.on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
-            let d_label = d.label().to_owned();
-            let d_id = d.id();
-            println!("New DataChannel {} {}", d_label, d_id);
+        let d_label = d.label().to_owned();
 
-            // Register channel opening handling
-            Box::pin(async move {
-                let d2 = Arc::clone(&d);
-                let d_label2 = d_label.clone();
-                let d_id2 = d_id;
-                d.on_open(Box::new(move || {
-                    println!("Data channel '{}'-'{}' open. Random messages will now be sent to any connected DataChannels every 5 seconds", d_label2, d_id2);
+        // Register channel opening handling
+        Box::pin(async move {
+            let d2 = Arc::clone(&d);
+            d.on_open(Box::new(move || {
+                Box::pin(async move {
+                    let mut result = anyhow::Result::<usize>::Ok(0);
+                    while result.is_ok() {
+                        let timeout = tokio::time::sleep(Duration::from_secs(5));
+                        tokio::pin!(timeout);
 
-                    Box::pin(async move {
-                        let mut result = anyhow::Result::<usize>::Ok(0);
-                        while result.is_ok() {
-                            let timeout = tokio::time::sleep(Duration::from_secs(5));
-                            tokio::pin!(timeout);
+                        tokio::select! {
+                            _ = timeout.as_mut() =>{
+                                let message = math_rand_alpha(15);
+                                result = d2.send_text(message).await.map_err(Into::into);
+                            }
+                        };
+                    }
+                })
+            }));
 
-                            tokio::select! {
-                                _ = timeout.as_mut() =>{
-                                    let message = math_rand_alpha(15);
-                                    println!("Sending '{}'", message);
-                                    result = d2.send_text(message).await.map_err(Into::into);
-                                }
-                            };
-                        }
-                    })
-                }));
-
-                // Register text message handling
-                d.on_message(Box::new(move |msg: DataChannelMessage| {
-                    let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
-                    println!("Message from DataChannel '{}': '{}'", d_label, msg_str);
-                    Box::pin(async {})
-                }));
-            })
+            // Register text message handling
+            d.on_message(Box::new(move |msg: DataChannelMessage| {
+                let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
+                log::debug!("Message from DataChannel '{d_label}': '{msg_str}'");
+                Box::pin(async {})
+            }));
+        })
     }));
 
     pc.on_track(Box::new(move |track, _| {
@@ -397,7 +391,7 @@ pub async fn echo_heartbeat_ws(
                         }
 
                         // send heartbeat ping
-                        let _ = signal_channel.ping(b"").await;
+                        let _ping_result = signal_channel.ping(b"").await;
                      },
 
                     candidate = ice_rx.recv() => {
@@ -419,7 +413,7 @@ pub async fn echo_heartbeat_ws(
                                                 ..Default::default()
                                             },
                                             "video".to_owned(),
-                                            track_id.to_owned().to_string(),
+                                            track_id.clone().to_string()
                                         ));
 
                                         debug!("Created new track: {:?}", track);
@@ -432,14 +426,14 @@ pub async fn echo_heartbeat_ws(
                                             anyhow::Result::<()>::Ok(())
                                         });
 
-                                 signal_channel.subscriptions.insert(packet.camera_id, Subscription {camera_id: packet.camera_id, track_id: track_id.clone(),  track, active: false});
+                                 signal_channel.subscriptions.insert(packet.camera_id, Subscription {camera_id: packet.camera_id, track_id,  track, active: false});
                                         signal_channel.send_subscriptions().await.unwrap();
                                     },
                                     Some(Subscription { camera_id: _, track_id: _, track, active }) => {
                                         if *active {
                                         track.write_sample(&Sample {
                                             data: packet.data.into(),
-                                            packet_timestamp: packet.timestamp as u32,
+                                            packet_timestamp: packet.timestamp.try_into().expect("Failed timestamp conversion"),
         //                                    duration: Duration::from_micros(packet.duration as u64),
                                             duration: Duration::from_secs(1),
                                             ..Default::default()
@@ -456,7 +450,7 @@ pub async fn echo_heartbeat_ws(
     };
 
     // attempt to close connection gracefully
-    let _ = signal_channel.close(reason).await;
+    let _channel = signal_channel.close(reason).await;
 
     log::info!("disconnected");
 }

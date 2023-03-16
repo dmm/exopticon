@@ -78,7 +78,8 @@ pub async fn ws_json_route(req: HttpRequest, stream: web::Payload) -> Result<Htt
     ws::start(WsSession::new(WsSerialization::Json), &req, stream)
 }
 
-/// Handshake and start WebSocket handler with heartbeats.
+/// Handshake and start `WebSocket` handler with heartbeats.
+#[allow(clippy::unused_async)]
 async fn echo_heartbeat_ws(
     req: HttpRequest,
     state: Data<RouteState>,
