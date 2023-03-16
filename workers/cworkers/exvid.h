@@ -49,6 +49,12 @@ struct in_context {
         struct timespec     last_frame_time;
         struct timespec     interrupt_time;
 
+				// only for ex_send_packet
+        struct timespec     first_frame_time;
+				int64_t             last_pts;
+				char                use_walltime_timestamps;
+				int64_t             packet_count;
+
         // Encoder contexts
         int            encoder_initialized;
         AVCodec        *encoder_codec;
@@ -92,4 +98,6 @@ int ex_write_output_packet(struct out_context *c,
                            AVPacket *pkt);
 int64_t timespec_to_ms_interval(const struct timespec beg,
                                 const struct timespec end);
+int ex_send_packet(struct in_context *c, AVPacket *pkt);
+
 #endif // EXVID_H

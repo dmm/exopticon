@@ -31,7 +31,7 @@ struct FrameMessage {
 
 void send_frame_message(struct FrameMessage *msg);
 void send_scaled_frame_message(struct FrameMessage *msg, const int32_t height);
-void send_packet(char *data, uint64_t size);
+void send_packet(char *data, uint64_t size, int64_t timestamp, int64_t duration);
 void send_new_file_message(char *filename, char *iso_begin_time);
 void send_end_file_message(char *filename, char *iso_end_time);
 void send_log_message(int level, char *message);

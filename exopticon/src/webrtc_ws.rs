@@ -39,6 +39,9 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout.
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// ip address to use as a token for replacement
+const TOKEN_IP: &str = "8.8.8.8";
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscriptionCommand {
@@ -78,12 +81,10 @@ async fn build_peer_connection(udp_network: UDPNetwork) -> anyhow::Result<RTCPee
     registry = register_default_interceptors(registry, &mut m)?;
 
     let mut setting_engine = SettingEngine::default();
+
+    // This is just a token to be replaced later...
     setting_engine.set_nat_1to1_ips(
-        vec![
-            "192.168.5.187".to_string(),
-            //            "173.27.162.33".to_string(),
-            "fd5a:64a9:8631:4202:5054:ff:fe04:7492".to_string(),
-        ],
+        vec![String::from(TOKEN_IP)],
         webrtc::ice_transport::ice_candidate_type::RTCIceCandidateType::Host,
     );
 
@@ -168,17 +169,21 @@ impl SignalChannel {
         &mut self,
         candidate: Option<RTCIceCandidateInit>,
     ) -> anyhow::Result<()> {
-        let candidate_json = serde_json::to_string(&SignalCommand::Candidate { candidate })?;
-        debug!("Sending candidate json: {}", candidate_json);
-        //        self.session.text(&candidate_json).await?;
-
-        self.session.text(&candidate_json).await?;
-        let candidate2_json =
-            candidate_json.replace("192.168.5.187", "2604:2d80:5f83:4202:5054:ff:fe04:7492");
-        self.session.text(&candidate2_json).await?;
-        let candidate3_json =
-            candidate_json.replace("192.168.5.187", "fd5a:64a9:8631:4202:5054:ff:fe04:7492");
-        self.session.text(&candidate3_json).await?;
+        let candidates = vec![
+            "exopticon.mattli.us",
+            "192.168.5.110",
+            "fd5a:64a9:8631:4202:5054:ff:fe6a:2420",
+            "2604:2d80:5f83:4202:5054:ff:fe6a:2420",
+        ];
+        for c in candidates {
+            let candidate_json = serde_json::to_string(&SignalCommand::Candidate {
+                candidate: candidate.clone(),
+            })?;
+            if candidate.is_some() {
+                let new_c = candidate_json.replace(TOKEN_IP, c);
+                self.session.text(&new_c).await?;
+            }
+        }
 
         Ok(())
     }
@@ -190,10 +195,10 @@ impl SignalChannel {
         match next {
             Some(Ok(msg)) => {
                 match msg {
-                    Message::Text(text) => {
+                    Message::Text(text_body) => {
                         //                        session.text(text.to_string()).await.unwrap();
                         let cmd: Result<SignalCommand, serde_json::Error> =
-                            serde_json::from_str(&text);
+                            serde_json::from_str(&text_body);
                         match cmd {
                             Ok(SignalCommand::Offer { sdp }) => {
                                 debug!("Got offer!!");
@@ -355,6 +360,15 @@ pub async fn echo_heartbeat_ws(
             })
     }));
 
+    pc.on_track(Box::new(move |track, _| {
+        tokio::spawn(async move {
+            if let Some(track) = track {
+                debug!("ON TRAAAAAAAAAAAAAAAACK {}", track.id().await);
+            }
+        });
+        Box::pin(async {})
+    }));
+
     let mut interval = interval(HEARTBEAT_INTERVAL);
     let mut signal_channel = SignalChannel::new(session, pc);
     let reason = loop {
@@ -367,76 +381,78 @@ pub async fn echo_heartbeat_ws(
         // interval timer to tick, yielding the value of whichever one is ready first
         //        match future::select(msg_stream.next(), tick).await {
         tokio::select! {
-            msg = msg_stream.next() => {
-                if let Err(e) = signal_channel.handle_message(msg).await {
-                    error!("Handle error {}", e);
-                    break None;
-                }
-            },
-
-
-            // heartbeat interval ticked
-            _inst = tick => {
-                // if no heartbeat ping/pong received recently, close the connection
-                if signal_channel.timeout() {
-                    break None;
-                }
-
-                // send heartbeat ping
-                let _ = signal_channel.ping(b"").await;
-             },
-
-            candidate = ice_rx.recv() => {
-                if let Err(e) = signal_channel.send_candidate(candidate).await {
-                    error!("Error sending candidate: {}", e);
-                    break None;
-                }
-
-            },
-            packet_result = video_receiver.recv() => {
-                match packet_result {
-                    Ok(packet) => {
-                        match signal_channel.get_subscription(packet.camera_id) {
-                            None => {
-                                let track_id = uuid::Uuid::new_v4();
-                                let track = Arc::new(TrackLocalStaticSample::new(
-                                    RTCRtpCodecCapability {
-                                        mime_type: MIME_TYPE_H264.to_owned(),
-                                        ..Default::default()
-                                    },
-                                    "video".to_owned(),
-                                    track_id.to_owned().to_string(),
-                                ));
-
-                                debug!("Created new track: {:?}", track);
-
-                                let rtp_sender = signal_channel.peer_connection.add_track(Arc::clone(&track) as Arc<dyn TrackLocal + Send + Sync>).await.unwrap();
-                                let sender = rtp_sender.clone();
-                                tokio::spawn(async move {
-                                    let mut rtcp_buf = vec![0u8; 1500];
-                                    while let Ok((_, _)) = sender.read(&mut rtcp_buf).await {}
-                                    anyhow::Result::<()>::Ok(())
-                                });
-
-                         signal_channel.subscriptions.insert(packet.camera_id, Subscription {camera_id: packet.camera_id, track_id: track_id.clone(),  track, active: false});
-                                signal_channel.send_subscriptions().await.unwrap();
-                            },
-                            Some(Subscription { camera_id: _, track_id: _, track, active }) => {
-                                if *active {
-                                track.write_sample(&Sample {
-                                    data: packet.data.into(),
-                                    duration: Duration::from_secs(1),
-                                    ..Default::default()
-                                }).await.unwrap();
-                                }
-
-                            },
+                    msg = msg_stream.next() => {
+                        if let Err(e) = signal_channel.handle_message(msg).await {
+                            error!("Handle socket error {}", e);
+                            break None;
                         }
                     },
-                    Err(e) => error!("Error receiving packet! {}", e),
+
+
+                    // heartbeat interval ticked
+                    _inst = tick => {
+                        // if no heartbeat ping/pong received recently, close the connection
+                        if signal_channel.timeout() {
+                            break None;
+                        }
+
+                        // send heartbeat ping
+                        let _ = signal_channel.ping(b"").await;
+                     },
+
+                    candidate = ice_rx.recv() => {
+                        if let Err(e) = signal_channel.send_candidate(candidate).await {
+                            error!("Error sending candidate: {}", e);
+                            break None;
+                        }
+
+                    },
+                    packet_result = video_receiver.recv() => {
+                        match packet_result {
+                            Ok(packet) => {
+                                match signal_channel.get_subscription(packet.camera_id) {
+                                    None => {
+                                        let track_id = uuid::Uuid::new_v4();
+                                        let track = Arc::new(TrackLocalStaticSample::new(
+                                            RTCRtpCodecCapability {
+                                                mime_type: MIME_TYPE_H264.to_owned(),
+                                                ..Default::default()
+                                            },
+                                            "video".to_owned(),
+                                            track_id.to_owned().to_string(),
+                                        ));
+
+                                        debug!("Created new track: {:?}", track);
+
+                                        let rtp_sender = signal_channel.peer_connection.add_track(Arc::clone(&track) as Arc<dyn TrackLocal + Send + Sync>).await.unwrap();
+                                        let sender = rtp_sender.clone();
+                                        tokio::spawn(async move {
+                                            let mut rtcp_buf = vec![0u8; 1500];
+                                            while let Ok((_, _)) = sender.read(&mut rtcp_buf).await {}
+                                            anyhow::Result::<()>::Ok(())
+                                        });
+
+                                 signal_channel.subscriptions.insert(packet.camera_id, Subscription {camera_id: packet.camera_id, track_id: track_id.clone(),  track, active: false});
+                                        signal_channel.send_subscriptions().await.unwrap();
+                                    },
+                                    Some(Subscription { camera_id: _, track_id: _, track, active }) => {
+                                        if *active {
+                                        track.write_sample(&Sample {
+                                            data: packet.data.into(),
+                                            packet_timestamp: packet.timestamp as u32,
+        //                                    duration: Duration::from_micros(packet.duration as u64),
+                                            duration: Duration::from_secs(1),
+                                            ..Default::default()
+                                        }).await.unwrap();
+                                        }
+
+                                    },
+                                }
+                            },
+                            Err(e) => error!("Error receiving packet! {}", e),
+                        }
+                    }
                 }
-            }
-        }
     };
 
     // attempt to close connection gracefully

@@ -30,6 +30,7 @@
 #include "libavutil/pixdesc.h"
 
 #include "exvid.h"
+#include "mpack_frame.h"
 
 int64_t timespec_to_ms_interval(const struct timespec beg,
                                 const struct timespec end)
@@ -203,6 +204,10 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
         av_dict_set(&opts, "reorder_queue_size", "2500", 0);
         c->fcx->max_delay = 500000; // 500ms
         clock_gettime(CLOCK_MONOTONIC, &(c->last_frame_time));
+        clock_gettime(CLOCK_MONOTONIC, &(c->first_frame_time));
+				c->last_pts = -1;
+				c->packet_count = 0;
+				c->use_walltime_timestamps = 0;
         int err = avformat_open_input(&(c->fcx), url, NULL, &opts);
         if (err != 0) {
                 char errbuf[100];
@@ -482,18 +487,6 @@ int ex_read_frame(struct in_context *c, AVPacket *pkt)
         return av_read_frame(c->fcx, pkt);
 }
 
-int ex_send_packet(struct in_context *c, AVPacket *pkt)
-{
-        int return_value = 0;
-
-        const int d_ret = avcodec_send_packet(c->ccx, pkt);
-        if (d_ret != 0) {
-                return_value = 1;
-        }
-
-        return return_value;
-}
-
 int ex_free_input(struct in_context *c)
 {
         if (c->fcx != NULL) {
@@ -726,5 +719,51 @@ int ex_write_output_packet(struct out_context *c,
         }
         av_write_frame(c->fcx, NULL);
 
+        return return_value;
+}
+
+int ex_send_packet(struct in_context *c, AVPacket *pkt) {
+				AVStream *in_stream = c->st;
+				int64_t pts = pkt->pts;
+				int64_t duration = pkt->duration;
+				c->packet_count++;
+
+				// Check for non-monotonic timestamps
+				if ((c->packet_count > 100 &&pts <= c->last_pts) || c->use_walltime_timestamps == 1) {
+//								fprintf(stderr, "NON MONO %ld %ld", pts, duration);
+								// non-monotonic pts detected!
+								// Switch to walltime
+								c->use_walltime_timestamps = 1;
+								struct timespec cur;
+								clock_gettime(CLOCK_MONOTONIC, &cur);
+								int64_t pts_ms = timespec_to_ms_interval(c->first_frame_time,
+																												 cur);
+								int64_t duration_ms = timespec_to_ms_interval(c->last_frame_time,
+																															cur);
+								pts = pts_ms * 1000;
+								duration = duration_ms * 1000;
+//								fprintf(stderr, "WALLTIME pts: %ld, duration: %ld\n, interval %ld", pts, duration, pts_ms);
+				}
+
+				// calculate timestamp
+				AVRational rtp_timebase = av_make_q(1, 90000);
+				int64_t timestamp = av_rescale_q_rnd(pts,
+																						 rtp_timebase,
+																						 in_stream->time_base,
+																						 AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX);
+//				fprintf(stderr, "dts: %ld, pts: %ld, rtp time_base: %d/%d, stream time_base: %d/%d, timestamp: %ld\n",
+//								pkt->dts, pts, rtp_timebase.num, rtp_timebase.den, in_stream->time_base.num, in_stream->time_base.den, timestamp);
+
+				// calculate duration
+				AVRational microsecond = av_make_q(1, 1000000);
+				int64_t rtp_duration = av_rescale_q(duration,
+																				microsecond,
+																				in_stream->time_base);
+
+        int return_value = 0;
+
+        send_packet(((char*)pkt->data), pkt->size, timestamp, rtp_duration);
+
+				c->last_pts = pts;
         return return_value;
 }

@@ -84,7 +84,7 @@ async fn echo_heartbeat_ws(
     state: Data<RouteState>,
     stream: web::Payload,
 ) -> Result<HttpResponse, Error> {
-    let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
+    let (response, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
     // spawn websocket handler (and don't await it) so that the response is returned immediately
     actix_web::rt::spawn(crate::webrtc_ws::echo_heartbeat_ws(
@@ -94,7 +94,7 @@ async fn echo_heartbeat_ws(
         state.video_sender.subscribe(),
     ));
 
-    Ok(res)
+    Ok(response)
 }
 
 /// helper function to create and returns the app after mounting all routes/resources

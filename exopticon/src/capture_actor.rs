@@ -112,6 +112,8 @@ pub struct CaptureMessage {
 pub struct VideoPacket {
     pub camera_id: i32,
     pub data: Vec<u8>,
+    pub timestamp: i64,
+    pub duration: i64,
 }
 
 enum CaptureState {
@@ -309,10 +311,16 @@ impl CaptureActor {
                     error!("CaptureActor: Error handling close file message.");
                 }
             }
-            CaptureMessage::Packet { data } => {
+            CaptureMessage::Packet {
+                data,
+                timestamp,
+                duration,
+            } => {
                 if let Err(e) = self.sender.send(VideoPacket {
                     camera_id: self.camera_id,
                     data,
+                    timestamp,
+                    duration,
                 }) {
                     error!("Error sending video packet: {}", e);
                 }

@@ -41,21 +41,96 @@ interface Subscription {
   trackId: string;
 }
 
+enum Status {
+  Paused,
+  Connecting,
+  Connected,
+}
+
 @Injectable({
   providedIn: "root",
 })
 export class WebrtcService {
   private peerConnection: RTCPeerConnection;
-  private dataChannel: RTCDataChannel;
-  private signalSocket: WebSocket;
+  private dataChannel?: RTCDataChannel;
+  private signalSocket?: WebSocket;
   private subscriptions: Map<number, Subscription> = new Map();
   private candidates: RTCIceCandidateInit[] = new Array();
   private emitters: Map<number, ReplaySubject<MediaStream>> = new Map();
   private activeCameras: Map<number, boolean> = new Map();
+  private enabled: boolean = false;
+
+  // status
+  private signalSocketStatus: Status = Status.Paused;
+  private webrtcStatus: Status = Status.Paused;
+
+  // status timer
+  private minTimeout = 500;
+  private maxTimeout = 5000;
+  private timeoutId: ReturnType<typeof setTimeout>;
 
   contructor() {}
 
-  addTrack(cameraId: number, trackId: string) {
+  updateState() {
+    clearTimeout(this.timeoutId);
+
+    console.dir(`Active cameras: ${this.activeCameras.entries()}`);
+    // if enabled but disconnected...
+    if (this.enabled && this.signalSocketStatus === Status.Paused) {
+      this.connect();
+    } else if (!this.enabled && this.signalSocketStatus !== Status.Paused) {
+      this.disconnect();
+    } else if (
+      this.enabled &&
+      this.signalSocketStatus === Status.Connected &&
+      this.webrtcStatus === Status.Paused
+    ) {
+      this.webrtcConnect();
+    } else if (
+      this.enabled &&
+      this.signalSocketStatus == Status.Connected &&
+      this.webrtcStatus == Status.Connected
+    ) {
+      this.updateSubscriptions();
+    }
+
+    if (this.enabled === true) {
+      this.timeoutId = setTimeout(this.updateState.bind(this), this.maxTimeout);
+    }
+  }
+
+  enable() {
+    this.enabled = true;
+    this.updateState();
+  }
+
+  disable() {
+    this.enabled = false;
+    this.updateState();
+  }
+
+  updateActiveCameras(activeCameraIds: number[]) {
+    for (let [id, _val] of this.activeCameras) {
+      this.activeCameras.set(id, false);
+    }
+
+    activeCameraIds.map((id) => {
+      this.activeCameras.set(id, true);
+    });
+    this.updateState();
+  }
+
+  subscribe(cameraId: number): ReplaySubject<MediaStream> {
+    if (this.emitters.has(cameraId)) {
+      return this.emitters.get(cameraId);
+    } else {
+      let ff = new ReplaySubject<MediaStream>(1);
+      this.emitters.set(cameraId, ff);
+      return ff;
+    }
+  }
+
+  private addTrack(cameraId: number, trackId: string) {
     this.subscriptions.set(cameraId, {
       id: cameraId,
       trackId: trackId,
@@ -68,28 +143,11 @@ export class WebrtcService {
     }
   }
 
-  subscribe(cameraId: number): ReplaySubject<MediaStream> {
-    console.log(`Subscribing to ${cameraId} ${this.signalSocket.readyState}`);
-    this.activeCameras.set(cameraId, true);
-    this.updateSubscriptions(cameraId);
-
-    if (this.emitters.has(cameraId)) {
-      return this.emitters.get(cameraId);
-    } else {
-      let ff = new ReplaySubject<MediaStream>(1);
-      this.emitters.set(cameraId, ff);
-      return ff;
-    }
-  }
-
-  unsubscribe(cameraId: number) {
-    this.activeCameras.set(cameraId, false);
-    //    this.subscriptions.delete(cameraId);
-    this.updateSubscriptions(cameraId);
-  }
-
-  updateSubscriptions(cameraId?: number) {
-    if (this.signalSocket.readyState !== this.signalSocket.OPEN) {
+  private updateSubscriptions() {
+    if (
+      this.signalSocket === undefined ||
+      this.signalSocket.readyState !== this.signalSocket.OPEN
+    ) {
       return;
     }
 
@@ -108,8 +166,9 @@ export class WebrtcService {
     }
   }
 
-  webrtcConnect() {
+  private webrtcConnect() {
     this.peerConnection = new RTCPeerConnection();
+    this.webrtcStatus = Status.Connecting;
 
     this.peerConnection.onconnectionstatechange = (ev) => {
       switch (this.peerConnection.connectionState) {
@@ -134,10 +193,14 @@ export class WebrtcService {
           break;
       }
     };
+
     this.peerConnection.oniceconnectionstatechange = (e) => {
-      console.log(
-        "ICE CONNECTION STATE: " + this.peerConnection.iceConnectionState
-      );
+      let state = this.peerConnection.iceConnectionState;
+      console.log("ICE CONNECTION STATE: " + state);
+      if (state === "connected") {
+        this.webrtcStatus = Status.Connected;
+      }
+      this.updateState();
     };
 
     this.peerConnection.onnegotiationneeded = async (e) => {
@@ -148,19 +211,16 @@ export class WebrtcService {
     //    this.peerConnection.onicecandidate = (event) => {};
 
     this.peerConnection.ontrack = (event) => {
-      console.log("GOT TRACK!! " + event.streams[0].id);
-
       for (let sub of this.subscriptions.values()) {
         if (sub.trackId === event.streams[0].id) {
           console.log("EMITTING TRACK! " + sub.trackId);
           this.emitters.get(sub.id).next(event.streams[0]);
         }
       }
-      //      document.getElementsByTagName("body")[0].appendChild(el);
     };
   }
 
-  async sendOffer() {
+  private async sendOffer() {
     console.log("SENDING OFFER!");
     try {
       let offer = await this.peerConnection.createOffer();
@@ -176,7 +236,7 @@ export class WebrtcService {
     }
   }
 
-  connect() {
+  private connect() {
     let url = "";
     let parse = document.createElement("a");
     parse.href = document.querySelector("base")["href"];
@@ -194,7 +254,10 @@ export class WebrtcService {
     this.webrtcConnect();
     this.signalSocket = new WebSocket(url);
 
+    this.signalSocketStatus = Status.Connecting;
+
     this.signalSocket.onopen = (event) => {
+      this.signalSocketStatus = Status.Connected;
       this.updateSubscriptions();
       this.dataChannel = this.peerConnection.createDataChannel("foo");
       this.dataChannel.onclose = () => console.log("sendChannel has closed");
@@ -203,6 +266,14 @@ export class WebrtcService {
         console.log(
           `Message from DataChannel '${this.dataChannel.label}' payload '${e.data}'`
         );
+    };
+
+    this.signalSocket.onclose = (event) => {
+      this.disconnect();
+    };
+
+    this.signalSocket.onerror = (event) => {
+      this.signalSocketStatus = Status.Paused;
     };
 
     this.signalSocket.onmessage = async (event) => {
@@ -256,8 +327,10 @@ export class WebrtcService {
     };
   }
 
-  disconnect() {
+  private disconnect() {
     this.signalSocket.close();
     this.peerConnection.close();
+    this.subscriptions.clear();
+    this.signalSocketStatus = Status.Paused;
   }
 }

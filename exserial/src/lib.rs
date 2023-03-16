@@ -110,13 +110,15 @@ pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _
 /// length
 ///
 #[no_mangle]
-pub unsafe extern "C" fn send_packet(data: *const u8, size: u64) {
+pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64, duration: i64) {
     assert!(!data.is_null());
 
     let data_slice = slice::from_raw_parts(data, size as usize);
     let message = CaptureMessage::Packet {
         //        encoding: models::PacketEncoding::H264,
         data: data_slice.to_vec(),
+        timestamp,
+        duration,
     };
 
     print_message(message);

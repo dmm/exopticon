@@ -99,6 +99,10 @@ pub enum CaptureMessage {
         #[serde(with = "serde_bytes")]
         /// compressed packet data
         data: Vec<u8>,
+        /// 90kHz timestamp
+        timestamp: i64,
+        /// duration in microseconds
+        duration: i64,
     },
     /// New file indication
     NewFile {

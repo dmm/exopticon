@@ -27,6 +27,7 @@ import { CameraGroupService } from "./camera-group.service";
 import { CameraService, PtzDirection } from "./camera.service";
 import { CameraResolution } from "./frame-message";
 import { VideoService } from "./video.service";
+import { WebrtcService } from "./webrtc.service";
 
 class PanelCamera {
   camera: Camera;
@@ -103,24 +104,33 @@ export class CameraPanelService {
     fromEvent(document, "visibilitychange").pipe(map(() => !document.hidden))
   );
 
-  private pageVisible: boolean = true;
+  private pageVisible: boolean = false;
 
   private setCameraTimeout = null;
 
   constructor(
     private cameraService: CameraService,
     private cameraGroupService: CameraGroupService,
-    private videoService: VideoService
+    private videoService: VideoService,
+    private webrtcService: WebrtcService
   ) {
     this.pageVisible$.subscribe((visible) => {
       this.pageVisible = visible;
       if (this.pageVisible) {
         this.setCameras();
+        this.webrtcService.enable();
       } else {
         // This should disable cameras when page hidden.
         this.projectCameras();
+        this.webrtcService.disable();
       }
     });
+
+    setInterval(() => {
+      for (let [key, value] of this.unsortedCameras) {
+        console.log(`PanelCamera ${key} ${value.enabled} ${value.inViewport}`);
+      }
+    }, 5000);
   }
 
   private rotateArray(arr: Array<any>, length: number): Array<any> {
@@ -221,9 +231,15 @@ export class CameraPanelService {
     ).slice(0, cameraCount);
 
     // this isn't great...
+    let activeCameraIds: number[] = new Array();
     this.cameraDesiredState = this.cameras.map((c) => {
       let p = this.unsortedCameras.get(c.id);
-      return p.inViewport && p.enabled && this.pageVisible;
+      let active = p.inViewport && p.enabled && this.pageVisible;
+      if (active) {
+        activeCameraIds.push(c.id);
+      }
+      this.webrtcService.updateActiveCameras(activeCameraIds);
+      return active;
     });
   }
 
@@ -253,6 +269,9 @@ export class CameraPanelService {
     if (panelCamera !== null) {
       panelCamera.inViewport = intersectionEvents.some(
         (e) => e.intersectionRatio >= this.intersectionThreshold
+      );
+      console.log(
+        `Cameraaa ${panelCamera.camera.name} is ${panelCamera.inViewport}`
       );
     }
 
