@@ -199,6 +199,8 @@ export class WebrtcService {
       console.log("ICE CONNECTION STATE: " + state);
       if (state === "connected") {
         this.webrtcStatus = Status.Connected;
+      } else if (state === "disconnected" || state === "failed") {
+        this.webrtcStatus = Status.Paused;
       }
       this.updateState();
     };
@@ -258,7 +260,6 @@ export class WebrtcService {
 
     this.signalSocket.onopen = (event) => {
       this.signalSocketStatus = Status.Connected;
-      this.updateSubscriptions();
       this.dataChannel = this.peerConnection.createDataChannel("foo");
       this.dataChannel.onclose = () => console.log("sendChannel has closed");
       this.dataChannel.onopen = () => console.log("sendChannel has opened");
@@ -266,6 +267,7 @@ export class WebrtcService {
         console.log(
           `Message from DataChannel '${this.dataChannel.label}' payload '${e.data}'`
         );
+      this.updateState();
     };
 
     this.signalSocket.onclose = (event) => {
