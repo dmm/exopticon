@@ -1,11 +1,12 @@
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use actix_ws::{CloseReason, Message, ProtocolError};
 use anyhow::anyhow;
+use axum::extract::ws::{Message, WebSocket};
 use futures_util::StreamExt as _;
 use tokio::{pin, sync::broadcast::Receiver, time::interval};
 use webrtc::{
@@ -29,7 +30,7 @@ use webrtc::{
     track::track_local::{track_local_static_sample::TrackLocalStaticSample, TrackLocal},
 };
 
-use crate::capture_actor::VideoPacket;
+use crate::super_capture_actor::VideoPacket;
 
 /// How often heartbeat pings are sent.
 ///
@@ -38,9 +39,6 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 
 /// How long before lack of client response causes a timeout.
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-
-/// ip address to use as a token for replacement
-const TOKEN_IP: &str = "8.8.8.8";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,10 +81,6 @@ async fn build_peer_connection(udp_network: UDPNetwork) -> anyhow::Result<RTCPee
     let mut setting_engine = SettingEngine::default();
 
     // This is just a token to be replaced later...
-    setting_engine.set_nat_1to1_ips(
-        vec![String::from(TOKEN_IP)],
-        webrtc::ice_transport::ice_candidate_type::RTCIceCandidateType::Host,
-    );
 
     setting_engine.set_udp_network(udp_network);
     let api = APIBuilder::new()
@@ -114,11 +108,11 @@ struct SignalChannel {
     last_heartbeat: Instant,
     pub peer_connection: RTCPeerConnection,
     pub subscriptions: HashMap<i32, Subscription>,
-    session: actix_ws::Session,
+    session: WebSocket,
 }
 
 impl SignalChannel {
-    pub fn new(session: actix_ws::Session, peer_connection: RTCPeerConnection) -> Self {
+    pub fn new(session: WebSocket, peer_connection: RTCPeerConnection) -> Self {
         Self {
             last_heartbeat: Instant::now(),
             peer_connection,
@@ -127,13 +121,15 @@ impl SignalChannel {
         }
     }
 
-    async fn close(self, reason: Option<CloseReason>) -> anyhow::Result<()> {
+    async fn close(self) -> anyhow::Result<()> {
         self.peer_connection.close().await?;
-        Ok(self.session.close(reason).await?)
+        self.session.close().await?;
+        Ok(())
     }
 
-    async fn ping(&mut self, message: &[u8]) -> anyhow::Result<()> {
-        Ok(self.session.ping(message).await?)
+    async fn ping(&mut self) -> anyhow::Result<()> {
+        self.session.send(Message::Ping(Vec::new())).await?;
+        Ok(())
     }
 
     fn timeout(&self) -> bool {
@@ -160,37 +156,42 @@ impl SignalChannel {
                 .collect(),
         })?;
 
-        self.session.text(&subscriptions_json).await?;
+        self.session.send(Message::Text(subscriptions_json)).await?;
 
         Ok(())
     }
 
-    async fn send_candidate(
-        &mut self,
-        candidate: Option<RTCIceCandidateInit>,
-    ) -> anyhow::Result<()> {
+    async fn send_all_candidates(&mut self) -> anyhow::Result<()> {
         let candidates = vec![
-            "exopticon.mattli.us",
+            "dev.exopticon.org",
             "192.168.5.110",
             "fd5a:64a9:8631:4202:5054:ff:fe6a:2420",
             "2604:2d80:5f83:4202:5054:ff:fe6a:2420",
         ];
         for c in candidates {
+            let candidate = RTCIceCandidateInit {
+                candidate: format!("candidate:2388685802 1 udp 2130706431 {} 4000 typ host", c),
+                sdp_mid: Some(String::new()),
+                sdp_mline_index: Some(0),
+                username_fragment: None,
+            };
             let candidate_json = serde_json::to_string(&SignalCommand::Candidate {
-                candidate: candidate.clone(),
+                candidate: Some(candidate),
             })?;
-            if candidate.is_some() {
-                let new_c = candidate_json.replace(TOKEN_IP, c);
-                self.session.text(&new_c).await?;
-            }
+            log::info!("Sending candidate! {}", &candidate_json);
+            self.session.send(Message::Text(candidate_json)).await?;
         }
 
         Ok(())
     }
 
+    async fn next(&mut self) -> Option<Result<Message, axum::Error>> {
+        self.session.next().await
+    }
+
     async fn handle_message(
         &mut self,
-        next: Option<Result<Message, ProtocolError>>,
+        next: Option<Result<Message, axum::Error>>,
     ) -> anyhow::Result<()> {
         match next {
             Some(Ok(msg)) => {
@@ -202,6 +203,7 @@ impl SignalChannel {
                         match cmd {
                             Ok(SignalCommand::Offer { sdp }) => {
                                 debug!("Got offer!!");
+                                self.send_all_candidates().await?;
                                 if let Ok(session_desc) = RTCSessionDescription::offer(sdp) {
                                     if let Err(e) = self
                                         .peer_connection
@@ -223,9 +225,9 @@ impl SignalChannel {
                                             .expect("Json camera frame serialization failed!");
 
                                         self.session
-                                            .text(answer_json)
+                                            .send(Message::Text(answer_json))
                                             .await
-                                            .expect("Sending answer failed!");
+                                            .expect("Sending answer failed");
                                     }
                                 } else {
                                     warn!("Failed to parse offer!");
@@ -249,9 +251,7 @@ impl SignalChannel {
                         }
                     }
 
-                    Message::Binary(bin) => {
-                        self.session.binary(bin).await.unwrap();
-                    }
+                    Message::Binary(bin) => {}
 
                     Message::Close(_reason) => {
                         return Err(anyhow!("socket closed"));
@@ -259,19 +259,12 @@ impl SignalChannel {
 
                     Message::Ping(bytes) => {
                         self.last_heartbeat = Instant::now();
-                        let _ = self.session.pong(&bytes).await;
+                        self.session.send(Message::Pong(bytes)).await?;
                     }
 
                     Message::Pong(_) => {
                         self.last_heartbeat = Instant::now();
                     }
-
-                    Message::Continuation(_) => {
-                        log::warn!("no support for continuation frames");
-                    }
-
-                    // no-op; ignore
-                    Message::Nop => {}
                 }
             }
             Some(Err(e)) => return Err(anyhow!("socket error {}", e)),
@@ -287,15 +280,16 @@ impl SignalChannel {
 /// connection health to detect network issues and free up resources.
 #[allow(clippy::too_many_lines)]
 pub async fn echo_heartbeat_ws(
-    session: actix_ws::Session,
-    mut msg_stream: actix_ws::MessageStream,
+    mut session: WebSocket,
+    //    session: actix_ws::Session,
+    //    mut msg_stream: actix_ws::MessageStream,
     udp_network: UDPNetwork,
     mut video_receiver: Receiver<VideoPacket>,
 ) {
     log::info!("connected");
 
     let pc = build_peer_connection(udp_network).await.unwrap();
-    let (ice_tx, mut ice_rx) = tokio::sync::mpsc::channel::<RTCIceCandidateInit>(1);
+    let (ice_tx, _ice_rx) = tokio::sync::mpsc::channel::<RTCIceCandidateInit>(1);
     pc.on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
         log::debug!("Peer Connection State has changed: {}", s);
 
@@ -365,7 +359,7 @@ pub async fn echo_heartbeat_ws(
 
     let mut interval = interval(HEARTBEAT_INTERVAL);
     let mut signal_channel = SignalChannel::new(session, pc);
-    let reason = loop {
+    loop {
         // create "next client timeout check" future
         let tick = interval.tick();
         // required for select()
@@ -375,36 +369,29 @@ pub async fn echo_heartbeat_ws(
         // interval timer to tick, yielding the value of whichever one is ready first
         //        match future::select(msg_stream.next(), tick).await {
         tokio::select! {
-                    msg = msg_stream.next() => {
+                    msg = signal_channel.next() => {
                         if let Err(e) = signal_channel.handle_message(msg).await {
                             error!("Handle socket error {}", e);
-                            break None;
+                            break
                         }
                     },
-
 
                     // heartbeat interval ticked
                     _inst = tick => {
                         // if no heartbeat ping/pong received recently, close the connection
                         if signal_channel.timeout() {
-                            break None;
+                            error!("signalling channel timeout");
+                            break;
                         }
 
                         // send heartbeat ping
-                        let _ping_result = signal_channel.ping(b"").await;
+                        let _ping_result = signal_channel.ping().await;
                      },
-
-                    candidate = ice_rx.recv() => {
-                        if let Err(e) = signal_channel.send_candidate(candidate).await {
-                            error!("Error sending candidate: {}", e);
-                            break None;
-                        }
-
-                    },
                     packet_result = video_receiver.recv() => {
                         match packet_result {
                             Ok(packet) => {
-                                match signal_channel.get_subscription(packet.camera_id) {
+                                let sub = signal_channel.get_subscription(packet.camera_id);
+                                match sub {
                                     None => {
                                         let track_id = uuid::Uuid::new_v4();
                                         let track = Arc::new(TrackLocalStaticSample::new(
@@ -418,7 +405,7 @@ pub async fn echo_heartbeat_ws(
 
                                         debug!("Created new track: {:?}", track);
 
-                                        let rtp_sender = signal_channel.peer_connection.add_track(Arc::clone(&track) as Arc<dyn TrackLocal + Send + Sync>).await.unwrap();
+                                         let rtp_sender = signal_channel.peer_connection.add_track(Arc::clone(&track) as Arc<dyn TrackLocal + Send + Sync>).await.unwrap();
                                         let sender = rtp_sender.clone();
                                         tokio::spawn(async move {
                                             let mut rtcp_buf = vec![0u8; 1500];
@@ -431,9 +418,15 @@ pub async fn echo_heartbeat_ws(
                                     },
                                     Some(Subscription { camera_id: _, track_id: _, track, active }) => {
                                         if *active {
+                                            let packet_timestamp = if let Ok(t) = u32::try_from(packet.timestamp % 4_294_967_295i64) { // u32::MAX
+                                                t
+                                            } else {
+                                                log::error!("Invalid timestamp: {}", packet.timestamp);
+                                                0
+                                            };
                                         track.write_sample(&Sample {
                                             data: packet.data.into(),
-                                            packet_timestamp: packet.timestamp.try_into().expect("Failed timestamp conversion"),
+                                            packet_timestamp,
         //                                    duration: Duration::from_micros(packet.duration as u64),
                                             duration: Duration::from_secs(1),
                                             ..Default::default()
@@ -447,10 +440,10 @@ pub async fn echo_heartbeat_ws(
                         }
                     }
                 }
-    };
+    }
 
     // attempt to close connection gracefully
-    let _channel = signal_channel.close(reason).await;
+    let _channel = signal_channel.close().await;
 
     log::info!("disconnected");
 }

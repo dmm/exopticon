@@ -32,7 +32,6 @@ import { CameraService } from "../camera.service";
 })
 export class CameraDetailComponent implements OnInit {
   public camera$: Observable<Camera>;
-  public analysisConfig$: Observable<any>;
 
   constructor(
     public route: ActivatedRoute,
@@ -52,23 +51,18 @@ export class CameraDetailComponent implements OnInit {
         }
       })
     );
-    this.analysisConfig$ = this.route.paramMap.pipe(
-      switchMap((params: ParamMap) => {
-        return this.cameraService.getCameraAnalysisConfiguration(
-          +params.get("id")
-        );
-      })
-    );
+    //    this.analysisConfig$ = this.route.paramMap.pipe(
+    //      switchMap((params: ParamMap) => {
+    //        return this.cameraService.getCameraAnalysisConfiguration(
+    //          +params.get("id")
+    //        );
+    //      })
+    //    );
   }
 
-  onSubmit(camera, analysisConfiguration) {
+  onSubmit(camera) {
     camera.onvifPort = +camera.onvifPort;
     this.camera$ = this.cameraService.setCamera(camera);
-    this.camera$.subscribe((camera) => {
-      this.analysisConfig$ = this.cameraService.setCameraAnalysisConfiguration(
-        camera.id,
-        analysisConfiguration
-      );
-    });
+    this.camera$.subscribe((_camera) => {});
   }
 }

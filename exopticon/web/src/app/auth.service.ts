@@ -39,8 +39,6 @@ export class AuthService {
       }),
       catchError(() => this.loggedIn.asObservable())
     );
-
-    return this.loggedIn.asObservable();
   }
 
   constructor(private http: HttpClient) {}

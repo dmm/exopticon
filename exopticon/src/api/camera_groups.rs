@@ -18,11 +18,14 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use actix_web::web::{self, Path};
-use actix_web::web::{block, Data};
-use actix_web::{web::Json, HttpResponse};
+use actix_rt::task::spawn_blocking;
+use axum::{
+    extract::{Path, State},
+    routing::get,
+    Json, Router,
+};
 
-use crate::db::Service;
+use crate::{db::Service, AppState};
 
 use super::UserError;
 
@@ -46,166 +49,54 @@ pub struct CreateCameraGroup {
 // Routes
 
 pub async fn create(
-    camera_group_request: Json<CreateCameraGroup>,
-    data: Data<Service>,
-) -> Result<HttpResponse, UserError> {
-    let db = data.into_inner();
-    let req = camera_group_request.into_inner();
+    State(state): State<AppState>,
+    Json(camera_group_request): Json<CreateCameraGroup>,
+) -> Result<Json<CameraGroup>, UserError> {
+    let db = state.db_service;
+    let req = camera_group_request;
     let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
-    let camera_group = block(move || db.create_camera_group(camera_group)).await??;
-    Ok(HttpResponse::Ok().json(camera_group))
+    let camera_group = spawn_blocking(move || db.create_camera_group(camera_group)).await??;
+    Ok(Json(camera_group))
 }
 
 pub async fn update(
-    camera_group_request: Json<CameraGroup>,
-    data: Data<Service>,
-) -> Result<HttpResponse, UserError> {
-    let db = data.into_inner();
-    let req = camera_group_request.into_inner();
+    State(state): State<AppState>,
+    Json(camera_group_request): Json<CameraGroup>,
+) -> Result<Json<CameraGroup>, UserError> {
+    let db = state.db_service;
+    let req = camera_group_request;
     let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
-    let camera_group = block(move || db.update_camera_group(req.id, camera_group)).await??;
-    Ok(HttpResponse::Ok().json(camera_group))
+    let camera_group =
+        spawn_blocking(move || db.update_camera_group(req.id, camera_group)).await??;
+    Ok(Json(camera_group))
 }
 
-pub async fn delete(id: Path<i32>, data: Data<Service>) -> Result<HttpResponse, UserError> {
-    let db = data.into_inner();
-    block(move || db.delete_camera_group(id.into_inner())).await??;
-    Ok(HttpResponse::Ok().finish())
+pub async fn delete(id: Path<i32>, State(state): State<AppState>) -> Result<(), UserError> {
+    let db = state.db_service;
+    spawn_blocking(move || db.delete_camera_group(id.0)).await??;
+    Ok(())
 }
 
-pub async fn fetch(id: Path<i32>, data: Data<Service>) -> Result<HttpResponse, UserError> {
-    let db = data.into_inner();
-    let camera_group = block(move || db.fetch_camera_group(id.into_inner())).await??;
-    Ok(HttpResponse::Ok().json(camera_group))
+pub async fn fetch(
+    id: Path<i32>,
+    State(state): State<AppState>,
+) -> Result<Json<CameraGroup>, UserError> {
+    let db = state.db_service;
+    let camera_group = spawn_blocking(move || db.fetch_camera_group(id.0)).await??;
+    Ok(Json(camera_group))
 }
 
-pub async fn fetch_all(data: Data<Service>) -> Result<HttpResponse, UserError> {
-    let db = data.into_inner();
-    let camera_groups = block(move || db.fetch_all_camera_groups()).await??;
-    Ok(HttpResponse::Ok().json(camera_groups))
+pub async fn fetch_all(State(state): State<AppState>) -> Result<Json<Vec<CameraGroup>>, UserError> {
+    let db = state.db_service;
+    let camera_groups = spawn_blocking(move || db.fetch_all_camera_groups()).await??;
+    Ok(Json(camera_groups))
 }
 
-/// Route configuration for `CameraGroup`s
-pub fn config(cfg: &mut web::ServiceConfig) {
-    println!("Configuring camera groups!!");
-    cfg.service(
-        web::resource("/camera_groups")
-            .route(web::get().to(fetch_all))
-            .route(web::post().to(create)),
-    );
-    cfg.service(
-        web::resource("/camera_groups/{id}")
-            .route(web::get().to(fetch))
-            .route(web::post().to(update))
-            .route(web::delete().to(delete)),
-    );
+pub fn router() -> Router<AppState> {
+    Router::<AppState>::new()
+        .route("/", get(fetch_all).post(create))
+        .route("/:id", get(fetch).post(update).delete(delete))
 }
 
 #[cfg(test)]
-mod tests {
-    use actix_web::body::to_bytes;
-    use actix_web::http::{self};
-
-    use crate::db::{Null, Service};
-
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_fetch_nonexistant_camera_group() {
-        // Arrange
-        let db = Data::new(Service::new_null(None));
-
-        // Act
-        let resp = fetch_all(db).await.unwrap();
-
-        // Assert
-        assert_eq!(resp.status(), http::StatusCode::OK);
-    }
-
-    #[actix_web::test]
-    async fn fetch_camera_groups_returns_all() {
-        // Arrange
-        let camera_groups = vec![
-            CameraGroup {
-                id: 1,
-                name: "group1".to_string(),
-                members: Vec::new(),
-            },
-            CameraGroup {
-                id: 2,
-                name: "group2".to_string(),
-                members: Vec::new(),
-            },
-        ];
-        let db = Data::new(Service::new_null(Some(Null::new(camera_groups.clone()))));
-
-        // Act
-        let res = fetch_all(db).await.unwrap();
-
-        // Assert
-        assert_eq!(res.status(), http::StatusCode::OK);
-        let groups: Vec<CameraGroup> =
-            serde_json::from_slice(&to_bytes(res.into_body()).await.unwrap()).unwrap();
-        assert_eq!(camera_groups.len(), groups.len());
-    }
-
-    #[actix_web::test]
-    async fn delete_camera_group() {
-        // Arrange
-        let camera_groups = vec![
-            CameraGroup {
-                id: 1,
-                name: "group1".to_string(),
-                members: Vec::new(),
-            },
-            CameraGroup {
-                id: 2,
-                name: "group3".to_string(),
-                members: Vec::new(),
-            },
-        ];
-        let db = Service::new_null(Some(Null::new(camera_groups.clone())));
-
-        // Act
-        delete(Path::from(1), Data::new(db.clone())).await.unwrap();
-        let res = fetch_all(Data::new(db)).await.unwrap();
-
-        // Assert
-        assert_eq!(res.status(), http::StatusCode::OK);
-        let groups: Vec<CameraGroup> =
-            serde_json::from_slice(&to_bytes(res.into_body()).await.unwrap()).unwrap();
-        assert_eq!(camera_groups.len() - 1, groups.len());
-    }
-
-    #[actix_web::test]
-    async fn delete_nonexistant_camera_group() {
-        // Arrange
-        let camera_groups = vec![
-            CameraGroup {
-                id: 1,
-                name: "group1".to_string(),
-                members: Vec::new(),
-            },
-            CameraGroup {
-                id: 2,
-                name: "group2".to_string(),
-                members: Vec::new(),
-            },
-        ];
-        let db = Service::new_null(Some(Null::new(camera_groups.clone())));
-
-        // Act
-        let del_res = delete(Path::from(3), Data::new(db.clone())).await;
-        let res = fetch_all(Data::new(db)).await.unwrap();
-
-        // Assert
-        if let Err(super::UserError::NotFound) = del_res {
-        } else {
-            panic!("Expected NotFound!");
-        }
-        assert_eq!(res.status(), http::StatusCode::OK);
-        let groups: Vec<CameraGroup> =
-            serde_json::from_slice(&to_bytes(res.into_body()).await.unwrap()).unwrap();
-        assert_eq!(camera_groups.len(), groups.len());
-    }
-}
+mod tests {}

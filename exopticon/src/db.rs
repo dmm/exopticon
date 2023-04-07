@@ -17,12 +17,17 @@
  * You should have received a copy of the GNU General Public License
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
+pub mod auth;
 pub mod camera_groups;
+pub mod cameras;
+pub mod storage_groups;
+pub mod video_units;
 
 use std::sync::{Arc, Mutex};
 
 use diesel::r2d2::ConnectionManager;
-use diesel::{self, PgConnection};
+use diesel::{BelongingToDsl, PgConnection};
+use thiserror::Error;
 
 use crate::api::camera_groups::CameraGroup;
 
@@ -96,9 +101,11 @@ impl Service {
     }
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error("not found")]
     NotFound,
+    #[error("other database error")]
     Other(OtherError),
 }
 

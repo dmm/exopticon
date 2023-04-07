@@ -23,6 +23,8 @@
 
 use actix_http::body::BoxBody;
 use actix_web::{http::StatusCode, web::Data, web::Json, web::Path, HttpResponse};
+use axum::extract::State;
+use axum::response::IntoResponse;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -32,6 +34,7 @@ use crate::app::RouteState;
 use crate::capture_supervisor::SyncCaptureActors;
 use crate::errors::ServiceError;
 use crate::models::{CreateCamera, FetchAllCamera, FetchCamera, UpdateCamera};
+use crate::AppState;
 
 #[derive(Debug)]
 /// Represents an error for camera routes

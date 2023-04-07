@@ -87,29 +87,13 @@ async fn echo_heartbeat_ws(
 ) -> Result<HttpResponse, Error> {
     let (response, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
-    // spawn websocket handler (and don't await it) so that the response is returned immediately
-    actix_web::rt::spawn(crate::webrtc_ws::echo_heartbeat_ws(
-        session,
-        msg_stream,
-        state.udp_network.clone(),
-        state.video_sender.subscribe(),
-    ));
-
     Ok(response)
 }
 
 /// helper function to create and returns the app after mounting all routes/resources
 #[allow(clippy::too_many_lines)]
 pub fn generate_config(cfg: &mut web::ServiceConfig) {
-    cfg
-        // routes for authentication
-        .service(
-            web::resource("/auth")
-                .route(web::post().to(login))
-                .route(web::get().to(check_login))
-                .route(web::delete().to(logout)),
-        )
-        .service(web::resource("/index.html").route(web::get().to(index)))
+    cfg.service(web::resource("/index.html").route(web::get().to(index)))
         .service(
             web::resource("/{file:[^/]+(.js|.js.map|.css)}")
                 .route(web::get().to(static_routes::fetch_static_file)),
@@ -128,41 +112,13 @@ pub fn generate_config(cfg: &mut web::ServiceConfig) {
                 .wrap(Auth)
                 .service(web::resource("/ws_json").route(web::get().to(ws_json_route)))
                 .service(web::resource("/ws").route(web::get().to(echo_heartbeat_ws)))
-                // personal access token routes
-                .service(
-                    web::resource("/personal_access_tokens")
-                        .route(web::get().to(fetch_personal_access_tokens))
-                        .route(web::post().to(create_personal_access_token)),
-                )
-                .service(
-                    web::resource("/personal_access_tokens/{id}")
-                        .route(web::delete().to(delete_personal_access_token)),
-                )
                 // routes to storage_group
                 .service(
                     web::resource("/storage_groups")
                         .route(web::post().to(create_storage_group))
                         .route(web::get().to(fetch_all_storage_groups)),
                 )
-                .service(
-                    web::resource("/storage_groups/{id}")
-                        .route(web::post().to(update_storage_group))
-                        .route(web::get().to(fetch_storage_group)),
-                )
-                // routes to camera groups
-                .configure(crate::api::camera_groups::config)
-                // routes to camera
-                .service(
-                    web::resource("/cameras")
-                        .route(web::post().to(create_camera))
-                        .route(web::get().to(fetch_all_cameras)),
-                )
                 .service(web::resource("/cameras/discover").route(web::get().to(discover)))
-                .service(
-                    web::resource("/cameras/{id}")
-                        .route(web::post().to(update_camera))
-                        .route(web::get().to(fetch_camera)),
-                )
                 .service(
                     web::resource("/cameras/{id}/time")
                         .route(web::post().to(fetch_time))

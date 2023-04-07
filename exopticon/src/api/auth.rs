@@ -1,0 +1,200 @@
+/*
+ * Exopticon - A free video surveillance system.
+ * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ *
+ * This file is part of Exopticon.
+ *
+ * Exopticon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Exopticon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+use actix_rt::task::spawn_blocking;
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    middleware::Next,
+    routing::get,
+    Extension, Json, Router,
+};
+use axum_extra::extract::{cookie::Cookie, CookieJar};
+use chrono::{DateTime, Duration, Utc};
+
+use rand::Rng;
+
+use crate::AppState;
+
+use super::UserError;
+
+const SESSION_COOKIE: &str = "id";
+
+/// Represents data for an authentication attempt
+#[derive(Debug, Deserialize)]
+pub struct AuthData {
+    /// username
+    pub username: String,
+    /// plaintext password
+    pub password: String,
+}
+
+/// User model without password. This is used as a return value for
+/// user operations.
+#[derive(Clone, Serialize)]
+pub struct User {
+    /// User id
+    pub id: i32,
+    /// username
+    pub username: String,
+    /// Olson database timezone, e.g. America/Chicago
+    pub timezone: String,
+}
+
+/// Request to create new user session
+#[derive(Clone, Deserialize)]
+pub struct CreateUserSession {
+    /// user session name
+    pub name: String,
+    /// id of user associated with session
+    pub user_id: i32,
+    /// session key value
+    pub session_key: String,
+    /// flag indicating where it is an api token or user session
+    pub is_token: bool,
+    /// Expiration timestamp
+    pub expiration: DateTime<Utc>,
+}
+
+/// Access Token model to return to user
+#[derive(Debug, Serialize)]
+pub struct SlimAccessToken {
+    /// user session id
+    pub id: i32,
+    /// user session name
+    pub name: String,
+    /// id of user associated with session
+    pub user_id: i32,
+    /// Expiration timestamp
+    pub expiration: DateTime<Utc>,
+}
+
+pub async fn login(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(auth_data): Json<AuthData>,
+) -> Result<CookieJar, UserError> {
+    let db = state.db_service.clone();
+    let db2 = state.db_service;
+
+    let user = spawn_blocking(move || db.login(&auth_data.username, &auth_data.password)).await??;
+
+    // We found a valid user with that password. Create a login session.
+    let session_key = base64::encode(&rand::thread_rng().gen::<[u8; 32]>());
+    let valid_time = Duration::days(7);
+    let expiration = match Utc::now().checked_add_signed(valid_time) {
+        None => {
+            error!("expiration date calculation failed!");
+            return Err(UserError::InternalError);
+        }
+        Some(time) => time,
+    };
+
+    let session = CreateUserSession {
+        name: String::new(),
+        user_id: user.id,
+        session_key,
+        is_token: false,
+        expiration,
+    };
+    let session_token = spawn_blocking(move || db2.create_user_session(&session)).await??;
+
+    let cookie = Cookie::build(SESSION_COOKIE, session_token)
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .same_site(axum_extra::extract::cookie::SameSite::Strict)
+        .finish();
+
+    let jar = jar.add(cookie);
+
+    Ok(jar)
+}
+
+pub async fn create_personal_access_token(
+    State(state): State<AppState>,
+    Json(create_token_request): Json<CreateUserSession>,
+) -> Result<Json<String>, UserError> {
+    let db = state.db_service;
+
+    // Ensure user session is a token
+    if !create_token_request.is_token {
+        return Err(UserError::Validation("Token flag must be set".to_string()));
+    }
+
+    let token = spawn_blocking(move || db.create_user_session(&create_token_request)).await??;
+
+    Ok(Json(token))
+}
+
+pub async fn delete_personal_access_token(
+    Path(id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<(), UserError> {
+    let db = state.db_service;
+
+    spawn_blocking(move || db.delete_user_session(id)).await??;
+    Ok(())
+}
+
+#[axum_macros::debug_handler]
+pub async fn fetch_personal_access_tokens(
+    State(state): State<AppState>,
+    Extension(user): Extension<User>,
+) -> Result<Json<Vec<SlimAccessToken>>, UserError> {
+    let db = state.db_service;
+
+    let tokens = spawn_blocking(move || db.fetch_users_tokens(user.id)).await??;
+
+    Ok(Json(tokens))
+}
+
+pub async fn auth_middleware<B>(
+    State(state): State<AppState>,
+    // you can add more extractors here but the last
+    // extractor must implement `FromRequest` which
+    // `Request` does
+    mut request: axum::http::Request<B>,
+    next: Next<B>,
+) -> Result<axum::response::Response, StatusCode> {
+    let jar = CookieJar::from_headers(&request.headers());
+    let session_cookie = jar.get("id");
+    let session_key = session_cookie.map(|x| String::from(x.value()));
+
+    if let Some(session_key) = session_key {
+        let db = state.db_service;
+        if let Ok(Ok(user)) = spawn_blocking(move || db.validate_user_session(&session_key)).await {
+            request.extensions_mut().insert(user);
+            let response = next.run(request).await;
+            return Ok(response);
+        }
+    }
+
+    Err(StatusCode::UNAUTHORIZED)
+}
+
+pub fn personal_access_token_router() -> Router<AppState> {
+    Router::<AppState>::new()
+        .route(
+            "/",
+            get(fetch_personal_access_tokens).post(create_personal_access_token),
+        )
+        .route("/:id", axum::routing::delete(delete_personal_access_token))
+}

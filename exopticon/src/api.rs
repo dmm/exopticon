@@ -24,14 +24,27 @@ use std::{
 };
 
 use actix_http::StatusCode;
+use actix_rt::task::JoinError;
 use actix_web::{error, http::header::ContentType, HttpResponse};
+use axum::response::IntoResponse;
 
+use crate::super_capture_supervisor::CaptureSupervisorCommand;
+
+pub mod auth;
 pub mod camera_groups;
+pub mod cameras;
+pub mod static_files;
+pub mod storage_groups;
+pub mod video_units;
 
+/// Error to be presented to api user
 #[derive(Debug)]
 pub enum UserError {
+    /// resource wasn't found
     NotFound,
+    /// validation error
     Validation(String),
+    /// internal server error
     InternalError,
 }
 
@@ -64,12 +77,27 @@ impl error::ResponseError for UserError {
     }
 }
 
+impl IntoResponse for UserError {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            UserError::NotFound => StatusCode::NOT_FOUND.into_response(),
+            UserError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY.into_response(),
+            UserError::InternalError => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+}
+
 impl From<crate::db::Error> for UserError {
     fn from(err: crate::db::Error) -> Self {
         match err {
             crate::db::Error::NotFound => Self::NotFound,
             crate::db::Error::Other(_) => Self::InternalError,
         }
+    }
+}
+impl From<JoinError> for UserError {
+    fn from(_: JoinError) -> Self {
+        Self::InternalError
     }
 }
 
@@ -84,5 +112,11 @@ impl From<crate::business::Error> for UserError {
         match err {
             crate::business::Error::Validation(message) => Self::Validation(message),
         }
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<CaptureSupervisorCommand>> for UserError {
+    fn from(_: tokio::sync::mpsc::error::SendError<CaptureSupervisorCommand>) -> Self {
+        Self::InternalError
     }
 }

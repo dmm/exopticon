@@ -188,30 +188,53 @@ mod webrtc_ws;
 /// Implements camera frame pub/sub
 mod ws_camera_server;
 
+mod super_capture_actor;
+mod super_capture_supervisor;
 /// Implements a websocket session
 mod ws_session;
 
+use crate::api::auth::{
+    auth_middleware, create_personal_access_token, delete_personal_access_token,
+    fetch_personal_access_tokens,
+};
+use crate::api::static_files::{index_file_handler, static_file_handler};
+use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
 use crate::capture_supervisor::CaptureSupervisor;
 use crate::models::DbExecutor;
+use crate::webrtc_ws::echo_heartbeat_ws;
 use actix::prelude::*;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::cookie::SameSite;
 use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
+use axum::extract::{ConnectInfo, State, WebSocketUpgrade};
+use axum::response::IntoResponse;
+use axum::routing::{delete, get, post};
+use axum::{headers, middleware, Router, TypedHeader};
 use dialoguer::{Input, PasswordInput};
 use dotenv::dotenv;
+use super_capture_actor::VideoPacket;
+use super_capture_supervisor::CaptureSupervisorCommand;
 use time::Duration;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
+use tower_http::trace::{self, TraceLayer};
+use tracing::Level;
+use tracing_subscriber::Layer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use webrtc::ice::udp_mux::{UDPMuxDefault, UDPMuxParams};
 use webrtc::ice::udp_network::UDPNetwork;
 
 use std::collections::HashMap;
 use std::env;
+use std::net::SocketAddr;
 
 use crate::app::RouteState;
 use crate::models::{CreateStorageGroup, CreateUser};
 use crate::root_supervisor::{ExopticonMode, RootSupervisor};
+
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 embed_migrations!("migrations/");
 
@@ -284,11 +307,116 @@ async fn add_storage_group(address: &Addr<DbExecutor>) -> Result<bool, std::io::
     println!("Created storage group!");
     Ok(true)
 }
+#[derive(Clone)]
+pub struct AppState {
+    pub db_service: crate::db::Service,
+    pub capture_channel: mpsc::Sender<CaptureSupervisorCommand>,
+    pub udp_network: UDPNetwork,
+    pub video_sender: broadcast::Sender<VideoPacket>,
+}
+
+async fn ws_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| {
+        echo_heartbeat_ws(socket, state.udp_network, state.video_sender.subscribe())
+    })
+}
+
+#[tokio::main]
+async fn main() {
+    //    console_subscriber::init();
+
+    //    let console_layer = console_subscriber::spawn();
+    tracing_subscriber::registry()
+        //        .with(console_layer)
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .without_time()
+                .with_filter(tracing_subscriber::filter::LevelFilter::DEBUG),
+        )
+        .init();
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    // create db connection pool
+    let db_service = crate::db::Service::new(&database_url);
+    let pool = match db_service.clone().pool {
+        crate::db::ServiceKind::Real(p) => p,
+        crate::db::ServiceKind::Null(_) => {
+            panic!("Tried to start Exopticon with a null db pool!")
+        }
+    };
+
+    // Run migrations
+    info!("Running migrations...");
+    embedded_migrations::run_with_output(
+        &pool.get().expect("migration connection failed"),
+        &mut std::io::stdout(),
+    )
+    .expect("migrations failed!");
+
+    let udp_socket = tokio::net::UdpSocket::bind(("0.0.0.0", 4000))
+        .await
+        .expect("Unable to open udp socket");
+    let udp_mux = UDPMuxDefault::new(UDPMuxParams::new(udp_socket));
+
+    let udp_network = UDPNetwork::Muxed(udp_mux);
+
+    // Start capture supervisor
+    let capture_supervisor = super_capture_supervisor::CaptureSupervisor::new(db_service.clone());
+    let capture_channel = capture_supervisor.get_command_channel();
+
+    let state = AppState {
+        db_service,
+        capture_channel,
+        udp_network,
+        video_sender: capture_supervisor.get_packet_sender(),
+    };
+
+    // TODO: watch this future for exit...
+    info!("Launching capture supervisor...");
+    tokio::spawn(capture_supervisor.supervise());
+
+    let app = Router::new()
+        .route("/v1/ws", get(ws_handler))
+        .nest(
+            "/v1/personal_access_tokens",
+            auth::personal_access_token_router(),
+        )
+        .nest("/v1/storage_groups", storage_groups::router())
+        .nest("/v1/camera_groups", camera_groups::router())
+        .nest("/v1/cameras", cameras::router())
+        .nest("/v1/video_units", video_units::router())
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
+        // public routes
+        .route("/auth", get(cameras::fetch_all).post(auth::login))
+        .route("/index.html", get(index_file_handler))
+        .route("/assets/:path", get(static_file_handler))
+        .route("/icons/:path", get(static_file_handler))
+        .route("/", get(index_file_handler))
+        .route("/*path", get(index_file_handler))
+        .with_state(state)
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+        );
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    tracing::debug!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}
 
 #[actix_web::main]
-async fn main() {
+async fn main2() {
     env_logger::init();
-
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 

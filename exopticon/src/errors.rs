@@ -18,6 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use actix::MailboxError;
 // errors.rs
 use actix_web::error::ResponseError;
 use actix_web::HttpResponse;
@@ -72,5 +73,11 @@ impl From<std::io::Error> for ServiceError {
 impl From<()> for ServiceError {
     fn from(_: ()) -> Self {
         Self::InternalServerError
+    }
+}
+
+impl From<ServiceError> for axum::http::StatusCode {
+    fn from(_: ServiceError) -> Self {
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR
     }
 }

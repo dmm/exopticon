@@ -210,7 +210,11 @@ export class WebrtcService {
       await this.sendOffer();
     };
 
-    //    this.peerConnection.onicecandidate = (event) => {};
+    this.peerConnection.onicecandidate = (event) => {
+      if (event.candidate !== null) {
+        console.log(`GOT LOCAL candidate: ${event.candidate.address}`);
+      }
+    };
 
     this.peerConnection.ontrack = (event) => {
       for (let sub of this.subscriptions.values()) {
@@ -227,6 +231,7 @@ export class WebrtcService {
     try {
       let offer = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offer);
+
       this.signalSocket.send(
         JSON.stringify({
           kind: "offer",

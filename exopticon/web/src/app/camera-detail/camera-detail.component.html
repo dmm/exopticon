@@ -18,7 +18,7 @@
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <h2>Camera Details</h2>
-<ng-container *ngIf="analysisConfig$ | async as analysisConfig">
+<ng-container >
   <div class="camera-wrapper" *ngIf="camera$ | async as camera">
     <h3>"{{ camera.name }}"</h3>
     <div class="submitMessage"></div>
@@ -68,21 +68,7 @@
         name="ptzType"
       />
 
-      <label>Analysis Configuration</label>
-      <select
-        class="form-control"
-        id="analysisConfiguration"
-        name="analysisConfiguration"
-        required
-        [(ngModel)]="analysisConfig.analysisType"
-      >
-        <option value="none">None</option>
-        <option value="motion">Motion</option>
-        <option value="yolo">Yolo</option>
-        <option value="coral">Coral</option>
-      </select>
-
-      <button type="submit" (click)="onSubmit(camera, analysisConfig)">
+      <button type="submit" (click)="onSubmit(camera)">
         Edit Camera
       </button>
     </form>
