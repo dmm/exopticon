@@ -19,6 +19,7 @@
  */
 
 use chrono::{DateTime, NaiveDateTime, Utc};
+use diesel::dsl::any;
 use diesel::{BelongingToDsl, Connection, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl};
 use uuid::Uuid;
 
@@ -289,4 +290,111 @@ impl Service {
     }
 
     // Delete Video Units
+
+    pub fn delete_video_unit(&self, delete_id: Uuid) -> anyhow::Result<()> {
+        use crate::schema;
+        use crate::schema::event_observations::dsl::*;
+        use crate::schema::events::dsl::*;
+        use crate::schema::observation_snapshots::dsl::*;
+        use crate::schema::observations::dsl::*;
+        use crate::schema::video_files::dsl::*;
+        use crate::schema::video_units::dsl::*;
+
+        match &self.pool {
+            ServiceKind::Real(pool) => {
+                let conn = pool.get()?;
+
+                // Delete VideoFiles associated with VideoUnit
+
+                // fetch video files to be deleted
+                let files: Vec<String> = video_files
+                    .inner_join(video_units)
+                    .filter(schema::video_files::columns::video_unit_id.eq(&delete_id))
+                    .select(filename)
+                    .load(&conn)?;
+
+                for f in files {
+                    debug!("Deleting file: {}", f);
+                    match std::fs::remove_file(&f) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            if err.kind() == std::io::ErrorKind::NotFound {
+                                // this is arguably a non-error error
+                                error!("Failed to delete file because it is missing: {}", f);
+                            } else {
+                                error!("Failed to delete file for other reasons... {}", err);
+                            }
+                        }
+                    }
+                }
+
+                // delete video files owned by VideoUnit
+                diesel::delete(
+                    video_files.filter(schema::video_files::columns::video_unit_id.eq(delete_id)),
+                )
+                .execute(&conn)?;
+
+                // fetch observation snapshots
+                let snaps: Vec<String> = observation_snapshots
+                    .inner_join(observations)
+                    .filter(schema::observations::columns::video_unit_id.eq(delete_id))
+                    .select(snapshot_path)
+                    .load(&conn)?;
+
+                for s in snaps {
+                    debug!("Deleting snapshot: {}", &s);
+                    if std::fs::remove_file(&s).is_err() {
+                        error!("Failed to delete file: {}", &s);
+                    }
+                }
+
+                let snapshot_delete_count = diesel::delete(
+                    observation_snapshots.filter(
+                        schema::observation_snapshots::columns::observation_id.eq_any(
+                            observations
+                                .filter(schema::observations::columns::video_unit_id.eq(delete_id))
+                                .select(schema::observations::columns::id),
+                        ),
+                    ),
+                )
+                .execute(&conn)?;
+
+                debug!("Deleted {} snapshots.", snapshot_delete_count);
+
+                // Remove observations associated with VideoUnit
+                let observation_ids: Vec<i64> = observations
+                    .filter(schema::observations::columns::video_unit_id.eq(delete_id))
+                    .select(schema::observations::columns::id)
+                    .load(&conn)?;
+
+                // delete event_observations
+                diesel::delete(event_observations)
+                    .filter(
+                        schema::event_observations::columns::observation_id
+                            .eq(any(&observation_ids)),
+                    )
+                    .execute(&conn)?;
+
+                // remove events without any observations
+                let empty_events = events
+                    .left_outer_join(schema::event_observations::table)
+                    .or_filter(schema::event_observations::columns::observation_id.is_null())
+                    .select(schema::events::columns::id)
+                    .load::<Uuid>(&conn)?;
+
+                diesel::delete(events.filter(schema::events::columns::id.eq(any(&empty_events))))
+                    .execute(&conn)?;
+
+                // finally delete observations
+                diesel::delete(
+                    observations
+                        .filter(schema::observations::columns::video_unit_id.eq(&delete_id)),
+                )
+                .execute(&conn)?;
+
+                Ok(())
+            }
+            ServiceKind::Null(_) => todo!(),
+        }
+    }
 }

@@ -190,6 +190,8 @@ mod ws_camera_server;
 
 mod super_capture_actor;
 mod super_capture_supervisor;
+mod super_deletion_actor;
+mod super_deletion_supervisor;
 /// Implements a websocket session
 mod ws_session;
 
@@ -201,6 +203,7 @@ use crate::api::static_files::{index_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
 use crate::capture_supervisor::CaptureSupervisor;
 use crate::models::DbExecutor;
+use crate::super_deletion_supervisor::DeletionSupervisor;
 use crate::webrtc_ws::echo_heartbeat_ws;
 use actix::prelude::*;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
@@ -367,6 +370,8 @@ async fn main() {
     let capture_supervisor = super_capture_supervisor::CaptureSupervisor::new(db_service.clone());
     let capture_channel = capture_supervisor.get_command_channel();
 
+    let deletion_supervisor = DeletionSupervisor::new(db_service.clone());
+
     let state = AppState {
         db_service,
         capture_channel,
@@ -377,6 +382,7 @@ async fn main() {
     // TODO: watch this future for exit...
     info!("Launching capture supervisor...");
     tokio::spawn(capture_supervisor.supervise());
+    tokio::spawn(deletion_supervisor.supervise());
 
     let app = Router::new()
         .route("/v1/ws", get(ws_handler))

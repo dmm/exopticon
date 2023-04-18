@@ -19,9 +19,15 @@
  */
 
 use chrono::NaiveDateTime;
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use diesel::{dsl::sum, ExpressionMethods, QueryDsl, RunQueryDsl};
 
-use crate::schema::storage_groups;
+use crate::{
+    db::{
+        cameras::Camera,
+        video_units::{VideoFile, VideoUnit},
+    },
+    schema::storage_groups,
+};
 
 /// Full storage group model. Represents a full row returned from the
 /// database.
@@ -73,6 +79,14 @@ impl From<crate::api::storage_groups::UpdateStorageGroup> for UpdateStorageGroup
             max_storage_size: g.max_storage_size,
         }
     }
+}
+
+/// Represents the current state of storage group, with a snapshot of
+/// older video units
+pub struct StorageGroupOldFiles {
+    pub storage_group_capacity: i64,
+    pub storage_group_size: i64,
+    pub video_units: Vec<(i64, VideoUnit, VideoFile)>,
 }
 
 impl super::Service {
@@ -165,6 +179,59 @@ impl super::Service {
                 Ok(())
             }
             super::ServiceKind::Null(_) => todo!(),
+        }
+    }
+
+    pub fn fetch_storage_group_old_units(
+        &self,
+        sid: i32,
+        count: i64,
+    ) -> Result<StorageGroupOldFiles, super::Error> {
+        use crate::schema::cameras::dsl::*;
+        use crate::schema::observation_snapshots::dsl::*;
+        use crate::schema::observations::dsl::*;
+        use crate::schema::storage_groups;
+        use crate::schema::video_files::dsl::*;
+        use crate::schema::video_units::dsl::*;
+
+        match &self.pool {
+            crate::db::ServiceKind::Real(pool) => {
+                let conn = pool.get()?;
+
+                let storage_group_capacity = storage_groups::dsl::storage_groups
+                    .select(storage_groups::max_storage_size)
+                    .filter(storage_groups::columns::id.eq(sid))
+                    .first::<i64>(&conn)?;
+
+                let storage_group_size = video_files
+                    .select(sum(size))
+                    .inner_join(video_units.inner_join(cameras))
+                    .filter(storage_group_id.eq(sid))
+                    .filter(size.ne(-1))
+                    .first::<Option<i64>>(&conn)?
+                    .unwrap_or(0);
+
+                let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras
+                    .inner_join(video_units.inner_join(video_files))
+                    .filter(storage_group_id.eq(sid))
+                    .filter(size.gt(-1))
+                    .filter(begin_time.ne(end_time))
+                    .order(begin_time.asc())
+                    .limit(count)
+                    .load(&conn)?;
+
+                let units = c
+                    .into_iter()
+                    .map(|(c, (unit, file))| (file.size.into(), unit, file))
+                    .collect();
+
+                Ok(StorageGroupOldFiles {
+                    storage_group_capacity,
+                    storage_group_size,
+                    video_units: units,
+                })
+            }
+            crate::db::ServiceKind::Null(_) => todo!(),
         }
     }
 }
