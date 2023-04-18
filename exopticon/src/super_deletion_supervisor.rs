@@ -20,8 +20,8 @@
 
 use std::time::Duration;
 
-use actix_rt::task::{spawn_blocking, JoinHandle};
 use futures::{stream::FuturesUnordered, StreamExt};
+use tokio::task::{spawn_blocking, JoinHandle};
 
 use crate::super_deletion_actor;
 

@@ -25,7 +25,6 @@ use std::{
     time::Instant,
 };
 
-use actix_rt::task::spawn_blocking;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
@@ -33,6 +32,7 @@ use tokio::{
     fs,
     process::{Child, ChildStdin, ChildStdout, Command},
     sync::{broadcast, mpsc},
+    task::spawn_blocking,
 };
 use tokio_util::codec::{length_delimited, FramedRead, LengthDelimitedCodec};
 use uuid::Uuid;

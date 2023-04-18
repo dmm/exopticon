@@ -23,10 +23,8 @@ use std::{
     fmt::{self, Display},
 };
 
-use actix_http::StatusCode;
-use actix_rt::task::JoinError;
-use actix_web::{error, http::header::ContentType, HttpResponse};
-use axum::response::IntoResponse;
+use axum::{http::StatusCode, response::IntoResponse};
+use tokio::task::JoinError;
 
 use crate::super_capture_supervisor::CaptureSupervisorCommand;
 
@@ -56,27 +54,6 @@ impl Display for UserError {
     }
 }
 
-impl error::ResponseError for UserError {
-    fn error_response(&self) -> HttpResponse {
-        let mut res = HttpResponse::build(self.status_code());
-        res.insert_header(ContentType::json());
-
-        if let Self::Validation(msg) = self {
-            res.body(String::from(msg))
-        } else {
-            res.finish()
-        }
-    }
-
-    fn status_code(&self) -> StatusCode {
-        match self {
-            Self::NotFound => StatusCode::NOT_FOUND,
-            Self::Validation(_msg) => StatusCode::UNPROCESSABLE_ENTITY,
-            Self::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
-}
-
 impl IntoResponse for UserError {
     fn into_response(self) -> axum::response::Response {
         match self {
@@ -97,12 +74,6 @@ impl From<crate::db::Error> for UserError {
 }
 impl From<JoinError> for UserError {
     fn from(_: JoinError) -> Self {
-        Self::InternalError
-    }
-}
-
-impl From<actix_web::error::BlockingError> for UserError {
-    fn from(_err: actix_web::error::BlockingError) -> Self {
         Self::InternalError
     }
 }

@@ -20,7 +20,7 @@
 
 use std::time::Duration;
 
-use actix_rt::task::spawn_blocking;
+use tokio::task::spawn_blocking;
 
 use crate::db::storage_groups::StorageGroupOldFiles;
 

@@ -18,7 +18,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use actix_rt::task::spawn_blocking;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -28,6 +27,7 @@ use axum::{
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use chrono::{DateTime, Duration, Utc};
+use tokio::task::spawn_blocking;
 
 use rand::Rng;
 

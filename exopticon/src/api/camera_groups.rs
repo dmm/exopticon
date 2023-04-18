@@ -18,12 +18,12 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use actix_rt::task::spawn_blocking;
 use axum::{
     extract::{Path, State},
     routing::get,
     Json, Router,
 };
+use tokio::task::spawn_blocking;
 
 use crate::{db::Service, AppState};
 

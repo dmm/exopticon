@@ -16,17 +16,6 @@ default-run = "exopticon"
 [dependencies]
 onvif = { path = "../onvif" }
 exserial = { path = "../exserial" }
-actix = "0.12"
-actix-files = "0.6"
-actix-http = "3"
-actix-identity = "0.4"
-actix-interop = "0.3"
-actix-rt = "2.7"
-actix-service = "2"
-actix-web = "4"
-actix-web-actors = "4.1"
-actix-web-prom = "0.6.0"
-actix-ws = "0.2.5"
 axum = { version = "0.6", features = ["ws", "headers"]}
 axum-extra = { version = "0.7", features = ["cookie"]}
 axum-macros = "0.3"

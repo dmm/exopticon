@@ -18,13 +18,13 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use actix_rt::task::spawn_blocking;
 use axum::{
     extract::{Path, Query, State},
     routing::get,
     Json, Router,
 };
 use chrono::{DateTime, NaiveDateTime, Utc};
+use tokio::task::spawn_blocking;
 use uuid::Uuid;
 
 use crate::AppState;
