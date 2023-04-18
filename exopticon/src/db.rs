@@ -26,10 +26,27 @@ pub mod video_units;
 use std::sync::{Arc, Mutex};
 
 use diesel::r2d2::ConnectionManager;
-use diesel::{BelongingToDsl, PgConnection};
+use diesel::PgConnection;
 use thiserror::Error;
 
 use crate::api::camera_groups::CameraGroup;
+
+// macro_rules! create_struct {
+//     ($idtype:ty, $name:ident { $($field:ident : $type:ty),+ $(,)? }) => {
+//         struct $name {
+//             id: $idtype,
+//             $($field: $type),+
+//         }
+
+//         struct [<Create $name>] {
+//             $($field: $type),+
+//         }
+
+//         struct [<Update $name>] {
+//             $($field: Option<$type>),+
+//         }
+//     };
+// }
 
 pub struct Null {
     camera_groups: Vec<CameraGroup>,

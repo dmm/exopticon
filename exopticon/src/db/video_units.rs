@@ -20,7 +20,7 @@
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel::dsl::any;
-use diesel::{BelongingToDsl, Connection, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl};
+use diesel::{BelongingToDsl, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use uuid::Uuid;
 
 use crate::db::cameras::Camera;
@@ -210,9 +210,6 @@ impl Service {
         end_time: NaiveDateTime,
         file_size: i32,
     ) -> Result<VideoSegment, super::Error> {
-        use crate::schema::video_files;
-        use crate::schema::video_units;
-
         match &self.pool {
             ServiceKind::Real(pool) => {
                 let conn = pool.get()?;

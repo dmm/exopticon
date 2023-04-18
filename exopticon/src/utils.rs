@@ -31,6 +31,7 @@ use crate::errors::ServiceError;
 ///
 /// `plain` - plaintext password to be hashed
 ///
+#[allow(dead_code)]
 pub fn hash_password(plain: &str) -> Result<String, ServiceError> {
     // get the hashing cost from the env variable or use default
     let hashing_cost: u32 =

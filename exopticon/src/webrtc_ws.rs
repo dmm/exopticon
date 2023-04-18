@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -251,7 +250,7 @@ impl SignalChannel {
                         }
                     }
 
-                    Message::Binary(bin) => {}
+                    Message::Binary(_bin) => {}
 
                     Message::Close(_reason) => {
                         return Err(anyhow!("socket closed"));
@@ -280,7 +279,7 @@ impl SignalChannel {
 /// connection health to detect network issues and free up resources.
 #[allow(clippy::too_many_lines)]
 pub async fn echo_heartbeat_ws(
-    mut session: WebSocket,
+    session: WebSocket,
     //    session: actix_ws::Session,
     //    mut msg_stream: actix_ws::MessageStream,
     udp_network: UDPNetwork,

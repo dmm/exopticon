@@ -85,8 +85,6 @@ pub struct CreateVideoFile {
     pub video_unit_id: Uuid,
 }
 
-type VideoSegment = (VideoUnit, VideoFile);
-
 #[derive(Deserialize)]
 pub struct Interval {
     begin_time: DateTime<Utc>,

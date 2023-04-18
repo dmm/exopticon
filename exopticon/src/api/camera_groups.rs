@@ -25,7 +25,7 @@ use axum::{
 };
 use tokio::task::spawn_blocking;
 
-use crate::{db::Service, AppState};
+use crate::AppState;
 
 use super::UserError;
 

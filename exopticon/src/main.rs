@@ -44,7 +44,6 @@
 #![allow(clippy::missing_errors_doc)] // TODO: Fix this one
 #![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
 
-#[macro_use]
 extern crate base64_serde;
 #[macro_use]
 extern crate diesel;
@@ -93,7 +92,6 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{middleware, Router};
-use dialoguer::{Input, PasswordInput};
 use dotenv::dotenv;
 use super_capture_actor::VideoPacket;
 use super_capture_supervisor::CaptureSupervisorCommand;

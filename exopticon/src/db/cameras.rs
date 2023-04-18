@@ -110,8 +110,6 @@ impl From<crate::api::cameras::CreateCamera> for CreateCamera {
 #[derive(AsChangeset, Debug)]
 #[table_name = "cameras"]
 pub struct UpdateCamera {
-    /// id of camera to update
-    pub id: i32,
     /// if present, new storage group id
     pub storage_group_id: Option<i32>,
     /// if present, new camera name
@@ -139,7 +137,6 @@ pub struct UpdateCamera {
 impl From<crate::api::cameras::UpdateCamera> for UpdateCamera {
     fn from(u: crate::api::cameras::UpdateCamera) -> Self {
         Self {
-            id: u.id,
             storage_group_id: u.storage_group_id,
             name: u.name,
             ip: u.ip,
@@ -176,6 +173,7 @@ impl Service {
 
     pub fn update_camera(
         &self,
+        camera_id: i32,
         camera: crate::api::cameras::UpdateCamera,
     ) -> Result<crate::api::cameras::Camera, super::Error> {
         match &self.pool {
@@ -183,7 +181,7 @@ impl Service {
                 use crate::schema::cameras::dsl::*;
                 let conn = pool.get()?;
 
-                let c: Camera = diesel::update(cameras.filter(id.eq(camera.id)))
+                let c: Camera = diesel::update(cameras.filter(id.eq(camera_id)))
                     .set(&Into::<UpdateCamera>::into(camera))
                     .get_result(&conn)?;
 
@@ -193,13 +191,13 @@ impl Service {
         }
     }
 
-    pub fn delete_camera(&self, id: i32) -> Result<(), super::Error> {
+    pub fn delete_camera(&self, cid: i32) -> Result<(), super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
                 use crate::schema::cameras::dsl::*;
                 let conn = pool.get()?;
 
-                diesel::delete(cameras.filter(id.eq(id))).execute(&conn)?;
+                diesel::delete(cameras.filter(id.eq(cid))).execute(&conn)?;
                 Ok(())
             }
             ServiceKind::Null(_) => todo!(),

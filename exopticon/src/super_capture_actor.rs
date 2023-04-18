@@ -22,7 +22,6 @@ use std::{
     env,
     path::{Path, PathBuf},
     process::Stdio,
-    time::Instant,
 };
 
 use bytes::BytesMut;
@@ -60,8 +59,6 @@ enum State {
     Ready,
     Started,
     Recording,
-    Stopping,
-    Draining,
 }
 
 pub struct CaptureActor {
@@ -69,13 +66,10 @@ pub struct CaptureActor {
     db: crate::db::Service,
     camera: Camera,
     storage_group: StorageGroup,
-    capture_start: Instant,
     worker: Option<Child>,
     stdin: Option<ChildStdin>,
-    offset: i64,
     framed_stream: Option<FramedRead<ChildStdout, LengthDelimitedCodec>>,
     video_segment_id: Option<(Uuid, i32)>,
-    filename: Option<String>,
 
     /// Video Packet Sender
     sender: broadcast::Sender<VideoPacket>,
@@ -88,7 +82,6 @@ impl CaptureActor {
         db: crate::db::Service,
         camera: Camera,
         storage_group: StorageGroup,
-        capture_start: Instant,
         command_receiver: mpsc::Receiver<CaptureActorCommands>,
         sender: broadcast::Sender<VideoPacket>,
     ) -> CaptureActor {
@@ -97,14 +90,10 @@ impl CaptureActor {
             db,
             camera,
             storage_group,
-            capture_start,
             worker: None,
             stdin: None,
-            offset: 0,
             framed_stream: None,
             video_segment_id: None,
-            filename: None,
-
             command_receiver,
             sender,
         }
@@ -192,7 +181,7 @@ impl CaptureActor {
         {
             let db = self.db.clone();
             let file_size: i32 = metadata.len().try_into().unwrap_or(-1);
-            let res = spawn_blocking(move || {
+            spawn_blocking(move || {
                 db.close_video_segment(
                     video_unit_id,
                     video_file_id,
@@ -210,7 +199,7 @@ impl CaptureActor {
         timestamp: i64,
         duration: i64,
     ) -> anyhow::Result<()> {
-        if let Err(e) = self.sender.send(VideoPacket {
+        if let Err(_e) = self.sender.send(VideoPacket {
             camera_id: self.camera.id,
             data,
             timestamp,
@@ -226,18 +215,18 @@ impl CaptureActor {
     }
     async fn message_to_action(&mut self, msg: CaptureMessage) -> anyhow::Result<()> {
         match msg {
-            CaptureMessage::Log { message } => {} //debug!("capture worker log: {}", message)},
+            CaptureMessage::Log { message } => debug!("capture worker log: {}", message),
             CaptureMessage::Frame {
-                jpeg,
-                offset,
-                unscaled_width,
-                unscaled_height,
+                jpeg: _,
+                offset: _,
+                unscaled_width: _,
+                unscaled_height: _,
             } => {}
             CaptureMessage::ScaledFrame {
-                jpeg,
-                offset,
-                unscaled_width,
-                unscaled_height,
+                jpeg: _,
+                offset: _,
+                unscaled_width: _,
+                unscaled_height: _,
             } => {}
             CaptureMessage::Packet {
                 data,
@@ -256,7 +245,12 @@ impl CaptureActor {
                 let end_time = end_time.parse::<DateTime<Utc>>().expect("Parse failure!");
                 self.handle_close_file(&filename, end_time).await?;
             }
-            CaptureMessage::Metric { label, values } => todo!(),
+            CaptureMessage::Metric {
+                label: _,
+                values: _,
+            } => {
+                debug!("got capture metrics");
+            }
         }
         Ok(())
     }

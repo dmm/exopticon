@@ -25,9 +25,9 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
-use crate::{db::Service, super_capture_supervisor::CaptureSupervisorCommand, AppState};
+use crate::{super_capture_supervisor::CaptureSupervisorCommand, AppState};
 
-use super::{video_units::fetch_video_units_between, UserError};
+use super::UserError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Camera {
@@ -87,8 +87,6 @@ pub struct CreateCamera {
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateCamera {
-    /// id of camera to update
-    pub id: i32,
     /// if present, new storage group id
     pub storage_group_id: Option<i32>,
     /// if present, new camera name
@@ -137,7 +135,7 @@ pub async fn update(
 ) -> Result<Json<Camera>, UserError> {
     let db = state.db_service;
 
-    let updated_camera = spawn_blocking(move || db.update_camera(update_request)).await??;
+    let updated_camera = spawn_blocking(move || db.update_camera(id, update_request)).await??;
 
     info!("Sending capture restart signal command");
     state

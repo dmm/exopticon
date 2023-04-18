@@ -86,14 +86,12 @@ impl FileDeletionActor {
         Ok(())
     }
 
-    pub async fn run(mut self) -> i32 {
+    pub async fn run(mut self) {
         loop {
             if let Err(e) = self.work().await {
                 error!("Error deleting files! {}", e);
             }
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
-
-        self.storage_group_id
     }
 }

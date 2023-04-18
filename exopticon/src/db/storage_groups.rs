@@ -169,13 +169,13 @@ impl super::Service {
         }
     }
 
-    pub fn delete_storage_group(&self, id: i32) -> Result<(), super::Error> {
+    pub fn delete_storage_group(&self, sid: i32) -> Result<(), super::Error> {
         match &self.pool {
             super::ServiceKind::Real(pool) => {
                 use crate::schema::storage_groups::dsl::*;
                 let conn = pool.get()?;
 
-                diesel::delete(storage_groups.filter(id.eq(id))).execute(&conn)?;
+                diesel::delete(storage_groups.filter(id.eq(sid))).execute(&conn)?;
                 Ok(())
             }
             super::ServiceKind::Null(_) => todo!(),
@@ -188,9 +188,6 @@ impl super::Service {
         count: i64,
     ) -> Result<StorageGroupOldFiles, super::Error> {
         use crate::schema::cameras::dsl::*;
-        use crate::schema::observation_snapshots::dsl::*;
-        use crate::schema::observations::dsl::*;
-        use crate::schema::storage_groups;
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
 
@@ -222,7 +219,7 @@ impl super::Service {
 
                 let units = c
                     .into_iter()
-                    .map(|(c, (unit, file))| (file.size.into(), unit, file))
+                    .map(|(_c, (unit, file))| (file.size.into(), unit, file))
                     .collect();
 
                 Ok(StorageGroupOldFiles {

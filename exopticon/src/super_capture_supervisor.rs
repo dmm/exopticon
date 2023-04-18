@@ -19,11 +19,11 @@
  */
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio::task::{spawn_blocking, JoinError};
 
@@ -50,9 +50,7 @@ pub struct CaptureSupervisor {
     command_receiver: mpsc::Receiver<CaptureSupervisorCommand>,
     capture_channels: HashMap<i32, mpsc::Sender<CaptureActorCommands>>,
     capture_handles: FuturesUnordered<JoinHandle<i32>>,
-    capture_start: Instant,
     packet_sender: broadcast::Sender<VideoPacket>,
-    start_cameras_at: Option<Instant>,
 }
 
 impl CaptureSupervisor {
@@ -67,9 +65,7 @@ impl CaptureSupervisor {
             command_receiver,
             capture_channels: HashMap::new(),
             capture_handles: FuturesUnordered::new(),
-            capture_start: Instant::now(),
             packet_sender,
-            start_cameras_at: None,
         }
     }
 
@@ -113,7 +109,6 @@ impl CaptureSupervisor {
                 self.db.clone(),
                 c,
                 storage_group,
-                self.capture_start,
                 command_receiver,
                 self.packet_sender.clone(),
             );

@@ -18,8 +18,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::time::Duration;
-
 use futures::{stream::FuturesUnordered, StreamExt};
 use tokio::task::{spawn_blocking, JoinHandle};
 
@@ -27,7 +25,7 @@ use crate::super_deletion_actor;
 
 pub struct DeletionSupervisor {
     db: crate::db::Service,
-    delete_handles: FuturesUnordered<JoinHandle<i32>>,
+    delete_handles: FuturesUnordered<JoinHandle<()>>,
 }
 
 impl DeletionSupervisor {
@@ -45,7 +43,7 @@ impl DeletionSupervisor {
         // start deletion actors
         for s in storage_groups {
             debug!("Starting deletion actor for storage id {}", s.id);
-            let mut actor = super_deletion_actor::FileDeletionActor::new(s.id, self.db.clone());
+            let actor = super_deletion_actor::FileDeletionActor::new(s.id, self.db.clone());
 
             let fut = tokio::spawn(actor.run());
             self.delete_handles.push(fut);
@@ -55,11 +53,10 @@ impl DeletionSupervisor {
     }
 
     pub async fn supervise(mut self) -> anyhow::Result<()> {
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
         self.start_deletors().await?;
         loop {
             tokio::select! {
-                Some(storage_group_id) = self.delete_handles.next() => {
+                Some(_storage_group_id) = self.delete_handles.next() => {
                     error!("Deletion Actor died!");
                     return Err(anyhow::anyhow!("Deletion Actor died!"));
                 },

@@ -137,7 +137,7 @@ impl Service {
                 use crate::schema::user_sessions::dsl;
                 let conn = pool.get()?;
 
-                let s = diesel::insert_into(dsl::user_sessions)
+                diesel::insert_into(dsl::user_sessions)
                     .values((
                         dsl::name.eq(&session.name),
                         dsl::user_id.eq(&session.user_id),
@@ -191,7 +191,7 @@ impl Service {
         }
     }
 
-    pub fn fetch_users_tokens(&self, user_id: i32) -> Result<Vec<SlimAccessToken>, super::Error> {
+    pub fn fetch_users_tokens(&self, user_id2: i32) -> Result<Vec<SlimAccessToken>, super::Error> {
         match &self.pool {
             super::ServiceKind::Real(pool) => {
                 use crate::schema::user_sessions::dsl::*;
@@ -199,7 +199,7 @@ impl Service {
                 let conn = pool.get()?;
 
                 let sessions = user_sessions
-                    .filter(user_id.eq(user_id))
+                    .filter(user_id.eq(user_id2))
                     .filter(is_token.eq(true))
                     .load::<UserSession>(&conn)?;
                 Ok(sessions.into_iter().map(|x| x.into()).collect())
