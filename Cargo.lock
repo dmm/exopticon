@@ -1342,7 +1342,6 @@ dependencies = [
  "mock_instant",
  "mqtt-async-client",
  "onvif",
- "paste",
  "prometheus",
  "qstring",
  "r2d2",
@@ -2418,12 +2417,6 @@ checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
 dependencies = [
  "regex",
 ]
-
-[[package]]
-name = "paste"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
 
 [[package]]
 name = "pem"

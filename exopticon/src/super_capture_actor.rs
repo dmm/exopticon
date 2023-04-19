@@ -84,7 +84,7 @@ impl CaptureActor {
         storage_group: StorageGroup,
         command_receiver: mpsc::Receiver<CaptureActorCommands>,
         sender: broadcast::Sender<VideoPacket>,
-    ) -> CaptureActor {
+    ) -> Self {
         Self {
             state: State::Ready,
             db,
@@ -99,7 +99,7 @@ impl CaptureActor {
         }
     }
 
-    fn start_worker(&mut self) -> anyhow::Result<()> {
+    fn start_worker(&mut self) {
         debug!(
             "Starting worker process for camera: {}, id: {}, stream: {}",
             self.camera.common.name, self.camera.id, self.camera.common.rtsp_url
@@ -138,7 +138,6 @@ impl CaptureActor {
         self.worker = Some(child);
         self.stdin = Some(stdin);
         self.state = State::Started;
-        Ok(())
     }
 
     async fn handle_new_file(
@@ -163,7 +162,7 @@ impl CaptureActor {
         };
         let db = self.db.clone();
         let (video_unit, video_file) =
-            spawn_blocking(move || db.create_video_segment(create_video_unit, create_video_file))
+            spawn_blocking(move || db.create_video_segment(&create_video_unit, create_video_file))
                 .await??;
 
         self.video_segment_id = Some((video_unit.id, video_file.id));
@@ -193,12 +192,7 @@ impl CaptureActor {
         }
         Ok(())
     }
-    fn handle_packet(
-        &mut self,
-        data: Vec<u8>,
-        timestamp: i64,
-        duration: i64,
-    ) -> anyhow::Result<()> {
+    fn handle_packet(&mut self, data: Vec<u8>, timestamp: i64, duration: i64) {
         if let Err(_e) = self.sender.send(VideoPacket {
             camera_id: self.camera.id,
             data,
@@ -210,8 +204,6 @@ impl CaptureActor {
             //     self.camera.id, self.camera.common.name, e
             // );
         }
-
-        Ok(())
     }
     async fn message_to_action(&mut self, msg: CaptureMessage) -> anyhow::Result<()> {
         match msg {
@@ -221,8 +213,8 @@ impl CaptureActor {
                 offset: _,
                 unscaled_width: _,
                 unscaled_height: _,
-            } => {}
-            CaptureMessage::ScaledFrame {
+            }
+            | CaptureMessage::ScaledFrame {
                 jpeg: _,
                 offset: _,
                 unscaled_width: _,
@@ -234,7 +226,7 @@ impl CaptureActor {
                 duration,
             } => {
                 // TODO handle packets...
-                self.handle_packet(data, timestamp, duration)?;
+                self.handle_packet(data, timestamp, duration);
             }
             CaptureMessage::NewFile {
                 filename,
@@ -285,13 +277,12 @@ impl CaptureActor {
     }
 
     pub async fn run(mut self) -> i32 {
-        self.start_worker().expect("Staring worker failed...");
+        self.start_worker();
         loop {
             let res = self.select_next().await;
             match res {
                 Ok(true) => {}
-                Ok(false) => break,
-                Err(_) => break,
+                Ok(false) | Err(_) => break,
             }
         }
         self.camera.id

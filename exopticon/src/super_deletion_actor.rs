@@ -30,7 +30,7 @@ pub struct FileDeletionActor {
 }
 
 impl FileDeletionActor {
-    pub fn new(storage_group_id: i32, db: crate::db::Service) -> Self {
+    pub const fn new(storage_group_id: i32, db: crate::db::Service) -> Self {
         Self {
             storage_group_id,
             db,
@@ -62,7 +62,7 @@ impl FileDeletionActor {
 
         for (video_unit_id, filename) in video_unit_ids {
             // delete video unit
-            let vu_id = video_unit_id.clone();
+            let vu_id = video_unit_id;
             let db = self.db.clone();
             debug!("Deleting {} {}", video_unit_id, filename);
             if let Err(e) = spawn_blocking(move || db.delete_video_unit(vu_id)).await? {

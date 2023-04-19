@@ -39,7 +39,7 @@ const SESSION_COOKIE: &str = "id";
 
 /// Represents data for an authentication attempt
 #[derive(Debug, Deserialize)]
-pub struct AuthData {
+pub struct Data {
     /// username
     pub username: String,
     /// plaintext password
@@ -89,7 +89,7 @@ pub struct SlimAccessToken {
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
-    Json(auth_data): Json<AuthData>,
+    Json(auth_data): Json<Data>,
 ) -> Result<CookieJar, UserError> {
     let db = state.db_service.clone();
     let db2 = state.db_service;
@@ -154,7 +154,6 @@ pub async fn delete_personal_access_token(
     Ok(())
 }
 
-#[axum_macros::debug_handler]
 pub async fn fetch_personal_access_tokens(
     State(state): State<AppState>,
     Extension(user): Extension<User>,
@@ -166,7 +165,7 @@ pub async fn fetch_personal_access_tokens(
     Ok(Json(tokens))
 }
 
-pub async fn auth_middleware<B>(
+pub async fn middleware<B>(
     State(state): State<AppState>,
     // you can add more extractors here but the last
     // extractor must implement `FromRequest` which
@@ -174,7 +173,7 @@ pub async fn auth_middleware<B>(
     mut request: axum::http::Request<B>,
     next: Next<B>,
 ) -> Result<axum::response::Response, StatusCode> {
-    let jar = CookieJar::from_headers(&request.headers());
+    let jar = CookieJar::from_headers(request.headers());
     let session_cookie = jar.get("id");
     let session_key = session_cookie.map(|x| String::from(x.value()));
 

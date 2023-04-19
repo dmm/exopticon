@@ -93,9 +93,9 @@ impl Service {
         username: &str,
         password: &str,
     ) -> Result<crate::api::auth::User, super::Error> {
+        use crate::schema::users::dsl;
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                use crate::schema::users::dsl;
                 let conn = pool.get()?;
 
                 let u = dsl::users
@@ -114,10 +114,10 @@ impl Service {
     }
 
     pub fn fetch_user(&self, user_id: i32) -> Result<crate::api::auth::User, super::Error> {
+        use crate::schema::users::dsl;
         match &self.pool {
             crate::db::ServiceKind::Real(pool) => {
                 let conn = pool.get()?;
-                use crate::schema::users::dsl;
                 let u = dsl::users
                     .filter(dsl::id.eq(user_id))
                     .first::<User>(&conn)?;
@@ -132,9 +132,10 @@ impl Service {
         &self,
         session: &crate::api::auth::CreateUserSession,
     ) -> Result<String, super::Error> {
+        use crate::schema::user_sessions::dsl;
+
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                use crate::schema::user_sessions::dsl;
                 let conn = pool.get()?;
 
                 diesel::insert_into(dsl::user_sessions)
@@ -146,16 +147,16 @@ impl Service {
                         dsl::expiration.eq(&session.expiration),
                     ))
                     .execute(&conn)?;
-                return Ok(session.session_key.clone());
+                Ok(session.session_key.clone())
             }
             super::ServiceKind::Null(_) => todo!(),
         }
     }
 
     pub fn delete_user_session(&self, session_id: i32) -> Result<(), super::Error> {
+        use crate::schema::user_sessions::dsl::*;
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                use crate::schema::user_sessions::dsl::*;
                 let conn = pool.get()?;
 
                 diesel::delete(user_sessions.filter(id.eq(session_id))).execute(&conn)?;
@@ -192,17 +193,16 @@ impl Service {
     }
 
     pub fn fetch_users_tokens(&self, user_id2: i32) -> Result<Vec<SlimAccessToken>, super::Error> {
+        use crate::schema::user_sessions::dsl::*;
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                use crate::schema::user_sessions::dsl::*;
-
                 let conn = pool.get()?;
 
                 let sessions = user_sessions
                     .filter(user_id.eq(user_id2))
                     .filter(is_token.eq(true))
                     .load::<UserSession>(&conn)?;
-                Ok(sessions.into_iter().map(|x| x.into()).collect())
+                Ok(sessions.into_iter().map(std::convert::Into::into).collect())
             }
             super::ServiceKind::Null(_) => todo!(),
         }

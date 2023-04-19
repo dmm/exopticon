@@ -27,7 +27,7 @@ use crate::schema::cameras;
 use super::{Service, ServiceKind};
 
 /// Full camera model, represents database row
-#[derive(Identifiable, PartialEq, Associations, Debug, Queryable, Insertable)]
+#[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
 #[belongs_to(StorageGroup)]
 #[table_name = "cameras"]
 pub struct Camera {
@@ -61,7 +61,7 @@ pub struct Camera {
     pub updated_at: NaiveDateTime,
 }
 
-#[derive(PartialEq, Associations, Debug, Queryable, Insertable)]
+#[derive(PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
 #[belongs_to(StorageGroup)]
 #[table_name = "cameras"]
 pub struct CreateCamera {
@@ -228,7 +228,7 @@ impl Service {
 
                 let cameras: Vec<crate::db::cameras::Camera> =
                     crate::schema::cameras::dsl::cameras.load(&conn)?;
-                Ok(cameras.into_iter().map(|x| x.into()).collect())
+                Ok(cameras.into_iter().map(std::convert::Into::into).collect())
             }
             ServiceKind::Null(_) => todo!(),
         }

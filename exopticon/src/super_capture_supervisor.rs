@@ -120,7 +120,7 @@ impl CaptureSupervisor {
         Ok(())
     }
 
-    async fn handle_supervisor_command(&mut self, cmd: CaptureSupervisorCommand) {
+    fn handle_supervisor_command(&mut self, cmd: &CaptureSupervisorCommand) {
         info!("Got supervisor command!");
         match cmd {
             CaptureSupervisorCommand::RestartAll => {
@@ -130,20 +130,15 @@ impl CaptureSupervisor {
         }
     }
 
-    async fn handle_camera_event(&mut self, _res: Result<i32, JoinError>) {
+    fn handle_camera_event(&mut self, _res: &Result<i32, JoinError>) {
         match self.state {
-            State::Ready => {
-                // fine..
-            }
             State::Running => {
                 error!("Capture task died but we're supposed to be running. Restart all cameras");
                 self.state = State::Restarting;
             }
-            State::Restarting => {
-                // Update the still running task count
-            }
-            State::Draining => {
-                // ignoring
+            State::Ready | State::Restarting | State::Draining => {
+                // Ready => ignoring
+                // Restarting => update task count
             }
         }
     }
@@ -189,8 +184,8 @@ impl CaptureSupervisor {
 
             tokio::select! {
                 Some(cmd) = self.command_receiver.recv()
-                    => self.handle_supervisor_command(cmd).await,
-                Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(camera_id).await,
+                    => self.handle_supervisor_command(&cmd),
+                Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id),
                 _inst = tick => self.handle_tick().await,
                 else => break
             }

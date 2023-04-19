@@ -54,6 +54,6 @@ impl From<()> for ServiceError {
 
 impl From<ServiceError> for axum::http::StatusCode {
     fn from(_: ServiceError) -> Self {
-        axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        Self::INTERNAL_SERVER_ERROR
     }
 }

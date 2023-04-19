@@ -31,7 +31,7 @@ use crate::{
 
 /// Full storage group model. Represents a full row returned from the
 /// database.
-#[derive(Identifiable, PartialEq, Associations, Debug, Queryable, Insertable)]
+#[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
 #[table_name = "storage_groups"]
 pub struct StorageGroup {
     /// storage group id
@@ -163,7 +163,7 @@ impl super::Service {
 
                 let groups = dsl::storage_groups.load::<StorageGroup>(&conn)?;
 
-                Ok(groups.into_iter().map(|x| x.into()).collect())
+                Ok(groups.into_iter().map(std::convert::Into::into).collect())
             }
             super::ServiceKind::Null(_) => todo!(),
         }

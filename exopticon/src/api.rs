@@ -57,9 +57,9 @@ impl Display for UserError {
 impl IntoResponse for UserError {
     fn into_response(self) -> axum::response::Response {
         match self {
-            UserError::NotFound => StatusCode::NOT_FOUND.into_response(),
-            UserError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY.into_response(),
-            UserError::InternalError => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Self::NotFound => StatusCode::NOT_FOUND.into_response(),
+            Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY.into_response(),
+            Self::InternalError => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
 }

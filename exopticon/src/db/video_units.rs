@@ -164,7 +164,7 @@ impl Service {
     // create VideoSegment
     pub fn create_video_segment(
         &self,
-        video_unit: crate::api::video_units::CreateVideoUnit,
+        video_unit: &crate::api::video_units::CreateVideoUnit,
         video_file: crate::api::video_units::CreateVideoFile,
     ) -> Result<VideoSegment, super::Error> {
         match &self.pool {

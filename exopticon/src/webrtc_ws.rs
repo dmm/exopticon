@@ -169,7 +169,7 @@ impl SignalChannel {
         ];
         for c in candidates {
             let candidate = RTCIceCandidateInit {
-                candidate: format!("candidate:2388685802 1 udp 2130706431 {} 4000 typ host", c),
+                candidate: format!("candidate:2388685802 1 udp 2130706431 {c} 4000 typ host"),
                 sdp_mid: Some(String::new()),
                 sdp_mline_index: Some(0),
                 username_fragment: None,

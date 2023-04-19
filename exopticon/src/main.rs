@@ -44,7 +44,6 @@
 #![allow(clippy::missing_errors_doc)] // TODO: Fix this one
 #![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
 
-extern crate base64_serde;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -82,7 +81,6 @@ mod super_capture_supervisor;
 mod super_deletion_actor;
 mod super_deletion_supervisor;
 
-use crate::api::auth::auth_middleware;
 use crate::api::static_files::{index_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
 
@@ -119,6 +117,7 @@ pub struct AppState {
     pub video_sender: broadcast::Sender<VideoPacket>,
 }
 
+#[allow(clippy::unused_async)]
 async fn ws_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
     ws.on_upgrade(move |socket| {
         echo_heartbeat_ws(socket, state.udp_network, state.video_sender.subscribe())
@@ -197,7 +196,7 @@ async fn main() {
         .nest("/v1/video_units", video_units::router())
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
-            auth_middleware,
+            auth::middleware,
         ))
         // public routes
         .route("/auth", get(cameras::fetch_all).post(auth::login))
