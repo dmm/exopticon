@@ -96,8 +96,8 @@ use super_capture_supervisor::CaptureSupervisorCommand;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
-use tracing_subscriber::Layer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{EnvFilter, Layer};
 use webrtc::ice::udp_mux::{UDPMuxDefault, UDPMuxParams};
 use webrtc::ice::udp_network::UDPNetwork;
 
@@ -129,13 +129,14 @@ async fn main() {
     //    console_subscriber::init();
 
     //    let console_layer = console_subscriber::spawn();
+    let filter = EnvFilter::from_default_env();
     tracing_subscriber::registry()
         //        .with(console_layer)
         .with(
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
                 .without_time()
-                .with_filter(tracing_subscriber::filter::LevelFilter::DEBUG),
+                .with_filter(filter),
         )
         .init();
     dotenv().ok();
