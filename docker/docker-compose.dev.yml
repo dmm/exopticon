@@ -14,6 +14,7 @@ services:
       - EXOPTICON_SHORT_NAME
       - RUST_LOG
       - EXOPTICON_METRICS_ENABLED
+      - EXOPTICON_WEBRTC_IPS
     ports:
       - 0.0.0.0:3002:3000
       - "4000:4000/udp"

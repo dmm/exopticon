@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    env,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -161,13 +162,11 @@ impl SignalChannel {
     }
 
     async fn send_all_candidates(&mut self) -> anyhow::Result<()> {
-        let candidates = vec![
-            "dev.exopticon.org",
-            "192.168.5.110",
-            "fd5a:64a9:8631:4202:5054:ff:fe6a:2420",
-            "2604:2d80:5f83:4202:5054:ff:fe6a:2420",
-        ];
+        let candidate_string = env::var("EXOPTICON_WEBRTC_IPS")?;
+        debug!("CANDIDATES: {candidate_string}");
+        let candidates = candidate_string.split(',');
         for c in candidates {
+            debug!("CANDIDATE: {c}");
             let candidate = RTCIceCandidateInit {
                 candidate: format!("candidate:2388685802 1 udp 2130706431 {c} 4000 typ host"),
                 sdp_mid: Some(String::new()),
