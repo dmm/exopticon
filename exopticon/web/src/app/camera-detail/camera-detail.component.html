@@ -18,7 +18,7 @@
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <h2>Camera Details</h2>
-<ng-container >
+<ng-container>
   <div class="camera-wrapper" *ngIf="camera$ | async as camera">
     <h3>"{{ camera.name }}"</h3>
     <div class="submitMessage"></div>
@@ -68,9 +68,7 @@
         name="ptzType"
       />
 
-      <button type="submit" (click)="onSubmit(camera)">
-        Edit Camera
-      </button>
+      <button type="submit" (click)="onSubmit(camera)">Edit Camera</button>
     </form>
   </div>
 </ng-container>
