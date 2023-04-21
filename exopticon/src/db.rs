@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 pub mod auth;
 pub mod camera_groups;
 pub mod cameras;
@@ -30,23 +31,6 @@ use diesel::PgConnection;
 use thiserror::Error;
 
 use crate::api::camera_groups::CameraGroup;
-
-// macro_rules! create_struct {
-//     ($idtype:ty, $name:ident { $($field:ident : $type:ty),+ $(,)? }) => {
-//         struct $name {
-//             id: $idtype,
-//             $($field: $type),+
-//         }
-
-//         struct [<Create $name>] {
-//             $($field: $type),+
-//         }
-
-//         struct [<Update $name>] {
-//             $($field: Option<$type>),+
-//         }
-//     };
-// }
 
 pub struct Null {
     camera_groups: Vec<CameraGroup>,

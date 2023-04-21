@@ -36,7 +36,7 @@ use super::{Service, ServiceKind};
     Identifiable, Eq, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
 )]
 #[table_name = "camera_groups"]
-pub struct CameraGroup {
+struct CameraGroup {
     pub id: i32,
     pub name: String,
 }
@@ -46,7 +46,7 @@ pub struct CameraGroup {
 )]
 #[belongs_to(CameraGroup)]
 #[table_name = "camera_group_memberships"]
-pub struct CameraGroupMembership {
+struct CameraGroupMembership {
     pub id: i32,
     pub camera_group_id: i32,
     pub camera_id: i32,
@@ -371,9 +371,9 @@ mod integration_tests {
 
     fn populate_db(db: &Service) -> (i32, Vec<i32>) {
         if let ServiceKind::Real(pool) = &db.pool {
-            let storage_group: crate::models::StorageGroup =
+            let storage_group: crate::db::storage_groups::StorageGroup =
                 diesel::insert_into(crate::schema::storage_groups::table)
-                    .values(crate::models::CreateStorageGroup {
+                    .values(crate::db::storage_groups::CreateStorageGroup {
                         name: "testgroup".to_string(),
                         storage_path: "/test/path".to_string(),
                         max_storage_size: 100,
@@ -384,9 +384,9 @@ mod integration_tests {
             let mut cameras = Vec::new();
 
             for n in 1..10 {
-                let camera: crate::models::Camera =
+                let camera: crate::db::cameras::Camera =
                     diesel::insert_into(crate::schema::cameras::table)
-                        .values(crate::models::CreateCamera {
+                        .values(crate::db::cameras::CreateCamera {
                             storage_group_id: storage_group.id,
                             name: format!("TestCamera{}", n),
                             ip: "".to_string(),

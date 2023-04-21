@@ -59,6 +59,19 @@ impl From<StorageGroup> for crate::api::storage_groups::StorageGroup {
     }
 }
 
+/// Full storage group model. Represents a full row returned from the
+/// database.
+#[derive(PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
+#[table_name = "storage_groups"]
+pub struct CreateStorageGroup {
+    /// storage group name
+    pub name: String,
+    /// full path to video storage path, e.g. /mnt/video/8/
+    pub storage_path: String,
+    /// maximum allowed storage size in bytes
+    pub max_storage_size: i64,
+}
+
 /// Represents a storage group update request
 #[derive(AsChangeset, Debug)]
 #[table_name = "storage_groups"]
