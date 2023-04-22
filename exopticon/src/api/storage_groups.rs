@@ -30,6 +30,7 @@ use super::UserError;
 
 /// Public `StorageGroup` model
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StorageGroup {
     /// storage group id
     pub id: i32,

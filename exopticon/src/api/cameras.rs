@@ -30,6 +30,7 @@ use crate::{super_capture_supervisor::CaptureSupervisorCommand, AppState};
 use super::UserError;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Camera {
     /// id of camera
     pub id: i32,
@@ -60,6 +61,7 @@ impl From<crate::db::cameras::Camera> for Camera {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateCamera {
     /// id of associated storage group
     pub storage_group_id: i32,
@@ -86,6 +88,7 @@ pub struct CreateCamera {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateCamera {
     /// if present, new storage group id
     pub storage_group_id: Option<i32>,

@@ -48,6 +48,7 @@ pub struct VideoUnit {
 
 /// Represents request to create new video unit record
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateVideoUnit {
     /// id of associated camera
     pub camera_id: i32,
@@ -63,6 +64,7 @@ pub struct CreateVideoUnit {
 
 /// Full video file model, represents full database row
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VideoFile {
     /// id of video file
     pub id: i32,

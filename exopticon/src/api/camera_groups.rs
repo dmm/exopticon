@@ -33,6 +33,7 @@ use super::UserError;
 
 /// `CameraGroup` api resource
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CameraGroup {
     pub id: i32,
     pub name: String,
@@ -41,6 +42,7 @@ pub struct CameraGroup {
 
 /// Request to create new `CameraGroup`
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateCameraGroup {
     pub name: String,
     pub members: Vec<i32>,
