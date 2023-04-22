@@ -18,6 +18,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::time::Duration;
+
 use axum::{
     extract::{Path, State},
     Json, Router,
@@ -175,11 +177,74 @@ pub async fn fetch_all(State(state): State<AppState>) -> Result<Json<Vec<Camera>
     Ok(Json(cameras))
 }
 
+pub async fn ptz_relative_move(
+    Path((id, direction)): Path<(i32, String)>,
+    State(state): State<AppState>,
+) -> Result<(), UserError> {
+    let (x, y) = match direction.as_str() {
+        "left" => (-0.1, 0.0),
+        "right" => (0.1, 0.0),
+        "up" => (0.0, 0.1),
+        "down" => (0.0, -0.1),
+        _ => {
+            return Err(UserError::Validation(
+                "invalid direction provided".to_string(),
+            ))
+        }
+    };
+    let zoom = 0.0;
+
+    let db = state.db_service.clone();
+    let camera = spawn_blocking(move || db.fetch_camera(id)).await??;
+    let onvif_cam = onvif::camera::Camera {
+        host: camera.common.ip,
+        port: camera.common.onvif_port,
+        username: camera.common.username,
+        password: camera.common.password,
+    };
+    if camera.common.ptz_type == "onvif_continuous" {
+        //camera.ptz_type == "onvif_continuous"
+        // other cases??
+        // start continuous move
+        let con = onvif_cam
+            .continuous_move(&camera.common.ptz_profile_token, x, y, zoom, 500.0)
+            .await;
+
+        if let Err(_err) = con {
+            return Err(UserError::InternalError);
+        }
+
+        // wait
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // stop continuous move
+        let con = onvif_cam.stop(&camera.common.ptz_profile_token).await;
+
+        if let Err(_err) = con {
+            return Err(UserError::InternalError);
+        }
+    } else {
+        // default to using a relative move
+        if let Err(_err) = onvif_cam
+            .relative_move(&camera.common.ptz_profile_token, x, y, zoom)
+            .await
+        {
+            return Err(UserError::InternalError);
+        }
+    }
+
+    Ok(())
+}
+
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
         .route("/", axum::routing::get(fetch_all).post(create))
         .route(
             "/:id",
             axum::routing::get(fetch).post(update).delete(delete),
+        )
+        .route(
+            "/:id/ptz/:direction",
+            axum::routing::post(ptz_relative_move),
         )
 }
