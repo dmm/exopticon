@@ -55,6 +55,7 @@ pub enum CaptureActorCommands {
     Stop,
 }
 
+#[derive(Clone, PartialEq, Eq)]
 enum State {
     Ready,
     Started,
@@ -66,9 +67,11 @@ pub struct CaptureActor {
     db: crate::db::Service,
     camera: Camera,
     storage_group: StorageGroup,
-    worker: Option<Child>,
-    stdin: Option<ChildStdin>,
-    framed_stream: Option<FramedRead<ChildStdout, LengthDelimitedCodec>>,
+    child: Option<(
+        Child,
+        ChildStdin,
+        FramedRead<ChildStdout, LengthDelimitedCodec>,
+    )>,
     video_segment_id: Option<(Uuid, i32)>,
 
     /// Video Packet Sender
@@ -90,9 +93,7 @@ impl CaptureActor {
             db,
             camera,
             storage_group,
-            worker: None,
-            stdin: None,
-            framed_stream: None,
+            child: None,
             video_segment_id: None,
             command_receiver,
             sender,
@@ -134,9 +135,7 @@ impl CaptureActor {
         let stdin = child.stdin.take().expect("Failed to open stdin");
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
 
-        self.framed_stream = Some(framed_stream);
-        self.worker = Some(child);
-        self.stdin = Some(stdin);
+        self.child = Some((child, stdin, framed_stream));
         self.state = State::Started;
     }
 
@@ -259,10 +258,29 @@ impl CaptureActor {
 
         Ok(())
     }
+
+    async fn exit_handler(&mut self) -> anyhow::Result<()> {
+        info!(
+            "Capture process for {} {} died. Restarting...",
+            self.camera.id, self.camera.common.name,
+        );
+        self.child = None;
+        self.state = State::Ready;
+
+        Ok(())
+    }
+
     async fn select_next(&mut self) -> anyhow::Result<bool> {
-        if let Some(framed_stream) = &mut self.framed_stream {
+        if let Some((child, _, framed_stream)) = &mut self.child {
             tokio::select! {
-                Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => return Ok(false),
+                biased;
+                _ = child.wait() => self.exit_handler().await?,
+                Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => {
+                    info!("Received stop command for {} {}.",
+                          self.camera.id, self.camera.common.name,
+                    );
+                    return Ok(false)
+                }
                 Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
                 else => return Ok(false)
             }
@@ -277,12 +295,29 @@ impl CaptureActor {
     }
 
     pub async fn run(mut self) -> i32 {
-        self.start_worker();
         loop {
+            if self.state == State::Ready {
+                self.start_worker();
+            }
             let res = self.select_next().await;
             match res {
                 Ok(true) => {}
-                Ok(false) | Err(_) => break,
+                Ok(false) => break,
+                Err(e) => {
+                    error!("Error {}", e);
+                    break;
+                }
+            }
+        }
+
+        if let Some((mut child, stdin, _)) = self.child.take() {
+            drop(stdin);
+            // wait for child to exit...
+            if let Err(e) = child.kill().await {
+                error!("error killing child: {}", e);
+            }
+            if let Err(e) = child.wait().await {
+                error!("error waiting for child exit: {}", e);
             }
         }
         self.camera.id
