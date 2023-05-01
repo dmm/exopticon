@@ -27,6 +27,7 @@ import { Component, Input, OnInit } from "@angular/core";
 })
 export class CameraStatusOverlayComponent implements OnInit {
   @Input() status: string;
+  @Input() name: string;
 
   constructor() {}
 

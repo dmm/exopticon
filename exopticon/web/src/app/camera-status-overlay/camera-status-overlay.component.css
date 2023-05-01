@@ -29,8 +29,19 @@ div {
   left: 0;
   background: rgba(0, 0, 0, 0.7);
 }
+
 span {
   background: black;
   border-radius: 15px;
   padding: 5px 10px 5px 10px;
+}
+
+.status {
+  animation: blinker 1s linear infinite;
+}
+
+@keyframes blinker {
+  50% {
+    opacity: 0;
+  }
 }
