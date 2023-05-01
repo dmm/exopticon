@@ -46,6 +46,7 @@ enum State {
 pub struct CaptureSupervisor {
     state: State,
     db: crate::db::Service,
+    stopped_camera_ids: Vec<i32>,
     command_sender: mpsc::Sender<CaptureSupervisorCommand>,
     command_receiver: mpsc::Receiver<CaptureSupervisorCommand>,
     capture_channels: HashMap<i32, mpsc::Sender<CaptureActorCommands>>,
@@ -61,6 +62,7 @@ impl CaptureSupervisor {
         Self {
             state: State::Ready,
             db,
+            stopped_camera_ids: Vec::new(),
             command_sender,
             command_receiver,
             capture_channels: HashMap::new(),
@@ -89,32 +91,42 @@ impl CaptureSupervisor {
         Ok(())
     }
 
-    async fn start_cameras(&mut self) -> anyhow::Result<()> {
+    async fn start_camera(&mut self, c: Camera) -> anyhow::Result<()> {
+        let db = self.db.clone();
+        let storage_group =
+            spawn_blocking(move || db.fetch_storage_group(c.common.storage_group_id)).await??;
+        let id = c.id;
+        let (command_sender, command_receiver) = mpsc::channel(1);
+        let actor = CaptureActor::new(
+            self.db.clone(),
+            c,
+            storage_group,
+            command_receiver,
+            self.packet_sender.clone(),
+        );
+        self.capture_channels.insert(id, command_sender);
+        let fut = tokio::spawn(actor.run());
+        self.capture_handles.push(fut);
+        Ok(())
+    }
+
+    async fn start_cameras(&mut self, camera_id: Option<i32>) -> anyhow::Result<()> {
         info!("Starting capture actors...");
         // fetch cameras
         let db = self.db.clone();
-        let cameras: Vec<Camera> = spawn_blocking(move || db.fetch_all_cameras())
+
+        let mut cameras: Vec<Camera> = spawn_blocking(move || db.fetch_all_cameras())
             .await??
             .into_iter()
             .filter(|c| c.common.enabled)
             .collect();
 
+        if let Some(id) = camera_id {
+            cameras = cameras.into_iter().filter(|c| c.id == id).collect();
+        }
+
         for c in cameras {
-            let db = self.db.clone();
-            let storage_group =
-                spawn_blocking(move || db.fetch_storage_group(c.common.storage_group_id)).await??;
-            let id = c.id;
-            let (command_sender, command_receiver) = mpsc::channel(1);
-            let actor = CaptureActor::new(
-                self.db.clone(),
-                c,
-                storage_group,
-                command_receiver,
-                self.packet_sender.clone(),
-            );
-            self.capture_channels.insert(id, command_sender);
-            let fut = tokio::spawn(actor.run());
-            self.capture_handles.push(fut);
+            self.start_camera(c).await?;
         }
 
         Ok(())
@@ -130,11 +142,19 @@ impl CaptureSupervisor {
         }
     }
 
-    fn handle_camera_event(&mut self, _res: &Result<i32, JoinError>) {
+    async fn handle_camera_event(&mut self, res: &Result<i32, JoinError>) {
         match self.state {
             State::Running => {
-                error!("Capture task died but we're supposed to be running. Restart all cameras");
-                self.state = State::Restarting;
+                if let Ok(id) = res {
+                    error!(
+                        "Capture task died but we're supposed to be running. camera id {}",
+                        id
+                    );
+                    self.stopped_camera_ids.push(*id);
+                } else {
+                    error!("Capture task died, restart all cameras..");
+                    self.state = State::Restarting;
+                }
             }
             State::Ready | State::Restarting | State::Draining => {
                 // Ready => ignoring
@@ -152,7 +172,7 @@ impl CaptureSupervisor {
 
         match self.state {
             State::Ready => {
-                if let Err(e) = self.start_cameras().await {
+                if let Err(e) = self.start_cameras(None).await {
                     error!("Error starting cameras! {}", e);
                     return;
                 }
@@ -160,6 +180,15 @@ impl CaptureSupervisor {
             }
             State::Running => {
                 // everything is fine
+
+                // check for stopped cameras
+                for id in self.stopped_camera_ids.clone() {
+                    if let Err(e) = self.start_cameras(Some(id)).await {
+                        error!("error restarting camera {}, {}. restarting all.", id, e);
+                        self.state = State::Restarting;
+                    }
+                }
+                self.stopped_camera_ids.clear();
             }
             State::Restarting => {
                 if let Err(e) = self.stop_cameras().await {
@@ -177,7 +206,7 @@ impl CaptureSupervisor {
     }
 
     pub async fn supervise(mut self) -> anyhow::Result<()> {
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        let mut interval = tokio::time::interval(Duration::from_secs(15));
         loop {
             let tick = interval.tick();
             tokio::pin!(tick); // required for select()
@@ -185,7 +214,7 @@ impl CaptureSupervisor {
             tokio::select! {
                 Some(cmd) = self.command_receiver.recv()
                     => self.handle_supervisor_command(&cmd),
-                Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id),
+                Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id).await,
                 _inst = tick => self.handle_tick().await,
                 else => break
             }
