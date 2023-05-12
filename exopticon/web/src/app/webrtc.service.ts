@@ -74,7 +74,6 @@ export class WebrtcService {
   updateState() {
     clearTimeout(this.timeoutId);
 
-    console.dir(`Active cameras: ${this.activeCameras.entries()}`);
     // if enabled but disconnected...
     if (this.enabled && this.signalSocketStatus === Status.Paused) {
       this.connect();
@@ -196,7 +195,6 @@ export class WebrtcService {
 
     this.peerConnection.oniceconnectionstatechange = (e) => {
       let state = this.peerConnection.iceConnectionState;
-      console.log("ICE CONNECTION STATE: " + state);
       if (state === "connected") {
         this.webrtcStatus = Status.Connected;
       } else if (state === "disconnected" || state === "failed") {
@@ -212,14 +210,12 @@ export class WebrtcService {
 
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate !== null) {
-        console.log(`GOT LOCAL candidate: ${event.candidate.address}`);
       }
     };
 
     this.peerConnection.ontrack = (event) => {
       for (let sub of this.subscriptions.values()) {
         if (sub.trackId === event.streams[0].id) {
-          console.log("EMITTING TRACK! " + sub.trackId);
           this.emitters.get(sub.id).next(event.streams[0]);
         }
       }
@@ -227,7 +223,6 @@ export class WebrtcService {
   }
 
   private async sendOffer() {
-    console.log("SENDING OFFER!");
     try {
       let offer = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offer);
@@ -256,7 +251,6 @@ export class WebrtcService {
     }
     var pathname = parse.pathname === "/" ? "" : `/${parse.pathname}`;
     url += `//${parse.host}${pathname}/v1/ws`;
-    console.log(`websocket url: ${url}`);
 
     this.webrtcConnect();
     this.signalSocket = new WebSocket(url);
@@ -268,11 +262,7 @@ export class WebrtcService {
       this.dataChannel = this.peerConnection.createDataChannel("foo");
       this.dataChannel.onclose = () => console.log("sendChannel has closed");
       this.dataChannel.onopen = () => console.log("sendChannel has opened");
-      this.dataChannel.onmessage = (e) =>
-        console.log(
-          `Message from DataChannel '${this.dataChannel.label}' payload '${e.data}'`
-        );
-      this.updateState();
+      this.dataChannel.onmessage = (e) => {};
     };
 
     this.signalSocket.onclose = (event) => {
@@ -291,11 +281,6 @@ export class WebrtcService {
           case "offer":
             break;
           case "answer":
-            console.log(
-              "GOT ANSWER! " + this.peerConnection.iceConnectionState
-            );
-            //            console.log("SDP: " + message.sdp);
-
             await this.peerConnection.setRemoteDescription({
               sdp: message.sdp,
               type: "answer",
@@ -306,18 +291,15 @@ export class WebrtcService {
             this.candidates = new Array();
             break;
           case "candidate":
-            console.log("Got candidate! " + message.candidate.candidate);
             if (this.peerConnection.currentRemoteDescription) {
               let res = await this.peerConnection.addIceCandidate(
                 message.candidate
               );
-              console.log("Add candidate result " + res);
             } else {
               this.candidates.push(message.candidate);
             }
             break;
           case "updateSubscriptions":
-            console.log("Got new track subscriptions!");
             message.subscriptions.forEach((s) => {
               if (!this.subscriptions.has(s.cameraId)) {
                 this.addTrack(s.cameraId, s.trackId);

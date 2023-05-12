@@ -125,12 +125,6 @@ export class CameraPanelService {
         this.webrtcService.disable();
       }
     });
-
-    setInterval(() => {
-      for (let [key, value] of this.unsortedCameras) {
-        console.log(`PanelCamera ${key} ${value.enabled} ${value.inViewport}`);
-      }
-    }, 5000);
   }
 
   private rotateArray(arr: Array<any>, length: number): Array<any> {
@@ -203,7 +197,6 @@ export class CameraPanelService {
   }
 
   private projectCameras() {
-    console.log("PROJECTING CAMERAS!");
     this.setCameraGroup(this.desiredCameraGroupId);
     let groupCameras: PanelCamera[] = new Array();
     if (this.activeCameraGroupId === 0) {
@@ -269,9 +262,6 @@ export class CameraPanelService {
     if (panelCamera !== null) {
       panelCamera.inViewport = intersectionEvents.some(
         (e) => e.intersectionRatio >= this.intersectionThreshold
-      );
-      console.log(
-        `Cameraaa ${panelCamera.camera.name} is ${panelCamera.inViewport}`
       );
     }
 
