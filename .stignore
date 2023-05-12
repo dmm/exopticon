@@ -1,0 +1,6 @@
+exopticon/web/dist/**
+exopticon/web/node_modules/**
+exopticon/web/e2e/**
+exopticon/web/.angular/**
+target/**
+.git/**
