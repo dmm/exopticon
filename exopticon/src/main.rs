@@ -81,7 +81,7 @@ mod super_capture_supervisor;
 mod super_deletion_actor;
 mod super_deletion_supervisor;
 
-use crate::api::static_files::{index_file_handler, static_file_handler};
+use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
 
 use crate::super_deletion_supervisor::DeletionSupervisor;
@@ -202,6 +202,7 @@ async fn main() {
         // public routes
         .route("/auth", get(cameras::fetch_all).post(auth::login))
         .route("/index.html", get(index_file_handler))
+        .route("/manifest.webmanifest", get(manifest_file_handler))
         .route("/assets/:path", get(static_file_handler))
         .route("/icons/:path", get(static_file_handler))
         .route("/", get(index_file_handler))

@@ -15,6 +15,16 @@ pub async fn index_file_handler() -> Result<impl IntoResponse, UserError> {
     })
 }
 
+#[allow(clippy::unused_async)]
+pub async fn manifest_file_handler() -> Result<impl IntoResponse, UserError> {
+    Asset::get("manifest.webmanifest").map_or(Err(UserError::NotFound), |content| {
+        Ok((
+            [(header::CONTENT_TYPE, "application/manifest+json")],
+            content,
+        ))
+    })
+}
+
 /// route handler for static files
 #[allow(clippy::unused_async)]
 pub async fn static_file_handler(
