@@ -80,6 +80,7 @@ mod super_capture_actor;
 mod super_capture_supervisor;
 mod super_deletion_actor;
 mod super_deletion_supervisor;
+//mod webrtc_server;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};

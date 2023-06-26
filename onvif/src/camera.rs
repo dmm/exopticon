@@ -169,17 +169,12 @@ pub struct NtpSettings {
 /// Helper that returns Pan-Tilt and Zoom sections for ptz requests
 #[must_use]
 fn generate_pan_tilt_vectors(x: f32, y: f32, zoom: f32) -> String {
-    let xy_element = format!(
-        r#"<PanTilt x="{}" y="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
-        x, y
-    );
+    let xy_element =
+        format!(r#"<PanTilt x="{x}" y="{y}" xmlns="http://www.onvif.org/ver10/schema" />"#,);
     let zoom_element = if zoom == 0.0 {
         String::new()
     } else {
-        format!(
-            r#"<Zoom x="{}" xmlns="http://www.onvif.org/ver10/schema" />"#,
-            zoom
-        )
+        format!(r#"<Zoom x="{zoom}" xmlns="http://www.onvif.org/ver10/schema" />"#,)
     };
 
     format!("{xy_element} {zoom_element}")

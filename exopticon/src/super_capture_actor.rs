@@ -259,22 +259,20 @@ impl CaptureActor {
         Ok(())
     }
 
-    async fn exit_handler(&mut self) -> anyhow::Result<()> {
+    fn exit_handler(&mut self) {
         info!(
             "Capture process for {} {} died. Restarting...",
             self.camera.id, self.camera.common.name,
         );
         self.child = None;
         self.state = State::Ready;
-
-        Ok(())
     }
 
     async fn select_next(&mut self) -> anyhow::Result<bool> {
         if let Some((child, _, framed_stream)) = &mut self.child {
             tokio::select! {
                 biased;
-                _ = child.wait() => self.exit_handler().await?,
+                _ = child.wait() => self.exit_handler(),
                 Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => {
                     info!("Received stop command for {} {}.",
                           self.camera.id, self.camera.common.name,

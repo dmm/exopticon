@@ -102,9 +102,8 @@ pub fn envelope_header(username: &str, password: &str) -> Result<String, Error> 
       xmlns:a="http://www.w3.org/2005/08/addressing"
      >
 
-  <s:Header>{}</s:Header>
+  <s:Header>{security_block}</s:Header>
   <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">"#,
-        security_block
     ))
 }
 
@@ -128,14 +127,13 @@ pub async fn soap_request(url: &str, body: String) -> Result<Vec<u8>, Error> {
         Err(_) => return Err(Error::InvalidArgument),
     };
 
-    let req = match Request::builder()
+    let Ok(req) = Request::builder()
         .method("POST")
         .uri(url)
         .header("Content-Type", "application/soap+xml")
         .body(Body::from(body))
-    {
-        Ok(req) => req,
-        Err(_) => return Err(Error::InvalidArgument),
+        else {
+            return Err(Error::InvalidArgument)
     };
 
     let mut response = client.request(req).await?;

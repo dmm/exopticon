@@ -122,7 +122,7 @@ impl CaptureSupervisor {
             .collect();
 
         if let Some(id) = camera_id {
-            cameras = cameras.into_iter().filter(|c| c.id == id).collect();
+            cameras.retain(|c| c.id == id);
         }
 
         for c in cameras {
@@ -142,7 +142,7 @@ impl CaptureSupervisor {
         }
     }
 
-    async fn handle_camera_event(&mut self, res: &Result<i32, JoinError>) {
+    fn handle_camera_event(&mut self, res: &Result<i32, JoinError>) {
         match self.state {
             State::Running => {
                 if let Ok(id) = res {
@@ -214,7 +214,7 @@ impl CaptureSupervisor {
             tokio::select! {
                 Some(cmd) = self.command_receiver.recv()
                     => self.handle_supervisor_command(&cmd),
-                Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id).await,
+                Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id),
                 _inst = tick => self.handle_tick().await,
                 else => break
             }
