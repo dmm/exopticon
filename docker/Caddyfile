@@ -1,5 +1,9 @@
 {$DOMAIN}:{$PORT} {
 
+  tls {
+      dns cloudflare {$CLOUDFLARE_TOKEN}
+  }
+
   basicauth /dbmetrics {
       prometheus {$METRICS_AUTH_HASH}
   }
