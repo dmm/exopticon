@@ -34,6 +34,7 @@ pub mod cameras;
 pub mod static_files;
 pub mod storage_groups;
 pub mod video_units;
+pub mod webrtc;
 
 /// Error to be presented to api user
 #[derive(Debug)]

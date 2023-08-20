@@ -97,7 +97,7 @@ export class CameraPanelComponent implements OnInit {
     });
 
     //    this.videoService.connect();
-    //    this.webrtcService.connect();
+    //this.webrtcService.connect();
   }
 
   @HostListener("window:keyup", ["$event"])

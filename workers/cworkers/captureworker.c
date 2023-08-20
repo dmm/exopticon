@@ -872,6 +872,8 @@ int main(int argc, char *argv[])
                                 continue;
                         }
 
+//                        push_frame(&cam);
+
                         ex_send_packet(&cam.in, &cam.pkt);
                         int write_ret = ex_write_output_packet(&cam.out, cam.in.st->time_base, &cam.pkt);
                         if (write_ret != 0) {

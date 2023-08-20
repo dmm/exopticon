@@ -1,3 +1,4 @@
+import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { ReplaySubject } from "rxjs";
 
@@ -61,7 +62,6 @@ export class WebrtcService {
   private enabled: boolean = false;
 
   // status
-  private signalSocketStatus: Status = Status.Paused;
   private webrtcStatus: Status = Status.Paused;
 
   // status timer
@@ -69,27 +69,17 @@ export class WebrtcService {
   private maxTimeout = 5000;
   private timeoutId: ReturnType<typeof setTimeout>;
 
-  contructor() {}
+  constructor(private http: HttpClient) {}
 
   updateState() {
     clearTimeout(this.timeoutId);
 
     // if enabled but disconnected...
-    if (this.enabled && this.signalSocketStatus === Status.Paused) {
+    if (this.enabled && this.webrtcStatus === Status.Paused) {
       this.connect();
-    } else if (!this.enabled && this.signalSocketStatus !== Status.Paused) {
+    } else if (!this.enabled && this.webrtcStatus !== Status.Paused) {
       this.disconnect();
-    } else if (
-      this.enabled &&
-      this.signalSocketStatus === Status.Connected &&
-      this.webrtcStatus === Status.Paused
-    ) {
-      this.webrtcConnect();
-    } else if (
-      this.enabled &&
-      this.signalSocketStatus == Status.Connected &&
-      this.webrtcStatus == Status.Connected
-    ) {
+    } else if (this.enabled && this.webrtcStatus == Status.Connected) {
       this.updateSubscriptions();
     }
 
@@ -143,31 +133,35 @@ export class WebrtcService {
   }
 
   private updateSubscriptions() {
-    if (
-      this.signalSocket === undefined ||
-      this.signalSocket.readyState !== this.signalSocket.OPEN
-    ) {
-      return;
-    }
-
-    for (const sub of this.subscriptions.values()) {
-      let status = false;
-      if (this.activeCameras.has(sub.id)) {
-        status = this.activeCameras.get(sub.id);
-      }
-      this.signalSocket.send(
-        JSON.stringify({
-          kind: "cameraStatus",
-          id: sub.id,
-          status: status,
-        })
-      );
-    }
+    // if (
+    //   this.signalSocket === undefined ||
+    //   this.signalSocket.readyState !== this.signalSocket.OPEN
+    // ) {
+    //   return;
+    // }
+    // for (const sub of this.subscriptions.values()) {
+    //   let status = false;
+    //   if (this.activeCameras.has(sub.id)) {
+    //     status = this.activeCameras.get(sub.id);
+    //   }
+    //   this.signalSocket.send(
+    //     JSON.stringify({
+    //       kind: "cameraStatus",
+    //       id: sub.id,
+    //       status: status,
+    //     })
+    //   );
+    // }
   }
 
   private webrtcConnect() {
     this.peerConnection = new RTCPeerConnection();
     this.webrtcStatus = Status.Connecting;
+
+    this.dataChannel = this.peerConnection.createDataChannel("foo");
+    this.dataChannel.onclose = () => console.log("sendChannel has closed");
+    this.dataChannel.onopen = () => console.log("sendChannel has opened");
+    this.dataChannel.onmessage = (e) => {};
 
     this.peerConnection.onconnectionstatechange = (ev) => {
       switch (this.peerConnection.connectionState) {
@@ -182,10 +176,10 @@ export class WebrtcService {
           console.log("Disconnecting...");
           break;
         case "closed":
-          console.log("Offline");
+          console.log("Connection Offline");
           break;
         case "failed":
-          console.log("Error");
+          console.log("Connection Error");
           break;
         default:
           console.log("Unknown");
@@ -205,7 +199,8 @@ export class WebrtcService {
 
     this.peerConnection.onnegotiationneeded = async (e) => {
       console.log("Renegotiation requested... Creating offer!");
-      await this.sendOffer();
+      this.negotiating = true;
+      this.sendOffer();
     };
 
     this.peerConnection.onicecandidate = (event) => {
@@ -225,101 +220,90 @@ export class WebrtcService {
   private async sendOffer() {
     try {
       let offer = await this.peerConnection.createOffer();
+
       await this.peerConnection.setLocalDescription(offer);
 
-      this.signalSocket.send(
-        JSON.stringify({
-          kind: "offer",
-          sdp: offer.sdp,
-        })
-      );
+      let answer = await this.http
+        .post<RTCSessionDescriptionInit>("/v1/webrtc/connect", offer)
+        .toPromise();
+
+      await this.peerConnection.setRemoteDescription(answer);
+      this.negotiating = false;
     } catch (error) {
       console.log("Error sending offer! " + error);
+      this.negotiating = false;
     }
   }
 
   private connect() {
-    let url = "";
-    let parse = document.createElement("a");
-    parse.href = document.querySelector("base")["href"];
-
-    let loc = window.location;
-    if (loc.protocol === "https:") {
-      url = "wss:";
-    } else {
-      url = "ws:";
-    }
-    var pathname = parse.pathname === "/" ? "" : `/${parse.pathname}`;
-    url += `//${parse.host}${pathname}/v1/ws`;
-
     this.webrtcConnect();
-    this.signalSocket = new WebSocket(url);
+    // this.signalSocket = new WebSocket(url);
 
-    this.signalSocketStatus = Status.Connecting;
+    // this.signalSocketStatus = Status.Connecting;
 
-    this.signalSocket.onopen = (event) => {
-      this.signalSocketStatus = Status.Connected;
-      this.dataChannel = this.peerConnection.createDataChannel("foo");
-      this.dataChannel.onclose = () => console.log("sendChannel has closed");
-      this.dataChannel.onopen = () => console.log("sendChannel has opened");
-      this.dataChannel.onmessage = (e) => {};
-    };
+    // this.signalSocket.onopen = (event) => {
+    //   this.signalSocketStatus = Status.Connected;
+    //   return;
+    //   this.dataChannel = this.peerConnection.createDataChannel("foo");
+    //   this.dataChannel.onclose = () => console.log("sendChannel has closed");
+    //   this.dataChannel.onopen = () => console.log("sendChannel has opened");
+    //   this.dataChannel.onmessage = (e) => {};
+    // };
 
-    this.signalSocket.onclose = (event) => {
-      this.disconnect();
-    };
+    // this.signalSocket.onclose = (event) => {
+    //   this.disconnect();
+    // };
 
-    this.signalSocket.onerror = (event) => {
-      this.signalSocketStatus = Status.Paused;
-    };
+    // this.signalSocket.onerror = (event) => {
+    //   this.signalSocketStatus = Status.Paused;
+    // };
 
-    this.signalSocket.onmessage = async (event) => {
-      let message: SignalMessage = JSON.parse(event.data);
+    // this.signalSocket.onmessage = async (event) => {
+    //   let message: SignalMessage = JSON.parse(event.data);
 
-      try {
-        switch (message.kind) {
-          case "offer":
-            break;
-          case "answer":
-            await this.peerConnection.setRemoteDescription({
-              sdp: message.sdp,
-              type: "answer",
-            });
-            for (const c of this.candidates) {
-              await this.peerConnection.addIceCandidate(c);
-            }
-            this.candidates = new Array();
-            break;
-          case "candidate":
-            if (this.peerConnection.currentRemoteDescription) {
-              let res = await this.peerConnection.addIceCandidate(
-                message.candidate
-              );
-            } else {
-              this.candidates.push(message.candidate);
-            }
-            break;
-          case "updateSubscriptions":
-            message.subscriptions.forEach((s) => {
-              if (!this.subscriptions.has(s.cameraId)) {
-                this.addTrack(s.cameraId, s.trackId);
-              }
-            });
-        }
-      } catch (err) {
-        console.log("Message error! " + err);
-        this.disconnect();
-        setTimeout(() => {
-          this.connect();
-        }, 1000);
-      }
-    };
+    //   try {
+    //     switch (message.kind) {
+    //       case "offer":
+    //         break;
+    //       case "answer":
+    //         await this.peerConnection.setRemoteDescription({
+    //           sdp: message.sdp,
+    //           type: "answer",
+    //         });
+    //         for (const c of this.candidates) {
+    //           await this.peerConnection.addIceCandidate(c);
+    //         }
+    //         this.candidates = new Array();
+    //         break;
+    //       case "candidate":
+    //         if (this.peerConnection.currentRemoteDescription) {
+    //           let res = await this.peerConnection.addIceCandidate(
+    //             message.candidate
+    //           );
+    //         } else {
+    //           this.candidates.push(message.candidate);
+    //         }
+    //         break;
+    //       case "updateSubscriptions":
+    //         message.subscriptions.forEach((s) => {
+    //           if (!this.subscriptions.has(s.cameraId)) {
+    //             this.addTrack(s.cameraId, s.trackId);
+    //           }
+    //         });
+    //     }
+    //   } catch (err) {
+    //     console.log("Message error! " + err);
+    //     this.disconnect();
+    //     setTimeout(() => {
+    //       this.connect();
+    //     }, 1000);
+    //   }
+    // };
   }
 
   private disconnect() {
-    this.signalSocket.close();
+    //    this.signalSocket.close();
     this.peerConnection.close();
     this.subscriptions.clear();
-    this.signalSocketStatus = Status.Paused;
   }
 }

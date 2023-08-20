@@ -73,22 +73,16 @@ mod schema;
 /// Utility functions
 mod utils;
 
-/// Implement webrtc signalling channel
-mod webrtc_ws;
-
 mod super_capture_actor;
 mod super_capture_supervisor;
 mod super_deletion_actor;
 mod super_deletion_supervisor;
-//mod webrtc_server;
+mod webrtc;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
-
 use crate::super_deletion_supervisor::DeletionSupervisor;
-use crate::webrtc_ws::echo_heartbeat_ws;
-use axum::extract::{State, WebSocketUpgrade};
-use axum::response::IntoResponse;
+
 use axum::routing::get;
 use axum::{middleware, Router};
 use dotenv::dotenv;
@@ -99,8 +93,6 @@ use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing_subscriber::{EnvFilter, Layer};
-use webrtc::ice::udp_mux::{UDPMuxDefault, UDPMuxParams};
-use webrtc::ice::udp_network::UDPNetwork;
 
 use std::env;
 use std::net::SocketAddr;
@@ -114,15 +106,8 @@ embed_migrations!("migrations/");
 pub struct AppState {
     pub db_service: crate::db::Service,
     pub capture_channel: mpsc::Sender<CaptureSupervisorCommand>,
-    pub udp_network: UDPNetwork,
     pub video_sender: broadcast::Sender<VideoPacket>,
-}
-
-#[allow(clippy::unused_async)]
-async fn ws_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| {
-        echo_heartbeat_ws(socket, state.udp_network, state.video_sender.subscribe())
-    })
+    pub rtc_sender: mpsc::Sender<str0m::Rtc>,
 }
 
 #[tokio::main]
@@ -164,9 +149,8 @@ async fn main() {
     let udp_socket = tokio::net::UdpSocket::bind(("0.0.0.0", 4000))
         .await
         .expect("Unable to open udp socket");
-    let udp_mux = UDPMuxDefault::new(UDPMuxParams::new(udp_socket));
 
-    let udp_network = UDPNetwork::Muxed(udp_mux);
+    let (rtc_sender, rtc_receiver) = mpsc::channel(10);
 
     // Start capture supervisor
     let capture_supervisor = super_capture_supervisor::CaptureSupervisor::new(db_service.clone());
@@ -174,11 +158,13 @@ async fn main() {
 
     let deletion_supervisor = DeletionSupervisor::new(db_service.clone());
 
+    tokio::spawn(webrtc::Server::new(rtc_receiver, udp_socket).run());
+
     let state = AppState {
         db_service,
         capture_channel,
-        udp_network,
         video_sender: capture_supervisor.get_packet_sender(),
+        rtc_sender,
     };
 
     // TODO: watch this future for exit...
@@ -187,7 +173,6 @@ async fn main() {
     tokio::spawn(deletion_supervisor.supervise());
 
     let app = Router::new()
-        .route("/v1/ws", get(ws_handler))
         .nest(
             "/v1/personal_access_tokens",
             auth::personal_access_token_router(),
@@ -196,6 +181,7 @@ async fn main() {
         .nest("/v1/camera_groups", camera_groups::router())
         .nest("/v1/cameras", cameras::router())
         .nest("/v1/video_units", video_units::router())
+        .nest("/v1/webrtc", crate::api::webrtc::router())
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::middleware,
