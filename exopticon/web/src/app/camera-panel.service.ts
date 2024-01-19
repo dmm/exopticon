@@ -231,9 +231,10 @@ export class CameraPanelService {
       if (active) {
         activeCameraIds.push(c.id);
       }
-      this.webrtcService.updateActiveCameras(activeCameraIds);
+
       return active;
     });
+    this.webrtcService.updateActiveCameras(activeCameraIds);
   }
 
   setRows(rowCount: number) {

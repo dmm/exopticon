@@ -24,9 +24,9 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 #![deny(
     nonstandard_style,
-    warnings,
+//    warnings,
     rust_2018_idioms,
-    unused,
+//    unused,
     future_incompatible,
     clippy::all,
     clippy::pedantic,
@@ -77,7 +77,7 @@ mod super_capture_actor;
 mod super_capture_supervisor;
 mod super_deletion_actor;
 mod super_deletion_supervisor;
-mod webrtc;
+mod webrtc_client;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
@@ -88,6 +88,7 @@ use axum::{middleware, Router};
 use dotenv::dotenv;
 use super_capture_actor::VideoPacket;
 use super_capture_supervisor::CaptureSupervisorCommand;
+use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
@@ -95,7 +96,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing_subscriber::{EnvFilter, Layer};
 
 use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -104,10 +106,49 @@ embed_migrations!("migrations/");
 
 #[derive(Clone)]
 pub struct AppState {
+    pub candidate_ips: Vec<IpAddr>,
+    pub udp_socket: Arc<UdpSocket>,
+    pub udp_channel: broadcast::Sender<(usize, SocketAddr, Vec<u8>)>,
     pub db_service: crate::db::Service,
     pub capture_channel: mpsc::Sender<CaptureSupervisorCommand>,
     pub video_sender: broadcast::Sender<VideoPacket>,
-    pub rtc_sender: mpsc::Sender<str0m::Rtc>,
+}
+
+fn parse_candidate_ips() -> Vec<IpAddr> {
+    let mut candidate_ips = Vec::new();
+
+    let candidate_string = match env::var("EXOPTICON_WEBRTC_IPS") {
+        Ok(s) => s,
+        Err(_) => return candidate_ips,
+    };
+    debug!("CANDIDATES: {candidate_string}");
+    for c in candidate_string.split(',') {
+        debug!("CANDIDATE: {c}");
+        let ip = match c.parse() {
+            Ok(ip) => ip,
+            Err(_) => continue,
+        };
+        candidate_ips.push(ip);
+    }
+
+    candidate_ips
+}
+
+async fn udp_listener(
+    udp_socket: Arc<UdpSocket>,
+    udp_channel: broadcast::Sender<(usize, SocketAddr, Vec<u8>)>,
+) {
+    let mut buf = vec![0; 2000];
+    loop {
+        match udp_socket.recv_from(&mut buf).await {
+            Ok((len, addr)) => {
+                udp_channel.send((len, addr, buf.clone())).unwrap();
+            }
+            Err(err) => {
+                error!("UDP error! {}", err);
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -146,11 +187,15 @@ async fn main() {
     )
     .expect("migrations failed!");
 
-    let udp_socket = tokio::net::UdpSocket::bind(("0.0.0.0", 4000))
-        .await
-        .expect("Unable to open udp socket");
+    let udp_socket = Arc::new(
+        UdpSocket::bind(("0.0.0.0", 4000))
+            .await
+            .expect("Unable to open udp socket"),
+    );
 
-    let (rtc_sender, rtc_receiver) = mpsc::channel(10);
+    // Start udp listener
+    let (udp_channel, _rx) = broadcast::channel(10);
+    tokio::spawn(udp_listener(udp_socket.clone(), udp_channel.clone()));
 
     // Start capture supervisor
     let capture_supervisor = super_capture_supervisor::CaptureSupervisor::new(db_service.clone());
@@ -158,13 +203,13 @@ async fn main() {
 
     let deletion_supervisor = DeletionSupervisor::new(db_service.clone());
 
-    tokio::spawn(webrtc::Server::new(rtc_receiver, udp_socket).run());
-
     let state = AppState {
+        candidate_ips: parse_candidate_ips(),
+        udp_socket,
+        udp_channel,
         db_service,
         capture_channel,
         video_sender: capture_supervisor.get_packet_sender(),
-        rtc_sender,
     };
 
     // TODO: watch this future for exit...

@@ -19,12 +19,21 @@
  */
 
 use std::{
-    net::SocketAddr,
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
     time::{Duration, Instant},
 };
 
-use str0m::{Input, Rtc};
+use axum::extract::ws::{self, WebSocket};
+use futures::stream::{FuturesUnordered, Stream};
+use futures_util::{stream::SplitSink, SinkExt, StreamExt};
+use str0m::{
+    change::SdpOffer, channel::ChannelId, media::Mid, net::Protocol, IceConnectionState, Input, Rtc,
+};
 use tokio::sync::mpsc::Receiver;
+use uuid::Uuid;
+
+use crate::super_capture_actor::VideoPacket;
 
 pub enum ClientEvent {
     Noop,
@@ -42,14 +51,66 @@ impl ClientEvent {
     }
 }
 
+#[derive(PartialEq)]
+pub enum MidStatus {
+    //    NotYetValid,
+    Valid,
+}
+
+pub struct ClientTrack {
+    mid: Mid,
+    mid_status: MidStatus,
+}
+/// Messages from client
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ClientMessage {
+    #[serde(rename_all = "camelCase")]
+    SubscriptionUpdate { subscribed_camera_ids: Vec<i32> },
+    #[serde(rename_all = "camelCase")]
+    NegotiationRequest { offer: String },
+}
+
+/// Messages from server
+#[derive(Serialize)]
+#[serde(tag = "kind")]
+#[serde(rename_all = "camelCase")]
+pub enum ServerMessage {
+    /// Maps camera id to Mid
+    #[serde(rename_all = "camelCase")]
+    StreamMappings(HashMap<i32, String>),
+    #[serde(rename_all = "camelCase")]
+    NegotiationAnswer { answer: String },
+}
+
 pub struct Client {
+    socket_sink: SplitSink<WebSocket, axum::extract::ws::Message>,
     rtc: Rtc,
-    //cid: Option<String>
+    cid: Option<ChannelId>,
+    /// mapping between camera_ids and `ClientTrack` struct
+    tracks: HashMap<i32, ClientTrack>,
+    subscriptions: HashMap<i32, bool>,
 }
 
 impl Client {
-    pub fn new(rtc: Rtc) -> Self {
-        Self { rtc }
+    pub fn new(rtc: Rtc, socket_sink: SplitSink<WebSocket, axum::extract::ws::Message>) -> Self {
+        Self {
+            socket_sink,
+            rtc,
+            cid: None,
+            tracks: HashMap::new(),
+            subscriptions: HashMap::new(),
+        }
+    }
+
+    fn get_stream_mappings(&self) -> HashMap<i32, String> {
+        let mut mappings = HashMap::new();
+        for (camera_id, client_track) in &self.tracks {
+            if client_track.mid_status == MidStatus::Valid {
+                mappings.insert(camera_id.clone(), client_track.mid.to_string());
+            }
+        }
+        mappings
     }
 
     pub fn accepts(&self, input: &Input<'_>) -> bool {
@@ -65,6 +126,66 @@ impl Client {
         if let Err(e) = self.rtc.handle_input(input) {
             warn!("Client ({}) disconnected: {:?}", 3, e);
             self.rtc.disconnect();
+        }
+    }
+
+    async fn send_server_message(&mut self, message: &ServerMessage) {
+        let serialized_message = match serde_json::to_string(&message) {
+            Ok(m) => m,
+            Err(err) => {
+                error!("error serializing client message...{:?}", err);
+                return;
+            }
+        };
+        if let Err(err) = self
+            .socket_sink
+            .send(ws::Message::Text(serialized_message))
+            .await
+        {
+            error!("Error sending websocket: {}", err);
+        }
+    }
+
+    pub async fn handle_message(&mut self, message_string: &str) {
+        // Parse json into `ClientMessage'
+        debug!("got client message: {}", message_string);
+        let message: ClientMessage = match serde_json::from_str(message_string) {
+            Ok(msg) => msg,
+            Err(err) => {
+                error!("Error parsing client message: {}", err);
+                return;
+            }
+        };
+
+        match message {
+            ClientMessage::SubscriptionUpdate {
+                subscribed_camera_ids,
+            } => {
+                self.subscriptions.clear();
+                for id in subscribed_camera_ids {
+                    self.subscriptions.insert(id, true);
+                }
+
+                // respond with current stream mappings
+                let mappings: ServerMessage =
+                    ServerMessage::StreamMappings(self.get_stream_mappings());
+                self.send_server_message(&mappings).await;
+            }
+            ClientMessage::NegotiationRequest { offer } => {
+                let spd_offer =
+                    SdpOffer::from_sdp_string(&offer).expect("Failed to deserialized sdp offer");
+                let answer = match self.rtc.sdp_api().accept_offer(spd_offer) {
+                    Ok(answer) => answer,
+                    Err(err) => {
+                        error!("accept_offer failed: {:?}", err);
+                        return;
+                    }
+                };
+                self.send_server_message(&ServerMessage::NegotiationAnswer {
+                    answer: answer.to_sdp_string(),
+                })
+                .await;
+            }
         }
     }
 
@@ -84,13 +205,36 @@ impl Client {
             str0m::Output::Event(e) => {
                 match e {
                     str0m::Event::Connected => info!("Connected!"),
-                    str0m::Event::IceConnectionStateChange(_) => info!("IceConnectionStateChange!"),
-                    str0m::Event::MediaAdded(_) => info!("media added!"),
+                    str0m::Event::IceConnectionStateChange(v) => {
+                        info!("IceConnectionStateChange!");
+                        if v == IceConnectionState::Disconnected {
+                            self.rtc.disconnect();
+                        }
+                    }
+                    str0m::Event::MediaAdded(added) => {
+                        info!("media added!");
+                        if let Some((_cid, track)) = self
+                            .tracks
+                            .iter_mut()
+                            .find(|(_cid, track)| track.mid == added.mid)
+                        {
+                            track.mid_status = MidStatus::Valid;
+                        }
+                    }
                     str0m::Event::MediaData(_) => info!("MediaData"),
                     str0m::Event::MediaChanged(_) => info!("MediaChanged!"),
                     str0m::Event::KeyframeRequest(_) => info!("Keyframe request!"),
-                    str0m::Event::ChannelOpen(_, _) => info!("Channel Open!"),
-                    str0m::Event::ChannelData(_) => info!("Channel Data"),
+                    str0m::Event::ChannelOpen(cid, _) => {
+                        info!("Channel Open!");
+                        self.cid = Some(cid);
+                    }
+                    str0m::Event::ChannelData(d) => {
+                        info!("Channel Data");
+                        if !d.binary {
+                            let message_string = String::from_utf8(d.data).unwrap();
+                            info!("Got channel message: {}", &message_string);
+                        }
+                    }
                     str0m::Event::ChannelClose(_) => info!("Channel close!"),
                     str0m::Event::PeerStats(_) => info!("PeerStats"),
                     str0m::Event::MediaIngressStats(_) => info!("MediaIngressStats"),
@@ -105,39 +249,85 @@ impl Client {
 }
 
 pub struct Server {
-    rtc_receiver: Receiver<Rtc>,
+    packet_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
+    ws_receiver: Receiver<WebSocket>,
+    websocket_streams:
+        FuturesUnordered<Box<dyn Stream<Item = (Uuid, Result<ws::Message, axum::Error>)> + Send>>,
     socket: tokio::net::UdpSocket,
-    clients: Vec<Client>,
+    candidate_ips: Vec<IpAddr>,
+    clients: HashMap<Uuid, Client>,
 }
 
 impl Server {
-    pub fn new(rtc_receiver: Receiver<Rtc>, socket: tokio::net::UdpSocket) -> Server {
-        Server {
-            rtc_receiver,
+    pub fn new(
+        packet_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
+        ws_receiver: Receiver<WebSocket>,
+        socket: tokio::net::UdpSocket,
+        candidate_ips: Vec<IpAddr>,
+    ) -> Self {
+        Self {
+            packet_receiver,
+            ws_receiver,
+            websocket_streams: FuturesUnordered::new(),
             socket,
-            clients: Vec::new(),
+            candidate_ips,
+            clients: HashMap::new(),
         }
     }
 
-    pub async fn spawn_new_client(&mut self, rtc: Rtc) {
+    pub async fn spawn_new_client(&mut self, ws: WebSocket) -> Result<(), ()> {
         debug!("Spawning new RTC client");
-        let client = Client::new(rtc);
-        self.clients.push(client);
+
+        let (sink, source) = ws.split();
+        let id = Uuid::new_v4();
+        let rtc = Rtc::builder().build();
+        let client = Client::new(rtc, sink);
+
+        self.clients.insert(id, client);
+        let id_stream = source.map(move |msg| (id, msg));
+        self.websocket_streams.push(Box::new(id_stream));
+
+        Ok(())
     }
 
+    pub async fn handle_control_message(
+        &mut self,
+        (id, msg): (Uuid, Result<ws::Message, axum::Error>),
+    ) {
+        let client = self.clients.get(&id);
+        match msg {
+            Ok(msg) => {}
+            Err(_) => todo!(),
+        }
+    }
+
+    /// handle video packet from capture workers
+    async fn handle_packet(&mut self, _pkt: VideoPacket) {
+        //        for client in &self.clients {}
+    }
+
+    /// Handle udp packet received by server
     pub async fn handle_udp(&mut self, len: usize, addr: SocketAddr, buf: &mut Vec<u8>) {
         buf.truncate(len);
-        debug!(
-            "Handling UDP packet! {}, len: {}, local addr: {}",
-            addr,
-            buf.len(),
-            self.socket.local_addr().unwrap()
-        );
-        match str0m::net::Receive::new(addr, self.socket.local_addr().unwrap(), buf) {
+        // debug!(
+        //     "Handling UDP packet! {}, len: {}, local addr: {}ma",
+        //     addr,
+        //     buf.len(),
+        //     self.socket.local_addr().unwrap()
+        // );
+        // str0m doesn't like it when we give it a destination address
+        // not in the webrc ips. This can happend when we are behind
+        // NAT. Replace the destination ip with the first one in the
+        // candidate ip set.
+        let destination_port = self.socket.local_addr().unwrap().port();
+        let destination_ip = self.candidate_ips.first().unwrap();
+
+        let socket_addr = SocketAddr::new(*destination_ip, destination_port);
+        match str0m::net::Receive::new(Protocol::Udp, addr, socket_addr, buf) {
             Ok(receive_body) => {
                 let input = Input::Receive(Instant::now(), receive_body);
 
-                if let Some(client) = self.clients.iter_mut().find(|c| c.accepts(&input)) {
+                if let Some(client) = self.clients.values_mut().find(|c| c.accepts(&input)) {
                     client.handle_input(input);
                 } else {
                     // Invalid packet?
@@ -165,7 +355,8 @@ impl Server {
     pub async fn process_client_events(&mut self) -> Duration {
         loop {
             // Poll all clients for events
-            let events: Vec<ClientEvent> = self.clients.iter_mut().map(|c| c.poll_rtc()).collect();
+            let events: Vec<ClientEvent> =
+                self.clients.values_mut().map(|c| c.poll_rtc()).collect();
             let timeouts: Vec<_> = events.iter().filter_map(|e| e.as_timeout()).collect();
             // handle events until they are all timeouts
             if events.len() == timeouts.len() {
@@ -185,15 +376,18 @@ impl Server {
         loop {
             buf.resize(2000, 0);
             tokio::select! {
-               Some(rtc) = self.rtc_receiver.recv() => self.spawn_new_client(rtc).await,
+                Ok(pkt) = self.packet_receiver.recv() => self.handle_packet(pkt).await,
+
+                Some(ws) = self.ws_receiver.recv() => self.spawn_new_client(ws).await.unwrap(),
                 Ok((len, addr)) = self.socket.recv_from(&mut buf) => self.handle_udp(len, addr, &mut buf).await,
+                control_message = self.websocket_streams.select_next_some() => self.handle_control_message(control_message).await,
                 _ = tokio::time::sleep(timeout) => (),
             }
 
             timeout = self.process_client_events().await;
 
             // clean out disconnected clients
-            self.clients.retain(|c| c.rtc.is_alive());
+            self.clients.retain(|_id, c| c.rtc.is_alive());
         }
     }
 }

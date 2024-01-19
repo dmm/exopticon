@@ -1523,6 +1523,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastrand"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
+
+[[package]]
 name = "ff"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3401,9 +3407,9 @@ dependencies = [
 
 [[package]]
 name = "sctp-proto"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae7ae1e01cd2977a9992382a5048ef8fdf01445a999719f866dca1a1ab17ceed"
+checksum = "514eb06a3f6b1f119b6a00a9a87afac072894817d3283b0d36adc8f8a135886a"
 dependencies = [
  "bytes 1.4.0",
  "crc",
@@ -3782,16 +3788,16 @@ checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
 name = "str0m"
-version = "0.1.0"
-source = "git+https://github.com/algesten/str0m.git#15a6e82b30b45684bdbb8ce5db2b5d45a1880668"
+version = "0.4.1"
+source = "git+https://github.com/algesten/str0m.git#34cdb8cd369d343a981f60e26af4b9c15d7d7baa"
 dependencies = [
  "combine",
  "crc",
+ "fastrand 2.0.1",
  "hmac 0.12.1",
  "once_cell",
  "openssl",
  "openssl-sys",
- "rand 0.8.5",
  "sctp-proto",
  "serde",
  "sha-1 0.10.1",
@@ -3920,7 +3926,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cdb1ef4eaeeaddc8fbd371e5017057064af0911902ef36b39801f67cc6d79e4"
 dependencies = [
  "cfg-if",
- "fastrand",
+ "fastrand 1.7.0",
  "libc",
  "redox_syscall 0.2.10",
  "remove_dir_all",
