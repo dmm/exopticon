@@ -58,7 +58,6 @@ pub struct Client {
     video_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
     candidate_ips: Vec<IpAddr>,
     rtc: Rtc,
-    writes: u32,
     subscribed_ids: HashSet<i32>,
     camera_mapping: HashMap<i32, Mid>,
 }
@@ -72,9 +71,9 @@ impl Client {
         candidate_ips: Vec<IpAddr>,
     ) -> Self {
         let mut builder = Rtc::builder()
-            .enable_h264(true)
-            .enable_vp8(false)
-            .enable_vp9(false);
+            .set_send_buffer_video(10000)
+            .clear_codecs()
+            .enable_h264(true);
 
         Self {
             websocket,
@@ -83,7 +82,6 @@ impl Client {
             video_receiver,
             candidate_ips,
             rtc: builder.build(),
-            writes: 0,
             subscribed_ids: HashSet::new(),
             camera_mapping: HashMap::new(),
         }
@@ -135,7 +133,7 @@ impl Client {
                 }
 
                 // Create an SDP Answer.
-                debug!("OFFER: {}", spd_offer.to_sdp_string());
+                //                debug!("OFFER: {}", spd_offer.to_sdp_string());
                 let answer = match self.rtc.sdp_api().accept_offer(spd_offer) {
                     Ok(answer) => answer,
                     Err(err) => {
@@ -143,7 +141,7 @@ impl Client {
                         return Err(());
                     }
                 };
-                debug!("ANSWER: {}", answer.to_sdp_string());
+                //                debug!("ANSWER: {}", answer.to_sdp_string());
                 let answer_text = serde_json::to_string(&ServerMessage::NegotiationAnswer {
                     answer: answer.to_sdp_string(),
                 })
@@ -196,7 +194,6 @@ impl Client {
 
     async fn handle_video(&mut self, msg: VideoPacket) {
         if true {
-            //self.subscribed_ids.contains(&msg.camera_id) {
             if let Some(mid) = self.camera_mapping.get(&msg.camera_id) {
                 let writer = match self.rtc.writer(*mid) {
                     Some(w) => w,
@@ -207,11 +204,13 @@ impl Client {
                 };
                 let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
                 let rtp_time = MediaTime::new(msg.timestamp, Frequency::NINETY_KHZ);
-
+                // debug!(
+                //     "Writing packet for camera id {} to mid {}, time {}",
+                //     msg.camera_id, mid, msg.timestamp
+                // );
                 if let Err(e) = writer.write(pt, Instant::now(), rtp_time, msg.data) {
-                    error!("Error writing video packet! writes({}) {}", self.writes, e);
+                    error!("Error writing video packet! ");
                 }
-                self.writes += 1;
             }
         } else {
         }
@@ -228,13 +227,25 @@ impl Client {
             };
 
             match event {
-                str0m::Output::Timeout(_) => return Ok(Duration::from_millis(100)),
+                str0m::Output::Timeout(timeout) => {
+                    // Drive time forward in client
+                    let now = Instant::now();
+                    if let Err(err) = self.rtc.handle_input(Input::Timeout(now)) {
+                        error!("Error driving client forward: {}", err);
+                    }
+
+                    let duration = (timeout - Instant::now()).max(Duration::from_millis(1));
+
+                    return Ok(duration);
+                }
                 str0m::Output::Transmit(t) => {
+                    if t.contents.len() > 1400 {
+                        debug!("It's a big boy! {}", t.contents.len());
+                    }
                     if let Err(err) = self.udp_socket.send_to(&t.contents, t.destination).await {
-                        error!("Error sending udp data! {}", err);
+                        error!("Error sending udp data to ! {}: {}", t.destination, err);
                         return Err(());
                     }
-                    self.writes = 0;
                 }
                 str0m::Output::Event(e) => match e {
                     str0m::Event::Connected => (),
@@ -245,9 +256,16 @@ impl Client {
                     str0m::Event::ChannelOpen(_, _) => (),
                     str0m::Event::ChannelData(_) => (),
                     str0m::Event::ChannelClose(_) => (),
-                    str0m::Event::PeerStats(_) => (),
+                    str0m::Event::PeerStats(s) => {
+                        debug!(
+                            "Peer stats loss {:?}, bwe {:?}",
+                            s.egress_loss_fraction, s.bwe_tx
+                        );
+                    }
                     str0m::Event::MediaIngressStats(_) => (),
-                    str0m::Event::MediaEgressStats(_) => (),
+                    str0m::Event::MediaEgressStats(s) => {
+                        debug!("Media egress stats loss {:?}, nacks {:?}", s.loss, s.nacks);
+                    }
                     str0m::Event::EgressBitrateEstimate(_) => (),
                     str0m::Event::KeyframeRequest(_) => (),
                     str0m::Event::StreamPaused(_) => (),

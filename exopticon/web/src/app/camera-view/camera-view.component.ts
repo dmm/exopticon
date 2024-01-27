@@ -19,15 +19,15 @@
  */
 
 import {
-    ChangeDetectorRef,
-    Component,
-    ElementRef,
-    EventEmitter,
-    Input,
-    OnInit,
-    Output,
-    SimpleChanges,
-    ViewChild,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  SimpleChanges,
+  ViewChild,
 } from "@angular/core";
 import { Observable, Subscription } from "rxjs";
 import { Camera } from "../camera";
@@ -36,129 +36,146 @@ import { SubscriptionSubject, VideoService } from "../video.service";
 import { WebrtcService } from "../webrtc.service";
 
 enum CameraViewStatus {
-    New,
-    Connecting,
-    Playing,
+  New,
+  Connecting,
+  Playing,
 }
 
 @Component({
-    selector: "app-camera-view",
-    templateUrl: "./camera-view.component.html",
-    styleUrls: ["./camera-view.component.css"],
+  selector: "app-camera-view",
+  templateUrl: "./camera-view.component.html",
+  styleUrls: ["./camera-view.component.css"],
 })
 export class CameraViewComponent implements OnInit {
-    @Input() camera: Camera;
-    @Input() selected: boolean;
-    @Input() enabled: boolean;
-    @Input() videoService: VideoService;
-    @Input() resolution: CameraResolution;
+  @Input() camera: Camera;
+  @Input() selected: boolean;
+  @Input() enabled: boolean;
+  @Input() videoService: VideoService;
+  @Input() resolution: CameraResolution;
 
-    @Output() isVisible = new EventEmitter<boolean>();
+  @Output() isVisible = new EventEmitter<boolean>();
 
-    @ViewChild("wrapperDiv") wrapperDiv: ElementRef;
+  @ViewChild("wrapperDiv") wrapperDiv: ElementRef;
 
-    @ViewChild("videoElement") videoElement: ElementRef;
+  @ViewChild("videoElement") videoElement: ElementRef;
 
-    public status: string;
+  public status: string;
 
-    private videoSubject: SubscriptionSubject;
-    public frameService?: Observable<WsMessage>;
-    private mediaStream?: MediaStream = null;
-    private state: CameraViewStatus = CameraViewStatus.New;
-    private subscription: Subscription = null;
+  private videoSubject: SubscriptionSubject;
+  public frameService?: Observable<WsMessage>;
+  private mediaStream?: MediaStream = null;
+  private state: CameraViewStatus = CameraViewStatus.New;
+  private subscription: Subscription = null;
 
-    constructor(
-        private changeRef: ChangeDetectorRef,
-        private webrtcService: WebrtcService
-    ) { }
+  constructor(
+    private changeRef: ChangeDetectorRef,
+    private webrtcService: WebrtcService
+  ) {}
 
-    ngOnInit() {
-        if (this.enabled) {
-            this.activate();
-        }
+  ngOnInit() {
+    if (this.enabled) {
+      this.activate();
+    }
+  }
+
+  ngAfterViewInit() {
+    if (this.state === CameraViewStatus.New) {
+      this.onVideoStatusChange("loading...");
+      this.activate();
+      this.setMediaSource();
+      this.state = CameraViewStatus.Connecting;
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes.hasOwnProperty("enabled")) {
+      if (changes["enabled"].currentValue) {
+        this.activate();
+      } else {
+        this.deactivate();
+      }
     }
 
-    ngAfterViewInit() {
-        if (this.state === CameraViewStatus.New) {
-            this.onVideoStatusChange("loading...");
-            this.activate();
-            this.setMediaSource();
-            this.state = CameraViewStatus.Connecting;
-        }
+    if (changes.hasOwnProperty("resolution")) {
+      // handle changing resolution
     }
+  }
 
-    ngOnChanges(changes: SimpleChanges) {
-        if (changes.hasOwnProperty("enabled")) {
-            if (changes["enabled"].currentValue) {
-                this.activate();
-            } else {
-                this.deactivate();
-            }
-        }
+  setMediaSource() {
+    if (this.mediaStream !== null) {
+      let video = this.videoElement.nativeElement as HTMLVideoElement;
+      video.srcObject = this.mediaStream;
+      video.muted = true;
+      video.autoplay = true;
+      video.onplaying = this.genStatusHandler("active");
+      video.onpause = this.genStatusHandler("loading");
+      this.state = CameraViewStatus.Playing;
+      video.onemptied = () => {
+        console.log("&&&&&&CAMERA " + this.camera.id + " EMPTIED!");
+      };
+      video.onwaiting = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " WAITING!");
+      };
+      video.onstalled = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " STALLED!");
+      };
+      video.onended = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " ENDED!");
+        this.state = CameraViewStatus.New;
+      };
 
-        if (changes.hasOwnProperty("resolution")) {
-            // handle changing resolution
-        }
+      video.onplaying = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " PLAAAAAYING!");
+      };
+    } else {
+      let video = this.videoElement.nativeElement as HTMLVideoElement;
+      video.pause();
+      video.srcObject = null;
     }
+  }
 
-    setMediaSource() {
-        if (this.mediaStream !== null) {
-            let video = this.videoElement.nativeElement as HTMLVideoElement;
-            video.srcObject = this.mediaStream;
-            video.muted = true;
-            video.autoplay = true;
-            video.onplaying = this.genStatusHandler("active");
-            video.onpause = this.genStatusHandler("loading");
-            this.state = CameraViewStatus.Playing;
-        } else {
-            let video = this.videoElement.nativeElement as HTMLVideoElement;
-            video.pause();
-            video.srcObject = null;
-        }
-    }
+  activate() {
+    this.videoSubject = {
+      kind: "camera",
+      cameraId: this.camera.id,
+      resolution: this.resolution,
+    };
+    //    this.frameService = this.videoService.getObservable(this.videoSubject);
+    this.subscription = this.webrtcService.subscribe(this.camera.id).subscribe(
+      (m) => {
+        this.mediaStream = m;
+        this.setMediaSource();
+      },
+      (err) => {
+        this.mediaStream = null;
+        this.setMediaSource();
+      }
+    );
+  }
 
-    activate() {
-        this.videoSubject = {
-            kind: "camera",
-            cameraId: this.camera.id,
-            resolution: this.resolution,
-        };
-        //    this.frameService = this.videoService.getObservable(this.videoSubject);
-        this.subscription = this.webrtcService.subscribe(this.camera.id).subscribe(
-            (m) => {
-                this.mediaStream = m;
-                this.setMediaSource();
-            },
-            (err) => {
-                this.mediaStream = null;
-                this.setMediaSource();
-            }
-        );
+  deactivate() {
+    if (this.subscription !== null) {
+      this.subscription.unsubscribe();
     }
+    if (this.videoElement !== undefined) {
+      let video = this.videoElement.nativeElement as HTMLVideoElement;
+      video.pause();
+    }
+  }
 
-    deactivate() {
-        if (this.subscription !== null) {
-            this.subscription.unsubscribe();
-        }
-        if (this.videoElement !== undefined) {
-            let video = this.videoElement.nativeElement as HTMLVideoElement;
-            video.pause();
-        }
-    }
+  setStatus(event) {
+    this.status = "active";
+  }
 
-    setStatus(event) {
-        this.status = "active";
-    }
+  genStatusHandler(status: string) {
+    return () => {
+      this.onVideoStatusChange(status);
+    };
+  }
 
-    genStatusHandler(status: string) {
-        return () => {
-            this.onVideoStatusChange(status);
-        };
-    }
-
-    onVideoStatusChange(status: string) {
-        setTimeout(() => {
-            this.status = status;
-        }, 0);
-    }
+  onVideoStatusChange(status: string) {
+    setTimeout(() => {
+      this.status = status;
+    }, 0);
+  }
 }
