@@ -107,7 +107,7 @@ export class CameraViewComponent implements OnInit {
       video.srcObject = this.mediaStream;
       video.muted = true;
       video.autoplay = true;
-      video.onplaying = this.genStatusHandler("active");
+      video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
       this.state = CameraViewStatus.Playing;
       video.onemptied = () => {
