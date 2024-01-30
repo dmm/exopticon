@@ -386,7 +386,7 @@ export class WebrtcService {
   }
 
   private disconnect(reason) {
-    console.log("disconnect( "+ reason + " )....!");
+    console.log("disconnect( " + reason + " )....!");
     this.status = { kind: "paused" };
     this.signalSocket.close();
     if (this.peerConnection) {
@@ -396,6 +396,5 @@ export class WebrtcService {
     }
     this.subscriptions.clear();
     this.transceivers.clear();
-//    this.activeCameras.clear();
   }
 }
