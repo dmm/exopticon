@@ -54,15 +54,11 @@ impl DeletionSupervisor {
 
     pub async fn supervise(mut self) -> anyhow::Result<()> {
         self.start_deletors().await?;
-        loop {
-            tokio::select! {
-                Some(_storage_group_id) = self.delete_handles.next() => {
-                    error!("Deletion Actor died!");
-                    return Err(anyhow::anyhow!("Deletion Actor died!"));
-                },
-                else => break
-            }
+        if let Some(_storage_group_id) = self.delete_handles.next().await {
+            error!("Deletion Actor died!");
+            return Err(anyhow::anyhow!("Deletion Actor died!"));
         }
+
         Ok(())
     }
 }

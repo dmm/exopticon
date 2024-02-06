@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -17,16 +17,6 @@ use tokio::net::UdpSocket;
 
 use crate::super_capture_actor::VideoPacket;
 
-#[derive(PartialEq)]
-pub enum MidStatus {
-    //    NotYetValid,
-    Valid,
-}
-
-pub struct ClientTrack {
-    mid: Mid,
-    mid_status: MidStatus,
-}
 /// Messages from client
 #[derive(Deserialize)]
 #[serde(tag = "kind")]
@@ -70,10 +60,11 @@ impl Client {
         udp_socket: Arc<UdpSocket>,
         candidate_ips: Vec<IpAddr>,
     ) -> Self {
-        let mut builder = Rtc::builder()
+        let rtc = Rtc::builder()
             .set_send_buffer_video(10000)
             .clear_codecs()
-            .enable_h264(true);
+            .enable_h264(true)
+            .build();
 
         Self {
             websocket,
@@ -81,7 +72,7 @@ impl Client {
             udp_socket,
             video_receiver,
             candidate_ips,
-            rtc: builder.build(),
+            rtc,
             subscribed_ids: HashSet::new(),
             camera_mapping: HashMap::new(),
         }
@@ -102,8 +93,7 @@ impl Client {
                 info!("got invalid binary message");
                 return Err(());
             }
-            ws::Message::Ping(_) => return Ok(()),
-            ws::Message::Pong(_) => return Ok(()),
+            ws::Message::Ping(_) | ws::Message::Pong(_) => return Ok(()),
             ws::Message::Close(_) => return Err(()),
         };
 
@@ -119,7 +109,7 @@ impl Client {
             ClientMessage::SubscriptionUpdate {
                 subscribed_camera_ids,
             } => {
-                self.subscribed_ids = HashSet::from_iter(subscribed_camera_ids.into_iter());
+                self.subscribed_ids = subscribed_camera_ids.into_iter().collect();
             }
             ClientMessage::NegotiationRequest { offer } => {
                 let spd_offer =
@@ -162,7 +152,7 @@ impl Client {
         Ok(())
     }
 
-    async fn handle_udp(&mut self, (len, addr, mut buf): (usize, SocketAddr, Vec<u8>)) {
+    fn handle_udp(&mut self, (len, addr, mut buf): (usize, SocketAddr, Vec<u8>)) {
         buf.truncate(len);
         // debug!(
         //     "Handling UDP packet! {}, len: {}, local addr: {}ma",
@@ -192,15 +182,11 @@ impl Client {
         }
     }
 
-    async fn handle_video(&mut self, msg: VideoPacket) {
+    fn handle_video(&mut self, msg: VideoPacket) {
         if true {
             if let Some(mid) = self.camera_mapping.get(&msg.camera_id) {
-                let writer = match self.rtc.writer(*mid) {
-                    Some(w) => w,
-                    None => {
-                        //                        error!("unable for find a writer for {} {}", &msg.camera_id, mid);
-                        return;
-                    }
+                let Some(writer) = self.rtc.writer(*mid) else {
+                    return;
                 };
                 let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
                 let rtp_time = MediaTime::new(msg.timestamp, Frequency::NINETY_KHZ);
@@ -208,11 +194,10 @@ impl Client {
                 //     "Writing packet for camera id {} to mid {}, time {}",
                 //     msg.camera_id, mid, msg.timestamp
                 // );
-                if let Err(e) = writer.write(pt, Instant::now(), rtp_time, msg.data) {
+                if let Err(_e) = writer.write(pt, Instant::now(), rtp_time, msg.data) {
                     error!("Error writing video packet! ");
                 }
             }
-        } else {
         }
     }
 
@@ -248,30 +233,18 @@ impl Client {
                     }
                 }
                 str0m::Output::Event(e) => match e {
-                    str0m::Event::Connected => (),
-                    str0m::Event::IceConnectionStateChange(_) => (),
-                    str0m::Event::MediaAdded(media) => {}
-                    str0m::Event::MediaData(_) => (),
-                    str0m::Event::MediaChanged(_) => (),
-                    str0m::Event::ChannelOpen(_, _) => (),
-                    str0m::Event::ChannelData(_) => (),
-                    str0m::Event::ChannelClose(_) => (),
                     str0m::Event::PeerStats(s) => {
                         debug!(
                             "Peer stats loss {:?}, bwe {:?}",
                             s.egress_loss_fraction, s.bwe_tx
                         );
                     }
-                    str0m::Event::MediaIngressStats(_) => (),
+
                     str0m::Event::MediaEgressStats(s) => {
                         debug!("Media egress stats loss {:?}, nacks {:?}", s.loss, s.nacks);
                     }
-                    str0m::Event::EgressBitrateEstimate(_) => (),
-                    str0m::Event::KeyframeRequest(_) => (),
-                    str0m::Event::StreamPaused(_) => (),
-                    str0m::Event::RtpPacket(_) => (),
-                    str0m::Event::RawPacket(_) => (),
-                    _ => (),
+                    str0m::Event::MediaAdded(_media) => {}
+                    _ => {}
                 },
             }
         }
@@ -283,23 +256,23 @@ impl Client {
             tokio::select! {
                 // websocket control messages
                 Some(msg) = self.websocket.recv() => {
-                    if let Err(_) = self.handle_websocket(msg).await {
+                    if self.handle_websocket(msg).await.is_err() {
                         info!("Got websocket error, exiting...");
                         return;
                     }
                 },
                 // webrtc udp packets
-                Ok(udp_msg) = self.udp_receiver.recv() => self.handle_udp(udp_msg).await,
+                Ok(udp_msg) = self.udp_receiver.recv() => self.handle_udp(udp_msg),
                 // video packets
-                Ok(msg) = self.video_receiver.recv() => self.handle_video(msg).await,
+                Ok(msg) = self.video_receiver.recv() => self.handle_video(msg),
                 // timeout
-                _ = tokio::time::sleep(timeout) => {
+                 () = tokio::time::sleep(timeout) => {
                 }
             }
 
             timeout = match self.process_client_events().await {
                 Ok(t) => t,
-                Err(_) => return,
+                Err(()) => return,
             };
 
             if !self.rtc.is_alive() {

@@ -24,16 +24,16 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 #![deny(
     nonstandard_style,
-//    warnings,
+    warnings,
     rust_2018_idioms,
-//    unused,
+    unused,
     future_incompatible,
     clippy::all,
     clippy::pedantic,
     clippy::nursery,
     clippy::cargo
 )]
-#![allow(clippy::integer_arithmetic)]
+#![allow(clippy::arithmetic_side_effects)]
 #![allow(clippy::integer_division)]
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::multiple_crate_versions)]
@@ -117,17 +117,13 @@ pub struct AppState {
 fn parse_candidate_ips() -> Vec<IpAddr> {
     let mut candidate_ips = Vec::new();
 
-    let candidate_string = match env::var("EXOPTICON_WEBRTC_IPS") {
-        Ok(s) => s,
-        Err(_) => return candidate_ips,
+    let Ok(candidate_string) = env::var("EXOPTICON_WEBRTC_IPS") else {
+        return candidate_ips;
     };
     debug!("CANDIDATES: {candidate_string}");
     for c in candidate_string.split(',') {
         debug!("CANDIDATE: {c}");
-        let ip = match c.parse() {
-            Ok(ip) => ip,
-            Err(_) => continue,
-        };
+        let Ok(ip) = c.parse() else { continue };
         candidate_ips.push(ip);
     }
 

@@ -313,7 +313,7 @@ impl Service {
                 for f in files {
                     debug!("Deleting file: {}", f);
                     match std::fs::remove_file(&f) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             if err.kind() == std::io::ErrorKind::NotFound {
                                 // this is arguably a non-error error

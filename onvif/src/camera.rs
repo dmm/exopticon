@@ -256,7 +256,12 @@ impl Camera {
         .string()
         .parse::<u32>()?;
 
-        let camera_datetime = Utc.ymd(year, month, day).and_hms(hour, minute, second);
+        let camera_datetime = match Utc.with_ymd_and_hms(year, month, day, hour, minute, second) {
+            chrono::LocalResult::Single(datetime) => datetime,
+            chrono::LocalResult::None | chrono::LocalResult::Ambiguous(_, _) => {
+                return Err(Error::InvalidArgument)
+            }
+        };
 
         let date_time_type = match evaluate_xpath(&doc, "//*[local-name()='DateTimeType'][1]")?
             .string()

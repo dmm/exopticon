@@ -47,7 +47,7 @@ impl From<std::io::Error> for ServiceError {
 }
 
 impl From<()> for ServiceError {
-    fn from(_: ()) -> Self {
+    fn from((): ()) -> Self {
         Self::InternalServerError
     }
 }

@@ -93,8 +93,7 @@ impl Service {
                     })
             }
             ServiceKind::Null(db) => {
-                let mut data = db.lock().unwrap();
-                data.camera_groups = vec![];
+                db.lock().unwrap().camera_groups = vec![];
                 Ok(crate::api::camera_groups::CameraGroup {
                     id: 0,
                     name: group.name,
@@ -149,8 +148,7 @@ impl Service {
                     })
             }
             ServiceKind::Null(db) => {
-                let mut data = db.lock().unwrap();
-                for g in &mut data.camera_groups {
+                for g in &mut db.lock().unwrap().camera_groups {
                     if id == g.id {
                         g.name = group.name.clone();
                         g.members = group.members.clone();
@@ -234,8 +232,7 @@ impl Service {
                     })
             }
             ServiceKind::Null(pool) => {
-                let db = pool.lock().expect("unable to lock null db");
-                for group in &db.camera_groups {
+                for group in &pool.lock().unwrap().camera_groups {
                     if group.id == id {
                         return Ok(group.clone());
                     }

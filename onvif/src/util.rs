@@ -132,8 +132,8 @@ pub async fn soap_request(url: &str, body: String) -> Result<Vec<u8>, Error> {
         .uri(url)
         .header("Content-Type", "application/soap+xml")
         .body(Body::from(body))
-        else {
-            return Err(Error::InvalidArgument)
+    else {
+        return Err(Error::InvalidArgument);
     };
 
     let mut response = client.request(req).await?;
