@@ -431,8 +431,7 @@ mod integration_tests {
             // arrange
             let group_name = "new_group_1#";
             let new_group =
-                crate::business::camera_groups::CameraGroup::new(group_name.clone(), Vec::new())
-                    .unwrap();
+                crate::business::camera_groups::CameraGroup::new(group_name, Vec::new()).unwrap();
 
             // act
             let camera_group_response = db.create_camera_group(new_group);
@@ -451,7 +450,7 @@ mod integration_tests {
             let ids = populate_db(db);
             let group_name = "new_group_1";
             let new_group =
-                crate::business::camera_groups::CameraGroup::new(group_name.clone(), ids.1.clone())
+                crate::business::camera_groups::CameraGroup::new(group_name, ids.1.clone())
                     .unwrap();
 
             // act
