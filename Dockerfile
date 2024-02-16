@@ -1,22 +1,19 @@
-# dmattli/debian-cuda:11.5-bullseye-runtime-20221026
-ARG RUNTIMEBASE=dmattli/debian-cuda@sha256:1003ed585c75ffd965d5a3dfa2adf8403b5e6ad4c08265a49a5944ed0301e895
-# debian:bullseye-20221024-slim
-ARG SLIMRUNTIMEBASE=debian@sha256:76cdda8fe5eb597ef5e712e4c9a9f5f1fb119e69f353daaa7bd6d0f6e66e541d
-# dmattli/debian-cuda:11.5-bullseye-devel-20221026
-ARG DEVELBASE=dmattli/debian-cuda@sha256:ee60c2713725d5d78d157ea75dbe0059a737f345530a5074df231d79ef4a6802
+# nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04
+ARG RUNTIMEBASE=nvidia/cuda@sha256:131e238d724ee145317f10d6c8eba0d301439c6c8764b02473510e7035756e81
+# nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+ARG DEVELBASE=nvidia/cuda@sha256:693d4bcb5b05ec381cf815ed0085d4cbc0757d46ccbaa5fab097bb5c250bc69d
 
 FROM $DEVELBASE AS exopticon-build
 
 WORKDIR /exopticon
 
-ENV CC=gcc-10
-ENV CXX=g++-10
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system packages
-RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
+#RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
 RUN apt-get update && apt-get install --no-install-recommends -y \
   # Exopticon Build Dependencies
-  libturbojpeg0-dev bzip2 unzip \
+  bzip2 unzip \
   dpkg-dev file imagemagick libz3-dev libc6-dev \
   libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
   libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
@@ -24,11 +21,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libncurses5-dev libncursesw5-dev libpng-dev libpq-dev \
   libreadline-dev libsqlite3-dev libssl-dev libtool libwebp-dev \
   libxml2-dev libxslt-dev libyaml-dev make patch xz-utils \
-  zlib1g-dev default-libmysqlclient-dev libturbojpeg0-dev \
+  zlib1g-dev default-libmysqlclient-dev \
   curl python3-pil python3-lxml \
   python3 python3-dev python3-pip python3-setuptools python3-wheel \
   git libopencv-dev python3-opencv python3-scipy cmake \
-# ffmpeg
+  # ffmpeg
   ffmpeg libavformat-dev libswscale-dev libavutil-dev libavcodec-dev libavfilter-dev \
   # hwaccel
   intel-media-va-driver-non-free i965-va-driver-shaders \
@@ -71,19 +68,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 #     && make -j`getconf _NPROCESSORS_ONLN` \
 #     && make install
 
-# Add Coral tpu repository and install python libraries
- RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee /etc/apt/sources.list.d/coral-edgetpu.list \
-     && wget -O - https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-     && apt-get update \
-     && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
-     && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=16.0 python3-pycoral edgetpu-compiler python3-gi \
-     && apt-get clean \
-     && rm -rf /var/lib/apt/lists/*
-
 # install node.js and npm
 RUN mkdir /node && cd /node \
-    && wget https://nodejs.org/dist/v16.14.0/node-v16.14.0-linux-x64.tar.xz -O node.tar.xz \
+    && curl https://nodejs.org/dist/v16.14.0/node-v16.14.0-linux-x64.tar.xz > node.tar.xz \
     && tar xf node.tar.xz \
     && mv node*/* . \
     && rm -rf node.tar.xz
@@ -109,8 +96,8 @@ ENV CARGO_HOME=/cargo
 ENV RUST_HOME=/rust
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-  && /cargo/bin/rustup toolchain install 1.66.1 \
-  && /cargo/bin/rustup default 1.66.1 \
+  && /cargo/bin/rustup toolchain install 1.75.0 \
+  && /cargo/bin/rustup default 1.75.0 \
   && /cargo/bin/rustup component add clippy
 #RUN /cargo/bin/cargo uninstall --force cargo-make
 
@@ -119,10 +106,10 @@ RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
 
 ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
-ENV CUDA_HOME=/usr/local/cuda-11.5
-ENV CUDA_PATH=/usr/local/cuda-11.5/bin
-ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-11.5
-ENV CUDACXX=/usr/local/cuda-11.5/bin/nvcc
+ENV CUDA_HOME=/usr/local/cuda-12.2
+ENV CUDA_PATH=/usr/local/cuda-12.2/bin
+ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-12.2
+ENV CUDACXX=/usr/local/cuda-12.2/bin/nvcc
 ENV PATH=$CUDA_PATH:/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:/home/exopticon/.local/bin/:$PATH
 
 WORKDIR /exopticon
@@ -147,65 +134,7 @@ USER exopticon:plugdev
 
 COPY --chown=exopticon:exopticon . ./
 
-RUN dvc pull workers/yolov4/data/yolov4-tiny.weights \
-      workers/coral/data/ssd_mobilenet_v2_coco_quant_postprocess_edgetpu.tflite
-
 RUN cargo make --profile release ci-flow
-
-FROM $SLIMRUNTIMEBASE AS exopticon-slim
-
-WORKDIR /exopticon
-
-USER root
-
-ENV FLASK_ENV=development
-ENV DEBIAN_FRONTEND=noninteractive
-# Install packages for apt repo
-RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
-RUN apt-get -qq update \
-# ffmpeg and runtime deps
-  && apt-get install --no-install-recommends -y \
-  libpq5 libturbojpeg0 ffmpeg python3-opencv \
-# hwaccel
-  intel-media-va-driver-non-free i965-va-driver-shaders \
-# Add Coral tpu repository and install python libraries
-    && apt-get -qq install --no-install-recommends -y \
-    gnupg wget unzip tzdata python3-gi \
-    && apt-get -qq install --no-install-recommends -y \
-        python3-pip \
-    && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-    && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
-    && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
-    && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=16.0 python3-pycoral \
-    && apt-get purge -y python3-setuptools python3-pip python3-wheel gnupg wget unzip mono-runtime \
-# Add imutils and numpy
-    && apt-get install --no-install-recommends -y \
-      python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
-    && pip3 install imutils numpy \
-    && apt-get purge -y python3-setuptools python3-pip python3-wheel \
-    # clean up
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \ # /wheels \
-    && (apt-get autoremove -y; apt-get autoclean -y)
-
-# configure run user
-RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
-RUN chown exopticon:exopticon /exopticon
-
-COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
-
-COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/assets/workers ./workers
-
-ENV EXOPTICONWORKERS=/exopticon/workers/
-ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
-ENV PATH=/exopticon:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/lib
-
-USER exopticon:plugdev
-
-ENTRYPOINT /exopticon/exopticon
 
 FROM $RUNTIMEBASE AS exopticon-runtime
 WORKDIR /exopticon
@@ -215,45 +144,30 @@ USER root
 ENV FLASK_ENV=development
 ENV DEBIAN_FRONTEND=noninteractive
 # Install packages for apt repo
-RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
 RUN apt-get -qq update \
 # ffmpeg
   && apt-get install --no-install-recommends -y \
-  libturbojpeg0 bzip2 \
+  bzip2 libssl3 \
   libbz2-1.0 libc6 \
   libcurl4 libevent-2.1-7 libffi7 \
   libgdbm6 libgeoip1 libglib2.0 \
   libkrb5-3 liblzma5 libmagickcore-6.q16-6 libmagickwand-6.q16-6 \
   libncurses5 libncursesw5 libpng16-16 libpq5 \
-  libreadline8 libsqlite3-0 libssl1.1 libwebp6 \
+  libreadline8 libsqlite3-0 \
   libxml2 libxslt1.1 libyaml-0-2 \
-  zlib1g libturbojpeg0 \
   python3-opencv \
   # ffmpeg runtime deps
   ffmpeg \
-  # hwaccel
-  intel-media-va-driver-non-free i965-va-driver-shaders \
-# Add Coral tpu repository and install python libraries
-    && apt-get -qq install --no-install-recommends -y \
-    gnupg wget unzip tzdata python3-gi \
-    && apt-get -qq install --no-install-recommends -y \
-        python3-pip \
-    && APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn apt-key adv --fetch-keys https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-    && echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" > /etc/apt/sources.list.d/coral-edgetpu.list \
-    && echo "libedgetpu1-max libedgetpu/accepted-eula select true" | debconf-set-selections \
-    && apt-get -qq update && apt-get -qq install --no-install-recommends -y \
-        libedgetpu1-max=16.0 python3-pycoral \
-    && apt-get purge -y python3-setuptools python3-pip python3-wheel gnupg wget unzip mono-runtime \
-# Add imutils and numpy
-    && apt-get install --no-install-recommends -y \
-      python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
-    && pip3 install imutils numpy \
-   && apt-get purge -y python3-setuptools python3-pip python3-wheel \
-# clean up
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \ # /wheels \
-    && (apt-get autoremove -y; apt-get autoclean -y)
+  # Add imutils and numpy
+  && apt-get install --no-install-recommends -y \
+  python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
+  && pip3 install imutils numpy \
+  && apt-get purge -y python3-setuptools python3-pip python3-wheel \
+  # clean up
+  && apt-get autoremove -y \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \ # /wheels \
+  && (apt-get autoremove -y; apt-get autoclean -y)
 
 # configure run user
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
