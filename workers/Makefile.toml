@@ -14,9 +14,6 @@ script = [
 '''
 cm_run_task cworkers
 cm_run_task exopticon
-cm_run_task yolov4
-cm_run_task frigate
-cm_run_task coral
 '''
 ]
 

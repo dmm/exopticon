@@ -3,7 +3,7 @@ mycflags= -W -Wall -Wextra -Wcast-align -Wpointer-arith -Wsign-compare -Wformat=
           -std=c99 -flto -D_FORTIFY_SOURCE=2 -fstack-protector-strong
 devcflags= -fsanitize=undefined -fsanitize=address
 
-LIBRARIES= -lavfilter -lavformat -lavutil -lavcodec -lswscale -lturbojpeg
+LIBRARIES= -lavfilter -lavformat -lavutil -lavcodec -lswscale
 CC ?= clang
 
 # so we can run make outside of Cargo
