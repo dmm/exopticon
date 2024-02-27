@@ -70,7 +70,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 # install node.js and npm
 RUN mkdir /node && cd /node \
-    && curl https://nodejs.org/dist/v16.14.0/node-v16.14.0-linux-x64.tar.xz > node.tar.xz \
+    && curl https://nodejs.org/dist/v20.11.1/node-v20.11.1-linux-x64.tar.xz > node.tar.xz \
     && tar xf node.tar.xz \
     && mv node*/* . \
     && rm -rf node.tar.xz

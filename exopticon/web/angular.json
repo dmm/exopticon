@@ -72,20 +72,20 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "exopticon:build",
-            "proxyConfig": "proxy.conf.json"
+            "proxyConfig": "proxy.conf.json",
+            "buildTarget": "exopticon:build"
 
           },
           "configurations": {
             "production": {
-              "browserTarget": "exopticon:build:production"
+              "buildTarget": "exopticon:build:production"
             }
           }
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "exopticon:build"
+            "buildTarget": "exopticon:build"
           }
         },
         "test": {
