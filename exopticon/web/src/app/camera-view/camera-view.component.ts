@@ -109,7 +109,7 @@ export class CameraViewComponent implements OnInit {
       video.autoplay = true;
       video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
-      this.state = CameraViewStatus.Playing;
+
       video.onemptied = () => {
         console.log("&&&&&&CAMERA " + this.camera.id + " EMPTIED!");
       };
@@ -126,7 +126,25 @@ export class CameraViewComponent implements OnInit {
 
       video.onplaying = () => {
         console.log("&&&&&&&CAMERA " + this.camera.id + " PLAAAAAYING!");
+        this.state = CameraViewStatus.Playing;
       };
+      video.onstalled = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " STALLED!");
+      };
+      video.onwaiting = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " WAITING!");
+      };
+      video.oncanplay = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " CANPLAY!");
+      };
+      video.onloadeddata = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " LOADEDDATA!");
+      };
+      video.ontimeupdate = () => {
+        console.log("&&&&&&&CAMERA " + this.camera.id + " TIMEUPDATE!");
+
+      };
+
     } else {
       let video = this.videoElement.nativeElement as HTMLVideoElement;
       video.pause();
