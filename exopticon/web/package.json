@@ -22,9 +22,9 @@
     "@angular/platform-browser-dynamic": "^17.2.2",
     "@angular/router": "^17.2.2",
     "@angular/service-worker": "^17.2.2",
-    "@js-joda/core": "^5.2",
-    "@js-joda/extra": "^0.8",
-    "@js-joda/timezone": "^2.12.0",
+    "@js-joda/core": "^5.6",
+    "@js-joda/extra": "^0.11",
+    "@js-joda/timezone": "^2.18",
     "@ng-web-apis/common": "^3.0.6",
     "@ng-web-apis/intersection-observer": "^3.2.0",
     "@types/uuid": "^8.3.4",
@@ -33,7 +33,7 @@
     "rxjs": "^6.6.7",
     "rxjs-compat": "^6.6.7",
     "tslib": "^2.3.1",
-    "uuid": "^8.3.2",
+    "uuid": "^9",
     "zone.js": "~0.14.4"
   },
   "devDependencies": {
