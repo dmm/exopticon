@@ -7,6 +7,7 @@ use std::{
 
 use axum::extract::ws::{self, WebSocket};
 use str0m::{
+    bwe::Bitrate,
     change::SdpOffer,
     format::PayloadParams,
     media::{Frequency, MediaTime, Mid},
@@ -61,7 +62,9 @@ impl Client {
         candidate_ips: Vec<IpAddr>,
     ) -> Self {
         let rtc = Rtc::builder()
-            .set_send_buffer_video(10000)
+            .set_send_buffer_video(100000)
+            .enable_bwe(Some(Bitrate::mbps(10)))
+            .set_reordering_size_video(500)
             .clear_codecs()
             .enable_h264(true)
             .build();
