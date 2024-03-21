@@ -121,6 +121,7 @@ pub async fn login(
         .secure(true)
         .http_only(true)
         .same_site(axum_extra::extract::cookie::SameSite::Strict)
+        .max_age(time::Duration::days(7))
         .finish();
 
     let jar = jar.add(cookie);
