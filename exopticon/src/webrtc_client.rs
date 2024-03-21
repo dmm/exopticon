@@ -146,6 +146,7 @@ impl Client {
                     .unwrap();
             }
             ClientMessage::StreamMapping { mappings } => {
+                self.camera_mapping.clear();
                 for (mid_string, camera_id) in mappings {
                     let m: Mid = Mid::from(mid_string.as_str());
                     self.camera_mapping.insert(camera_id, m);
