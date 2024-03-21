@@ -1,0 +1,6 @@
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fda2:bc05:c887:4200::/64
