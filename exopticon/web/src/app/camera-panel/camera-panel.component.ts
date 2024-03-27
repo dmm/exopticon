@@ -46,6 +46,7 @@ export class CameraPanelComponent implements OnInit {
   fullscreen: boolean = false;
   error: any;
   private cameraVisibility: Map<number, boolean>;
+  webrtcStatus$ = this.webrtcService;
 
   constructor(
     public cameraPanelService: CameraPanelService,

@@ -1,30 +1,13 @@
 import { Injectable } from "@angular/core";
 import { Duration, Instant } from "@js-joda/core";
-import { ReplaySubject } from "rxjs";
+import { ReplaySubject, BehaviorSubject } from "rxjs";
 
 interface Subscription {
   id: number;
   trackId: string;
 }
 
-type ClientMessage = SubscriptionUpdate | NegotiationRequest | StreamMapping;
-
-interface SubscriptionUpdate {
-  kind: "subscriptionUpdate";
-  subscribedCameraIds: number[];
-}
-
-interface NegotiationRequest {
-  kind: "negotiationRequest";
-  offer: string;
-}
-
 type ServerMessage = NegotiationAnswer;
-
-interface StreamMapping {
-  kind: "streamMapping";
-  mappings: Map<String, number>;
-}
 
 interface NegotiationAnswer {
   kind: "negotiationAnswer";
@@ -61,6 +44,9 @@ type ClientStatus =
   providedIn: "root",
 })
 export class WebrtcService {
+  statusSubject: BehaviorSubject<ClientStatus> = new BehaviorSubject({
+    kind: "paused",
+  });
   private peerConnection: RTCPeerConnection;
   private dataChannel?: RTCDataChannel;
   private subscriptions: Map<number, Subscription> = new Map();
@@ -78,7 +64,14 @@ export class WebrtcService {
   private maxTimeout = 5000;
   private timeoutId: ReturnType<typeof setTimeout>;
 
+  status$ = this.statusSubject.asObservable();
+
   constructor() {}
+
+  updateStatus(newStatus: ClientStatus) {
+    this.status = newStatus;
+    this.statusSubject.next(newStatus);
+  }
 
   updateState() {
     let activeCameras = " [";
@@ -125,10 +118,8 @@ export class WebrtcService {
     if (s === "new") {
     } else if (s === "connecting") {
       this.syncTracks();
-      this.updateSubscriptions();
     } else if (s === "connected") {
       this.syncTracks();
-      this.updateSubscriptions();
     } else if (s === "disconnected") {
     } else if (s === "failed") {
     } else if (s === "closed") {
@@ -146,9 +137,7 @@ export class WebrtcService {
     ) {
       // ensure every cameraId has a corresponding transceiver
       for (let [cameraId, cameraActive] of this.activeCameras) {
-        let direction: RTCRtpTransceiverDirection = cameraActive
-          ? "recvonly"
-          : "inactive";
+        let direction: RTCRtpTransceiverDirection = "recvonly";
         let transceiver = this.transceivers.get(cameraId);
         if (transceiver === undefined) {
           console.log("CREATING tranceiver for " + cameraId);
@@ -207,7 +196,8 @@ export class WebrtcService {
     let mappings = new Object();
 
     for (let [cameraId, transceiver] of this.transceivers) {
-      if (transceiver.mid !== null) {
+      let active = this.activeCameras.get(cameraId);
+      if (transceiver.mid !== null && active) {
         mappings[transceiver.mid] = cameraId;
       }
     }
@@ -217,31 +207,6 @@ export class WebrtcService {
         mappings: mappings,
       })
     );
-  }
-
-  private updateSubscriptions() {
-    for (const [cameraId, transceiver] of this.transceivers) {
-      const newDirection = this.activeCameras.get(cameraId)
-        ? "recvonly"
-        : "inactive";
-
-      if (transceiver.currentDirection === "stopped") {
-        this.transceivers.delete(cameraId);
-        return;
-      }
-
-      if (transceiver.direction !== newDirection) {
-        console.log(
-          "Updating " +
-            cameraId +
-            " from " +
-            transceiver.direction +
-            " to " +
-            newDirection
-        );
-        transceiver.direction = newDirection;
-      }
-    }
   }
 
   private webrtcConnect() {
@@ -262,11 +227,11 @@ export class WebrtcService {
         case "new":
         case "connecting":
           console.log("WebRTC Connecting...");
-          this.status = { kind: "webrtcConnecting", since: Instant.now() };
+          this.updateStatus({ kind: "webrtcConnecting", since: Instant.now() });
           break;
         case "connected":
           console.log("Online **");
-          this.status = { kind: "webrtcConnected", since: Instant.now() };
+          this.updateStatus({ kind: "webrtcConnected", since: Instant.now() });
           self.updateState();
           break;
         case "disconnected":
@@ -348,10 +313,10 @@ export class WebrtcService {
 
     this.signalSocket = new WebSocket(url);
 
-    this.status = {
+    this.updateStatus({
       kind: "signalChannelConnecting",
       since: Instant.now(),
-    };
+    });
 
     this.signalSocket.onopen = (event) => {
       this.webrtcConnect();
@@ -362,7 +327,7 @@ export class WebrtcService {
     };
 
     this.signalSocket.onerror = (event) => {
-      this.status = { kind: "paused" };
+      this.updateStatus({ kind: "paused" });
     };
 
     this.signalSocket.onmessage = async (event) => {
@@ -385,9 +350,9 @@ export class WebrtcService {
     };
   }
 
-  private disconnect(reason) {
+  private disconnect(reason: string) {
     console.log("disconnect( " + reason + " )....!");
-    this.status = { kind: "paused" };
+    this.updateStatus({ kind: "paused" });
     this.signalSocket.close();
     if (this.peerConnection) {
       this.peerConnection.close();

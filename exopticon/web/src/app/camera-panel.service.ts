@@ -108,6 +108,8 @@ export class CameraPanelService {
 
   private setCameraTimeout = null;
 
+  private projectCameraTimeout = null;
+
   constructor(
     private cameraService: CameraService,
     private cameraGroupService: CameraGroupService,
@@ -197,6 +199,17 @@ export class CameraPanelService {
   }
 
   private projectCameras() {
+    if (this.projectCameraTimeout === null) {
+      this.projectCameraTimeout = setTimeout(
+        () => this.realProjectCameras(),
+        200,
+      );
+    }
+  }
+
+  private realProjectCameras() {
+    this.projectCameraTimeout = null;
+
     this.setCameraGroup(this.desiredCameraGroupId);
     let groupCameras: PanelCamera[] = new Array();
     if (this.activeCameraGroupId === 0) {
@@ -266,6 +279,7 @@ export class CameraPanelService {
       );
     }
 
+    this.projectCameraTimeout;
     this.projectCameras();
   }
 

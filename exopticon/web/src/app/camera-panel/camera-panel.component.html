@@ -36,6 +36,13 @@
 </div>
 <div class="panel" waIntersectionObserver waIntersectionThreshold="0.1">
   <div
+    *ngIf="(webrtcService.status$ | async).kind != 'webrtcConnected'"
+    class="webrtc-status"
+  >
+    CONNECTING: {{ (webrtcService.status$ | async).kind }}
+  </div>
+
+  <div
     *ngFor="let camera of cameraPanelService.cameras; index as i"
     class="wrapper"
     (touchstart)="

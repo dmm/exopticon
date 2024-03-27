@@ -18,6 +18,16 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+div.webrtc-status {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  color: red;
+  border: 1px solid red;
+  background: black;
+  z-index: 1000;
+}
+
 div.group-selector {
   width: 100%;
   height: 60px;
