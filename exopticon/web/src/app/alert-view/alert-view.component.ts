@@ -46,7 +46,7 @@ export class AlertViewComponent implements OnInit {
     public route: ActivatedRoute,
     private observationService: ObservationService,
     private videoService: VideoService,
-    private visibilityService: ElementVisibleService
+    private visibilityService: ElementVisibleService,
   ) {}
 
   stop(): void {

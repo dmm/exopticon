@@ -101,7 +101,7 @@ export class CameraPanelService {
   // page visible observable
   private pageVisible$ = concat(
     defer(() => of(!document.hidden)),
-    fromEvent(document, "visibilitychange").pipe(map(() => !document.hidden))
+    fromEvent(document, "visibilitychange").pipe(map(() => !document.hidden)),
   );
 
   private pageVisible: boolean = false;
@@ -114,7 +114,7 @@ export class CameraPanelService {
     private cameraService: CameraService,
     private cameraGroupService: CameraGroupService,
     private videoService: VideoService,
-    private webrtcService: WebrtcService
+    private webrtcService: WebrtcService,
   ) {
     this.pageVisible$.subscribe((visible) => {
       this.pageVisible = visible;
@@ -233,7 +233,7 @@ export class CameraPanelService {
 
     this.cameras = this.rotateArray(
       groupCameras.map((c: PanelCamera) => c.camera),
-      this.offset
+      this.offset,
     ).slice(0, cameraCount);
 
     // this isn't great...
@@ -269,13 +269,13 @@ export class CameraPanelService {
 
   setCameraVisibility(
     cameraId: number,
-    intersectionEvents: IntersectionObserverEntry[]
+    intersectionEvents: IntersectionObserverEntry[],
   ) {
     let panelCamera = this.unsortedCameras.get(cameraId);
 
     if (panelCamera !== null) {
       panelCamera.inViewport = intersectionEvents.some(
-        (e) => e.intersectionRatio >= this.intersectionThreshold
+        (e) => e.intersectionRatio >= this.intersectionThreshold,
       );
     }
 

@@ -30,7 +30,7 @@ import { PlaybackSubject, VideoService } from "./video.service";
 export class VideoClipService {
   constructor(
     private videoUnitService: VideoUnitService,
-    private videoService: VideoService
+    private videoService: VideoService,
   ) {}
 
   playContext(videoUnitId: number, frameOffset: number): Observable<WsMessage> {

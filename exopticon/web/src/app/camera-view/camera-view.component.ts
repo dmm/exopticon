@@ -69,7 +69,7 @@ export class CameraViewComponent implements OnInit {
 
   constructor(
     private changeRef: ChangeDetectorRef,
-    private webrtcService: WebrtcService
+    private webrtcService: WebrtcService,
   ) {}
 
   ngOnInit() {
@@ -142,9 +142,7 @@ export class CameraViewComponent implements OnInit {
       };
       video.ontimeupdate = () => {
         console.log("&&&&&&&CAMERA " + this.camera.id + " TIMEUPDATE!");
-
       };
-
     } else {
       let video = this.videoElement.nativeElement as HTMLVideoElement;
       video.pause();
@@ -167,7 +165,7 @@ export class CameraViewComponent implements OnInit {
       (err) => {
         this.mediaStream = null;
         this.setMediaSource();
-      }
+      },
     );
   }
 

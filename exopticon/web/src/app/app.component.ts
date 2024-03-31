@@ -43,7 +43,7 @@ export class AppComponent {
   constructor(
     private route: ActivatedRoute,
     public router: Router,
-    private authService: AuthService
+    private authService: AuthService,
   ) {}
 
   ngOnInit() {

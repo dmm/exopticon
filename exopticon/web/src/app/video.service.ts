@@ -97,7 +97,7 @@ export class VideoService {
           this.subscription = null;
           this.setupAcker();
         },
-        () => {}
+        () => {},
       );
     }
   }
@@ -116,8 +116,8 @@ export class VideoService {
 
   public getObservable(subject: SubscriptionSubject): Observable<WsMessage> {
     return null;
-    let frameSub: WebSocketSubject<WsMessage> = (this
-      .subject as unknown) as WebSocketSubject<WsMessage>;
+    let frameSub: WebSocketSubject<WsMessage> = this
+      .subject as unknown as WebSocketSubject<WsMessage>;
 
     return frameSub.multiplex(
       () => {
@@ -193,7 +193,7 @@ export class VideoService {
         } else {
           // invalid kind
         }
-      }
+      },
     );
   }
 

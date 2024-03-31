@@ -39,7 +39,7 @@ export class LoginComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
   ) {}
 
   ngOnInit(): void {}
@@ -52,7 +52,7 @@ export class LoginComponent implements OnInit {
         } else {
           return "/";
         }
-      })
+      }),
     );
 
     let username = this.loginForm.controls.username.value;

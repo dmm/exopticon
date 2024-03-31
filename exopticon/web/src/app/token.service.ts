@@ -64,7 +64,7 @@ export class TokenService {
   getTokens(): Observable<Token[]> {
     return this.http.get<TokenDto[]>(this.tokenUrl).pipe(
       map((data) => data.map((d) => new Token(d))),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 
@@ -76,7 +76,7 @@ export class TokenService {
     };
     return this.http.post<string>(this.tokenUrl, createUserToken).pipe(
       map((data) => data),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 
@@ -84,7 +84,7 @@ export class TokenService {
     let url = `${this.tokenUrl}/${id}`;
     return this.http.delete<string>(url).pipe(
       map((data) => data),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 

@@ -38,11 +38,11 @@ export class ObservationService {
   getObservations(
     cameraId: number,
     beginTime: ZonedDateTime,
-    endTime: ZonedDateTime
+    endTime: ZonedDateTime,
   ): Observable<any> {
     return this.http.get(
       `/v1/cameras/${cameraId}/observations?begin_time=${beginTime.toString()}` +
-        `&end_time=${endTime.toString()}`
+        `&end_time=${endTime.toString()}`,
     );
   }
 }

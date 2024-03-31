@@ -53,17 +53,16 @@ export class VideoPlayer {
   private subscription?: Subscription;
   private videoObservable: Observable<WsMessage>;
   private positionEmitter: EventEmitter<Instant> = new EventEmitter<Instant>(
-    true
+    true,
   );
-  private frameEmitter: EventEmitter<FrameMessage> = new EventEmitter<
-    FrameMessage
-  >(true);
+  private frameEmitter: EventEmitter<FrameMessage> =
+    new EventEmitter<FrameMessage>(true);
 
   constructor(
     private frameService: Observable<WsMessage>,
     private videoUnitService: VideoUnitService,
     private videoService: VideoService,
-    private canvas: ElementRef<HTMLCanvasElement>
+    private canvas: ElementRef<HTMLCanvasElement>,
   ) {
     this.position = Instant.MIN;
   }
@@ -96,7 +95,7 @@ export class VideoPlayer {
       .getVideoUnits(
         cameraId,
         beginTime.atZone(ZoneId.of("Z")),
-        endTime.atZone(ZoneId.of("Z"))
+        endTime.atZone(ZoneId.of("Z")),
       )
       .subscribe((units) => {
         this.videoUnitLibrary = new VideoUnitLibrary(units);
@@ -106,6 +105,6 @@ export class VideoPlayer {
   getAvailability(
     cameraId: number,
     beginTime: Instant,
-    endTime: Instant
+    endTime: Instant,
   ): Observable<[Instant, Instant][]> {}
 }

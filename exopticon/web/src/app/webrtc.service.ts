@@ -87,7 +87,7 @@ export class WebrtcService {
         this.status.kind +
         ", Enabled? " +
         this.enabled +
-        activeCameras
+        activeCameras,
     );
     clearTimeout(this.timeoutId);
 
@@ -205,7 +205,7 @@ export class WebrtcService {
       JSON.stringify({
         kind: "streamMapping",
         mappings: mappings,
-      })
+      }),
     );
   }
 

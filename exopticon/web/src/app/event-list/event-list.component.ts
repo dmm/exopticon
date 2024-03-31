@@ -50,7 +50,7 @@ export class EventListComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private eventService: EventService,
-    private userService: UserService
+    private userService: UserService,
   ) {}
 
   ngOnInit(): void {
@@ -96,7 +96,7 @@ export class EventListComponent implements OnInit {
           this.state = EventListState.Loaded;
           console.log(groups);
           return groups;
-        })
+        }),
       );
     });
   }

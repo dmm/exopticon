@@ -37,7 +37,10 @@ export class TokenListComponent implements OnInit {
   newToken: string;
   minDate: LocalDate = LocalDate.now().plusDays(1);
 
-  constructor(private router: Router, private tokenService: TokenService) {}
+  constructor(
+    private router: Router,
+    private tokenService: TokenService,
+  ) {}
 
   ngOnInit(): void {
     this.tokens$ = this.tokenService.getTokens();

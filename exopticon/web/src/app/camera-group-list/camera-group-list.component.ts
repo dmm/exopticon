@@ -33,7 +33,7 @@ export class CameraGroupListComponent implements OnInit {
   cameraGroups$: Observable<CameraGroup[]>;
   constructor(
     private cameraGroupService: CameraGroupService,
-    public router: Router
+    public router: Router,
   ) {}
 
   ngOnInit(): void {

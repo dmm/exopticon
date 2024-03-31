@@ -25,13 +25,11 @@ describe("CameraOverlayComponent", () => {
   let component: CameraOverlayComponent;
   let fixture: ComponentFixture<CameraOverlayComponent>;
 
-  beforeEach(
-    waitForAsync(() => {
-      TestBed.configureTestingModule({
-        declarations: [CameraOverlayComponent],
-      }).compileComponents();
-    })
-  );
+  beforeEach(waitForAsync(() => {
+    TestBed.configureTestingModule({
+      declarations: [CameraOverlayComponent],
+    }).compileComponents();
+  }));
 
   beforeEach(() => {
     fixture = TestBed.createComponent(CameraOverlayComponent);

@@ -28,7 +28,7 @@ import { catchError, map, mergeMap } from "rxjs/operators";
 })
 export class AuthService {
   private loggedIn: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(
-    false
+    false,
   );
 
   get isLoggedIn() {
@@ -37,7 +37,7 @@ export class AuthService {
         this.loggedIn.next(response.ok);
         return this.loggedIn.asObservable();
       }),
-      catchError(() => this.loggedIn.asObservable())
+      catchError(() => this.loggedIn.asObservable()),
     );
   }
 
@@ -54,7 +54,7 @@ export class AuthService {
           this.loggedIn.next(true);
           return true;
         }),
-        catchError(() => of(false))
+        catchError(() => of(false)),
       );
   }
 }

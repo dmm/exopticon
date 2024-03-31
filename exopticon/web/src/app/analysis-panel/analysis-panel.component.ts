@@ -37,7 +37,7 @@ export class AnalysisPanelComponent implements OnInit {
 
   constructor(
     public route: ActivatedRoute,
-    public videoService: VideoService
+    public videoService: VideoService,
   ) {}
 
   ngOnInit() {

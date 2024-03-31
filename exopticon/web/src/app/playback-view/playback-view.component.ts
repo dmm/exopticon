@@ -68,7 +68,7 @@ export class PlaybackViewComponent implements OnInit {
     public route: ActivatedRoute,
     public videoService: VideoService,
     public observationService: ObservationService,
-    public videoUnitService: VideoUnitService
+    public videoUnitService: VideoUnitService,
   ) {
     this.units = [];
     this.playbackProgress = -1;
@@ -77,7 +77,7 @@ export class PlaybackViewComponent implements OnInit {
   progress(newOffset: number) {
     let currentPlaybackOffset = Duration.between(
       this.viewStartTime,
-      this.currentVideoUnit[0].beginTime.plusNanos(newOffset * 1000)
+      this.currentVideoUnit[0].beginTime.plusNanos(newOffset * 1000),
     ).toMillis();
     this.playbackProgress =
       currentPlaybackOffset / this.playerDuration.toMillis();
@@ -97,7 +97,7 @@ export class PlaybackViewComponent implements OnInit {
   }
 
   findNextVideoUnit(
-    current: [VideoUnit, any[], Observation[]]
+    current: [VideoUnit, any[], Observation[]],
   ): [VideoUnit, any[], Observation[]] | null {
     let next = null;
     this.units.forEach((u, i, arr) => {
@@ -140,7 +140,7 @@ export class PlaybackViewComponent implements OnInit {
       0,
       0,
       this.obCtx.canvas.width,
-      this.obCtx.canvas.height
+      this.obCtx.canvas.height,
     );
 
     let canvasWidth = 1000;
@@ -170,7 +170,7 @@ export class PlaybackViewComponent implements OnInit {
   }
 
   findVideoUnitForTime(
-    time: ZonedDateTime
+    time: ZonedDateTime,
   ): [VideoUnit, any[], Observation[]] | null {
     return this.units.find(([videoUnit, files, obs]) => {
       return (
@@ -190,7 +190,7 @@ export class PlaybackViewComponent implements OnInit {
       offset: offset,
     };
     this.currentVideoService = this.videoService.getObservable(
-      this.playbackSubject
+      this.playbackSubject,
     );
     this.playbackEnabled = true;
   }
@@ -208,10 +208,10 @@ export class PlaybackViewComponent implements OnInit {
 
   calculateProgressPosition(
     time: ZonedDateTime,
-    offset_micros: number = 0
+    offset_micros: number = 0,
   ): number {
     let viewEndTime = this.viewStartTime.plusMinutes(
-      this.playerDuration.toMinutes()
+      this.playerDuration.toMinutes(),
     );
     if (time.isBefore(this.viewStartTime) || time.isAfter(viewEndTime)) {
       return -1;
@@ -220,7 +220,7 @@ export class PlaybackViewComponent implements OnInit {
     let offsetDuration = Duration.ofNanos(offset_micros * 1000);
     let displayMillis = Duration.between(
       this.viewStartTime,
-      viewEndTime
+      viewEndTime,
     ).toMillis();
     let displayOffsetMillis = Duration.between(this.viewStartTime, time)
       .plus(offsetDuration)
@@ -243,7 +243,7 @@ export class PlaybackViewComponent implements OnInit {
     }
 
     let viewEndTime = this.viewStartTime.plusMinutes(
-      this.playerDuration.toMinutes()
+      this.playerDuration.toMinutes(),
     );
     this.videoUnitService
       .getVideoUnits(this.cameraId, this.viewStartTime, viewEndTime)
@@ -261,10 +261,10 @@ export class PlaybackViewComponent implements OnInit {
     this.obCtx = this.obCanvas.nativeElement.getContext("2d");
     this.currentTime = ZonedDateTime.now(ZoneOffset.UTC);
     this.setViewStartTime(
-      this.currentTime.minusMinutes(this.playerDuration.toMinutes() / 2)
+      this.currentTime.minusMinutes(this.playerDuration.toMinutes() / 2),
     );
     let viewEndTime = this.viewStartTime.plusMinutes(
-      this.playerDuration.toMinutes()
+      this.playerDuration.toMinutes(),
     );
     this.enabled = true;
     this.drawProgressBar();

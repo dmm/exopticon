@@ -15,14 +15,14 @@ export class CameraGroupService {
   getCameraGroups(): Observable<CameraGroup[]> {
     return this.http.get<CameraGroup[]>(this.cameraGroupUrl).pipe(
       map((data) => data),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 
   getCameraGroup(id: Number): Observable<CameraGroup> {
     return this.http.get<CameraGroup>(this.cameraGroupUrl + "/" + id).pipe(
       map((data) => data),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 
@@ -36,12 +36,12 @@ export class CameraGroupService {
     } else {
       obs = this.http.post<CameraGroup>(
         this.cameraGroupUrl + "/" + cameraGroup.id.toString(),
-        cameraGroup
+        cameraGroup,
       );
     }
     return obs.pipe(
       map((data) => data),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 

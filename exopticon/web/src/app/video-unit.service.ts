@@ -41,19 +41,18 @@ export class VideoUnitService {
   getVideoUnits(
     cameraId: number,
     beginTime: ZonedDateTime,
-    endTime: ZonedDateTime
+    endTime: ZonedDateTime,
   ): Observable<[VideoUnit, any[], Observation[]][]> {
     return this.http
-      .get<[any, any[], Observation[]][]>(
-        `/v1/cameras/${cameraId}/video?begin_time=${beginTime.toString()}` +
-          `&end_time=${endTime.toString()}`
-      )
+      .get<
+        [any, any[], Observation[]][]
+      >(`/v1/cameras/${cameraId}/video?begin_time=${beginTime.toString()}` + `&end_time=${endTime.toString()}`)
       .pipe(
         map((groups) => {
           return groups.map(([unit, files, obs]) => {
             return [new VideoUnit(unit), files, obs];
           });
-        })
+        }),
       );
   }
 }

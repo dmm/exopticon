@@ -35,7 +35,7 @@ export class CameraDetailComponent implements OnInit {
 
   constructor(
     public route: ActivatedRoute,
-    private cameraService: CameraService
+    private cameraService: CameraService,
   ) {}
 
   ngOnInit(): void {
@@ -49,7 +49,7 @@ export class CameraDetailComponent implements OnInit {
           cam.storageGroupId = 1;
           return of(cam);
         }
-      })
+      }),
     );
     //    this.analysisConfig$ = this.route.paramMap.pipe(
     //      switchMap((params: ParamMap) => {

@@ -56,7 +56,7 @@ export class CameraPanelComponent implements OnInit {
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
     private router: Router,
-    private ngZone: NgZone
+    private ngZone: NgZone,
   ) {}
 
   getCameras(): void {
@@ -84,7 +84,7 @@ export class CameraPanelComponent implements OnInit {
 
       if (params.has("group")) {
         this.cameraPanelService.setDesiredCameraGroup(
-          parseInt(params.get("group"), 10)
+          parseInt(params.get("group"), 10),
         );
       }
     });
@@ -137,7 +137,7 @@ export class CameraPanelComponent implements OnInit {
         {
           queryParamsHandling: "preserve",
           relativeTo: this.route,
-        }
+        },
       );
     }
   }
@@ -168,7 +168,7 @@ export class CameraPanelComponent implements OnInit {
     let route: ActivatedRoute;
     const newUrl = this.router.createUrlTree(
       [this.merge({ group: newGroupId }, this.route.snapshot.params)],
-      { relativeTo: route }
+      { relativeTo: route },
     );
     this.router.navigateByUrl(newUrl);
   }

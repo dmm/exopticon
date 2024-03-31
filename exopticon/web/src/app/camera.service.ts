@@ -42,14 +42,14 @@ export class CameraService {
   getCameras(): Observable<Camera[]> {
     return this.http.get<Camera[]>(this.cameraUrl).pipe(
       map((data) => data),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 
   getCamera(id: number | string): Observable<Camera> {
     return this.http.get<Camera[]>(this.cameraUrl).pipe(
       map((data: Camera[]) => data.find((c) => c.id == +id)),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 
@@ -57,7 +57,7 @@ export class CameraService {
     let url = this.cameraUrl + (camera.id == 0 ? "" : "/" + camera.id);
     return this.http.post<Camera>(url, camera).pipe(
       map((data) => data),
-      catchError(this.handleError)
+      catchError(this.handleError),
     );
   }
 
@@ -67,39 +67,39 @@ export class CameraService {
       .post(`${this.cameraUrl}/${cameraId}/ptz/${directionArg}`, null)
       .pipe(
         map((data) => data),
-        catchError(this.handleError)
+        catchError(this.handleError),
       )
       .subscribe(
         () => {},
-        () => {}
+        () => {},
       );
   }
 
   getCameraAnalysisConfiguration(
-    camera_id: number | string
+    camera_id: number | string,
   ): Observable<AnalysisConfiguration> {
     return this.http
       .get<AnalysisConfiguration>(
-        this.cameraUrl + "/" + camera_id + "/analysis_configuration"
+        this.cameraUrl + "/" + camera_id + "/analysis_configuration",
       )
       .pipe(
         map((data) => data),
-        catchError(this.handleError)
+        catchError(this.handleError),
       );
   }
 
   setCameraAnalysisConfiguration(
     camera_id: number | string,
-    configuration: AnalysisConfiguration
+    configuration: AnalysisConfiguration,
   ): Observable<AnalysisConfiguration> {
     return this.http
       .post<AnalysisConfiguration>(
         this.cameraUrl + "/" + camera_id + "/analysis_configuration",
-        configuration
+        configuration,
       )
       .pipe(
         map((data) => data),
-        catchError(this.handleError)
+        catchError(this.handleError),
       );
   }
 

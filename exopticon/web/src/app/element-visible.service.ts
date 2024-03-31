@@ -32,7 +32,9 @@ export class ElementVisibleService {
   constructor(@Inject(DOCUMENT) document: any) {
     this.pageVisible$ = concat(
       defer(() => of(!document.hidden)),
-      fromEvent(document, "visibilitychange").pipe(map((e) => !document.hidden))
+      fromEvent(document, "visibilitychange").pipe(
+        map((e) => !document.hidden),
+      ),
     );
   }
 
@@ -50,13 +52,13 @@ export class ElementVisibleService {
     }).pipe(
       flatMap((entries: IntersectionObserverEntry[]) => entries),
       map((entry: IntersectionObserverEntry) => entry.isIntersecting),
-      distinctUntilChanged()
+      distinctUntilChanged(),
     );
 
     const elementInViewport$ = combineLatest(
       this.pageVisible$,
       elementVisible$,
-      (pageVisible, elementVisible: boolean) => pageVisible && elementVisible
+      (pageVisible, elementVisible: boolean) => pageVisible && elementVisible,
     ).pipe(distinctUntilChanged());
 
     return elementInViewport$;

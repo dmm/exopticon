@@ -36,7 +36,7 @@ export class CameraOverlayComponent implements OnInit {
 
   constructor(
     private cameraService: CameraService,
-    private cameraPanelService: CameraPanelService
+    private cameraPanelService: CameraPanelService,
   ) {}
 
   ngOnInit() {}

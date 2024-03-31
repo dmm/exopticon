@@ -55,7 +55,7 @@ export class VideoViewComponent implements OnInit {
   constructor(
     private elementRef: ElementRef,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
   ) {}
 
   ngOnInit() {}
@@ -105,7 +105,7 @@ export class VideoViewComponent implements OnInit {
             this.drawObservations(
               message.unscaledWidth,
               message.unscaledHeight,
-              message.observations
+              message.observations,
             );
           }
         }
@@ -117,14 +117,14 @@ export class VideoViewComponent implements OnInit {
         // complete
         console.log("VideoView: playback End subscription complete");
         this.status.emit("eof");
-      }
+      },
     );
   }
 
   drawObservations(
     canvasWidth: number,
     canvasHeight: number,
-    observations: Observation[]
+    observations: Observation[],
   ) {
     //    this.ctx.clearRect(0, 0, this.canvas.nativeElement.width, this.canvas.nativeElement.height);
     this.canvas.nativeElement.width = canvasWidth;

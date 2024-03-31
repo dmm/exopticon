@@ -25,13 +25,11 @@ describe("AnalysisPanelComponent", () => {
   let component: AnalysisPanelComponent;
   let fixture: ComponentFixture<AnalysisPanelComponent>;
 
-  beforeEach(
-    waitForAsync(() => {
-      TestBed.configureTestingModule({
-        declarations: [AnalysisPanelComponent],
-      }).compileComponents();
-    })
-  );
+  beforeEach(waitForAsync(() => {
+    TestBed.configureTestingModule({
+      declarations: [AnalysisPanelComponent],
+    }).compileComponents();
+  }));
 
   beforeEach(() => {
     fixture = TestBed.createComponent(AnalysisPanelComponent);

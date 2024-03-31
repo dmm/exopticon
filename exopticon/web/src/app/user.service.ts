@@ -52,7 +52,7 @@ export class UserService {
     return this.http.get<UserDto>(`/v1/users/me`).pipe(
       map((dto) => new User(dto)),
       publishReplay(1),
-      refCount()
+      refCount(),
     );
   }
 }

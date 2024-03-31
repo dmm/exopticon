@@ -34,7 +34,7 @@ export class CameraGroupDetailComponent implements OnInit {
     public route: ActivatedRoute,
     public router: Router,
     private cameraService: CameraService,
-    private cameraGroupService: CameraGroupService
+    private cameraGroupService: CameraGroupService,
   ) {}
 
   ngOnInit(): void {
@@ -45,7 +45,7 @@ export class CameraGroupDetailComponent implements OnInit {
           let id = params.get("id");
           if (id !== null) {
             cameraGroup$ = this.cameraGroupService.getCameraGroup(
-              parseInt(id, 10)
+              parseInt(id, 10),
             );
           } else {
             // initialize empty form group
@@ -58,7 +58,7 @@ export class CameraGroupDetailComponent implements OnInit {
             cameraGroup: cameraGroup$,
             cameras: this.cameraService.getCameras(),
           });
-        })
+        }),
       )
       .subscribe((res) => {
         this.setFormFromGroup(res.cameraGroup, res.cameras);
@@ -114,7 +114,7 @@ export class CameraGroupDetailComponent implements OnInit {
           id: new FormControl(c.id),
           name: new FormControl(c.name),
           include: new FormControl(true),
-        })
+        }),
       );
     });
     // Add non-included cameras
@@ -124,7 +124,7 @@ export class CameraGroupDetailComponent implements OnInit {
           id: new FormControl(c.id),
           name: new FormControl(c.name),
           include: new FormControl(false),
-        })
+        }),
       );
     });
     this.groupForm = new FormGroup({
