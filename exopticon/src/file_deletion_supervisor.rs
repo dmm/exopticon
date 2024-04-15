@@ -21,14 +21,14 @@
 use futures::{stream::FuturesUnordered, StreamExt};
 use tokio::task::{spawn_blocking, JoinHandle};
 
-use crate::deletion_actor;
+use crate::file_deletion_actor;
 
-pub struct DeletionSupervisor {
+pub struct FileDeletionSupervisor {
     db: crate::db::Service,
     delete_handles: FuturesUnordered<JoinHandle<()>>,
 }
 
-impl DeletionSupervisor {
+impl FileDeletionSupervisor {
     pub fn new(db: crate::db::Service) -> Self {
         Self {
             db,
@@ -43,7 +43,7 @@ impl DeletionSupervisor {
         // start deletion actors
         for s in storage_groups {
             debug!("Starting deletion actor for storage id {}", s.id);
-            let actor = deletion_actor::FileDeletionActor::new(s.id, self.db.clone());
+            let actor = file_deletion_actor::FileDeletionActor::new(s.id, self.db.clone());
 
             let fut = tokio::spawn(actor.run());
             self.delete_handles.push(fut);

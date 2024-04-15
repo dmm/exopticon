@@ -27,7 +27,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
-use crate::{capture_supervisor::CaptureSupervisorCommand, AppState};
+use crate::{capture_supervisor::Command, AppState};
 
 use super::UserError;
 
@@ -125,10 +125,7 @@ pub async fn create(
     let camera = spawn_blocking(move || db.create_camera(camera_request)).await??;
 
     info!("Sending capture restart signal command");
-    state
-        .capture_channel
-        .send(CaptureSupervisorCommand::RestartAll)
-        .await?;
+    state.capture_channel.send(Command::RestartAll).await?;
 
     Ok(Json(camera))
 }
@@ -143,10 +140,7 @@ pub async fn update(
     let updated_camera = spawn_blocking(move || db.update_camera(id, update_request)).await??;
 
     info!("Sending capture restart signal command");
-    state
-        .capture_channel
-        .send(CaptureSupervisorCommand::RestartAll)
-        .await?;
+    state.capture_channel.send(Command::RestartAll).await?;
 
     Ok(Json(updated_camera))
 }

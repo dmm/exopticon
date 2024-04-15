@@ -28,10 +28,10 @@ use tokio::task::JoinHandle;
 use tokio::task::{spawn_blocking, JoinError};
 
 use crate::api::cameras::Camera;
+use crate::capture_actor;
 use crate::capture_actor::VideoPacket;
-use crate::capture_actor::{CaptureActor, CaptureActorCommands};
 
-pub enum CaptureSupervisorCommand {
+pub enum Command {
     RestartAll,
 }
 
@@ -47,9 +47,9 @@ pub struct CaptureSupervisor {
     state: State,
     db: crate::db::Service,
     stopped_camera_ids: Vec<i32>,
-    command_sender: mpsc::Sender<CaptureSupervisorCommand>,
-    command_receiver: mpsc::Receiver<CaptureSupervisorCommand>,
-    capture_channels: HashMap<i32, mpsc::Sender<CaptureActorCommands>>,
+    command_sender: mpsc::Sender<Command>,
+    command_receiver: mpsc::Receiver<Command>,
+    capture_channels: HashMap<i32, mpsc::Sender<capture_actor::Command>>,
     capture_handles: FuturesUnordered<JoinHandle<i32>>,
     packet_sender: broadcast::Sender<VideoPacket>,
 }
@@ -71,7 +71,7 @@ impl CaptureSupervisor {
         }
     }
 
-    pub fn get_command_channel(&self) -> mpsc::Sender<CaptureSupervisorCommand> {
+    pub fn get_command_channel(&self) -> mpsc::Sender<Command> {
         self.command_sender.clone()
     }
 
@@ -82,7 +82,7 @@ impl CaptureSupervisor {
     async fn stop_cameras(&mut self) -> anyhow::Result<()> {
         for (id, ch) in &self.capture_channels {
             info!("Telling camera {} to stop!", id);
-            if let Err(_err) = ch.send(CaptureActorCommands::Stop).await {
+            if let Err(_err) = ch.send(capture_actor::Command::Stop).await {
                 error!("Failed to send stop command!");
             }
         }
@@ -97,7 +97,7 @@ impl CaptureSupervisor {
             spawn_blocking(move || db.fetch_storage_group(c.common.storage_group_id)).await??;
         let id = c.id;
         let (command_sender, command_receiver) = mpsc::channel(1);
-        let actor = CaptureActor::new(
+        let actor = capture_actor::CaptureActor::new(
             self.db.clone(),
             c,
             storage_group,
@@ -132,10 +132,10 @@ impl CaptureSupervisor {
         Ok(())
     }
 
-    fn handle_supervisor_command(&mut self, cmd: &CaptureSupervisorCommand) {
+    fn handle_supervisor_command(&mut self, cmd: &Command) {
         info!("Got supervisor command!");
         match cmd {
-            CaptureSupervisorCommand::RestartAll => {
+            Command::RestartAll => {
                 info!("Got capture restart all command!");
                 self.state = State::Restarting;
             }

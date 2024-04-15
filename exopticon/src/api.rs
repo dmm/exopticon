@@ -26,7 +26,7 @@ use std::{
 use axum::{http::StatusCode, response::IntoResponse};
 use tokio::task::JoinError;
 
-use crate::capture_supervisor::CaptureSupervisorCommand;
+use crate::capture_supervisor::Command;
 
 pub mod auth;
 pub mod camera_groups;
@@ -87,8 +87,8 @@ impl From<crate::business::Error> for UserError {
     }
 }
 
-impl From<tokio::sync::mpsc::error::SendError<CaptureSupervisorCommand>> for UserError {
-    fn from(_: tokio::sync::mpsc::error::SendError<CaptureSupervisorCommand>) -> Self {
+impl From<tokio::sync::mpsc::error::SendError<Command>> for UserError {
+    fn from(_: tokio::sync::mpsc::error::SendError<Command>) -> Self {
         Self::InternalError
     }
 }

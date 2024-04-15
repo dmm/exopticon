@@ -29,7 +29,7 @@ use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 use tokio::{
     fs,
-    process::{Child, ChildStdin, ChildStdout, Command},
+    process::{self, Child, ChildStdin, ChildStdout},
     sync::{broadcast, mpsc},
     task::spawn_blocking,
 };
@@ -51,7 +51,7 @@ pub struct VideoPacket {
     pub duration: i64,
 }
 
-pub enum CaptureActorCommands {
+pub enum Command {
     Stop,
 }
 
@@ -77,7 +77,7 @@ pub struct CaptureActor {
     /// Video Packet Sender
     sender: broadcast::Sender<VideoPacket>,
     /// Supervisor command channel
-    command_receiver: mpsc::Receiver<CaptureActorCommands>,
+    command_receiver: mpsc::Receiver<Command>,
 }
 
 impl CaptureActor {
@@ -85,7 +85,7 @@ impl CaptureActor {
         db: crate::db::Service,
         camera: Camera,
         storage_group: StorageGroup,
-        command_receiver: mpsc::Receiver<CaptureActorCommands>,
+        command_receiver: mpsc::Receiver<Command>,
         sender: broadcast::Sender<VideoPacket>,
     ) -> Self {
         Self {
@@ -120,7 +120,7 @@ impl CaptureActor {
 
         let hwaccel_method =
             env::var("EXOPTICON_HWACCEL_METHOD").unwrap_or_else(|_| "none".to_string());
-        let mut cmd = Command::new(executable_path);
+        let mut cmd = process::Command::new(executable_path);
         cmd.arg(&self.camera.common.rtsp_url);
         cmd.arg(&storage_path);
         cmd.arg(hwaccel_method);
@@ -273,7 +273,7 @@ impl CaptureActor {
             tokio::select! {
                 biased;
                 _ = child.wait() => self.exit_handler(),
-                Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => {
+                Some(Command::Stop) = self.command_receiver.recv() => {
                     info!("Received stop command for {} {}.",
                           self.camera.id, self.camera.common.name,
                     );
@@ -284,7 +284,7 @@ impl CaptureActor {
             }
         } else {
             tokio::select! {
-                Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => return Ok(false),
+                Some(Command::Stop) = self.command_receiver.recv() => return Ok(false),
                 else => return Ok(false),
             }
         }

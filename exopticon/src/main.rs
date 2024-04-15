@@ -75,18 +75,18 @@ mod utils;
 
 mod capture_actor;
 mod capture_supervisor;
-mod deletion_actor;
-mod deletion_supervisor;
+mod file_deletion_actor;
+mod file_deletion_supervisor;
 mod webrtc_client;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
-use crate::deletion_supervisor::DeletionSupervisor;
+use crate::file_deletion_supervisor::FileDeletionSupervisor;
 
 use axum::routing::get;
 use axum::{middleware, Router};
 use capture_actor::VideoPacket;
-use capture_supervisor::CaptureSupervisorCommand;
+use capture_supervisor::Command;
 use dotenv::dotenv;
 use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc};
@@ -110,7 +110,7 @@ pub struct AppState {
     pub udp_socket: Arc<UdpSocket>,
     pub udp_channel: broadcast::Sender<(usize, SocketAddr, Vec<u8>)>,
     pub db_service: crate::db::Service,
-    pub capture_channel: mpsc::Sender<CaptureSupervisorCommand>,
+    pub capture_channel: mpsc::Sender<Command>,
     pub video_sender: broadcast::Sender<VideoPacket>,
 }
 
@@ -197,7 +197,7 @@ async fn main() {
     let capture_supervisor = capture_supervisor::CaptureSupervisor::new(db_service.clone());
     let capture_channel = capture_supervisor.get_command_channel();
 
-    let deletion_supervisor = DeletionSupervisor::new(db_service.clone());
+    let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone());
 
     let state = AppState {
         candidate_ips: parse_candidate_ips(),
