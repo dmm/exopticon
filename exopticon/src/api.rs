@@ -26,7 +26,7 @@ use std::{
 use axum::{http::StatusCode, response::IntoResponse};
 use tokio::task::JoinError;
 
-use crate::super_capture_supervisor::CaptureSupervisorCommand;
+use crate::capture_supervisor::CaptureSupervisorCommand;
 
 pub mod auth;
 pub mod camera_groups;

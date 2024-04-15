@@ -16,7 +16,7 @@ use str0m::{
 };
 use tokio::net::UdpSocket;
 
-use crate::super_capture_actor::VideoPacket;
+use crate::capture_actor::VideoPacket;
 
 /// Messages from client
 #[derive(Deserialize)]

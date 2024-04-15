@@ -73,21 +73,21 @@ mod schema;
 /// Utility functions
 mod utils;
 
-mod super_capture_actor;
-mod super_capture_supervisor;
-mod super_deletion_actor;
-mod super_deletion_supervisor;
+mod capture_actor;
+mod capture_supervisor;
+mod deletion_actor;
+mod deletion_supervisor;
 mod webrtc_client;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
-use crate::super_deletion_supervisor::DeletionSupervisor;
+use crate::deletion_supervisor::DeletionSupervisor;
 
 use axum::routing::get;
 use axum::{middleware, Router};
+use capture_actor::VideoPacket;
+use capture_supervisor::CaptureSupervisorCommand;
 use dotenv::dotenv;
-use super_capture_actor::VideoPacket;
-use super_capture_supervisor::CaptureSupervisorCommand;
 use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::trace::{self, TraceLayer};
@@ -194,7 +194,7 @@ async fn main() {
     tokio::spawn(udp_listener(udp_socket.clone(), udp_channel.clone()));
 
     // Start capture supervisor
-    let capture_supervisor = super_capture_supervisor::CaptureSupervisor::new(db_service.clone());
+    let capture_supervisor = capture_supervisor::CaptureSupervisor::new(db_service.clone());
     let capture_channel = capture_supervisor.get_command_channel();
 
     let deletion_supervisor = DeletionSupervisor::new(db_service.clone());

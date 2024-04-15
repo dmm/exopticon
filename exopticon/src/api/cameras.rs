@@ -27,7 +27,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
-use crate::{super_capture_supervisor::CaptureSupervisorCommand, AppState};
+use crate::{capture_supervisor::CaptureSupervisorCommand, AppState};
 
 use super::UserError;
 

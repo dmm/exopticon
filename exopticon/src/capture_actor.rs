@@ -1,6 +1,6 @@
 /*
  * Exopticon - A free video surveillance system.
- * Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+ * Copyright (C) 2023 David Matthew Mattli <dmm@mattli.us>
  *
  * This file is part of Exopticon.
  *
@@ -18,95 +18,30 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::convert::TryInto;
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Stdio;
-use std::time::Duration;
-use std::time::Instant;
-
-use actix::{
-    fut::wrap_future, registry::SystemService, Actor, ActorContext, ActorFutureExt, AsyncContext,
-    Context, Handler, Message, StreamHandler,
+use std::{
+    env,
+    path::{Path, PathBuf},
+    process::Stdio,
 };
+
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
-use exserial::models::CaptureMessage;
-use tokio::process::Child;
-use tokio::process::{ChildStdin, Command};
-use tokio::sync::broadcast::Sender;
-use tokio_util::codec::length_delimited;
+use futures::stream::StreamExt;
+use tokio::{
+    fs,
+    process::{Child, ChildStdin, ChildStdout, Command},
+    sync::{broadcast, mpsc},
+    task::spawn_blocking,
+};
+use tokio_util::codec::{length_delimited, FramedRead, LengthDelimitedCodec};
 use uuid::Uuid;
 
-use crate::capture_supervisor::{CaptureActorMetrics, StopCaptureWorker};
-use crate::db_registry;
-use crate::models::{CreateVideoUnitFile, UpdateVideoUnitFile};
-use crate::ws_camera_server::{CameraFrame, FrameResolution, FrameSource, WsCameraServer};
-
-/*
-/// Holds messages from capture worker
-#[derive(Default, Debug, PartialEq, Deserialize, Serialize)]
-pub struct CaptureMessage {
-    /// type of worker message
-    #[serde(rename = "type")]
-    #[serde(default)]
-    pub message_type: String,
-
-    /// if message is a log, the log level
-    #[serde(default)]
-    pub level: String,
-
-    /// if the message is a log, the log message
-    #[serde(default)]
-    pub message: String,
-
-    /// if the message is a frame, the jpeg frame
-    #[serde(rename = "jpegFrame")]
-    #[serde(default)]
-    #[serde(with = "serde_bytes")]
-    pub jpeg: Vec<u8>,
-
-    /// if the message is a frame, the sd scaled jpeg frame
-    #[serde(rename = "jpegFrameScaled")]
-    #[serde(default)]
-    #[serde(with = "serde_bytes")]
-    pub scaled_jpeg: Vec<u8>,
-
-    /// if the message is a frame the original width of the image
-    #[serde(rename = "unscaledWidth")]
-    #[serde(default)]
-    pub unscaled_width: i32,
-
-    /// if the message is a frame the original height of the image
-    #[serde(rename = "unscaledHeight")]
-    #[serde(default)]
-    pub unscaled_height: i32,
-
-    /// if message is a frame, the offset from the beginning of file
-    #[serde(default)]
-    pub offset: i64,
-
-    ///
-    #[serde(default)]
-    pub height: i32,
-
-    /// if message is a new file, the created file name
-    #[serde(default)]
-    pub filename: String,
-
-    /// if message is a new file, the file creation time
-    #[serde(rename = "beginTime")]
-    #[serde(default)]
-    pub begin_time: String,
-
-    /// if the message is a closed file, the file end time
-    #[serde(rename = "endTime")]
-    #[serde(default)]
-    pub end_time: String,
-}
-*/
+use crate::api::{
+    cameras::Camera,
+    storage_groups::StorageGroup,
+    video_units::{CreateVideoFile, CreateVideoUnit},
+};
+use exserial::models::CaptureMessage;
 
 #[derive(Clone)]
 pub struct VideoPacket {
@@ -116,258 +51,62 @@ pub struct VideoPacket {
     pub duration: i64,
 }
 
-enum CaptureState {
-    Running,
-    Shutdown,
+pub enum CaptureActorCommands {
+    Stop,
 }
 
-/// Holds state of capture actor
+#[derive(Clone, PartialEq, Eq)]
+enum State {
+    Ready,
+    Started,
+    Recording,
+}
+
 pub struct CaptureActor {
-    /// id of camera actor is capturing video for
-    pub camera_id: i32,
-    /// url of video stream
-    pub stream_url: String,
-    /// absolute path to video storage
-    pub storage_path: String,
-    /// capture start time
-    pub capture_start: Instant,
-    /// id of currently open video unit
-    pub video_unit_id: Option<Uuid>,
-    /// id of currently open video file
-    pub video_file_id: Option<i32>,
-    /// frame offset from beginning of the current video unit
-    pub offset: i64,
-    /// filename currently being captured
-    pub filename: Option<String>,
-    /// worker process
-    pub worker: Option<Child>,
-    /// stdin of worker process
-    pub stdin: Option<ChildStdin>,
-    /// State of CaptureActor
-    state: CaptureState,
-    /// CaptureActor metrics
-    metrics: CaptureActorMetrics,
+    state: State,
+    db: crate::db::Service,
+    camera: Camera,
+    storage_group: StorageGroup,
+    child: Option<(
+        Child,
+        ChildStdin,
+        FramedRead<ChildStdout, LengthDelimitedCodec>,
+    )>,
+    video_segment_id: Option<(Uuid, i32)>,
+
     /// Video Packet Sender
-    sender: Sender<VideoPacket>,
+    sender: broadcast::Sender<VideoPacket>,
+    /// Supervisor command channel
+    command_receiver: mpsc::Receiver<CaptureActorCommands>,
 }
 
 impl CaptureActor {
-    /// Returns new initialized `CaptureActor`
-    pub const fn new(
-        camera_id: i32,
-        stream_url: String,
-        storage_path: String,
-        capture_start: Instant,
-        metrics: CaptureActorMetrics,
-        sender: Sender<VideoPacket>,
+    pub fn new(
+        db: crate::db::Service,
+        camera: Camera,
+        storage_group: StorageGroup,
+        command_receiver: mpsc::Receiver<CaptureActorCommands>,
+        sender: broadcast::Sender<VideoPacket>,
     ) -> Self {
         Self {
-            camera_id,
-            stream_url,
-            storage_path,
-            capture_start,
-            video_unit_id: None,
-            video_file_id: None,
-            offset: 0,
-            filename: None,
-            worker: None,
-            stdin: None,
-            state: CaptureState::Running,
-            metrics,
+            state: State::Ready,
+            db,
+            camera,
+            storage_group,
+            child: None,
+            video_segment_id: None,
+            command_receiver,
             sender,
         }
     }
 
-    /// Called when the underlying capture worker signals the file as
-    /// closed. The database record is updated
-    #[allow(clippy::cast_possible_truncation)]
-    fn close_file(&self, ctx: &mut Context<Self>, filename: &str, end_time: DateTime<Utc>) {
-        if let (Some(video_unit_id), Some(video_file_id), Ok(metadata)) = (
-            self.video_unit_id,
-            self.video_file_id,
-            fs::metadata(filename),
-        ) {
-            let fut = db_registry::get_db().send(UpdateVideoUnitFile {
-                video_unit_id,
-                end_time: end_time.naive_utc(),
-                video_file_id,
-                size: metadata
-                    .len()
-                    .try_into()
-                    .expect("Unexpected i32 overflow in metadata.len()"),
-            });
-            ctx.spawn(
-                wrap_future::<_, Self>(fut).map(|result, _actor, _ctx| match result {
-                    Ok(Ok((_video_unit, _video_file))) => {}
-                    Ok(Err(e)) => panic!("CaptureWorker: Error updating video unit: {e}"),
-                    Err(e) => panic!("CaptureWorker: Error updating video unit: {e}"),
-                }),
-            );
-        } else {
-            error!("Error closing file!");
-        }
-    }
-
-    /// Processes a `CaptureMessage` from the capture worker,
-    /// performing the appropriate action.
-    #[allow(clippy::panic)]
-    #[allow(clippy::too_many_lines)]
-    fn message_to_action(&mut self, msg: CaptureMessage, ctx: &mut Context<Self>) {
-        // Check if log
-        match msg {
-            CaptureMessage::Log { message } => {
-                debug!("Capture worker {} log message: {}", self.camera_id, message);
-            }
-            CaptureMessage::Frame {
-                jpeg,
-                offset,
-                unscaled_width,
-                unscaled_height,
-            } => {
-                if self.video_unit_id.is_none() {
-                    error!("Video Unit id not set!");
-                }
-                WsCameraServer::from_registry().do_send(CameraFrame {
-                    camera_id: self.camera_id,
-                    jpeg,
-                    observations: Vec::new(),
-                    resolution: FrameResolution::HD,
-                    source: FrameSource::Camera {
-                        camera_id: self.camera_id,
-                        analysis_offset: Instant::now().duration_since(self.capture_start),
-                    },
-                    video_unit_id: self
-                        .video_unit_id
-                        .expect("video unit to be set. state violation!"),
-                    offset,
-                    unscaled_width,
-                    unscaled_height,
-                });
-                self.offset += 1;
-            }
-            CaptureMessage::ScaledFrame {
-                jpeg,
-                offset,
-                unscaled_width,
-                unscaled_height,
-            } => {
-                self.metrics.frame_count.inc();
-                WsCameraServer::from_registry().do_send(CameraFrame {
-                    camera_id: self.camera_id,
-                    jpeg,
-                    observations: Vec::new(),
-                    resolution: FrameResolution::SD,
-                    source: FrameSource::Camera {
-                        camera_id: self.camera_id,
-                        analysis_offset: Instant::now().duration_since(self.capture_start),
-                    },
-                    video_unit_id: self.video_unit_id.unwrap_or_else(Uuid::nil),
-                    offset,
-                    unscaled_width,
-                    unscaled_height,
-                });
-                self.offset += 1;
-            }
-            CaptureMessage::NewFile {
-                filename,
-                begin_time,
-            } => {
-                let new_id = Uuid::new_v4();
-                // worker has created a new file. Write video_unit and
-                // file to database.
-                if let Ok(date) = begin_time.parse::<DateTime<Utc>>() {
-                    let fut = db_registry::get_db().send(CreateVideoUnitFile {
-                        video_unit_id: new_id,
-                        camera_id: self.camera_id,
-                        monotonic_index: 0,
-                        begin_time: date.naive_utc(),
-                        filename: filename.clone(),
-                    });
-                    self.video_unit_id = Some(new_id);
-                    ctx.spawn(wrap_future::<_, Self>(fut).map(
-                        |result, actor, _ctx| match result {
-                            Ok(Ok((_video_unit, video_file))) => {
-                                actor.video_file_id = Some(video_file.id);
-                                actor.filename = Some(filename);
-                            }
-                            Ok(Err(e)) => {
-                                panic!("Error inserting video unit: db handler error {e}");
-                            }
-                            Err(e) => panic!("Error inserting video unit: message error {e}"),
-                        },
-                    ));
-                } else {
-                    error!("CaptureWorker: unable to parse begin time: {}", begin_time);
-                }
-                self.offset = 0;
-            }
-            CaptureMessage::EndFile { filename, end_time } => {
-                if let Ok(end_time) = end_time.parse::<DateTime<Utc>>() {
-                    self.close_file(ctx, &filename, end_time);
-                    self.video_unit_id = None;
-                    self.video_file_id = None;
-                    self.filename = None;
-                } else {
-                    error!("CaptureActor: Error handling close file message.");
-                }
-            }
-            CaptureMessage::Packet {
-                data,
-                timestamp,
-                duration,
-            } => {
-                if let Err(e) = self.sender.send(VideoPacket {
-                    camera_id: self.camera_id,
-                    data,
-                    timestamp,
-                    duration,
-                }) {
-                    error!("Error sending video packet: {}", e);
-                }
-            }
-            CaptureMessage::Metric {
-                label: _,
-                values: _,
-            } => (),
-        }
-    }
-}
-
-impl StreamHandler<Result<BytesMut, std::io::Error>> for CaptureActor {
-    fn handle(&mut self, item: Result<BytesMut, std::io::Error>, ctx: &mut Context<Self>) {
-        let item = match item {
-            Ok(b) => b,
-            Err(e) => {
-                debug!("stream handle error! {}", e);
-                self.stdin = None;
-                ctx.terminate();
-                return;
-            }
-        };
-        let frame: Result<CaptureMessage, bincode::Error> = bincode::deserialize(&item[..]);
-
-        match frame {
-            Ok(f) => self.message_to_action(f, ctx),
-            Err(e) => error!("Error deserializing frame! {}", e),
-        }
-    }
-
-    fn finished(&mut self, _ctx: &mut Self::Context) {
-        info!("Stream handler finished!");
-    }
-}
-
-/// Message for capture actor to start worker
-#[derive(Message)]
-#[rtype(result = "()")]
-struct StartWorker;
-
-impl Handler<StartWorker> for CaptureActor {
-    type Result = ();
-
-    fn handle(&mut self, _msg: StartWorker, ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Launching worker for stream: {}", self.stream_url);
-        let storage_path = Path::new(&self.storage_path).join(self.camera_id.to_string());
+    fn start_worker(&mut self) {
+        debug!(
+            "Starting worker process for camera: {}, id: {}, stream: {}",
+            self.camera.common.name, self.camera.id, self.camera.common.rtsp_url
+        );
+        let storage_path =
+            Path::new(&self.storage_group.storage_path).join(self.camera.id.to_string());
         if std::fs::create_dir(&storage_path).is_err() {
             // The error returned by create_dir has no information so
             // we can't really distinguish between failure
@@ -382,7 +121,7 @@ impl Handler<StartWorker> for CaptureActor {
         let hwaccel_method =
             env::var("EXOPTICON_HWACCEL_METHOD").unwrap_or_else(|_| "none".to_string());
         let mut cmd = Command::new(executable_path);
-        cmd.arg(&self.stream_url);
+        cmd.arg(&self.camera.common.rtsp_url);
         cmd.arg(&storage_path);
         cmd.arg(hwaccel_method);
         cmd.stdout(Stdio::piped());
@@ -393,94 +132,192 @@ impl Handler<StartWorker> for CaptureActor {
             .stdout
             .take()
             .expect("Failed to open stdout on worker child");
-        self.stdin = Some(child.stdin.take().expect("Failed to open stdin"));
+        let stdin = child.stdin.take().expect("Failed to open stdin");
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
-        Self::add_stream(framed_stream, ctx);
 
-        self.worker = Some(child);
-
-        ctx.notify_later(CheckWorker {}, Duration::new(15, 0));
+        self.child = Some((child, stdin, framed_stream));
+        self.state = State::Started;
     }
-}
 
-impl Handler<StopCaptureWorker> for CaptureActor {
-    type Result = ();
+    async fn handle_new_file(
+        &mut self,
+        filename: String,
+        begin_time: String,
+    ) -> anyhow::Result<()> {
+        let new_video_unit_id = Uuid::new_v4();
+        let date = begin_time.parse::<DateTime<Utc>>().expect("Parse failure!");
 
-    fn handle(&mut self, _msg: StopCaptureWorker, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!(
-            "Camera {} received StopCaptureWorker, going to shutdown...",
-            self.camera_id
+        let create_video_unit = CreateVideoUnit {
+            camera_id: self.camera.id,
+            monotonic_index: 0,
+            begin_time: date.naive_utc(),
+            end_time: date.naive_utc(),
+            id: new_video_unit_id,
+        };
+        let create_video_file = CreateVideoFile {
+            filename,
+            size: 0,
+            video_unit_id: new_video_unit_id,
+        };
+        let db = self.db.clone();
+        let (video_unit, video_file) =
+            spawn_blocking(move || db.create_video_segment(&create_video_unit, create_video_file))
+                .await??;
+
+        self.video_segment_id = Some((video_unit.id, video_file.id));
+        self.state = State::Recording;
+        Ok(())
+    }
+
+    async fn handle_close_file(
+        &mut self,
+        filename: &str,
+        end_time: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        if let (Some((video_unit_id, video_file_id)), Ok(metadata)) =
+            (self.video_segment_id, fs::metadata(filename).await)
+        {
+            let db = self.db.clone();
+            let file_size: i32 = metadata.len().try_into().unwrap_or(-1);
+            spawn_blocking(move || {
+                db.close_video_segment(
+                    video_unit_id,
+                    video_file_id,
+                    end_time.naive_utc(),
+                    file_size,
+                )
+            })
+            .await??;
+        }
+        Ok(())
+    }
+    fn handle_packet(&mut self, data: Vec<u8>, timestamp: i64, duration: i64) {
+        if let Err(_e) = self.sender.send(VideoPacket {
+            camera_id: self.camera.id,
+            data,
+            timestamp,
+            duration,
+        }) {
+            // error!(
+            //     "Error sending packet! Camera: {}, {}, {} ",
+            //     self.camera.id, self.camera.common.name, e
+            // );
+        }
+    }
+    async fn message_to_action(&mut self, msg: CaptureMessage) -> anyhow::Result<()> {
+        match msg {
+            CaptureMessage::Log { message } => debug!("capture worker log: {}", message),
+            CaptureMessage::Frame {
+                jpeg: _,
+                offset: _,
+                unscaled_width: _,
+                unscaled_height: _,
+            }
+            | CaptureMessage::ScaledFrame {
+                jpeg: _,
+                offset: _,
+                unscaled_width: _,
+                unscaled_height: _,
+            } => {}
+            CaptureMessage::Packet {
+                data,
+                timestamp,
+                duration,
+            } => {
+                // TODO handle packets...
+                self.handle_packet(data, timestamp, duration);
+            }
+            CaptureMessage::NewFile {
+                filename,
+                begin_time,
+            } => self.handle_new_file(filename, begin_time).await?,
+
+            CaptureMessage::EndFile { filename, end_time } => {
+                let end_time = end_time.parse::<DateTime<Utc>>().expect("Parse failure!");
+                self.handle_close_file(&filename, end_time).await?;
+            }
+            CaptureMessage::Metric {
+                label: _,
+                values: _,
+            } => {
+                debug!("got capture metrics");
+            }
+        }
+        Ok(())
+    }
+
+    async fn stream_handler(
+        &mut self,
+        msg: Result<BytesMut, std::io::Error>,
+    ) -> anyhow::Result<()> {
+        let item = msg?;
+
+        let frame: CaptureMessage = bincode::deserialize(&item[..])?;
+
+        self.message_to_action(frame).await?;
+
+        Ok(())
+    }
+
+    fn exit_handler(&mut self) {
+        info!(
+            "Capture process for {} {} died. Restarting...",
+            self.camera.id, self.camera.common.name,
         );
-        self.state = CaptureState::Shutdown;
-
-        self.stdin = None;
+        self.child = None;
+        self.state = State::Ready;
     }
-}
 
-#[derive(Message)]
-#[rtype(result = "()")]
-struct CheckWorker;
-
-impl Handler<CheckWorker> for CaptureActor {
-    type Result = ();
-
-    fn handle(&mut self, _msg: CheckWorker, ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Checking capture worker...");
-        ctx.notify_later(CheckWorker {}, Duration::new(15, 0));
-
-        if let Some(mut worker) = self.worker.take() {
-            match worker.try_wait() {
-                Ok(Some(_)) => {
-                    // worker has died
+    async fn select_next(&mut self) -> anyhow::Result<bool> {
+        if let Some((child, _, framed_stream)) = &mut self.child {
+            tokio::select! {
+                biased;
+                _ = child.wait() => self.exit_handler(),
+                Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => {
+                    info!("Received stop command for {} {}.",
+                          self.camera.id, self.camera.common.name,
+                    );
+                    return Ok(false)
                 }
-                Ok(None) => {
-                    // Worker is still alive, return so the actor stays alive.
-                    self.worker = Some(worker);
-                    return;
-                }
-                Err(err) => {
-                    error!("Error checking child: {}", err);
+                Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
+                else => return Ok(false)
+            }
+        } else {
+            tokio::select! {
+                Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => return Ok(false),
+                else => return Ok(false),
+            }
+        }
+
+        Ok(true)
+    }
+
+    pub async fn run(mut self) -> i32 {
+        loop {
+            if self.state == State::Ready {
+                self.start_worker();
+            }
+            let res = self.select_next().await;
+            match res {
+                Ok(true) => {}
+                Ok(false) => break,
+                Err(e) => {
+                    error!("Error {}", e);
+                    break;
                 }
             }
         }
 
-        // Change this to an error when we can't distinguish
-        // between intentional and unintentional exits.
-        debug!("CaptureWorker {}: capture process died...", self.camera_id);
-
-        // Close file if open
-        if let Some(filename) = &self.filename {
-            debug!(
-                "CaptureSelf {}: capture process died, closing file: {}",
-                self.camera_id, &filename
-            );
-            self.close_file(ctx, filename, Utc::now());
-            self.filename = None;
-        }
-        match self.state {
-            CaptureState::Running => {
-                debug!("Shutting down running captureworker...");
-                self.stdin = None;
-                ctx.terminate();
+        if let Some((mut child, stdin, _)) = self.child.take() {
+            drop(stdin);
+            // wait for child to exit...
+            if let Err(e) = child.kill().await {
+                error!("error killing child: {}", e);
             }
-            CaptureState::Shutdown => {
-                debug!("Shutting down captureworker...");
-                self.stdin = None;
-                ctx.terminate();
+            if let Err(e) = child.wait().await {
+                error!("error waiting for child exit: {}", e);
             }
         }
-    }
-}
-
-impl Actor for CaptureActor {
-    type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        info!("Starting CaptureActor for camera id: {}", self.camera_id);
-        ctx.address().do_send(StartWorker {});
-    }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        info!("Capture Actor for camera id {} is stopped!", self.camera_id);
+        self.camera.id
     }
 }
