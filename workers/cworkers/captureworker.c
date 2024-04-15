@@ -33,6 +33,7 @@
 #include <libavutil/imgutils.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
+#include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +49,10 @@
 #include "mpack_frame.h"
 
 #define METRIC_SAMPLES 25 * 5
+
+// from ffmpeg rtp.h
+#define RTP_VERSION 2
+#define RTCP_PSFB 206
 
 enum metrics {
         LOOP_TIME,
@@ -185,14 +190,6 @@ time_t get_time()
         gettimeofday(&tv, NULL);
 
         return tv.tv_sec;
-}
-
-void free_buffer(void *opaque, uint8_t *data)
-{
-        // Silence unused parameter warning for callback
-        (void)(opaque);
-
-        tjFree(data);
 }
 
 char *timespec_to_8601(struct timespec *ts)
@@ -394,6 +391,32 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
         return 0;
 }
 
+int request_keyframe(struct in_context *ctx) {
+				if (ctx->ssrc != 0) {
+								AVIOContext *pb = ctx->fcx->pb;
+								if (avio_open_dyn_buf(&pb) < 0 ) {
+												bs_log("ERROR OPENING AVIO!");
+												return;
+								}
+
+								avio_w8(pb, (RTP_VERSION << 6) | 1); /* PLI */
+								avio_w8(pb, RTCP_PSFB);
+								avio_wb16(pb, 2); /* length in words - 1 */
+								// our own SSRC: we use the server's SSRC + 1 to avoid conflicts
+								avio_wb32(pb, ctx->ssrc + 1);
+								avio_wb32(pb, ctx->ssrc); // server SSRC
+
+								avio_flush(pb);
+								uint8_t *buf;
+								int len = avio_close_dyn(pub, &buf);
+								if (len > 0 && buf) {
+												ffurl_write(fd, buf, len);
+												av_free(buf);
+								}
+								bs_log("KEYFRAME ACTUALLY SENT! omg omg omg");
+				}
+				return 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -435,6 +458,14 @@ int main(int argc, char *argv[])
         clock_gettime(CLOCK_MONOTONIC, &(cam.in.last_frame_time));
         while ((ret = ex_read_frame(&cam.in, &cam.pkt)) >= 0) {
                 if (cam.pkt.stream_index == cam.in.stream_index) {
+												// try to capture the ssrc
+												if (cam.in.ssrc == 0
+														&& cam.pkt.data
+//														&& strcmp(cam.in.fcx->iformat->name, "rtp")
+														&& cam.pkt.size >= 12) {
+																// Extract the SSRC from the RTP header
+																cam.in.ssrc = (cam.pkt.data[8] << 24) | (cam.pkt.data[9] << 16) | (cam.pkt.data[10] << 8) | cam.pkt.data[11];
+												}
                         record_metric_start(&cam, LOOP_TIME);
                         int handle_ret = handle_output_file(&cam.in, &cam.out, &cam.pkt, cam.output_directory_name);
                         if (handle_ret != 0) {
@@ -461,7 +492,22 @@ int main(int argc, char *argv[])
                 }
                 av_packet_unref(&cam.pkt);
                 av_init_packet(&cam.pkt);
-                increment_metrics(&cam);
+
+								// check for keyframe request
+								struct pollfd pfd;
+								pfd.fd = 0;
+								pfd.events = POLLIN;
+								int res33 = poll(&pfd, 1, 0);
+
+								if (res33 > 0 && pfd.revents & POLLIN) {
+												bs_log("KEYFRAME LOOOOPING");
+												request_keyframe(&cam.in);
+												char buffer[1024];
+												read(0, buffer, 1);
+//												while (read(0, buffer, 1) > 0) {
+																// Discard the data by doing nothing with it
+												//											}
+								}
         }
 
         char buf[1024];

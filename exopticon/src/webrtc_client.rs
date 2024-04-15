@@ -16,7 +16,7 @@ use str0m::{
 };
 use tokio::net::UdpSocket;
 
-use crate::super_capture_actor::VideoPacket;
+use crate::{super_capture_actor::VideoPacket, super_capture_supervisor::CaptureSupervisorCommand};
 
 /// Messages from client
 #[derive(Deserialize)]
@@ -51,6 +51,7 @@ pub struct Client {
     rtc: Rtc,
     subscribed_ids: HashSet<i32>,
     camera_mapping: HashMap<i32, Mid>,
+    capture_command_channel: tokio::sync::mpsc::Sender<CaptureSupervisorCommand>,
 }
 
 impl Client {
@@ -60,6 +61,7 @@ impl Client {
         video_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
         udp_socket: Arc<UdpSocket>,
         candidate_ips: Vec<IpAddr>,
+        capture_command_channel: tokio::sync::mpsc::Sender<CaptureSupervisorCommand>,
     ) -> Self {
         let rtc = Rtc::builder()
             .set_send_buffer_video(100000)
@@ -78,6 +80,7 @@ impl Client {
             rtc,
             subscribed_ids: HashSet::new(),
             camera_mapping: HashMap::new(),
+            capture_command_channel,
         }
     }
 
@@ -248,6 +251,20 @@ impl Client {
                         debug!("Media egress stats loss {:?}, nacks {:?}", s.loss, s.nacks);
                     }
                     str0m::Event::MediaAdded(_media) => {}
+                    str0m::Event::KeyframeRequest(request) => {
+                        // find camera_id matching request mid
+                        for (camera_id, mid) in &self.camera_mapping {
+                            if *mid == request.mid {
+                                if let Err(err) = self
+                                    .capture_command_channel
+                                    .send(CaptureSupervisorCommand::RequestKeyFrame(*camera_id))
+                                    .await
+                                {
+                                    error!("Error sending keyframe request: {}", err);
+                                }
+                            }
+                        }
+                    }
                     _ => {}
                 },
             }

@@ -29,6 +29,7 @@ use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 use tokio::{
     fs,
+    io::AsyncWriteExt,
     process::{Child, ChildStdin, ChildStdout, Command},
     sync::{broadcast, mpsc},
     task::spawn_blocking,
@@ -52,6 +53,7 @@ pub struct VideoPacket {
 }
 
 pub enum CaptureActorCommands {
+    RequestKeyFrame,
     Stop,
 }
 
@@ -268,20 +270,44 @@ impl CaptureActor {
         self.state = State::Ready;
     }
 
+    async fn handle_command(&mut self, cmd: CaptureActorCommands) -> bool {
+        match cmd {
+            CaptureActorCommands::RequestKeyFrame => {
+                if let Some((_, stdin, _)) = &mut self.child {
+                    debug!("actor requesting keyframe for {}", self.camera.id);
+                    if let Err(err) = stdin.write(b"a").await {
+                        error!("Error writing to capture process stdin: {}", err);
+                        return false;
+                    }
+                    if let Err(err) = stdin.flush().await {
+                        error!("Error flushing to capture process stdin: {}", err);
+                        return false;
+                    }
+                }
+                return true;
+            }
+            CaptureActorCommands::Stop => {
+                info!(
+                    "Received stop command for {} {}.",
+                    self.camera.id, self.camera.common.name,
+                );
+                return false;
+            }
+        }
+    }
+
     async fn select_next(&mut self) -> anyhow::Result<bool> {
         if let Some((child, _, framed_stream)) = &mut self.child {
             tokio::select! {
-                biased;
-                _ = child.wait() => self.exit_handler(),
-                Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => {
-                    info!("Received stop command for {} {}.",
-                          self.camera.id, self.camera.common.name,
-                    );
-                    return Ok(false)
-                }
-                Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
-                else => return Ok(false)
-            }
+                            biased;
+                            _ = child.wait() => self.exit_handler(),
+                            Some(cmd) = self.command_receiver.recv() => {
+                                return Ok(self.handle_command(cmd).await
+            );
+                            }
+                            Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
+                            else => return Ok(false)
+                        }
         } else {
             tokio::select! {
                 Some(CaptureActorCommands::Stop) = self.command_receiver.recv() => return Ok(false),

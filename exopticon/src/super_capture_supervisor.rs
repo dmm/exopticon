@@ -33,6 +33,7 @@ use crate::super_capture_actor::{CaptureActor, CaptureActorCommands};
 
 pub enum CaptureSupervisorCommand {
     RestartAll,
+    RequestKeyFrame(i32),
 }
 
 #[derive(Debug)]
@@ -132,12 +133,22 @@ impl CaptureSupervisor {
         Ok(())
     }
 
-    fn handle_supervisor_command(&mut self, cmd: &CaptureSupervisorCommand) {
+    async fn handle_supervisor_command(&mut self, cmd: &CaptureSupervisorCommand) {
         info!("Got supervisor command!");
         match cmd {
             CaptureSupervisorCommand::RestartAll => {
                 info!("Got capture restart all command!");
                 self.state = State::Restarting;
+            }
+            CaptureSupervisorCommand::RequestKeyFrame(camera_id) => {
+                if let Some(command_channel) = self.capture_channels.get(camera_id) {
+                    if let Err(err) = command_channel
+                        .send(CaptureActorCommands::RequestKeyFrame)
+                        .await
+                    {
+                        error!("Error requesting keyframe: {}", err);
+                    }
+                }
             }
         }
     }
@@ -213,7 +224,7 @@ impl CaptureSupervisor {
 
             tokio::select! {
                 Some(cmd) = self.command_receiver.recv()
-                    => self.handle_supervisor_command(&cmd),
+                    => self.handle_supervisor_command(&cmd).await,
                 Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id),
                 _inst = tick => self.handle_tick().await,
                 else => break

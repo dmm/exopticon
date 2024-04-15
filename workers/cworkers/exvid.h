@@ -42,6 +42,7 @@ struct in_context {
         enum AVPixelFormat  hw_pix_fmt;
         enum AVHWDeviceType hw_accel_type;
         AVBufferRef         *hw_device_ctx;
+        uint32_t            ssrc;
 
         int scaled_height;
         int scaled_width;

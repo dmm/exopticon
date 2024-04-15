@@ -46,6 +46,7 @@ async fn handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl In
             video_receiver,
             state.udp_socket,
             candidate_ips,
+            state.capture_channel.clone(),
         );
         tokio::spawn(client.run());
     })
