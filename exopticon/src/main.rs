@@ -41,7 +41,6 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::expect_used)]
 #![allow(clippy::future_not_send)]
-#![allow(clippy::missing_errors_doc)] // TODO: Fix this one
 #![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
 
 #[macro_use]
