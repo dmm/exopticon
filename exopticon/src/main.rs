@@ -183,7 +183,7 @@ async fn main() {
     .expect("migrations failed!");
 
     let udp_socket = Arc::new(
-        UdpSocket::bind(("::0", 4000))
+        UdpSocket::bind(("0.0.0.0", 4000))
             .await
             .expect("Unable to open udp socket"),
     );
