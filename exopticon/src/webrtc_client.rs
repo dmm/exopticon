@@ -83,7 +83,7 @@ impl Client {
     ) -> Self {
         let rtc = Rtc::builder()
             .set_send_buffer_video(100_000)
-            .enable_bwe(Some(Bitrate::mbps(10)))
+            .enable_bwe(Some(Bitrate::mbps(25)))
             .set_reordering_size_video(500)
             .clear_codecs()
             .enable_h264(true)
