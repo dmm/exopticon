@@ -112,21 +112,6 @@ static void record_metric_end(struct CameraState *cam, enum metrics metric) {
        cam->metrics[metric][cam->metric_index] = (double)interval_ms;
 }
 
-static void increment_metrics(struct CameraState *cam) {
-        assert(cam->metric_index < METRIC_SAMPLES);
-
-        cam->metric_index++;
-
-        if (cam->metric_index >= METRIC_SAMPLES) {
-                // report metrics
-                bs_log("LOOP TIME: %f, DECODE_TIME: %f, JPEG FULL: %f, JPEG SCALED: %f\n", cam->metrics[LOOP_TIME][0],
-                       cam->metrics[DECODE_TIME][0],
-                       cam->metrics[JPEG_FULL][0],
-                       cam->metrics[JPEG_SCALED][0]);
-                cam->metric_index = 0;
-        }
-}
-
 static int is_hwaccel_pix_fmt(enum AVPixelFormat pix_fmt)
 {
         const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
@@ -461,7 +446,6 @@ int main(int argc, char *argv[])
                 }
                 av_packet_unref(&cam.pkt);
                 av_init_packet(&cam.pkt);
-                increment_metrics(&cam);
         }
 
         char buf[1024];
