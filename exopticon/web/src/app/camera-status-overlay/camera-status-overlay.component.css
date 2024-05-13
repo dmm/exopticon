@@ -18,22 +18,30 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-div {
+div.container {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: start;
+  align-items: start;
   height: 100%;
   width: 100%;
   position: absolute;
   top: 0;
   left: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 30px;
+  padding-top: 15px;
+}
+
+div.status-message {
+    margin-left: 15px;
+    padding: 5px;
+    border: 3px dashed green;
 }
 
 span {
   background: black;
-  border-radius: 15px;
   padding: 5px 10px 5px 10px;
+
 }
 
 .status {
