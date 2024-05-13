@@ -33,15 +33,14 @@ div.container {
 }
 
 div.status-message {
-    margin-left: 15px;
-    padding: 5px;
-    border: 3px dashed green;
+  margin-left: 15px;
+  padding: 5px;
+  border: 3px dashed green;
 }
 
 span {
   background: black;
   padding: 5px 10px 5px 10px;
-
 }
 
 .status {
