@@ -2,6 +2,52 @@
 
 <!--- next entry here -->
 
+## 0.27.0
+2024-05-13
+
+### Features
+
+- WIP webrtc video streaming (3ceff4c63f091278e10c61cd1f95d16922909bd4)
+- Add relative ptz move route (f58596c6557484867d9c57f6f372644c571bf3ab)
+- CaptureSupervisor: restart a single CaptureActor if stopped (672efcc2bbef4b2dc730f1411e59c26baecfef1a)
+- camera-status-overlay: add camera name (e3a080ee74162ac42d68cc21387148cb07e48a2f)
+- WIP initial broken video streaming with str0m (fb873a73994b56d2471b7a9d925f16f0150f5e0c)
+- switch to cloudflare validation for caddy certs (d0b00589be66123150d523e9dc6dd08205fafffe)
+- **ci:** Remove deploy step (b9fb6e1ac00845434e1bb41700e4d93ad147951a)
+
+### Fixes
+
+- fix playbackworker warnings (0810ced3c9e23323c75028a52add6ea249becaee)
+- remove unused function (4b778926a779ce9bd169fdac0b29266e499e424f)
+- extract jpeg encoder function (233ae86286397364a47ca3854057b565ee288c84)
+- remove mpack_frame.c because we don't use it anymore (173b02f342b67f98e9266454bab3be1d250c87d9)
+- Used calculated scaled heights instead of hardcoded values (c90cad247a9f7e25aa27eb6f579e40b54d11e3fa)
+- WIP (fffd594cc75c4a364b83af689e7c963ba3a5c4b9)
+- Update Rust to 1.66.1 and appease Clippy (fbcc9a0b1d8d0d05f3fefe5a42e9e683668e3aa6)
+- Add timestamps and durations to video packets (bf07c84fb1e64da5288dac6f17766ebf9f24b19f)
+- appease clippy (b7973707ad3ba10812028bf2bc4d318e94fb7b17)
+- updateState when websocket connects (41d482af29baf63cdfeb56be822094a95c0f2437)
+- axum refactor (693eadce8ad10d1efe91337a6b6abeced3cc61ff)
+- Implement new deletion actor (401625e9972bda71609065a074f5a9296699a702)
+- Remove actix_web (1999fed6d37e4794b4877412b941950b5443f492)
+- fix warnings (c571ff9a299688f0ed6567c51979e053c1c8cabb)
+- appease clippy (3d52ce4309eb1fe9f3210218d257b8dc27958938)
+- fix release build args (2ca1880522650f79cd174994fdaa79f34104b91c)
+- Add webrtc_ips env var (d1f28e983eb0014914b67f8c75397440111e4b26)
+- use env log levels (810d6fa0c4d9ac80d1da42a5ecc2c2b10baba3ac)
+- Fix db tests (0f9f751ca782219f1986a1f999ddd8ea90226af1)
+- fix formatting (d79ec157f5f6cbd31d474870079d19b39bde1fb8)
+- Make sure api response are camelCase (d8a99610ea547902cfa644b69996366c9acf6025)
+- wait for child exit in CaptureActor (152f8a69ed9b1a9900e7ecf63bf027c9975d01b4)
+- remove old noisy logs from camera-panel.service (00506a3007cbaebd5b4a004ff8af4aa9b5b21e28)
+- Add route for manifest.webmanifest (b93b8860cbdf5a616d336a935958662447d5ace4)
+- **web:** Fix the webmanifest route (08889bff036ab4db7e1e6d6882a9befe276193da)
+- appease clippy (10e63291635b1271fcbb5c959fa48039504d2bea)
+- Fix static asset loading (9a255df92ee0152c2c095ef9a54b8926db2be33e)
+- Set fixed name for webmanifest (3c56b8988eda510457ffc1dfce4eebb7aafc5a74)
+- fix css formatting (e85e33811314b3f7a57ef869ccde1cf27df36206)
+- remove slim build (a85777fba4dd3f96f9f816b93371515492c3f4a3)
+
 ## 0.26.5
 2022-11-11
 
