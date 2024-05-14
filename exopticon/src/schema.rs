@@ -100,6 +100,8 @@ diesel::table! {
         enabled -> Bool,
         inserted_at -> Timestamp,
         updated_at -> Timestamp,
+        ptz_x_step_size -> Int2,
+        ptz_y_step_size -> Int2,
     }
 }
 

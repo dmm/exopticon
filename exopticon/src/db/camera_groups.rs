@@ -394,6 +394,8 @@ mod integration_tests {
                             rtsp_url: "".to_string(),
                             ptz_type: "".to_string(),
                             ptz_profile_token: "".to_string(),
+                            ptz_x_step_size: 0,
+                            ptz_y_step_size: 0,
                             enabled: true,
                         })
                         .get_result(&pool.get().unwrap())

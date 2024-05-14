@@ -30,6 +30,8 @@ export class Camera {
   rtspUrl: string;
   ptzType: string;
   ptzProfileToken: string;
+  ptzXStepSize: number;
+  ptzYStepSize: number;
   enabled: boolean;
   insertedAt: string;
   updatedAt: string;

@@ -57,6 +57,8 @@ impl From<crate::db::cameras::Camera> for Camera {
                 ptz_type: c.ptz_type,
                 ptz_profile_token: c.ptz_profile_token,
                 enabled: c.enabled,
+                ptz_x_step_size: c.ptz_x_step_size,
+                ptz_y_step_size: c.ptz_y_step_size,
             },
         }
     }
@@ -87,6 +89,10 @@ pub struct CreateCamera {
     pub ptz_profile_token: String,
     /// whether camera capture is enabled.
     pub enabled: bool,
+    /// ptz x step size, in hundredths
+    pub ptz_x_step_size: i16,
+    /// ptz y step size, in hundredths
+    pub ptz_y_step_size: i16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,6 +120,10 @@ pub struct UpdateCamera {
     pub ptz_profile_token: Option<String>,
     /// if present, updates enabled status
     pub enabled: Option<bool>,
+    /// ptz x step size, in hundredths
+    pub ptz_x_step_size: Option<i16>,
+    /// ptz y step size, in hundredths
+    pub ptz_y_step_size: Option<i16>,
 }
 
 pub async fn create(
@@ -175,17 +185,6 @@ pub async fn ptz_relative_move(
     Path((id, direction)): Path<(i32, String)>,
     State(state): State<AppState>,
 ) -> Result<(), UserError> {
-    let (x, y) = match direction.as_str() {
-        "left" => (-0.1, 0.0),
-        "right" => (0.1, 0.0),
-        "up" => (0.0, 0.1),
-        "down" => (0.0, -0.1),
-        _ => {
-            return Err(UserError::Validation(
-                "invalid direction provided".to_string(),
-            ))
-        }
-    };
     let zoom = 0.0;
 
     let db = state.db_service.clone();
@@ -196,6 +195,21 @@ pub async fn ptz_relative_move(
         username: camera.common.username,
         password: camera.common.password,
     };
+
+    let x_step = f32::from(camera.common.ptz_x_step_size);
+    let y_step = f32::from(camera.common.ptz_y_step_size);
+    let (x, y) = match direction.as_str() {
+        "left" => (x_step / -100.0f32, 0.0),
+        "right" => (x_step / 100f32, 0.0),
+        "up" => (0.0, y_step / 100f32),
+        "down" => (0.0, y_step / -100f32),
+        _ => {
+            return Err(UserError::Validation(
+                "invalid direction provided".to_string(),
+            ))
+        }
+    };
+
     if camera.common.ptz_type == "onvif_continuous" {
         //camera.ptz_type == "onvif_continuous"
         // other cases??

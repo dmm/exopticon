@@ -59,6 +59,10 @@ pub struct Camera {
     pub inserted_at: NaiveDateTime,
     /// update time
     pub updated_at: NaiveDateTime,
+    /// ptz x step size, in hundredths
+    pub ptz_x_step_size: i16,
+    /// ptz y step size, in hundredths
+    pub ptz_y_step_size: i16,
 }
 
 #[derive(PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
@@ -87,6 +91,10 @@ pub struct CreateCamera {
     pub ptz_profile_token: String,
     /// whether camera capture is enabled.
     pub enabled: bool,
+    /// ptz x step size, in hundredths
+    pub ptz_x_step_size: i16,
+    /// ptz y step size, in hundredths
+    pub ptz_y_step_size: i16,
 }
 
 impl From<crate::api::cameras::CreateCamera> for CreateCamera {
@@ -103,6 +111,8 @@ impl From<crate::api::cameras::CreateCamera> for CreateCamera {
             ptz_type: c.ptz_type,
             ptz_profile_token: c.ptz_profile_token,
             enabled: c.enabled,
+            ptz_x_step_size: c.ptz_x_step_size,
+            ptz_y_step_size: c.ptz_y_step_size,
         }
     }
 }
@@ -132,6 +142,10 @@ pub struct UpdateCamera {
     pub ptz_profile_token: Option<String>,
     /// if present, updates enabled status
     pub enabled: Option<bool>,
+    /// ptz x step size, in hundredths
+    pub ptz_x_step_size: Option<i16>,
+    /// ptz y step size, in hundredths
+    pub ptz_y_step_size: Option<i16>,
 }
 
 impl From<crate::api::cameras::UpdateCamera> for UpdateCamera {
@@ -148,6 +162,8 @@ impl From<crate::api::cameras::UpdateCamera> for UpdateCamera {
             ptz_type: u.ptz_type,
             ptz_profile_token: u.ptz_profile_token,
             enabled: u.enabled,
+            ptz_x_step_size: u.ptz_x_step_size,
+            ptz_y_step_size: u.ptz_y_step_size,
         }
     }
 }

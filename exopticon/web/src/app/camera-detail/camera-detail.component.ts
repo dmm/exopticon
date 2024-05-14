@@ -62,6 +62,8 @@ export class CameraDetailComponent implements OnInit {
 
   onSubmit(camera) {
     camera.onvifPort = +camera.onvifPort;
+    camera.ptzXStepSize = +camera.ptzXStepSize;
+    camera.ptzYStepSize = +camera.ptzYStepSize;
     this.camera$ = this.cameraService.setCamera(camera);
     this.camera$.subscribe((_camera) => {});
   }
