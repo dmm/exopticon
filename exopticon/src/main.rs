@@ -95,7 +95,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing_subscriber::{EnvFilter, Layer};
 
 use std::env;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 #[global_allocator]
@@ -105,7 +105,7 @@ embed_migrations!("migrations/");
 
 #[derive(Clone)]
 pub struct AppState {
-    pub candidate_ips: Vec<IpAddr>,
+    pub candidate_ips: Vec<String>,
     pub udp_socket: Arc<UdpSocket>,
     pub udp_channel: broadcast::Sender<(usize, SocketAddr, Vec<u8>)>,
     pub db_service: crate::db::Service,
@@ -113,7 +113,7 @@ pub struct AppState {
     pub video_sender: broadcast::Sender<VideoPacket>,
 }
 
-fn parse_candidate_ips() -> Vec<IpAddr> {
+fn parse_candidate_ips() -> Vec<String> {
     let mut candidate_ips = Vec::new();
 
     let Ok(candidate_string) = env::var("EXOPTICON_WEBRTC_IPS") else {
@@ -121,9 +121,7 @@ fn parse_candidate_ips() -> Vec<IpAddr> {
     };
     debug!("CANDIDATES: {candidate_string}");
     for c in candidate_string.split(',') {
-        debug!("CANDIDATE: {c}");
-        let Ok(ip) = c.parse() else { continue };
-        candidate_ips.push(ip);
+        candidate_ips.push(c.to_string());
     }
 
     candidate_ips

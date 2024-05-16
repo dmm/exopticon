@@ -20,7 +20,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    net::{IpAddr, SocketAddr},
+    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -34,7 +34,7 @@ use str0m::{
     net::Protocol,
     Candidate, Input, Rtc,
 };
-use tokio::net::UdpSocket;
+use tokio::net::{lookup_host, UdpSocket};
 
 use crate::capture_actor::VideoPacket;
 
@@ -67,7 +67,8 @@ pub struct Client {
     udp_socket: Arc<UdpSocket>,
     udp_receiver: tokio::sync::broadcast::Receiver<(usize, SocketAddr, Vec<u8>)>,
     video_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
-    candidate_ips: Vec<IpAddr>,
+    candidate_ips: Vec<String>,
+    candidate_socketaddrs: Vec<SocketAddr>,
     rtc: Rtc,
     subscribed_ids: HashSet<i32>,
     camera_mapping: HashMap<i32, Mid>,
@@ -79,7 +80,7 @@ impl Client {
         udp_receiver: tokio::sync::broadcast::Receiver<(usize, SocketAddr, Vec<u8>)>,
         video_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
         udp_socket: Arc<UdpSocket>,
-        candidate_ips: Vec<IpAddr>,
+        candidate_ips: Vec<String>,
     ) -> Self {
         let rtc = Rtc::builder()
             .set_send_buffer_video(100_000)
@@ -95,10 +96,35 @@ impl Client {
             udp_socket,
             video_receiver,
             candidate_ips,
+            candidate_socketaddrs: Vec::new(),
             rtc,
             subscribed_ids: HashSet::new(),
             camera_mapping: HashMap::new(),
         }
+    }
+
+    /// Parse list of candidates, and populate `candidate_socketaddrs`
+    async fn parse_candidates(&mut self) -> Vec<SocketAddr> {
+        let mut addrs = Vec::new();
+
+        for c in &self.candidate_ips {
+            // First try to parse as ip address:port
+            if let Ok(ip) = c.parse::<SocketAddr>() {
+                addrs.push(ip);
+                continue;
+            }
+
+            // If that fails, perform dns lookup
+            if let Ok(ips) = lookup_host(c).await {
+                for ip in ips {
+                    if let SocketAddr::V4(_) = ip {
+                        addrs.push(ip);
+                    }
+                }
+            }
+        }
+
+        addrs
     }
 
     async fn handle_websocket(&mut self, msg: Result<ws::Message, axum::Error>) -> Result<(), ()> {
@@ -139,9 +165,9 @@ impl Client {
                     SdpOffer::from_sdp_string(&offer).expect("Failed to deserialized sdp offer");
 
                 // Add candidate ips
-                for ip in &self.candidate_ips {
-                    let addr = SocketAddr::new(*ip, 4000);
-                    let candidate = Candidate::host(addr, Protocol::Udp).unwrap();
+                self.candidate_socketaddrs = self.parse_candidates().await;
+                for ip in &self.candidate_socketaddrs {
+                    let candidate = Candidate::host(*ip, Protocol::Udp).unwrap();
                     self.rtc.add_local_candidate(candidate);
                 }
 
@@ -188,11 +214,9 @@ impl Client {
         // not in the webrc ips. This can happend when we are behind
         // NAT. Replace the destination ip with the first one in the
         // candidate ip set.
-        let destination_port = self.udp_socket.local_addr().unwrap().port();
-        let destination_ip = self.candidate_ips.first().unwrap();
+        let destination_ip = self.candidate_socketaddrs.first().unwrap();
 
-        let socket_addr = SocketAddr::new(*destination_ip, destination_port);
-        match str0m::net::Receive::new(Protocol::Udp, addr, socket_addr, &buf) {
+        match str0m::net::Receive::new(Protocol::Udp, addr, *destination_ip, &buf) {
             Ok(receive_body) => {
                 let input = Input::Receive(Instant::now(), receive_body);
 
