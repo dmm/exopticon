@@ -60,8 +60,8 @@ serde_repr = "0.1"
 serde_json="1.0"
 serde = { version = "1.0", features = ["derive"] }
 snmalloc-rs = "0.3.0"
-str0m = { git = "https://github.com/algesten/str0m.git", rev = "29a5506" }
-#str0m = "0.4"
+#str0m = { git = "https://github.com/algesten/str0m.git", rev = "29a5506" }
+str0m = "0.5.1"
 url = "^2.1"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 webrtc = "0.6"

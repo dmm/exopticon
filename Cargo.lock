@@ -3624,8 +3624,9 @@ dependencies = [
 
 [[package]]
 name = "str0m"
-version = "0.4.1"
-source = "git+https://github.com/algesten/str0m.git?rev=29a5506#29a5506bcd65d3687b5e9b160193b7dbdaaf3773"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6706347e49b13373f7ddfafad47df7583ed52083d6fc8a594eb2c80497ef959d"
 dependencies = [
  "combine",
  "crc",
