@@ -2,6 +2,18 @@
 
 <!--- next entry here -->
 
+## 0.28.0
+2024-05-16
+
+### Features
+
+- Add ptz step size (71f4bd44f93613f571774de22424da8b5e3218c4)
+- Enable alternative ports and hostname candidates (2c95da8f44edbcb09a2100f036def2beb5ae3663)
+
+### Fixes
+
+- update str0m (704932febf1e179677ed80e5e8b5712c4fd052a0)
+
 ## 0.27.0
 2024-05-13
 
