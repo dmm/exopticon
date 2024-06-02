@@ -50,8 +50,6 @@ extern crate diesel_migrations;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate failure;
-#[macro_use]
 extern crate log;
 
 /// Api Application implementation

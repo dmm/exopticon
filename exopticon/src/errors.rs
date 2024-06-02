@@ -18,19 +18,21 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use thiserror::Error;
+
 /// Enum of service errors
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum ServiceError {
     /// Internal server error
-    #[fail(display = "Internal Server Error")]
+    #[error("Internal Server Error")]
     InternalServerError,
 
     /// Bad Request
-    #[fail(display = "BadRequest: {}", _0)]
+    #[error("BadRequest: {0}")]
     BadRequest(String),
 
     /// Resource Not Found
-    #[fail(display = "Not Found")]
+    #[error("Not Found")]
     NotFound,
 }
 

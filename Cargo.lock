@@ -867,7 +867,6 @@ dependencies = [
  "dotenv",
  "env_logger",
  "exserial",
- "failure",
  "futures",
  "futures-util",
  "lazy_static",
