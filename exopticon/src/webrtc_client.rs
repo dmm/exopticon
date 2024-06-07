@@ -214,7 +214,13 @@ impl Client {
         // not in the webrc ips. This can happend when we are behind
         // NAT. Replace the destination ip with the first one in the
         // candidate ip set.
-        let destination_ip = self.candidate_socketaddrs.first().unwrap();
+        let destination_ip = match self.candidate_socketaddrs.first() {
+            Some(ip) => ip,
+            None => {
+                error!("NO candidate ips");
+                return;
+            }
+        };
 
         match str0m::net::Receive::new(Protocol::Udp, addr, *destination_ip, &buf) {
             Ok(receive_body) => {
@@ -300,6 +306,7 @@ impl Client {
 
     pub async fn run(mut self) {
         let mut timeout = Duration::from_millis(100);
+        self.candidate_socketaddrs = self.parse_candidates().await;
         loop {
             tokio::select! {
                 // websocket control messages
