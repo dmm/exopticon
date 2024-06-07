@@ -19,7 +19,11 @@
  */
 
 import { APP_BASE_HREF } from "@angular/common";
-import { HttpClientModule, HTTP_INTERCEPTORS } from "@angular/common/http";
+import {
+  HTTP_INTERCEPTORS,
+  provideHttpClient,
+  withInterceptorsFromDi,
+} from "@angular/common/http";
 import { NgModule } from "@angular/core";
 import { FormsModule, ReactiveFormsModule } from "@angular/forms";
 import { BrowserModule } from "@angular/platform-browser";
@@ -66,11 +70,11 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     CameraGroupListComponent,
     CameraGroupDetailComponent,
   ],
+  bootstrap: [AppComponent],
   imports: [
     BrowserModule,
     FormsModule,
     AppRoutingModule,
-    HttpClientModule,
     IntersectionObserverModule,
     ReactiveFormsModule,
     ServiceWorkerModule.register("ngsw-worker.js", {
@@ -82,7 +86,7 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     { provide: APP_BASE_HREF, useValue: "/" },
     CameraService,
     TokenService,
+    provideHttpClient(withInterceptorsFromDi()),
   ],
-  bootstrap: [AppComponent],
 })
 export class AppModule {}
