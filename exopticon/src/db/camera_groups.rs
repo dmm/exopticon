@@ -150,8 +150,8 @@ impl Service {
             ServiceKind::Null(db) => {
                 for g in &mut db.lock().unwrap().camera_groups {
                     if id == g.id {
-                        g.name = group.name.clone();
-                        g.members = group.members.clone();
+                        g.name.clone_from(&group.name);
+                        g.members.clone_from(&group.members);
                         return Ok(crate::api::camera_groups::CameraGroup {
                             id,
                             name: group.name.clone(),

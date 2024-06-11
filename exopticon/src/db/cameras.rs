@@ -49,7 +49,7 @@ pub struct Camera {
     pub password: String,
     /// url for rtsp stream
     pub rtsp_url: String,
-    /// ptz type, either onvif or onvif_continuous
+    /// ptz type, either `onvif` or `onvif_continuous`
     pub ptz_type: String,
     /// ONVIF profile token for ptz
     pub ptz_profile_token: String,
@@ -85,7 +85,7 @@ pub struct CreateCamera {
     pub password: String,
     /// url for rtsp stream
     pub rtsp_url: String,
-    /// ptz type, either onvif or onvif_continuous
+    /// ptz type, either `onvif` or `onvif_continuous`
     pub ptz_type: String,
     /// ONVIF profile token for ptz
     pub ptz_profile_token: String,
@@ -134,7 +134,7 @@ pub struct UpdateCamera {
     pub username: Option<String>,
     /// if present, new plaintext password of ONVIF and RTSP streaming
     pub password: Option<String>,
-    /// if present, new rtsp_url
+    /// if present, new `rtsp_url`
     pub rtsp_url: Option<String>,
     /// if present, new ptz type
     pub ptz_type: Option<String>,
