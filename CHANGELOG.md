@@ -2,6 +2,16 @@
 
 <!--- next entry here -->
 
+## 0.28.1
+2024-06-13
+
+### Fixes
+
+- parse candidate ips first (d0d79cff7e5aee2157e22f7aef35ea6372ae514c)
+- Bump Rust version (d3ca1d3cfb50230d8deaa02a1a5f08b0f2eb5ed9)
+- Bump npm versions (45f20804ab6c42e662756d13110b1b1897a9e6ca)
+- update to Angular 18 (1c262ca6a75fc54f060abbcfc676226e1234fb55)
+
 ## 0.28.0
 2024-05-16
 
