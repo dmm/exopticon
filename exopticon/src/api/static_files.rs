@@ -4,7 +4,7 @@ use rust_embed::RustEmbed;
 use super::UserError;
 
 #[derive(RustEmbed)]
-#[folder = "web/dist"]
+#[folder = "web/dist/browser"]
 struct Asset;
 
 /// Route handler for index.html
