@@ -2,6 +2,17 @@
 
 <!--- next entry here -->
 
+## 0.29.0
+2024-06-14
+
+### Features
+
+- Add log level to exserial log messages (83b70f52c9742c85a932091ace706c0640475e4c)
+
+### Fixes
+
+- Use correct web asset path (03f951b90b8d3ef7ad0f3ce0db68c27ae1e3e2b0)
+
 ## 0.28.1
 2024-06-13
 
