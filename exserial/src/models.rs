@@ -75,7 +75,7 @@ pub enum FrameSource {
 /// Message from captureworker
 pub enum CaptureMessage {
     /// Log
-    Log { message: String },
+    Log { level: log::Level, message: String },
     /// Full jpeg frame
     Frame {
         #[serde(with = "serde_bytes")]

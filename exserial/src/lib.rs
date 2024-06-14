@@ -195,14 +195,31 @@ pub unsafe extern "C" fn send_end_file_message(
 /// message must be a null-terminated character arrays.
 ///
 #[no_mangle]
-pub unsafe extern "C" fn send_log_message(_level: i32, message: *const c_char) {
+pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) {
     let message = {
         assert!(!message.is_null());
 
         CStr::from_ptr(message).to_string_lossy().into_owned()
     };
 
-    let capture_message = CaptureMessage::Log { message };
+    let log_level = match level {
+        // error, fatal, panic
+        16 | 8 | 0 => log::Level::Error,
+        // warning
+        24 => log::Level::Warn,
+        // info
+        32 => log::Level::Info,
+        // verbose, debug
+        40 | 48 => log::Level::Debug,
+        // trace
+        56 => log::Level::Trace,
+        _ => log::Level::Trace,
+    };
+
+    let capture_message = CaptureMessage::Log {
+        level: log_level,
+        message,
+    };
 
     print_message(capture_message);
 }

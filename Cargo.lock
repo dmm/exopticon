@@ -905,6 +905,7 @@ dependencies = [
  "bincode",
  "criterion 0.5.1",
  "libc",
+ "log",
  "rand 0.8.5",
  "serde",
  "serde_bytes",
@@ -1481,6 +1482,9 @@ name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "matchers"

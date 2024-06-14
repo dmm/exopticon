@@ -206,7 +206,9 @@ impl CaptureActor {
     }
     async fn message_to_action(&mut self, msg: CaptureMessage) -> anyhow::Result<()> {
         match msg {
-            CaptureMessage::Log { message } => debug!("capture worker log: {}", message),
+            CaptureMessage::Log { level, message } => {
+                log!(level, "capture worker log: {}", message);
+            }
             CaptureMessage::Frame {
                 jpeg: _,
                 offset: _,
