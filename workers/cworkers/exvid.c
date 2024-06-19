@@ -109,7 +109,7 @@ static int interrupt_cb(void *ctx)
 
 int ex_init(void(*log_callback)(void *, int, const char *, va_list)) {
         // Initialize ffmpeg
-        av_log_set_level(AV_LOG_INFO);
+        av_log_set_level(AV_LOG_VERBOSE);
         if (log_callback != NULL) {
                 av_log_set_callback(log_callback);
         }

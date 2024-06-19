@@ -131,9 +131,6 @@ static void my_av_log_callback(__attribute__((unused)) void *avcl, int level, co
 {
         char output_message[2048];
 
-        if (av_log_get_level() < level) {
-                return;
-        }
         pthread_mutex_lock(&log_mutex);
 
         vsnprintf(output_message, sizeof(output_message), fmt, vl);
