@@ -2,9 +2,7 @@ version: '2.4'
 
 services:
   caddy:
-    build:
-      context: .
-      dockerfile: caddy.Dockerfile
+    image: quay.io/fariszr/caddy-dns:desec
     restart: always
     ports:
       - 80:80  # Needed for the ACME HTTP-01 challenge.
@@ -17,7 +15,7 @@ services:
       - PORT
       - EMAIL
       - METRICS_AUTH_HASH
-      - CLOUDFLARE_TOKEN
+      - DESEC_TOKEN
 
 volumes:
   caddy:

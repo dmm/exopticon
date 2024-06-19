@@ -1,7 +1,10 @@
 {$DOMAIN}:{$PORT} {
 
   tls {
-      dns cloudflare {$CLOUDFLARE_TOKEN}
+      propagation_delay 200s
+      dns desec {
+        token {$DESEC_TOKEN}
+      }
   }
 
   basicauth /dbmetrics {
