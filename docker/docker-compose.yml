@@ -11,9 +11,11 @@ services:
       - EXOPTICON_NAME
       - EXOPTICON_SHORT_NAME
       - EXOPTICON_METRICS_ENABLED
+      - EXOPTICON_WEBRTC_IPS
     restart: always
     ports:
       - 0.0.0.0:3000:3000
+      - "4000:4000/udp"
     devices: []
 #      - /dev/apex_0:/dev/apex_0
     device_cgroup_rules:
