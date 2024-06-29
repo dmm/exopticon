@@ -153,7 +153,6 @@ async fn main() {
         .with(
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
-                .without_time()
                 .with_filter(filter),
         )
         .init();
