@@ -198,7 +198,7 @@ int ex_open_input_stream(const char *url, struct in_context *c) {
 
         // Open input format
         AVDictionary *opts = 0;
-        av_dict_set(&opts, "buffer_size", "26214400", 0);
+        av_dict_set(&opts, "buffer_size", "4194304", 0);
         av_dict_set(&opts, "rtsp_transport", "udp", 0);
         // default reorder queue size is 500
         av_dict_set(&opts, "reorder_queue_size", "2500", 0);
