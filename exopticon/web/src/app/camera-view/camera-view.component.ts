@@ -110,38 +110,12 @@ export class CameraViewComponent implements OnInit {
       video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
 
-      video.onemptied = () => {
-        console.log("&&&&&&CAMERA " + this.camera.id + " EMPTIED!");
-      };
-      video.onwaiting = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " WAITING!");
-      };
-      video.onstalled = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " STALLED!");
-      };
       video.onended = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " ENDED!");
         this.state = CameraViewStatus.New;
       };
 
-      video.onplaying = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " PLAAAAAYING!");
-        this.state = CameraViewStatus.Playing;
-      };
-      video.onstalled = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " STALLED!");
-      };
-      video.onwaiting = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " WAITING!");
-      };
-      video.oncanplay = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " CANPLAY!");
-      };
-      video.onloadeddata = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " LOADEDDATA!");
-      };
       video.ontimeupdate = () => {
-        console.log("&&&&&&&CAMERA " + this.camera.id + " TIMEUPDATE!");
+        this.state = CameraViewStatus.Playing;
       };
     } else {
       let video = this.videoElement.nativeElement as HTMLVideoElement;
