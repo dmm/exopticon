@@ -2,6 +2,24 @@
 
 <!--- next entry here -->
 
+## 0.30.0
+2024-07-02
+
+### Features
+
+- Add camera name and id to capture actor logs (8f53cc262ea096743ad4a9ec2491237221a4dfd1)
+
+### Fixes
+
+- Capture verbose ffmpeg logs from captureworker (96ac3d77a2f3647c1c9bd4a5baa885acf247c150)
+- **web:** switch from cloudflare to desec.io (8b88d2c8ac1e94f68b72da44dd41e55787a57643)
+- Add webrtc ips envvar to prod docker-compose (248675323050f9a53063d23224187e1fe7be370c)
+- Enable log timestamps (d47430d8b864245dcfa4e157db1401bfa9ab18b8)
+- set capture buffer size to 4 MiB (755da6646cb96a67ff340086438dc972440a089f)
+- 2021 edition (ed98cc7b5e5a0c80d495c18ccbd2145207fa8c03)
+- Remove extra event handlers (7038bc4f44b1eae5de06e38b18a04377a31b961f)
+- Make camera supervisor log debug (1a076a7fb98d6826681519994c5237586ac962b4)
+
 ## 0.29.0
 2024-06-14
 
