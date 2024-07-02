@@ -164,7 +164,7 @@ impl CaptureSupervisor {
     }
 
     async fn handle_tick(&mut self) {
-        info!(
+        debug!(
             "Capture supervisor tick! state: {:?}, # handles: {}",
             self.state,
             self.capture_handles.len()
