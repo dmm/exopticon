@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.30.1
+2024-07-14
+
+### Fixes
+
+- remove bwe (3d4177c6413c1142e08a8bded909f9eaa6fe272a)
+
 ## 0.30.0
 2024-07-02
 
