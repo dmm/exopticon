@@ -15,6 +15,7 @@ services:
       - RUST_LOG
       - EXOPTICON_METRICS_ENABLED
       - EXOPTICON_WEBRTC_IPS
+      - EXOPTICON_WEBRTC_BUFFER_SIZE
     ports:
       - 3000:3000
       - "4000:4000/udp"

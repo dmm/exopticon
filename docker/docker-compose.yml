@@ -12,6 +12,7 @@ services:
       - EXOPTICON_SHORT_NAME
       - EXOPTICON_METRICS_ENABLED
       - EXOPTICON_WEBRTC_IPS
+      - EXOPTICON_WEBRTC_BUFFER_SIZE
     restart: always
     ports:
       - 0.0.0.0:3000:3000

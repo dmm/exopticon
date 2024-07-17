@@ -53,6 +53,7 @@ serde_repr = "0.1"
 serde_json="1.0"
 serde = { version = "1.0", features = ["derive"] }
 str0m = "0.5.1"
+socket2 = "0.5"
 url = "^2.1"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 thiserror = "1.0"

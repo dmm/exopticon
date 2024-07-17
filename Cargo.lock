@@ -883,6 +883,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_repr",
+ "socket2",
  "str0m",
  "tempfile 3.10.1",
  "thiserror",

@@ -99,6 +99,9 @@ use std::sync::Arc;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+/// size of webrtc udp send/recv buffers if not set with env variable
+static DEFAULT_BUFFER_SIZE: usize = 2_097_152;
+
 embed_migrations!("migrations/");
 
 #[derive(Clone)]
@@ -177,11 +180,38 @@ async fn main() {
     )
     .expect("migrations failed!");
 
-    let udp_socket = Arc::new(
-        UdpSocket::bind(("0.0.0.0", 4000))
-            .await
-            .expect("Unable to open udp socket"),
+    let buffer_size: usize = env::var("EXOPTICON_WEBRTC_BUFFER_SIZE")
+        .unwrap_or_default()
+        .parse()
+        .map_or_else(
+            |_| {
+                info!(
+                    "UDP buffer size {}. parsing env failed, using default size",
+                    DEFAULT_BUFFER_SIZE
+                );
+                DEFAULT_BUFFER_SIZE
+            },
+            |buffer_size| {
+                info!("UDP buffer size {}, parsed from env", buffer_size);
+                buffer_size
+            },
+        );
+    error!(
+        "Creating webrtc udp socket with send/recv buffer size: {}",
+        buffer_size
     );
+    let tokio_socket = UdpSocket::bind(("0.0.0.0", 4000))
+        .await
+        .expect("Unable to open udp socket");
+    let ext_socket: socket2::Socket = tokio_socket.into_std().expect("socket into_std").into();
+    ext_socket
+        .set_recv_buffer_size(buffer_size)
+        .expect("setting socket recv buffer size");
+    ext_socket
+        .set_send_buffer_size(buffer_size)
+        .expect("setting socket send buffer size");
+    let tokio_socket2 = UdpSocket::from_std(ext_socket.into()).expect("converting to tokio socket");
+    let udp_socket = Arc::new(tokio_socket2);
 
     // Start udp listener
     let (udp_channel, _rx) = broadcast::channel(10);
