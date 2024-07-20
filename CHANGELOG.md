@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.31.0
+2024-07-20
+
+### Features
+
+- Allow webrtc udp buffer sizes to be set with an env variable (9029041f950b231cefd5e153a9f07737345e0796)
+
 ## 0.30.1
 2024-07-14
 
