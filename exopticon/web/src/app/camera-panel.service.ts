@@ -217,7 +217,10 @@ export class CameraPanelService {
     } else {
       let cameraGroup = this.cameraGroups.get(this.activeCameraGroupId);
       cameraGroup.members.forEach((cameraId) => {
-        groupCameras.push(this.unsortedCameras.get(cameraId));
+        const c = this.unsortedCameras.get(cameraId);
+        if (c !== undefined) {
+          groupCameras.push(this.unsortedCameras.get(cameraId));
+        }
       });
     }
 
