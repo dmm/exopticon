@@ -63,7 +63,7 @@ export class CameraViewComponent implements OnInit {
 
   private videoSubject: SubscriptionSubject;
   public frameService?: Observable<WsMessage>;
-  private mediaStream?: MediaStream = null;
+  private mediaStream?: MediaStream = undefined;
   private state: CameraViewStatus = CameraViewStatus.New;
   private subscription: Subscription = null;
 
@@ -102,7 +102,7 @@ export class CameraViewComponent implements OnInit {
   }
 
   setMediaSource() {
-    if (this.mediaStream !== null) {
+    if (this.mediaStream) {
       let video = this.videoElement.nativeElement as HTMLVideoElement;
       video.srcObject = this.mediaStream;
       video.muted = true;
@@ -136,8 +136,8 @@ export class CameraViewComponent implements OnInit {
         this.mediaStream = m;
         this.setMediaSource();
       },
-      (err) => {
-        this.mediaStream = null;
+      (_err) => {
+        this.mediaStream = undefined;
         this.setMediaSource();
       },
     );
