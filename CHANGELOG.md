@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.31.1
+2024-07-22
+
+### Fixes
+
+- Fix switching groups when they contain disabled camera (24a6a82cb193131ee5a28c91633881c52d6bec46)
+- Fix referencing mediaStream (04f1b8afdf68c518e569f71695e14d764616a9de)
+
 ## 0.31.0
 2024-07-20
 
