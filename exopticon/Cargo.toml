@@ -16,11 +16,11 @@ default-run = "exopticon"
 [dependencies]
 onvif = { path = "../onvif" }
 exserial = { path = "../exserial" }
-axum = { version = "0.6", features = ["ws", "headers"]}
-axum-extra = { version = "0.7", features = ["cookie"]}
+axum = { version = "0.7", features = ["ws"]}
+axum-extra = { version = "0.9", features = ["cookie"]}
 axum-macros = "0.3"
 anyhow = "1.0"
-base64 = "0.10.1"
+base64 = "0.22"
 bcrypt = "0.11"
 bincode = "1.3.3"
 bytes = "^1.4"
@@ -59,6 +59,6 @@ uuid = { version = "0.8.2", features = ["serde", "v4"] }
 thiserror = "1.0"
 tokio-tungstenite = "0.18.0"
 tower = { version = "0.4", features = ["util"] }
-tower-http = { version = "0.4.0", features = ["fs", "trace"] }
+tower-http = { version = "0.5", features = ["fs", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

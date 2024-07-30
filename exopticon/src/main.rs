@@ -266,10 +266,10 @@ async fn main() {
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         );
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    tracing::debug!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
-        .unwrap();
+        .expect("to listen on 0.0.0.0:3000");
+    axum::serve(listener, app.into_make_service())
+        .await
+        .expect("to start server");
 }

@@ -26,10 +26,10 @@ use axum::{
     Extension, Json, Router,
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use chrono::{DateTime, Duration, Utc};
-use tokio::task::spawn_blocking;
-
 use rand::Rng;
+use tokio::task::spawn_blocking;
 
 use crate::AppState;
 
@@ -97,7 +97,7 @@ pub async fn login(
     let user = spawn_blocking(move || db.login(&auth_data.username, &auth_data.password)).await??;
 
     // We found a valid user with that password. Create a login session.
-    let session_key = base64::encode(&rand::thread_rng().gen::<[u8; 32]>());
+    let session_key = BASE64_STANDARD.encode(rand::thread_rng().gen::<[u8; 32]>());
     let valid_time = Duration::days(7);
     let expiration = match Utc::now().checked_add_signed(valid_time) {
         None => {
@@ -116,15 +116,14 @@ pub async fn login(
     };
     let session_token = spawn_blocking(move || db2.create_user_session(&session)).await??;
 
-    let cookie = Cookie::build(SESSION_COOKIE, session_token)
+    let cookie_builder = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .secure(true)
         .http_only(true)
         .same_site(axum_extra::extract::cookie::SameSite::Strict)
-        .max_age(time::Duration::days(7))
-        .finish();
+        .max_age(time::Duration::days(7));
 
-    let jar = jar.add(cookie);
+    let jar = jar.add(cookie_builder);
 
     Ok(jar)
 }
@@ -166,13 +165,13 @@ pub async fn fetch_personal_access_tokens(
     Ok(Json(tokens))
 }
 
-pub async fn middleware<B>(
+pub async fn middleware(
     State(state): State<AppState>,
     // you can add more extractors here but the last
     // extractor must implement `FromRequest` which
     // `Request` does
-    mut request: axum::http::Request<B>,
-    next: Next<B>,
+    mut request: axum::extract::Request,
+    next: Next,
 ) -> Result<axum::response::Response, StatusCode> {
     let jar = CookieJar::from_headers(request.headers());
     let session_cookie = jar.get("id");
