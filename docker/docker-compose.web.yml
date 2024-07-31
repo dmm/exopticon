@@ -14,7 +14,6 @@ services:
       - DOMAIN
       - PORT
       - EMAIL
-      - METRICS_AUTH_HASH
       - DESEC_TOKEN
 
 volumes:

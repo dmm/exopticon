@@ -29,6 +29,7 @@ use tokio::task::JoinError;
 use crate::capture_supervisor::Command;
 
 pub mod auth;
+pub mod basic_auth_middleware;
 pub mod camera_groups;
 pub mod cameras;
 pub mod static_files;

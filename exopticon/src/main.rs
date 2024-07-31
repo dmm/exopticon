@@ -80,8 +80,9 @@ use crate::api::static_files::{index_file_handler, manifest_file_handler, static
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
 use crate::file_deletion_supervisor::FileDeletionSupervisor;
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{middleware, Router};
+use axum_prometheus::PrometheusMetricLayer;
 use capture_actor::VideoPacket;
 use capture_supervisor::Command;
 use dotenv::dotenv;
@@ -237,6 +238,8 @@ async fn main() {
     tokio::spawn(capture_supervisor.supervise());
     tokio::spawn(deletion_supervisor.supervise());
 
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+
     let app = Router::new()
         .nest(
             "/v1/personal_access_tokens",
@@ -251,8 +254,15 @@ async fn main() {
             state.clone(),
             auth::middleware,
         ))
+        // metrics
+        .route(
+            "/metrics",
+            get(|| async move { metric_handle.render() }).layer(middleware::from_fn(
+                crate::api::basic_auth_middleware::metrics_auth_middleware,
+            )),
+        )
         // public routes
-        .route("/auth", get(cameras::fetch_all).post(auth::login))
+        .route("/auth", post(auth::login))
         .route("/index.html", get(index_file_handler))
         .route("/manifest.webmanifest", get(manifest_file_handler))
         .route("/assets/*path", get(static_file_handler))
@@ -264,7 +274,8 @@ async fn main() {
             TraceLayer::new_for_http()
                 .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
-        );
+        )
+        .layer(prometheus_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await

@@ -7,18 +7,5 @@
       }
   }
 
-  basicauth /dbmetrics {
-      prometheus {$METRICS_AUTH_HASH}
-  }
-
- handle_path /dbmetrics {
-     rewrite * /metrics
-     reverse_proxy dbmetrics:9187
- }
-
-  basicauth /metrics {
-      prometheus {$METRICS_AUTH_HASH}
-  }
-
   reverse_proxy exopticon:3000
 }
