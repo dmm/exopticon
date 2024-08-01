@@ -26,6 +26,7 @@ use std::{
 };
 
 use axum::extract::ws::{self, WebSocket};
+use metrics::gauge;
 use str0m::{
     change::SdpOffer,
     format::PayloadParams,
@@ -300,6 +301,8 @@ impl Client {
     }
 
     pub async fn run(mut self) {
+        let gauge = gauge!("webrtc_sessions");
+        gauge.increment(1);
         let mut timeout = Duration::from_millis(100);
         self.candidate_socketaddrs = self.parse_candidates().await;
         loop {
@@ -308,7 +311,7 @@ impl Client {
                 Some(msg) = self.websocket.recv() => {
                     if self.handle_websocket(msg).await.is_err() {
                         info!("Got websocket error, exiting...");
-                        return;
+                        break;
                     }
                 },
                 // webrtc udp packets
@@ -322,12 +325,13 @@ impl Client {
 
             timeout = match self.process_client_events().await {
                 Ok(t) => t,
-                Err(()) => return,
+                Err(()) => break,
             };
 
             if !self.rtc.is_alive() {
-                return;
+                break;
             }
         }
+        gauge.decrement(1);
     }
 }
