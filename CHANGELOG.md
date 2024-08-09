@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.32.0
+2024-08-09
+
+### Features
+
+- Add metrics route (6da59898025f2d35e623c0acf3b470b429b4df53)
+- Add gauge for webrtc_sessions (3a730e0ac0a7839598ca61d2a9ee3eec1c573e1e)
+
+### Fixes
+
+- upgrade to Axum 0.7 (06757bbf049c6342f8b6587ff4672eb418a7e76d)
+- kill CaptureActor if child process dies (8d069d5cd7ec5cdb99ab27cd8da2bef6f71a80ef)
+
 ## 0.31.1
 2024-07-22
 
