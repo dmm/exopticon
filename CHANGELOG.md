@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.32.1
+2024-09-05
+
+### Fixes
+
+- Update docker base images (cff21e6ba54222039d4b5dbc4e1737eff6e42434)
+
 ## 0.32.0
 2024-08-09
 
