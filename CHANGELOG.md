@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.32.2
+2024-10-02
+
+### Fixes
+
+- Update cargo deps (8cc4aa94d1e1080604bb528cc47014402caa7d1d)
+
 ## 0.32.1
 2024-09-05
 
