@@ -58,11 +58,18 @@ impl Display for UserError {
 
 impl IntoResponse for UserError {
     fn into_response(self) -> axum::response::Response {
-        match self {
-            Self::NotFound => StatusCode::NOT_FOUND.into_response(),
-            Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY.into_response(),
-            Self::InternalError => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        }
+        let (status, message) = match self {
+            Self::NotFound => (StatusCode::NOT_FOUND, "not found".to_owned()),
+            Self::Validation(err_string) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, err_string.to_owned())
+            }
+            Self::InternalError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal error".to_owned(),
+            ),
+        };
+
+        (status, message).into_response()
     }
 }
 
