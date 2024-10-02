@@ -11,7 +11,7 @@ struct Asset;
 #[allow(clippy::unused_async)]
 pub async fn index_file_handler() -> Result<impl IntoResponse, UserError> {
     Asset::get("index.html").map_or(Err(UserError::NotFound), |content| {
-        Ok(([(header::CONTENT_TYPE, "text/html")], content))
+        Ok(([(header::CONTENT_TYPE, "text/html")], content.data))
     })
 }
 
@@ -20,7 +20,7 @@ pub async fn manifest_file_handler() -> Result<impl IntoResponse, UserError> {
     Asset::get("manifest.webmanifest").map_or(Err(UserError::NotFound), |content| {
         Ok((
             [(header::CONTENT_TYPE, "application/manifest+json")],
-            content,
+            content.data,
         ))
     })
 }
@@ -34,7 +34,7 @@ pub async fn static_file_handler(
     Asset::get(&path).map_or(Err(UserError::NotFound), |content| {
         Ok((
             [(header::CONTENT_TYPE, content_type.to_string())],
-            content.into_owned(),
+            content.data,
         ))
     })
 }

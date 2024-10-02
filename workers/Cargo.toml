@@ -17,7 +17,7 @@ exserial = { path = "../exserial" }
 
 [dev-dependencies]
 criterion = "0.3"
-tempfile = "3.1.0"
+tempfile = "3.13.0"
 
 [build-dependencies]
 exserial = { path = "../exserial" }

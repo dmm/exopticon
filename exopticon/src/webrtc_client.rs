@@ -239,7 +239,8 @@ impl Client {
                     return;
                 };
                 let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
-                let rtp_time = MediaTime::new(msg.timestamp, Frequency::NINETY_KHZ);
+                let timestamp: u64 = msg.timestamp.try_into().unwrap_or(0);
+                let rtp_time = MediaTime::new(timestamp, Frequency::NINETY_KHZ);
                 // debug!(
                 //     "Writing packet for camera id {} to mid {}, time {}",
                 //     msg.camera_id, mid, msg.timestamp

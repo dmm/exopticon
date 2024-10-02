@@ -18,45 +18,45 @@ onvif = { path = "../onvif" }
 exserial = { path = "../exserial" }
 axum = { version = "0.7", features = ["ws"]}
 axum-extra = { version = "0.9", features = ["cookie", "typed-header"]}
-axum-macros = "0.3"
+axum-macros = "0.4"
 axum-prometheus = "0.7.0"
 anyhow = "1.0"
 base64 = "0.22"
-bcrypt = "0.11"
+bcrypt = "0.15"
 bincode = "1.3.3"
-bytes = "^1.4"
-console-subscriber = "0.1.8"
+bytes = "^1.7"
+console-subscriber = "0.4"
 conv = "0.3.3"
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = "0.5"
-dialoguer = "0.3"
+chrono-tz = "0.10"
+dialoguer = "0.11"
 diesel = { version = "1.4", features = ["postgres", "uuidv07", "r2d2", "chrono"] }
 diesel_migrations = "1.4"
-dotenv = "0.13"
-env_logger = "0.8.4"
-futures-util = "0.3.25"
-lazy_static = "1.3.0"
+dotenv = "0.15"
+env_logger = "0.11"
+futures-util = "0.3"
+lazy_static = "1.5"
 log = "0.4"
 metrics = "0.23"
-mimalloc = { version = "*", default-features = false }
-mime_guess = "2.0.0-alpha.6"
+mimalloc = { version = "0.1", default-features = false }
+mime_guess = "2"
 prometheus = "0.13"
-rand = "^0.6"
+rand = "^0.8"
 futures = "0.3"
 r2d2 = "0.8"
-rust-embed = { version = "5.9.0", features = ["interpolate-folder-path"] }
-tempfile = "3.1.0"
+rust-embed = { version = "8.5", features = ["interpolate-folder-path"] }
+tempfile = "3"
 time = { version = "0.3", default-features = false, features = ["std"] }
-tokio = { version = "^1.13.1", features = ["full", "tracing"] }
+tokio = { version = "^1.40.0", features = ["full", "tracing"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 serde_bytes = "0.10"
 serde_derive="1.0"
 serde_repr = "0.1"
 serde_json="1.0"
 serde = { version = "1.0", features = ["derive"] }
-str0m = "0.5.1"
+str0m = "^0.6"
 socket2 = "0.5"
-url = "^2.1"
+url = "^2.5"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 thiserror = "1.0"
 tokio-tungstenite = "0.18.0"
