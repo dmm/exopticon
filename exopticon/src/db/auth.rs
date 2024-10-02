@@ -28,9 +28,9 @@ use crate::{
 use super::Service;
 
 /// Full user model struct, represents full value from database.
-#[derive(Queryable, Associations, Identifiable, Serialize)]
+#[derive(Queryable, Identifiable, Serialize, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "users"]
+#[diesel(table_name = users)]
 pub struct User {
     /// user id
     pub id: i32,
@@ -58,7 +58,7 @@ impl From<User> for crate::api::auth::User {
 
 /// User login session or token
 #[derive(Associations, Insertable, Serialize, Queryable, Clone)]
-#[belongs_to(User)]
+#[diesel(belongs_to(User))]
 pub struct UserSession {
     /// user session id
     pub id: i32,
@@ -96,11 +96,11 @@ impl Service {
         use crate::schema::users::dsl;
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let u = dsl::users
                     .filter(dsl::username.eq(username))
-                    .first::<User>(&conn)?;
+                    .first::<User>(&mut conn)?;
 
                 if let Ok(matching) = bcrypt::verify(password, &u.password) {
                     if matching {
@@ -117,10 +117,10 @@ impl Service {
         use crate::schema::users::dsl;
         match &self.pool {
             crate::db::ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
                 let u = dsl::users
                     .filter(dsl::id.eq(user_id))
-                    .first::<User>(&conn)?;
+                    .first::<User>(&mut conn)?;
 
                 Ok(u.into())
             }
@@ -136,7 +136,7 @@ impl Service {
 
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 diesel::insert_into(dsl::user_sessions)
                     .values((
@@ -146,7 +146,7 @@ impl Service {
                         dsl::is_token.eq(&session.is_token),
                         dsl::expiration.eq(&session.expiration),
                     ))
-                    .execute(&conn)?;
+                    .execute(&mut conn)?;
                 Ok(session.session_key.clone())
             }
             super::ServiceKind::Null(_) => todo!(),
@@ -157,9 +157,9 @@ impl Service {
         use crate::schema::user_sessions::dsl::*;
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
-                diesel::delete(user_sessions.filter(id.eq(session_id))).execute(&conn)?;
+                diesel::delete(user_sessions.filter(id.eq(session_id))).execute(&mut conn)?;
                 Ok(())
             }
             super::ServiceKind::Null(_) => todo!(),
@@ -173,18 +173,19 @@ impl Service {
         use crate::schema::user_sessions::dsl::*;
         match &self.pool {
             crate::db::ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 // remove expired sessions
-                diesel::delete(user_sessions.filter(expiration.lt(Utc::now()))).execute(&conn)?;
+                diesel::delete(user_sessions.filter(expiration.lt(Utc::now())))
+                    .execute(&mut conn)?;
                 let session = user_sessions
                     .filter(session_key.eq(&session_key_text))
                     .filter(expiration.gt(Utc::now()))
-                    .first::<UserSession>(&conn)?;
+                    .first::<UserSession>(&mut conn)?;
 
                 let user = crate::schema::users::dsl::users
                     .filter(crate::schema::users::dsl::id.eq(session.user_id))
-                    .first::<User>(&conn)?;
+                    .first::<User>(&mut conn)?;
 
                 Ok(user.into())
             }
@@ -196,12 +197,12 @@ impl Service {
         use crate::schema::user_sessions::dsl::*;
         match &self.pool {
             super::ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let sessions = user_sessions
                     .filter(user_id.eq(user_id2))
                     .filter(is_token.eq(true))
-                    .load::<UserSession>(&conn)?;
+                    .load::<UserSession>(&mut conn)?;
                 Ok(sessions.into_iter().map(std::convert::Into::into).collect())
             }
             super::ServiceKind::Null(_) => todo!(),

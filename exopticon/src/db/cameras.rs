@@ -28,8 +28,8 @@ use super::{Service, ServiceKind};
 
 /// Full camera model, represents database row
 #[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
-#[belongs_to(StorageGroup)]
-#[table_name = "cameras"]
+#[diesel(belongs_to(StorageGroup))]
+#[diesel(table_name = cameras)]
 pub struct Camera {
     /// id of camera
     pub id: i32,
@@ -66,8 +66,8 @@ pub struct Camera {
 }
 
 #[derive(PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
-#[belongs_to(StorageGroup)]
-#[table_name = "cameras"]
+#[diesel(belongs_to(StorageGroup))]
+#[diesel(table_name = cameras)]
 pub struct CreateCamera {
     /// id of associated storage group
     pub storage_group_id: i32,
@@ -118,7 +118,7 @@ impl From<crate::api::cameras::CreateCamera> for CreateCamera {
 }
 
 #[derive(AsChangeset, Debug)]
-#[table_name = "cameras"]
+#[diesel(table_name = cameras)]
 pub struct UpdateCamera {
     /// if present, new storage group id
     pub storage_group_id: Option<i32>,
@@ -175,11 +175,11 @@ impl Service {
     ) -> Result<crate::api::cameras::Camera, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
                     .values(&Into::<CreateCamera>::into(create_camera))
-                    .get_result(&conn)?;
+                    .get_result(&mut conn)?;
 
                 Ok(c.into())
             }
@@ -195,11 +195,11 @@ impl Service {
         match &self.pool {
             ServiceKind::Real(pool) => {
                 use crate::schema::cameras::dsl::*;
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let c: Camera = diesel::update(cameras.filter(id.eq(camera_id)))
                     .set(&Into::<UpdateCamera>::into(camera))
-                    .get_result(&conn)?;
+                    .get_result(&mut conn)?;
 
                 Ok(c.into())
             }
@@ -211,9 +211,9 @@ impl Service {
         match &self.pool {
             ServiceKind::Real(pool) => {
                 use crate::schema::cameras::dsl::*;
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
-                diesel::delete(cameras.filter(id.eq(cid))).execute(&conn)?;
+                diesel::delete(cameras.filter(id.eq(cid))).execute(&mut conn)?;
                 Ok(())
             }
             ServiceKind::Null(_) => todo!(),
@@ -223,11 +223,11 @@ impl Service {
     pub fn fetch_camera(&self, id: i32) -> Result<crate::api::cameras::Camera, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let c = crate::schema::cameras::dsl::cameras
                     .find(id)
-                    .get_result::<Camera>(&conn)?;
+                    .get_result::<Camera>(&mut conn)?;
 
                 Ok(c.into())
             }
@@ -240,10 +240,10 @@ impl Service {
     pub fn fetch_all_cameras(&self) -> Result<Vec<crate::api::cameras::Camera>, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let cameras: Vec<crate::db::cameras::Camera> =
-                    crate::schema::cameras::dsl::cameras.load(&conn)?;
+                    crate::schema::cameras::dsl::cameras.load(&mut conn)?;
                 Ok(cameras.into_iter().map(std::convert::Into::into).collect())
             }
             ServiceKind::Null(_) => todo!(),
