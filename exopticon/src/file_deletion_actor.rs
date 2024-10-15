@@ -22,15 +22,15 @@ use std::time::Duration;
 
 use tokio::task::spawn_blocking;
 
-use crate::db::storage_groups::StorageGroupOldFiles;
+use crate::db::{storage_groups::StorageGroupOldFiles, uuid::Uuid};
 
 pub struct FileDeletionActor {
-    storage_group_id: i32,
+    storage_group_id: Uuid,
     db: crate::db::Service,
 }
 
 impl FileDeletionActor {
-    pub const fn new(storage_group_id: i32, db: crate::db::Service) -> Self {
+    pub const fn new(storage_group_id: Uuid, db: crate::db::Service) -> Self {
         Self {
             storage_group_id,
             db,

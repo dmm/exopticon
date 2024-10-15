@@ -22,66 +22,55 @@ pub mod auth;
 pub mod camera_groups;
 pub mod cameras;
 pub mod storage_groups;
+pub mod uuid;
 pub mod video_units;
 
-use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use diesel::r2d2::ConnectionManager;
-use diesel::PgConnection;
+use diesel::{connection::SimpleConnection, r2d2::ConnectionManager, SqliteConnection};
 use thiserror::Error;
 
-use crate::api::camera_groups::CameraGroup;
-
-pub struct Null {
-    camera_groups: Vec<CameraGroup>,
+#[derive(Debug)]
+pub struct ConnectionOptions {
+    pub enable_wal: bool,
+    pub enable_foreign_keys: bool,
+    pub busy_timeout: Option<Duration>,
 }
 
-impl Null {
-    #[allow(dead_code)]
-    pub fn new(camera_groups: Vec<CameraGroup>) -> Self {
-        Self { camera_groups }
+impl diesel::r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error>
+    for ConnectionOptions
+{
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        (|| {
+            if self.enable_wal {
+                conn.batch_execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
+            }
+            if self.enable_foreign_keys {
+                conn.batch_execute("PRAGMA foreign_keys = ON;")?;
+            }
+            if let Some(d) = self.busy_timeout {
+                conn.batch_execute(&format!("PRAGMA busy_timeout = {};", d.as_millis()))?;
+            }
+            Ok(())
+        })()
+        .map_err(diesel::r2d2::Error::QueryError)
     }
-}
-
-#[derive(Default)]
-pub struct NullBuilder {
-    #[allow(dead_code)]
-    camera_groups: Vec<CameraGroup>,
-}
-
-#[allow(dead_code)]
-impl NullBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn build(self) -> Null {
-        Null {
-            camera_groups: self.camera_groups,
-        }
-    }
-
-    pub fn camera_groups(&mut self, camera_groups: &[CameraGroup]) {
-        self.camera_groups.extend_from_slice(camera_groups);
-    }
-}
-
-#[derive(Clone)]
-pub enum ServiceKind {
-    Real(r2d2::Pool<ConnectionManager<diesel::PgConnection>>),
-    #[allow(dead_code)]
-    Null(Arc<Mutex<Null>>),
 }
 
 #[derive(Clone)]
 pub struct Service {
-    pub pool: ServiceKind,
+    pub pool: r2d2::Pool<ConnectionManager<diesel::SqliteConnection>>,
 }
 
-fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::PgConnection>> {
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
+fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::SqliteConnection>> {
+    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
     r2d2::Pool::builder()
+        .max_size(16)
+        .connection_customizer(Box::new(ConnectionOptions {
+            enable_wal: true,
+            enable_foreign_keys: true,
+            busy_timeout: Some(Duration::from_secs(5)),
+        }))
         .build(manager)
         .expect("Failed to create pool.")
 }
@@ -89,15 +78,7 @@ fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::PgConn
 impl Service {
     pub fn new(database_url: &str) -> Self {
         Self {
-            pool: ServiceKind::Real(build_pool(database_url)),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn new_null(null_db: Option<Null>) -> Self {
-        let db = null_db.map_or_else(|| NullBuilder::new().build(), |d| d);
-        Self {
-            pool: ServiceKind::Null(Arc::new(Mutex::new(db))),
+            pool: build_pool(database_url),
         }
     }
 }
@@ -144,104 +125,5 @@ impl From<diesel::result::Error> for Error {
                 cause: err,
             })
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use diesel::{sql_query, Connection, PgConnection, RunQueryDsl};
-    use std::sync::atomic::AtomicU32;
-    use url::Url;
-
-    // TestDb inspired by:
-    // https://github.com/diesel-rs/diesel/issues/1549#issuecomment-892978784
-    static TEST_DB_COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    pub struct TestDb {
-        base_url: String,
-        name: String,
-        db: Service,
-    }
-
-    impl TestDb {
-        pub fn new() -> Self {
-            let name = format!(
-                "test_db_{}_{}",
-                std::process::id(),
-                TEST_DB_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-            );
-            let base_url = std::env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL");
-            let conn = PgConnection::establish(&base_url).unwrap();
-            sql_query(format!("CREATE DATABASE {};", name))
-                .execute(&conn)
-                .unwrap();
-
-            let mut url = Url::parse(&base_url).unwrap();
-            url.set_path(&name);
-
-            let conn2 = PgConnection::establish(&url.to_string()).unwrap();
-
-            crate::embedded_migrations::run(&conn2).unwrap();
-
-            let db = Service::new(&url.to_string());
-            Self { base_url, name, db }
-        }
-    }
-
-    impl Drop for TestDb {
-        fn drop(&mut self) {
-            let conn = PgConnection::establish(&self.base_url).unwrap();
-
-            sql_query(format!(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{}'",
-                self.name
-            ))
-            .execute(&conn)
-            .unwrap();
-            sql_query(format!("DROP DATABASE {}", self.name))
-                .execute(&conn)
-                .unwrap();
-        }
-    }
-
-    pub fn run_db_test(f: fn(&Service)) {
-        let testdb = TestDb::new();
-
-        f(&testdb.db);
-
-        drop(testdb);
-    }
-
-    #[test]
-    pub fn nulldbbuilder_new_creates_empty() {
-        // Arrange
-        let builder = NullBuilder::new();
-
-        // Act
-        let null_db = builder.build();
-
-        // Assert
-        assert_eq!(0, null_db.camera_groups.len());
-    }
-
-    #[test]
-    pub fn nulldbbuilder_addcameragroup_adds() {
-        // Arrange
-        let mut builder = NullBuilder::new();
-        let camera_groups = vec![CameraGroup {
-            id: 1,
-            name: String::from("TestGroupA"),
-            members: vec![],
-        }];
-
-        // Act
-        builder.camera_groups(&camera_groups);
-        let null_db = builder.build();
-
-        // Assert
-        assert_eq!(1, null_db.camera_groups.len());
-        assert_eq!(camera_groups[0], null_db.camera_groups[0]);
     }
 }

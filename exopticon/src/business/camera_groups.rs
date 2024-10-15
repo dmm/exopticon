@@ -18,6 +18,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use crate::db::uuid::Uuid;
+
 use super::Error;
 
 /// Maximum number of members in a ``CameraGroup``. This has to be less
@@ -31,11 +33,11 @@ static MAX_MEMBERS_ERROR_MESSAGE: &str = "Maximum number of CameraGroup members 
 #[non_exhaustive]
 pub struct CameraGroup {
     pub name: String,
-    pub members: Vec<i32>,
+    pub members: Vec<Uuid>,
 }
 
 impl CameraGroup {
-    pub fn new(name: &str, members: Vec<i32>) -> Result<Self, Error> {
+    pub fn new(name: &str, members: Vec<Uuid>) -> Result<Self, Error> {
         if members.len() > MAX_MEMBER_COUNT {
             return Err(Error::Validation(String::from(MAX_MEMBERS_ERROR_MESSAGE)));
         }

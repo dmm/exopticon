@@ -24,7 +24,7 @@ use axum::{
 };
 use tokio::task::spawn_blocking;
 
-use crate::AppState;
+use crate::{db::uuid::Uuid, AppState};
 
 use super::UserError;
 
@@ -33,7 +33,7 @@ use super::UserError;
 #[serde(rename_all = "camelCase")]
 pub struct StorageGroup {
     /// storage group id
-    pub id: i32,
+    pub id: Uuid,
     /// storage group name
     pub name: String,
     /// full path to video storage path, e.g. /mnt/video/8/
@@ -58,7 +58,7 @@ pub struct CreateStorageGroup {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateStorageGroup {
     /// storage group id
-    pub id: i32,
+    pub id: Uuid,
     /// storage group name
     pub name: Option<String>,
     /// full path to video storage path, e.g. /mnt/video/8/
@@ -82,7 +82,7 @@ pub async fn create(
 
 pub async fn update(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<Uuid>,
     Json(update_request): Json<UpdateStorageGroup>,
 ) -> Result<Json<StorageGroup>, UserError> {
     let db = state.db_service;
@@ -93,7 +93,7 @@ pub async fn update(
     Ok(Json(updated_group))
 }
 
-pub async fn delete(Path(id): Path<i32>, State(state): State<AppState>) -> Result<(), UserError> {
+pub async fn delete(Path(id): Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
     let db = state.db_service;
 
     spawn_blocking(move || db.delete_storage_group(id)).await??;
@@ -102,7 +102,7 @@ pub async fn delete(Path(id): Path<i32>, State(state): State<AppState>) -> Resul
 }
 
 pub async fn fetch(
-    Path(id): Path<i32>,
+    Path(id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<StorageGroup>, UserError> {
     let db = state.db_service;

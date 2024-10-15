@@ -165,12 +165,7 @@ async fn main() {
 
     // create db connection pool
     let db_service = crate::db::Service::new(&database_url);
-    let pool = match db_service.clone().pool {
-        crate::db::ServiceKind::Real(p) => p,
-        crate::db::ServiceKind::Null(_) => {
-            panic!("Tried to start Exopticon with a null db pool!")
-        }
-    };
+    let pool = db_service.clone().pool;
 
     // Run migrations
     info!("Running migrations...");

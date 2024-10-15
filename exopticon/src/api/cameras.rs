@@ -24,10 +24,11 @@ use axum::{
     extract::{Path, State},
     Json, Router,
 };
+use axum_macros::debug_handler;
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
-use crate::{capture_supervisor::Command, AppState};
+use crate::{capture_supervisor::Command, db::uuid::Uuid, AppState};
 
 use super::UserError;
 
@@ -35,7 +36,7 @@ use super::UserError;
 #[serde(rename_all = "camelCase")]
 pub struct Camera {
     /// id of camera
-    pub id: i32,
+    pub id: Uuid,
 
     #[serde(flatten)]
     pub common: CreateCamera,
@@ -63,12 +64,11 @@ impl From<crate::db::cameras::Camera> for Camera {
         }
     }
 }
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCamera {
     /// id of associated storage group
-    pub storage_group_id: i32,
+    pub storage_group_id: Uuid,
     /// name of camera
     pub name: String,
     /// ip address associated with camera, e.g. 192.168.0.53
@@ -99,7 +99,7 @@ pub struct CreateCamera {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCamera {
     /// if present, new storage group id
-    pub storage_group_id: Option<i32>,
+    pub storage_group_id: Option<Uuid>,
     /// if present, new camera name
     pub name: Option<String>,
     /// if present, new ip address
@@ -142,7 +142,7 @@ pub async fn create(
 
 pub async fn update(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<Uuid>,
     Json(update_request): Json<UpdateCamera>,
 ) -> Result<Json<Camera>, UserError> {
     let db = state.db_service;
@@ -155,15 +155,16 @@ pub async fn update(
     Ok(Json(updated_camera))
 }
 
-pub async fn delete(Path(id): Path<i32>, State(state): State<AppState>) -> Result<(), UserError> {
+pub async fn delete(Path(id): Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
     let db = state.db_service;
 
     spawn_blocking(move || db.delete_camera(id)).await??;
     Ok(())
 }
 
+#[debug_handler]
 pub async fn fetch(
-    Path(id): Path<i32>,
+    Path(id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<Camera>, UserError> {
     let db = state.db_service;
@@ -181,8 +182,9 @@ pub async fn fetch_all(State(state): State<AppState>) -> Result<Json<Vec<Camera>
     Ok(Json(cameras))
 }
 
+#[debug_handler]
 pub async fn ptz_relative_move(
-    Path((id, direction)): Path<(i32, String)>,
+    Path((id, direction)): Path<(Uuid, String)>,
     State(state): State<AppState>,
 ) -> Result<(), UserError> {
     let zoom = 0.0;

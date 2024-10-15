@@ -6,8 +6,6 @@ services:
       context: ..
       target: development
     environment:
-      - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
-      - TEST_DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@testdb
       - ROOT_URL="https://${DOMAIN}"
       - DOMAIN
       - EXOPTICON_NAME
@@ -18,6 +16,8 @@ services:
       - EXOPTICON_METRICS_PASSWORD
       - EXOPTICON_WEBRTC_IPS
       - EXOPTICON_WEBRTC_BUFFER_SIZE
+      - EXOPTICON_DB_DIRECTORY
+      - EXOPTICON_DB_FILENAME
     ports:
       - 3000:3000
       - "4000:4000/udp"
@@ -27,20 +27,11 @@ services:
     devices: []
 #      - /dev/apex_0:/dev/apex_0
     volumes:
-      - cargo_home:/cargo
       - target:/exopticon/target
       - /dev/bus/usb:/dev/bus/usb
       - ..:/exopticon # map source directory for development
       - $EXOPTICON_VIDEO_PATH:/video
-  testdb:
-    image: postgres:13
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}
-    volumes:
-      - test_db:/var/lib/postgresql/data
-
+      - $EXOPTICON_DB_DIRECTORY:/db
 volumes:
-  test_db:
   cargo_home:
   target:

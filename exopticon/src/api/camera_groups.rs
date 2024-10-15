@@ -25,7 +25,7 @@ use axum::{
 };
 use tokio::task::spawn_blocking;
 
-use crate::AppState;
+use crate::{db::uuid::Uuid, AppState};
 
 use super::UserError;
 
@@ -35,9 +35,9 @@ use super::UserError;
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CameraGroup {
-    pub id: i32,
+    pub id: Uuid,
     pub name: String,
-    pub members: Vec<i32>,
+    pub members: Vec<Uuid>,
 }
 
 /// Request to create new `CameraGroup`
@@ -45,7 +45,7 @@ pub struct CameraGroup {
 #[serde(rename_all = "camelCase")]
 pub struct CreateCameraGroup {
     pub name: String,
-    pub members: Vec<i32>,
+    pub members: Vec<Uuid>,
 }
 
 // Routes
@@ -73,14 +73,14 @@ pub async fn update(
     Ok(Json(camera_group))
 }
 
-pub async fn delete(id: Path<i32>, State(state): State<AppState>) -> Result<(), UserError> {
+pub async fn delete(id: Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
     let db = state.db_service;
     spawn_blocking(move || db.delete_camera_group(id.0)).await??;
     Ok(())
 }
 
 pub async fn fetch(
-    id: Path<i32>,
+    id: Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<CameraGroup>, UserError> {
     let db = state.db_service;

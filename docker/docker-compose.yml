@@ -4,7 +4,6 @@ services:
   exopticon:
     image: dmattli/exopticon:v${RELEASE_VERSION}
     environment:
-      - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
       - RUST_LOG
       - ROOT_URL="https://${DOMAIN}"
       - DOMAIN
@@ -13,6 +12,8 @@ services:
       - EXOPTICON_METRICS_ENABLED
       - EXOPTICON_WEBRTC_IPS
       - EXOPTICON_WEBRTC_BUFFER_SIZE
+      - EXOPTICON_DB_DIRECTORY
+      - EXOPTICON_DB_FILENAME
     restart: always
     ports:
       - 0.0.0.0:3000:3000
@@ -23,4 +24,5 @@ services:
       - 'a 189:* rwm'
     volumes:
       - $EXOPTICON_VIDEO_PATH:/video
+      - $EXOPTICON_DB_DIRECTORY:/db
       - /dev/bus/usb:/dev/bus/usb
