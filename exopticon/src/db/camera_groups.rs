@@ -61,7 +61,7 @@ impl Service {
         let mut conn = self.pool.get()?;
         conn.immediate_transaction::<_, super::Error, _>(|tconn| {
             let new_camera_group = CameraGroup {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 name: group.name,
             };
 

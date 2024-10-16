@@ -27,8 +27,8 @@ use uuid;
 pub struct Uuid(pub uuid::Uuid);
 
 impl Uuid {
-    pub fn new_v4() -> Self {
-        Self(uuid::Uuid::new_v4())
+    pub fn now_v7() -> Self {
+        Self(uuid::Uuid::now_v7())
     }
 }
 

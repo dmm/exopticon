@@ -64,7 +64,7 @@ pub struct Camera {
 impl From<crate::api::cameras::CreateCamera> for Camera {
     fn from(c: crate::api::cameras::CreateCamera) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             storage_group_id: c.storage_group_id,
             name: c.name,
             ip: c.ip,

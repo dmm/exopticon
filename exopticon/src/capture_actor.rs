@@ -146,7 +146,7 @@ impl CaptureActor {
         filename: String,
         begin_time: String,
     ) -> anyhow::Result<()> {
-        let new_video_unit_id = Uuid::new_v4();
+        let new_video_unit_id = Uuid::now_v7();
         let date = begin_time.parse::<DateTime<Utc>>().expect("Parse failure!");
 
         let create_video_unit = CreateVideoUnit {
