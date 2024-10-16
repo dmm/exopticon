@@ -25,7 +25,7 @@ use crate::api::auth::SlimAccessToken;
 use super::{uuid::Uuid, Service};
 
 /// Full user model struct, represents full value from database.
-#[derive(Queryable, Identifiable, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Eq, PartialEq, Debug)]
 #[diesel(table_name = crate::schema::users)]
 pub struct User {
     /// user id

@@ -116,7 +116,7 @@ pub struct UpdateCamera {
 impl From<crate::api::cameras::UpdateCamera> for UpdateCamera {
     fn from(u: crate::api::cameras::UpdateCamera) -> Self {
         Self {
-            storage_group_id: u.storage_group_id.into(),
+            storage_group_id: u.storage_group_id,
             name: u.name,
             ip: u.ip,
             onvif_port: u.onvif_port,

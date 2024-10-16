@@ -40,7 +40,7 @@ impl From<Uuid> for uuid::Uuid {
 
 impl From<uuid::Uuid> for Uuid {
     fn from(s: uuid::Uuid) -> Self {
-        Uuid(s)
+        Self(s)
     }
 }
 
@@ -56,9 +56,7 @@ where
 {
     fn from_sql(bytes: <B as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
         let value = <Vec<u8>>::from_sql(bytes)?;
-        uuid::Uuid::from_slice(&value)
-            .map(Uuid)
-            .map_err(|e| e.into())
+        uuid::Uuid::from_slice(&value).map(Uuid).map_err(Into::into)
     }
 }
 

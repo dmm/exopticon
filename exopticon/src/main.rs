@@ -42,6 +42,7 @@
 #![allow(clippy::expect_used)]
 #![allow(clippy::future_not_send)]
 #![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
+#![allow(clippy::needless_pass_by_ref_mut)] // tokio::run Send + Sync
 
 #[macro_use]
 extern crate diesel;

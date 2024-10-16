@@ -24,7 +24,6 @@ use axum::{
     extract::{Path, State},
     Json, Router,
 };
-use axum_macros::debug_handler;
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
@@ -162,7 +161,6 @@ pub async fn delete(Path(id): Path<Uuid>, State(state): State<AppState>) -> Resu
     Ok(())
 }
 
-#[debug_handler]
 pub async fn fetch(
     Path(id): Path<Uuid>,
     State(state): State<AppState>,
@@ -182,7 +180,6 @@ pub async fn fetch_all(State(state): State<AppState>) -> Result<Json<Vec<Camera>
     Ok(Json(cameras))
 }
 
-#[debug_handler]
 pub async fn ptz_relative_move(
     Path((id, direction)): Path<(Uuid, String)>,
     State(state): State<AppState>,
