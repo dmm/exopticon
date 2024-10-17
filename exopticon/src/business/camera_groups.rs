@@ -52,6 +52,7 @@ impl CameraGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::uuid::Uuid;
 
     #[test]
     pub fn new_sets_correct_name() {
@@ -68,7 +69,7 @@ mod tests {
     #[test]
     pub fn new_adds_correct_members() {
         // Arrange
-        let members = vec![1, 2, 3];
+        let members = vec![Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7()];
 
         // Act
         let res = CameraGroup::new("TestGroup", members.clone());
@@ -82,8 +83,8 @@ mod tests {
         // Arrange
         let mut members = Vec::new();
 
-        for i in 0..MAX_MEMBER_COUNT {
-            members.push(i32::try_from(i).unwrap());
+        for _i in 0..MAX_MEMBER_COUNT {
+            members.push(Uuid::now_v7());
         }
 
         // Act
@@ -98,8 +99,8 @@ mod tests {
         // Arrange
         let mut members = Vec::new();
 
-        for i in 0..MAX_MEMBER_COUNT + 1 {
-            members.push(i32::try_from(i).unwrap());
+        for _i in 0..MAX_MEMBER_COUNT + 1 {
+            members.push(Uuid::now_v7());
         }
 
         // Act
