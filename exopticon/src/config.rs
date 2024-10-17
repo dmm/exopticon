@@ -1,5 +1,5 @@
 /// size of webrtc udp send/recv buffers if not set with env variable
-fn default_buffer_size() -> usize {
+const fn default_buffer_size() -> usize {
     2_097_152
 }
 #[derive(Deserialize, Debug)]

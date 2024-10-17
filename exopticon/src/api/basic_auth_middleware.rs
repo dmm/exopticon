@@ -37,6 +37,6 @@ pub async fn metrics_auth_middleware(
         }
     } else {
         // metric auth is not configured
-        return Err(StatusCode::UNAUTHORIZED);
+        Err(StatusCode::UNAUTHORIZED)
     }
 }
