@@ -71,12 +71,14 @@ mod utils;
 
 mod capture_actor;
 mod capture_supervisor;
+pub mod config;
 mod file_deletion_actor;
 mod file_deletion_supervisor;
 mod webrtc_client;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
 use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
+use crate::config::Config;
 use crate::file_deletion_supervisor::FileDeletionSupervisor;
 
 use axum::routing::{get, post};
@@ -85,7 +87,6 @@ use axum_prometheus::PrometheusMetricLayer;
 use capture_actor::VideoPacket;
 use capture_supervisor::Command;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use dotenv::dotenv;
 use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::trace::{self, TraceLayer};
@@ -93,15 +94,11 @@ use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing_subscriber::{EnvFilter, Layer};
 
-use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
-/// size of webrtc udp send/recv buffers if not set with env variable
-static DEFAULT_BUFFER_SIZE: usize = 2_097_152;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
 
@@ -113,20 +110,7 @@ pub struct AppState {
     pub db_service: crate::db::Service,
     pub capture_channel: mpsc::Sender<Command>,
     pub video_sender: broadcast::Sender<VideoPacket>,
-}
-
-fn parse_candidate_ips() -> Vec<String> {
-    let mut candidate_ips = Vec::new();
-
-    let Ok(candidate_string) = env::var("EXOPTICON_WEBRTC_IPS") else {
-        return candidate_ips;
-    };
-    debug!("CANDIDATES: {candidate_string}");
-    for c in candidate_string.split(',') {
-        candidate_ips.push(c.to_string());
-    }
-
-    candidate_ips
+    pub metrics_auth: Option<(String, String)>,
 }
 
 async fn udp_listener(
@@ -160,12 +144,13 @@ async fn main() {
                 .with_filter(filter),
         )
         .init();
-    dotenv().ok();
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let config = envy::prefixed("EXOPTICON_")
+        .from_env::<Config>()
+        .expect("failed to load config");
 
     // create db connection pool
-    let db_service = crate::db::Service::new(&database_url);
+    let db_service = crate::db::Service::new(&config.database_url);
     let pool = db_service.clone().pool;
 
     // Run migrations
@@ -176,35 +161,15 @@ async fn main() {
         .run_pending_migrations(MIGRATIONS)
         .expect("migrations failed");
 
-    let buffer_size: usize = env::var("EXOPTICON_WEBRTC_BUFFER_SIZE")
-        .unwrap_or_default()
-        .parse()
-        .map_or_else(
-            |_| {
-                info!(
-                    "UDP buffer size {}. parsing env failed, using default size",
-                    DEFAULT_BUFFER_SIZE
-                );
-                DEFAULT_BUFFER_SIZE
-            },
-            |buffer_size| {
-                info!("UDP buffer size {}, parsed from env", buffer_size);
-                buffer_size
-            },
-        );
-    error!(
-        "Creating webrtc udp socket with send/recv buffer size: {}",
-        buffer_size
-    );
     let tokio_socket = UdpSocket::bind(("0.0.0.0", 4000))
         .await
         .expect("Unable to open udp socket");
     let ext_socket: socket2::Socket = tokio_socket.into_std().expect("socket into_std").into();
     ext_socket
-        .set_recv_buffer_size(buffer_size)
+        .set_recv_buffer_size(config.webrtc_buffer_size)
         .expect("setting socket recv buffer size");
     ext_socket
-        .set_send_buffer_size(buffer_size)
+        .set_send_buffer_size(config.webrtc_buffer_size)
         .expect("setting socket send buffer size");
     let tokio_socket2 = UdpSocket::from_std(ext_socket.into()).expect("converting to tokio socket");
     let udp_socket = Arc::new(tokio_socket2);
@@ -219,13 +184,27 @@ async fn main() {
 
     let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone());
 
+    let metrics_auth = if config.metrics_enabled {
+        Some((
+            config
+                .metrics_username
+                .expect("metrics enabled but no username provided"),
+            config
+                .metrics_password
+                .expect("metrics enabled but no password provided"),
+        ))
+    } else {
+        None
+    };
+
     let state = AppState {
-        candidate_ips: parse_candidate_ips(),
+        candidate_ips: config.webrtc_ips.clone(),
         udp_socket,
         udp_channel,
         db_service,
         capture_channel,
         video_sender: capture_supervisor.get_packet_sender(),
+        metrics_auth,
     };
 
     // TODO: watch this future for exit...
@@ -252,7 +231,8 @@ async fn main() {
         // metrics
         .route(
             "/metrics",
-            get(|| async move { metric_handle.render() }).layer(middleware::from_fn(
+            get(|| async move { metric_handle.render() }).layer(middleware::from_fn_with_state(
+                state.clone(),
                 crate::api::basic_auth_middleware::metrics_auth_middleware,
             )),
         )
