@@ -26,6 +26,7 @@ use futures::StreamExt;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio::task::{spawn_blocking, JoinError};
+use uuid::Uuid;
 
 use crate::api::cameras::Camera;
 use crate::capture_actor;
@@ -46,11 +47,11 @@ enum State {
 pub struct CaptureSupervisor {
     state: State,
     db: crate::db::Service,
-    stopped_camera_ids: Vec<i32>,
+    stopped_camera_ids: Vec<Uuid>,
     command_sender: mpsc::Sender<Command>,
     command_receiver: mpsc::Receiver<Command>,
-    capture_channels: HashMap<i32, mpsc::Sender<capture_actor::Command>>,
-    capture_handles: FuturesUnordered<JoinHandle<i32>>,
+    capture_channels: HashMap<Uuid, mpsc::Sender<capture_actor::Command>>,
+    capture_handles: FuturesUnordered<JoinHandle<Uuid>>,
     packet_sender: broadcast::Sender<VideoPacket>,
 }
 
@@ -110,7 +111,7 @@ impl CaptureSupervisor {
         Ok(())
     }
 
-    async fn start_cameras(&mut self, camera_id: Option<i32>) -> anyhow::Result<()> {
+    async fn start_cameras(&mut self, camera_id: Option<Uuid>) -> anyhow::Result<()> {
         info!("Starting capture actors...");
         // fetch cameras
         let db = self.db.clone();
@@ -142,7 +143,7 @@ impl CaptureSupervisor {
         }
     }
 
-    fn handle_camera_event(&mut self, res: &Result<i32, JoinError>) {
+    fn handle_camera_event(&mut self, res: &Result<Uuid, JoinError>) {
         match self.state {
             State::Running => {
                 if let Ok(id) = res {

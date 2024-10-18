@@ -45,7 +45,7 @@ use exserial::models::CaptureMessage;
 
 #[derive(Clone)]
 pub struct VideoPacket {
-    pub camera_id: i32,
+    pub camera_id: Uuid,
     pub data: Vec<u8>,
     pub timestamp: i64,
     pub duration: i64,
@@ -72,7 +72,7 @@ pub struct CaptureActor {
         ChildStdin,
         FramedRead<ChildStdout, LengthDelimitedCodec>,
     )>,
-    video_segment_id: Option<(Uuid, i32)>,
+    video_segment_id: Option<(Uuid, Uuid)>,
 
     /// Video Packet Sender
     sender: broadcast::Sender<VideoPacket>,
@@ -149,9 +149,8 @@ impl CaptureActor {
 
         let create_video_unit = CreateVideoUnit {
             camera_id: self.camera.id,
-            monotonic_index: 0,
-            begin_time: date.naive_utc(),
-            end_time: date.naive_utc(),
+            begin_time: date,
+            end_time: date,
             id: new_video_unit_id,
         };
         let create_video_file = CreateVideoFile {
@@ -180,12 +179,7 @@ impl CaptureActor {
             let db = self.db.clone();
             let file_size: i32 = metadata.len().try_into().unwrap_or(-1);
             spawn_blocking(move || {
-                db.close_video_segment(
-                    video_unit_id,
-                    video_file_id,
-                    end_time.naive_utc(),
-                    file_size,
-                )
+                db.close_video_segment(video_unit_id, video_file_id, end_time, file_size)
             })
             .await??;
         }
@@ -297,7 +291,7 @@ impl CaptureActor {
         Ok(true)
     }
 
-    pub async fn run(mut self) -> i32 {
+    pub async fn run(mut self) -> Uuid {
         loop {
             if self.state == State::Ready {
                 self.start_worker();

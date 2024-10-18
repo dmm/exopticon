@@ -18,8 +18,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use chrono::NaiveDateTime;
 use diesel::{dsl::sum, ExpressionMethods, QueryDsl, RunQueryDsl};
+use uuid::Uuid;
 
 use crate::{
     db::{
@@ -31,21 +31,17 @@ use crate::{
 
 /// Full storage group model. Represents a full row returned from the
 /// database.
-#[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
-#[table_name = "storage_groups"]
+#[derive(Identifiable, PartialEq, Eq, Debug, Queryable, Insertable)]
+#[diesel(table_name = storage_groups)]
 pub struct StorageGroup {
     /// storage group id
-    pub id: i32,
+    pub id: Uuid,
     /// storage group name
     pub name: String,
     /// full path to video storage path, e.g. /mnt/video/8/
     pub storage_path: String,
     /// maximum allowed storage size in bytes
     pub max_storage_size: i64,
-    /// insertion time
-    pub inserted_at: NaiveDateTime,
-    /// update time
-    pub updated_at: NaiveDateTime,
 }
 
 impl From<StorageGroup> for crate::api::storage_groups::StorageGroup {
@@ -61,8 +57,8 @@ impl From<StorageGroup> for crate::api::storage_groups::StorageGroup {
 
 /// Full storage group model. Represents a full row returned from the
 /// database.
-#[derive(PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
-#[table_name = "storage_groups"]
+#[derive(PartialEq, Eq, Debug, Queryable, Insertable)]
+#[diesel(table_name = storage_groups)]
 pub struct CreateStorageGroup {
     /// storage group name
     pub name: String,
@@ -74,7 +70,7 @@ pub struct CreateStorageGroup {
 
 /// Represents a storage group update request
 #[derive(AsChangeset, Debug)]
-#[table_name = "storage_groups"]
+#[diesel(table_name = storage_groups)]
 pub struct UpdateStorageGroup {
     /// if provided, updated name for storage group
     pub name: Option<String>,
@@ -110,7 +106,7 @@ impl super::Service {
         match &self.pool {
             super::ServiceKind::Real(pool) => {
                 use crate::schema::storage_groups::dsl;
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let new_storage_group: StorageGroup = diesel::insert_into(storage_groups::table)
                     .values((
@@ -118,7 +114,7 @@ impl super::Service {
                         dsl::storage_path.eq(group.storage_path),
                         dsl::max_storage_size.eq(group.max_storage_size),
                     ))
-                    .get_result(&conn)?;
+                    .get_result(&mut conn)?;
 
                 Ok(new_storage_group.into())
             }
@@ -128,18 +124,18 @@ impl super::Service {
 
     pub fn update_storage_group(
         &self,
-        id: i32,
+        id: Uuid,
         group: crate::api::storage_groups::UpdateStorageGroup,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
         match &self.pool {
             super::ServiceKind::Real(pool) => {
                 use crate::schema::storage_groups::dsl;
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let updated_storage_group: StorageGroup =
                     diesel::update(dsl::storage_groups.filter(dsl::id.eq(id)))
                         .set::<UpdateStorageGroup>(group.into())
-                        .get_result(&conn)?;
+                        .get_result(&mut conn)?;
 
                 Ok(updated_storage_group.into())
             }
@@ -149,16 +145,16 @@ impl super::Service {
 
     pub fn fetch_storage_group(
         &self,
-        id: i32,
+        id: Uuid,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
         match &self.pool {
             super::ServiceKind::Real(pool) => {
                 use crate::schema::storage_groups::dsl;
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let group = dsl::storage_groups
                     .find(id)
-                    .get_result::<StorageGroup>(&conn)?;
+                    .get_result::<StorageGroup>(&mut conn)?;
 
                 Ok(group.into())
             }
@@ -172,9 +168,9 @@ impl super::Service {
         match &self.pool {
             super::ServiceKind::Real(pool) => {
                 use crate::schema::storage_groups::dsl;
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
-                let groups = dsl::storage_groups.load::<StorageGroup>(&conn)?;
+                let groups = dsl::storage_groups.load::<StorageGroup>(&mut conn)?;
 
                 Ok(groups.into_iter().map(std::convert::Into::into).collect())
             }
@@ -182,13 +178,13 @@ impl super::Service {
         }
     }
 
-    pub fn delete_storage_group(&self, sid: i32) -> Result<(), super::Error> {
+    pub fn delete_storage_group(&self, sid: Uuid) -> Result<(), super::Error> {
         match &self.pool {
             super::ServiceKind::Real(pool) => {
                 use crate::schema::storage_groups::dsl::*;
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
-                diesel::delete(storage_groups.filter(id.eq(sid))).execute(&conn)?;
+                diesel::delete(storage_groups.filter(id.eq(sid))).execute(&mut conn)?;
                 Ok(())
             }
             super::ServiceKind::Null(_) => todo!(),
@@ -197,7 +193,7 @@ impl super::Service {
 
     pub fn fetch_storage_group_old_units(
         &self,
-        sid: i32,
+        sid: Uuid,
         count: i64,
     ) -> Result<StorageGroupOldFiles, super::Error> {
         use crate::schema::cameras::dsl::*;
@@ -206,19 +202,19 @@ impl super::Service {
 
         match &self.pool {
             crate::db::ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 let storage_group_capacity = storage_groups::dsl::storage_groups
                     .select(storage_groups::max_storage_size)
                     .filter(storage_groups::columns::id.eq(sid))
-                    .first::<i64>(&conn)?;
+                    .first::<i64>(&mut conn)?;
 
                 let storage_group_size = video_files
                     .select(sum(size))
                     .inner_join(video_units.inner_join(cameras))
                     .filter(storage_group_id.eq(sid))
                     .filter(size.ne(-1))
-                    .first::<Option<i64>>(&conn)?
+                    .first::<Option<i64>>(&mut conn)?
                     .unwrap_or(0);
 
                 let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras
@@ -228,7 +224,7 @@ impl super::Service {
                     .filter(begin_time.ne(end_time))
                     .order(begin_time.asc())
                     .limit(count)
-                    .load(&conn)?;
+                    .load(&mut conn)?;
 
                 let units = c
                     .into_iter()

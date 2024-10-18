@@ -33,7 +33,7 @@ services:
       - ..:/exopticon # map source directory for development
       - $EXOPTICON_VIDEO_PATH:/video
   testdb:
-    image: postgres:13
+    image: postgres:17
     restart: always
     environment:
       POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}

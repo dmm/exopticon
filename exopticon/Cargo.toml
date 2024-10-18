@@ -30,8 +30,8 @@ conv = "0.3.3"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 dialoguer = "0.11"
-diesel = { version = "1.4", features = ["postgres", "uuidv07", "r2d2", "chrono"] }
-diesel_migrations = "1.4"
+diesel = { version = "^2", features = ["postgres", "uuid", "r2d2", "chrono"] }
+diesel_migrations = "^2"
 dotenv = "0.15"
 env_logger = "0.11"
 futures-util = "0.3"
@@ -57,7 +57,7 @@ serde = { version = "1.0", features = ["derive"] }
 str0m = "^0.6"
 socket2 = "0.5"
 url = "^2.5"
-uuid = { version = "0.8.2", features = ["serde", "v4"] }
+uuid = { version = "^1", features = ["serde", "v4", "v7"] }
 thiserror = "1.0"
 tokio-tungstenite = "0.18.0"
 tower = { version = "0.4", features = ["util"] }

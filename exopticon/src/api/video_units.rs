@@ -23,7 +23,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use tokio::task::spawn_blocking;
 use uuid::Uuid;
 
@@ -37,13 +37,11 @@ pub struct VideoUnit {
     /// id of video unit
     pub id: Uuid,
     /// id of associated camera
-    pub camera_id: i32,
-    /// monotonic index
-    pub monotonic_index: i32,
+    pub camera_id: Uuid,
     /// begin time in UTC
-    pub begin_time: NaiveDateTime,
+    pub begin_time: DateTime<Utc>,
     /// end time in UTC
-    pub end_time: NaiveDateTime,
+    pub end_time: DateTime<Utc>,
 }
 
 /// Represents request to create new video unit record
@@ -51,13 +49,11 @@ pub struct VideoUnit {
 #[serde(rename_all = "camelCase")]
 pub struct CreateVideoUnit {
     /// id of associated camera
-    pub camera_id: i32,
-    /// monotonic index
-    pub monotonic_index: i32,
+    pub camera_id: Uuid,
     /// begin time in UTC
-    pub begin_time: NaiveDateTime,
+    pub begin_time: DateTime<Utc>,
     /// end time in UTC
-    pub end_time: NaiveDateTime,
+    pub end_time: DateTime<Utc>,
     /// id of video unit
     pub id: Uuid,
 }
@@ -67,7 +63,7 @@ pub struct CreateVideoUnit {
 #[serde(rename_all = "camelCase")]
 pub struct VideoFile {
     /// id of video file
-    pub id: i32,
+    pub id: Uuid,
     /// filename of video file
     pub filename: String,
     /// size in bytes of video file
@@ -95,7 +91,7 @@ pub struct Interval {
 
 pub async fn fetch_video_units_between(
     interval: Query<Interval>,
-    Path(camera_id): Path<i32>,
+    Path(camera_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<(VideoUnit, VideoFile)>>, super::UserError> {
     let db = state.db_service;

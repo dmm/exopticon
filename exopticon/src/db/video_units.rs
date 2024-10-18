@@ -18,8 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-use diesel::dsl::any;
+use chrono::{DateTime, Utc};
 use diesel::{BelongingToDsl, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use uuid::Uuid;
 
@@ -31,23 +30,17 @@ use super::{Service, ServiceKind};
 /// Full video unit model, represents entire database row
 #[derive(Identifiable, Associations, Serialize, Queryable, Clone)]
 #[serde(rename_all = "camelCase")]
-#[belongs_to(Camera)]
-#[table_name = "video_units"]
+#[diesel(belongs_to(Camera))]
+#[diesel(table_name = video_units)]
 pub struct VideoUnit {
-    /// id of associated camera
-    pub camera_id: i32,
-    /// monotonic index
-    pub monotonic_index: i32,
-    /// begin time in UTC
-    pub begin_time: NaiveDateTime,
-    /// end time in UTC
-    pub end_time: NaiveDateTime,
-    /// insertion time
-    pub inserted_at: NaiveDateTime,
-    /// update time
-    pub updated_at: NaiveDateTime,
     /// id of video unit
     pub id: Uuid,
+    /// id of associated camera
+    pub camera_id: Uuid,
+    /// begin time in UTC
+    pub begin_time: DateTime<Utc>,
+    /// end time in UTC
+    pub end_time: DateTime<Utc>,
 }
 
 impl From<VideoUnit> for crate::api::video_units::VideoUnit {
@@ -55,7 +48,6 @@ impl From<VideoUnit> for crate::api::video_units::VideoUnit {
         Self {
             id: v.id,
             camera_id: v.camera_id,
-            monotonic_index: v.monotonic_index,
             begin_time: v.begin_time,
             end_time: v.end_time,
         }
@@ -65,53 +57,45 @@ impl From<VideoUnit> for crate::api::video_units::VideoUnit {
 /// Represents request to create new video unit record
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "video_units"]
+#[diesel(table_name = video_units)]
 pub struct CreateVideoUnit {
-    /// id of associated camera
-    pub camera_id: i32,
-    /// monotonic index
-    pub monotonic_index: i32,
-    /// begin time in UTC
-    pub begin_time: NaiveDateTime,
-    /// end time in UTC
-    pub end_time: NaiveDateTime,
     /// id of video unit
     pub id: Uuid,
+    /// id of associated camera
+    pub camera_id: Uuid,
+    /// begin time in UTC
+    pub begin_time: DateTime<Utc>,
+    /// end time in UTC
+    pub end_time: DateTime<Utc>,
 }
 
 /// Represents request to update video unit record
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "video_units"]
+#[diesel(table_name = video_units)]
 pub struct UpdateVideoUnit {
-    /// if present, new associated camera id
-    pub camera_id: Option<i32>,
-    /// if present, new monotonic index
-    pub monotonic_index: Option<i32>,
-    /// if present, new begin time, in UTC
-    pub begin_time: Option<NaiveDateTime>,
-    /// if present, new end time, in UTC
-    pub end_time: Option<NaiveDateTime>,
     /// id of video unit to update
     pub id: Uuid,
+    /// if present, new associated camera id
+    pub camera_id: Option<Uuid>,
+    /// if present, new begin time, in UTC
+    pub begin_time: Option<DateTime<Utc>>,
+    /// if present, new end time, in UTC
+    pub end_time: Option<DateTime<Utc>>,
 }
 
 /// Full video file model, represents full database row
 #[derive(Queryable, Associations, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "video_files"]
-#[belongs_to(VideoUnit)]
+#[diesel(table_name = video_files)]
+#[diesel(belongs_to(VideoUnit))]
 pub struct VideoFile {
     /// id of video file
-    pub id: i32,
+    pub id: Uuid,
     /// filename of video file
     pub filename: String,
     /// size in bytes of video file
     pub size: i32,
-    /// insertion time
-    pub inserted_at: NaiveDateTime,
-    /// update time
-    pub updated_at: NaiveDateTime,
     /// id of associated video unit
     pub video_unit_id: Uuid,
 }
@@ -130,7 +114,7 @@ impl From<VideoFile> for crate::api::video_units::VideoFile {
 /// Represents request to create new video file
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "video_files"]
+#[diesel(table_name = video_files)]
 pub struct CreateVideoFile {
     /// filename for new video file
     pub filename: String,
@@ -143,10 +127,10 @@ pub struct CreateVideoFile {
 /// Represents request to update video file
 #[derive(AsChangeset, Debug, Deserialize, Insertable)]
 #[serde(rename_all = "camelCase")]
-#[table_name = "video_files"]
+#[diesel(table_name = video_files)]
 pub struct UpdateVideoFile {
     /// id of video file to update
-    pub id: i32,
+    pub id: Uuid,
     /// if present, new id of associated video unit
     pub video_unit_id: Option<Uuid>,
     /// if present, new filename
@@ -169,27 +153,27 @@ impl Service {
     ) -> Result<VideoSegment, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
-                let res: (VideoUnit, VideoFile) = conn.transaction::<_, super::Error, _>(|| {
-                    let video_unit = diesel::insert_into(video_units::dsl::video_units)
-                        .values(CreateVideoUnit {
-                            camera_id: video_unit.camera_id,
-                            monotonic_index: video_unit.monotonic_index,
-                            begin_time: video_unit.begin_time,
-                            end_time: video_unit.end_time,
-                            id: video_unit.id,
-                        })
-                        .get_result::<VideoUnit>(&conn)?;
+                let mut conn = pool.get()?;
+                let res: (VideoUnit, VideoFile) =
+                    conn.transaction::<_, super::Error, _>(|conn| {
+                        let video_unit = diesel::insert_into(video_units::dsl::video_units)
+                            .values(CreateVideoUnit {
+                                camera_id: video_unit.camera_id,
+                                begin_time: video_unit.begin_time,
+                                end_time: video_unit.end_time,
+                                id: video_unit.id,
+                            })
+                            .get_result::<VideoUnit>(conn)?;
 
-                    let video_file = diesel::insert_into(video_files::dsl::video_files)
-                        .values(CreateVideoFile {
-                            filename: video_file.filename,
-                            size: video_file.size,
-                            video_unit_id: video_unit.id,
-                        })
-                        .get_result(&conn)?;
-                    Ok((video_unit, video_file))
-                })?;
+                        let video_file = diesel::insert_into(video_files::dsl::video_files)
+                            .values(CreateVideoFile {
+                                filename: video_file.filename,
+                                size: video_file.size,
+                                video_unit_id: video_unit.id,
+                            })
+                            .get_result(conn)?;
+                        Ok((video_unit, video_file))
+                    })?;
 
                 let res2: (
                     crate::api::video_units::VideoUnit,
@@ -206,14 +190,14 @@ impl Service {
     pub fn close_video_segment(
         &self,
         video_unit_id: Uuid,
-        video_file_id: i32,
-        end_time: NaiveDateTime,
+        video_file_id: Uuid,
+        end_time: DateTime<Utc>,
         file_size: i32,
     ) -> Result<VideoSegment, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
-                let res = conn.transaction::<_, super::Error, _>(|| {
+                let mut conn = pool.get()?;
+                let res = conn.transaction::<_, super::Error, _>(|conn| {
                     let video_unit = diesel::update(
                         video_units::dsl::video_units
                             .filter(crate::schema::video_units::columns::id.eq(video_unit_id)),
@@ -221,11 +205,10 @@ impl Service {
                     .set(UpdateVideoUnit {
                         id: video_unit_id,
                         camera_id: None,
-                        monotonic_index: None,
                         begin_time: None,
                         end_time: Some(end_time),
                     })
-                    .get_result::<VideoUnit>(&conn)?;
+                    .get_result::<VideoUnit>(conn)?;
 
                     let video_file = diesel::update(
                         video_files::dsl::video_files
@@ -237,7 +220,7 @@ impl Service {
                         filename: None,
                         size: Some(file_size),
                     })
-                    .get_result::<VideoFile>(&conn)?;
+                    .get_result::<VideoFile>(conn)?;
 
                     Ok((video_unit, video_file))
                 })?;
@@ -251,25 +234,25 @@ impl Service {
     // Fetch between video unit
     pub fn fetch_video_units_between(
         &self,
-        camera_id: i32,
+        camera_id: Uuid,
         begin_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<Vec<VideoSegment>, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
-                let res = conn.transaction::<_, super::Error, _>(|| {
+                let mut conn = pool.get()?;
+                let res = conn.transaction::<_, super::Error, _>(|conn| {
                     use crate::schema::video_units::dsl;
                     let vus: Vec<VideoUnit> = dsl::video_units
                         .filter(dsl::camera_id.eq(camera_id))
-                        .filter(dsl::begin_time.le(end_time.naive_utc()))
-                        .filter(dsl::end_time.ge(begin_time.naive_utc()))
+                        .filter(dsl::begin_time.le(end_time))
+                        .filter(dsl::end_time.ge(begin_time))
                         .order(dsl::begin_time.asc())
                         .limit(999)
-                        .load(&conn)?;
+                        .load(conn)?;
 
                     let files: Vec<VideoFile> =
-                        VideoFile::belonging_to(&vus).load::<VideoFile>(&conn)?;
+                        VideoFile::belonging_to(&vus).load::<VideoFile>(conn)?;
 
                     //                    let grouped_files = files.grouped_by(&vus);
 
@@ -290,16 +273,12 @@ impl Service {
 
     pub fn delete_video_unit(&self, delete_id: Uuid) -> anyhow::Result<()> {
         use crate::schema;
-        use crate::schema::event_observations::dsl::*;
-        use crate::schema::events::dsl::*;
-        use crate::schema::observation_snapshots::dsl::*;
-        use crate::schema::observations::dsl::*;
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
 
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
 
                 // Delete VideoFiles associated with VideoUnit
 
@@ -308,7 +287,7 @@ impl Service {
                     .inner_join(video_units)
                     .filter(schema::video_files::columns::video_unit_id.eq(&delete_id))
                     .select(filename)
-                    .load(&conn)?;
+                    .load(&mut conn)?;
 
                 for f in files {
                     debug!("Deleting file: {}", f);
@@ -329,65 +308,7 @@ impl Service {
                 diesel::delete(
                     video_files.filter(schema::video_files::columns::video_unit_id.eq(delete_id)),
                 )
-                .execute(&conn)?;
-
-                // fetch observation snapshots
-                let snaps: Vec<String> = observation_snapshots
-                    .inner_join(observations)
-                    .filter(schema::observations::columns::video_unit_id.eq(delete_id))
-                    .select(snapshot_path)
-                    .load(&conn)?;
-
-                for s in snaps {
-                    debug!("Deleting snapshot: {}", &s);
-                    if std::fs::remove_file(&s).is_err() {
-                        error!("Failed to delete file: {}", &s);
-                    }
-                }
-
-                let snapshot_delete_count = diesel::delete(
-                    observation_snapshots.filter(
-                        schema::observation_snapshots::columns::observation_id.eq_any(
-                            observations
-                                .filter(schema::observations::columns::video_unit_id.eq(delete_id))
-                                .select(schema::observations::columns::id),
-                        ),
-                    ),
-                )
-                .execute(&conn)?;
-
-                debug!("Deleted {} snapshots.", snapshot_delete_count);
-
-                // Remove observations associated with VideoUnit
-                let observation_ids: Vec<i64> = observations
-                    .filter(schema::observations::columns::video_unit_id.eq(delete_id))
-                    .select(schema::observations::columns::id)
-                    .load(&conn)?;
-
-                // delete event_observations
-                diesel::delete(event_observations)
-                    .filter(
-                        schema::event_observations::columns::observation_id
-                            .eq(any(&observation_ids)),
-                    )
-                    .execute(&conn)?;
-
-                // remove events without any observations
-                let empty_events = events
-                    .left_outer_join(schema::event_observations::table)
-                    .or_filter(schema::event_observations::columns::observation_id.is_null())
-                    .select(schema::events::columns::id)
-                    .load::<Uuid>(&conn)?;
-
-                diesel::delete(events.filter(schema::events::columns::id.eq(any(&empty_events))))
-                    .execute(&conn)?;
-
-                // finally delete observations
-                diesel::delete(
-                    observations
-                        .filter(schema::observations::columns::video_unit_id.eq(&delete_id)),
-                )
-                .execute(&conn)?;
+                .execute(&mut conn)?;
 
                 Ok(())
             }

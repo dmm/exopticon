@@ -30,6 +30,7 @@ use base64::prelude::{Engine as _, BASE64_STANDARD};
 use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 use tokio::task::spawn_blocking;
+use uuid::Uuid;
 
 use crate::AppState;
 
@@ -51,7 +52,7 @@ pub struct Data {
 #[derive(Clone, Serialize)]
 pub struct User {
     /// User id
-    pub id: i32,
+    pub id: Uuid,
     /// username
     pub username: String,
     /// Olson database timezone, e.g. America/Chicago
@@ -64,7 +65,7 @@ pub struct CreateUserSession {
     /// user session name
     pub name: String,
     /// id of user associated with session
-    pub user_id: i32,
+    pub user_id: Uuid,
     /// session key value
     pub session_key: String,
     /// flag indicating where it is an api token or user session
@@ -77,11 +78,11 @@ pub struct CreateUserSession {
 #[derive(Debug, Serialize)]
 pub struct SlimAccessToken {
     /// user session id
-    pub id: i32,
+    pub id: Uuid,
     /// user session name
     pub name: String,
     /// id of user associated with session
-    pub user_id: i32,
+    pub user_id: Uuid,
     /// Expiration timestamp
     pub expiration: DateTime<Utc>,
 }
@@ -145,7 +146,7 @@ pub async fn create_personal_access_token(
 }
 
 pub async fn delete_personal_access_token(
-    Path(id): Path<i32>,
+    Path(id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<(), UserError> {
     let db = state.db_service;

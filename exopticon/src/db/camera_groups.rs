@@ -19,6 +19,7 @@
  */
 
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use uuid::Uuid;
 
 use crate::schema::{camera_group_memberships, camera_groups};
 
@@ -32,24 +33,22 @@ use super::{Service, ServiceKind};
 
 // Models
 
-#[derive(
-    Identifiable, Eq, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
-)]
-#[table_name = "camera_groups"]
+#[derive(Identifiable, Eq, PartialEq, Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[diesel(table_name = camera_groups)]
 struct CameraGroup {
-    pub id: i32,
+    pub id: Uuid,
     pub name: String,
 }
 
 #[derive(
     Identifiable, Eq, PartialEq, Associations, Debug, Serialize, Deserialize, Queryable, Insertable,
 )]
-#[belongs_to(CameraGroup)]
-#[table_name = "camera_group_memberships"]
+#[diesel(belongs_to(CameraGroup))]
+#[diesel(table_name = camera_group_memberships)]
 struct CameraGroupMembership {
-    pub id: i32,
-    pub camera_group_id: i32,
-    pub camera_id: i32,
+    pub id: Uuid,
+    pub camera_group_id: Uuid,
+    pub camera_id: Uuid,
     display_order: i32,
 }
 
@@ -60,13 +59,13 @@ impl Service {
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
                 conn.build_transaction()
                     .serializable()
-                    .run::<_, super::Error, _>(|| {
+                    .run::<_, super::Error, _>(|conn| {
                         let new_camera_group = diesel::insert_into(camera_groups::table)
                             .values(&(vec![camera_groups::dsl::name.eq(group.name)]))
-                            .get_result::<CameraGroup>(&conn)?;
+                            .get_result::<CameraGroup>(conn)?;
 
                         for (pos, m) in group.members.iter().enumerate() {
                             diesel::insert_into(camera_group_memberships::table)
@@ -82,7 +81,7 @@ impl Service {
                                         ),
                                     )]),
                                 )
-                                .execute(&conn)?;
+                                .execute(conn)?;
                         }
 
                         Ok(crate::api::camera_groups::CameraGroup {
@@ -95,7 +94,7 @@ impl Service {
             ServiceKind::Null(db) => {
                 db.lock().unwrap().camera_groups = vec![];
                 Ok(crate::api::camera_groups::CameraGroup {
-                    id: 0,
+                    id: Uuid::now_v7(),
                     name: group.name,
                     members: group.members,
                 })
@@ -105,24 +104,24 @@ impl Service {
 
     pub fn update_camera_group(
         &self,
-        id: i32,
+        id: Uuid,
         group: crate::business::camera_groups::CameraGroup,
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
                 conn.build_transaction()
                     .serializable()
-                    .run::<_, super::Error, _>(|| {
-                        let new_camera_group: (i32, String) = diesel::update(
+                    .run::<_, super::Error, _>(|conn| {
+                        let new_camera_group: (Uuid, String) = diesel::update(
                             camera_groups::table.filter(camera_groups::dsl::id.eq(id)),
                         )
                         .set(camera_groups::dsl::name.eq(group.name))
-                        .get_result(&conn)?;
+                        .get_result(conn)?;
 
                         diesel::delete(camera_group_memberships::table)
                             .filter(camera_group_memberships::dsl::camera_group_id.eq(id))
-                            .execute(&conn)?;
+                            .execute(conn)?;
 
                         for (pos, m) in group.members.iter().enumerate() {
                             diesel::insert_into(camera_group_memberships::table)
@@ -137,7 +136,7 @@ impl Service {
                                         ),
                                     )]),
                                 )
-                                .execute(&conn)?;
+                                .execute(conn)?;
                         }
 
                         Ok(crate::api::camera_groups::CameraGroup {
@@ -164,26 +163,26 @@ impl Service {
         }
     }
 
-    pub fn delete_camera_group(&self, id: i32) -> Result<(), super::Error> {
+    pub fn delete_camera_group(&self, id: Uuid) -> Result<(), super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
                 conn.build_transaction()
                     .serializable()
-                    .run::<_, super::Error, _>(|| {
+                    .run::<_, super::Error, _>(|conn| {
                         // Delete group memberships
                         diesel::delete(
                             crate::schema::camera_group_memberships::dsl::camera_group_memberships
                                 .filter(camera_group_memberships::dsl::camera_group_id.eq(id)),
                         )
-                        .execute(&conn)?;
+                        .execute(conn)?;
 
                         // Delete camera group
                         diesel::delete(
                             crate::schema::camera_groups::dsl::camera_groups
                                 .filter(camera_groups::dsl::id.eq(id)),
                         )
-                        .execute(&conn)?;
+                        .execute(conn)?;
                         Ok(())
                     })
             }
@@ -207,22 +206,22 @@ impl Service {
 
     pub fn fetch_camera_group(
         &self,
-        id: i32,
+        id: Uuid,
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
                 conn.build_transaction()
                     .serializable()
-                    .run::<_, super::Error, _>(|| {
+                    .run::<_, super::Error, _>(|conn| {
                         let c = crate::schema::camera_groups::dsl::camera_groups
                             .find(id)
-                            .get_result::<CameraGroup>(&conn)?;
+                            .get_result::<CameraGroup>(conn)?;
 
                         let members =
                             crate::schema::camera_group_memberships::dsl::camera_group_memberships
                                 .filter(camera_group_memberships::camera_group_id.eq(c.id))
-                                .load::<CameraGroupMembership>(&conn)?;
+                                .load::<CameraGroupMembership>(conn)?;
 
                         Ok(crate::api::camera_groups::CameraGroup {
                             id: c.id,
@@ -247,19 +246,19 @@ impl Service {
     ) -> Result<Vec<crate::api::camera_groups::CameraGroup>, super::Error> {
         match &self.pool {
             ServiceKind::Real(pool) => {
-                let conn = pool.get()?;
+                let mut conn = pool.get()?;
                 conn.build_transaction()
                     .serializable()
-                    .run::<_, super::Error, _>(|| {
+                    .run::<_, super::Error, _>(|conn| {
                         let groups = crate::schema::camera_groups::dsl::camera_groups
-                            .load::<CameraGroup>(&conn)?;
+                            .load::<CameraGroup>(conn)?;
 
                         let mut groups2 = Vec::new();
                         for c in &groups {
                             let members =
                             crate::schema::camera_group_memberships::dsl::camera_group_memberships
                                 .filter(camera_group_memberships::camera_group_id.eq(c.id))
-                                .load::<CameraGroupMembership>(&conn)?;
+                                .load::<CameraGroupMembership>(conn)?;
 
                             groups2.push(crate::api::camera_groups::CameraGroup {
                                 id: c.id,
@@ -305,7 +304,7 @@ mod tests {
     #[test]
     fn test_delete_null_camera_group() {
         // Arrange
-        let delete_id = 1;
+        let delete_id = Uuid::now_v7();
         let keep_id = 2;
         let mut builder = NullBuilder::new();
         builder.camera_groups(&vec![

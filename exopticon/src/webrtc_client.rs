@@ -35,6 +35,7 @@ use str0m::{
     Candidate, Input, Rtc,
 };
 use tokio::net::{lookup_host, UdpSocket};
+use uuid::Uuid;
 
 use crate::capture_actor::VideoPacket;
 
@@ -44,12 +45,12 @@ use crate::capture_actor::VideoPacket;
 #[serde(rename_all = "camelCase")]
 pub enum ClientMessage {
     #[serde(rename_all = "camelCase")]
-    SubscriptionUpdate { subscribed_camera_ids: Vec<i32> },
+    SubscriptionUpdate { subscribed_camera_ids: Vec<Uuid> },
     #[serde(rename_all = "camelCase")]
     NegotiationRequest { offer: String },
     /// Maps camera id to Mid
     #[serde(rename_all = "camelCase")]
-    StreamMapping { mappings: HashMap<String, i32> },
+    StreamMapping { mappings: HashMap<String, Uuid> },
 }
 
 /// Messages from server
@@ -70,8 +71,8 @@ pub struct Client {
     candidate_ips: Vec<String>,
     candidate_socketaddrs: Vec<SocketAddr>,
     rtc: Rtc,
-    subscribed_ids: HashSet<i32>,
-    camera_mapping: HashMap<i32, Mid>,
+    subscribed_ids: HashSet<Uuid>,
+    camera_mapping: HashMap<Uuid, Mid>,
 }
 
 impl Client {

@@ -46,8 +46,6 @@
 #[macro_use]
 extern crate diesel;
 #[macro_use]
-extern crate diesel_migrations;
-#[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate log;
@@ -85,6 +83,7 @@ use axum::{middleware, Router};
 use axum_prometheus::PrometheusMetricLayer;
 use capture_actor::VideoPacket;
 use capture_supervisor::Command;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
 use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc};
@@ -103,7 +102,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 /// size of webrtc udp send/recv buffers if not set with env variable
 static DEFAULT_BUFFER_SIZE: usize = 2_097_152;
 
-embed_migrations!("migrations/");
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
 
 #[derive(Clone)]
 pub struct AppState {
@@ -175,11 +174,11 @@ async fn main() {
 
     // Run migrations
     info!("Running migrations...");
-    embedded_migrations::run_with_output(
-        &pool.get().expect("migration connection failed"),
-        &mut std::io::stdout(),
-    )
-    .expect("migrations failed!");
+    let _migration_res = &pool
+        .get()
+        .expect("migration connection failed")
+        .run_pending_migrations(MIGRATIONS)
+        .expect("migrations failed");
 
     let buffer_size: usize = env::var("EXOPTICON_WEBRTC_BUFFER_SIZE")
         .unwrap_or_default()
