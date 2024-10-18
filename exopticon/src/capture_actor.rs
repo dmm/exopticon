@@ -81,7 +81,7 @@ pub struct CaptureActor {
 }
 
 impl CaptureActor {
-    pub fn new(
+    pub const fn new(
         db: crate::db::Service,
         camera: Camera,
         storage_group: StorageGroup,
@@ -169,7 +169,7 @@ impl CaptureActor {
     }
 
     async fn handle_close_file(
-        &mut self,
+        &self,
         filename: &str,
         end_time: DateTime<Utc>,
     ) -> anyhow::Result<()> {
@@ -185,7 +185,7 @@ impl CaptureActor {
         }
         Ok(())
     }
-    fn handle_packet(&mut self, data: Vec<u8>, timestamp: i64, duration: i64) {
+    fn handle_packet(&self, data: Vec<u8>, timestamp: i64, duration: i64) {
         if let Err(_e) = self.sender.send(VideoPacket {
             camera_id: self.camera.id,
             data,

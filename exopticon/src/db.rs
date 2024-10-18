@@ -38,7 +38,7 @@ pub struct Null {
 
 impl Null {
     #[allow(dead_code)]
-    pub fn new(camera_groups: Vec<CameraGroup>) -> Self {
+    pub const fn new(camera_groups: Vec<CameraGroup>) -> Self {
         Self { camera_groups }
     }
 }

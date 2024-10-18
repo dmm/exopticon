@@ -104,7 +104,7 @@ impl Client {
     }
 
     /// Parse list of candidates, and populate `candidate_socketaddrs`
-    async fn parse_candidates(&mut self) -> Vec<SocketAddr> {
+    async fn parse_candidates(&mut self) {
         let mut addrs = Vec::new();
 
         for c in &self.candidate_ips {
@@ -124,7 +124,7 @@ impl Client {
             }
         }
 
-        addrs
+        self.candidate_socketaddrs = addrs;
     }
 
     async fn handle_websocket(&mut self, msg: Result<ws::Message, axum::Error>) -> Result<(), ()> {
@@ -165,7 +165,7 @@ impl Client {
                     SdpOffer::from_sdp_string(&offer).expect("Failed to deserialized sdp offer");
 
                 // Add candidate ips
-                self.candidate_socketaddrs = self.parse_candidates().await;
+                self.parse_candidates().await;
                 for ip in &self.candidate_socketaddrs {
                     let candidate = Candidate::host(*ip, Protocol::Udp).unwrap();
                     self.rtc.add_local_candidate(candidate);
@@ -306,7 +306,7 @@ impl Client {
         let gauge = gauge!("webrtc_sessions");
         gauge.increment(1);
         let mut timeout = Duration::from_millis(100);
-        self.candidate_socketaddrs = self.parse_candidates().await;
+        self.parse_candidates().await;
         loop {
             tokio::select! {
                 // websocket control messages

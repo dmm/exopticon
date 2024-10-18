@@ -36,7 +36,7 @@ impl FileDeletionSupervisor {
         }
     }
 
-    async fn start_deletors(&mut self) -> anyhow::Result<()> {
+    async fn start_deletors(&self) -> anyhow::Result<()> {
         let db = self.db.clone();
         let storage_groups: Vec<crate::api::storage_groups::StorageGroup> =
             spawn_blocking(move || db.fetch_all_storage_groups()).await??;

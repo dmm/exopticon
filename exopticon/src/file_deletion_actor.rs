@@ -77,7 +77,7 @@ impl FileDeletionActor {
         Ok(())
     }
 
-    async fn work(&mut self) -> anyhow::Result<()> {
+    async fn work(&self) -> anyhow::Result<()> {
         let db = self.db.clone();
         let storage_group_id = self.storage_group_id;
         let files = spawn_blocking(move || db.fetch_storage_group_old_units(storage_group_id, 100))
@@ -87,7 +87,7 @@ impl FileDeletionActor {
         Ok(())
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(self) {
         loop {
             if let Err(e) = self.work().await {
                 error!("Error deleting files! {}", e);
