@@ -103,23 +103,18 @@ impl super::Service {
         &self,
         group: crate::api::storage_groups::CreateStorageGroup,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                use crate::schema::storage_groups::dsl;
-                let mut conn = pool.get()?;
+        use crate::schema::storage_groups::dsl;
+        let mut conn = self.pool.get()?;
 
-                let new_storage_group: StorageGroup = diesel::insert_into(storage_groups::table)
-                    .values((
-                        dsl::name.eq(group.name),
-                        dsl::storage_path.eq(group.storage_path),
-                        dsl::max_storage_size.eq(group.max_storage_size),
-                    ))
-                    .get_result(&mut conn)?;
+        let new_storage_group: StorageGroup = diesel::insert_into(storage_groups::table)
+            .values((
+                dsl::name.eq(group.name),
+                dsl::storage_path.eq(group.storage_path),
+                dsl::max_storage_size.eq(group.max_storage_size),
+            ))
+            .get_result(&mut conn)?;
 
-                Ok(new_storage_group.into())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        Ok(new_storage_group.into())
     }
 
     pub fn update_storage_group(
@@ -127,68 +122,48 @@ impl super::Service {
         id: Uuid,
         group: crate::api::storage_groups::UpdateStorageGroup,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                use crate::schema::storage_groups::dsl;
-                let mut conn = pool.get()?;
+        use crate::schema::storage_groups::dsl;
+        let mut conn = self.pool.get()?;
 
-                let updated_storage_group: StorageGroup =
-                    diesel::update(dsl::storage_groups.filter(dsl::id.eq(id)))
-                        .set::<UpdateStorageGroup>(group.into())
-                        .get_result(&mut conn)?;
+        let updated_storage_group: StorageGroup =
+            diesel::update(dsl::storage_groups.filter(dsl::id.eq(id)))
+                .set::<UpdateStorageGroup>(group.into())
+                .get_result(&mut conn)?;
 
-                Ok(updated_storage_group.into())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        Ok(updated_storage_group.into())
     }
 
     pub fn fetch_storage_group(
         &self,
         id: Uuid,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                use crate::schema::storage_groups::dsl;
-                let mut conn = pool.get()?;
+        use crate::schema::storage_groups::dsl;
+        let mut conn = self.pool.get()?;
 
-                let group = dsl::storage_groups
-                    .find(id)
-                    .get_result::<StorageGroup>(&mut conn)?;
+        let group = dsl::storage_groups
+            .find(id)
+            .get_result::<StorageGroup>(&mut conn)?;
 
-                Ok(group.into())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        Ok(group.into())
     }
 
     pub fn fetch_all_storage_groups(
         &self,
     ) -> Result<Vec<crate::api::storage_groups::StorageGroup>, super::Error> {
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                use crate::schema::storage_groups::dsl;
-                let mut conn = pool.get()?;
+        use crate::schema::storage_groups::dsl;
+        let mut conn = self.pool.get()?;
 
-                let groups = dsl::storage_groups.load::<StorageGroup>(&mut conn)?;
+        let groups = dsl::storage_groups.load::<StorageGroup>(&mut conn)?;
 
-                Ok(groups.into_iter().map(std::convert::Into::into).collect())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        Ok(groups.into_iter().map(std::convert::Into::into).collect())
     }
 
     pub fn delete_storage_group(&self, sid: Uuid) -> Result<(), super::Error> {
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                use crate::schema::storage_groups::dsl::*;
-                let mut conn = pool.get()?;
+        use crate::schema::storage_groups::dsl::*;
+        let mut conn = self.pool.get()?;
 
-                diesel::delete(storage_groups.filter(id.eq(sid))).execute(&mut conn)?;
-                Ok(())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        diesel::delete(storage_groups.filter(id.eq(sid))).execute(&mut conn)?;
+        Ok(())
     }
 
     pub fn fetch_storage_group_old_units(
@@ -200,44 +175,39 @@ impl super::Service {
         use crate::schema::video_files::dsl::*;
         use crate::schema::video_units::dsl::*;
 
-        match &self.pool {
-            crate::db::ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                let storage_group_capacity = storage_groups::dsl::storage_groups
-                    .select(storage_groups::max_storage_size)
-                    .filter(storage_groups::columns::id.eq(sid))
-                    .first::<i64>(&mut conn)?;
+        let storage_group_capacity = storage_groups::dsl::storage_groups
+            .select(storage_groups::max_storage_size)
+            .filter(storage_groups::columns::id.eq(sid))
+            .first::<i64>(&mut conn)?;
 
-                let storage_group_size = video_files
-                    .select(sum(size))
-                    .inner_join(video_units.inner_join(cameras))
-                    .filter(storage_group_id.eq(sid))
-                    .filter(size.ne(-1))
-                    .first::<Option<i64>>(&mut conn)?
-                    .unwrap_or(0);
+        let storage_group_size = video_files
+            .select(sum(size))
+            .inner_join(video_units.inner_join(cameras))
+            .filter(storage_group_id.eq(sid))
+            .filter(size.ne(-1))
+            .first::<Option<i64>>(&mut conn)?
+            .unwrap_or(0);
 
-                let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras
-                    .inner_join(video_units.inner_join(video_files))
-                    .filter(storage_group_id.eq(sid))
-                    .filter(size.gt(-1))
-                    .filter(begin_time.ne(end_time))
-                    .order(begin_time.asc())
-                    .limit(count)
-                    .load(&mut conn)?;
+        let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras
+            .inner_join(video_units.inner_join(video_files))
+            .filter(storage_group_id.eq(sid))
+            .filter(size.gt(-1))
+            .filter(begin_time.ne(end_time))
+            .order(begin_time.asc())
+            .limit(count)
+            .load(&mut conn)?;
 
-                let units = c
-                    .into_iter()
-                    .map(|(_c, (unit, file))| (file.size.into(), unit, file))
-                    .collect();
+        let units = c
+            .into_iter()
+            .map(|(_c, (unit, file))| (file.size.into(), unit, file))
+            .collect();
 
-                Ok(StorageGroupOldFiles {
-                    storage_group_capacity,
-                    storage_group_size,
-                    video_units: units,
-                })
-            }
-            crate::db::ServiceKind::Null(_) => todo!(),
-        }
+        Ok(StorageGroupOldFiles {
+            storage_group_capacity,
+            storage_group_size,
+            video_units: units,
+        })
     }
 }

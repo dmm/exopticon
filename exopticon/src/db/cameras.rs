@@ -24,7 +24,7 @@ use uuid::Uuid;
 use crate::db::storage_groups::StorageGroup;
 use crate::schema::cameras;
 
-use super::{Service, ServiceKind};
+use super::Service;
 
 /// Full camera model, represents database row
 #[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
@@ -169,18 +169,13 @@ impl Service {
         &self,
         create_camera: crate::api::cameras::CreateCamera,
     ) -> Result<crate::api::cameras::Camera, super::Error> {
-        match &self.pool {
-            ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
-                    .values(&Into::<CreateCamera>::into(create_camera))
-                    .get_result(&mut conn)?;
+        let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
+            .values(&Into::<CreateCamera>::into(create_camera))
+            .get_result(&mut conn)?;
 
-                Ok(c.into())
-            }
-            ServiceKind::Null(_) => todo!(),
-        }
+        Ok(c.into())
     }
 
     pub fn update_camera(
@@ -188,61 +183,39 @@ impl Service {
         camera_id: Uuid,
         camera: crate::api::cameras::UpdateCamera,
     ) -> Result<crate::api::cameras::Camera, super::Error> {
-        match &self.pool {
-            ServiceKind::Real(pool) => {
-                use crate::schema::cameras::dsl::*;
-                let mut conn = pool.get()?;
+        use crate::schema::cameras::dsl::*;
+        let mut conn = self.pool.get()?;
 
-                let c: Camera = diesel::update(cameras.filter(id.eq(camera_id)))
-                    .set(&Into::<UpdateCamera>::into(camera))
-                    .get_result(&mut conn)?;
+        let c: Camera = diesel::update(cameras.filter(id.eq(camera_id)))
+            .set(&Into::<UpdateCamera>::into(camera))
+            .get_result(&mut conn)?;
 
-                Ok(c.into())
-            }
-            ServiceKind::Null(_) => todo!(),
-        }
+        Ok(c.into())
     }
 
     pub fn delete_camera(&self, cid: Uuid) -> Result<(), super::Error> {
-        match &self.pool {
-            ServiceKind::Real(pool) => {
-                use crate::schema::cameras::dsl::*;
-                let mut conn = pool.get()?;
+        use crate::schema::cameras::dsl::*;
+        let mut conn = self.pool.get()?;
 
-                diesel::delete(cameras.filter(id.eq(cid))).execute(&mut conn)?;
-                Ok(())
-            }
-            ServiceKind::Null(_) => todo!(),
-        }
+        diesel::delete(cameras.filter(id.eq(cid))).execute(&mut conn)?;
+        Ok(())
     }
 
     pub fn fetch_camera(&self, id: Uuid) -> Result<crate::api::cameras::Camera, super::Error> {
-        match &self.pool {
-            ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                let c = crate::schema::cameras::dsl::cameras
-                    .find(id)
-                    .get_result::<Camera>(&mut conn)?;
+        let c = crate::schema::cameras::dsl::cameras
+            .find(id)
+            .get_result::<Camera>(&mut conn)?;
 
-                Ok(c.into())
-            }
-            ServiceKind::Null(_pool) => {
-                todo!()
-            }
-        }
+        Ok(c.into())
     }
 
     pub fn fetch_all_cameras(&self) -> Result<Vec<crate::api::cameras::Camera>, super::Error> {
-        match &self.pool {
-            ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                let cameras: Vec<crate::db::cameras::Camera> =
-                    crate::schema::cameras::dsl::cameras.load(&mut conn)?;
-                Ok(cameras.into_iter().map(std::convert::Into::into).collect())
-            }
-            ServiceKind::Null(_) => todo!(),
-        }
+        let cameras: Vec<crate::db::cameras::Camera> =
+            crate::schema::cameras::dsl::cameras.load(&mut conn)?;
+        Ok(cameras.into_iter().map(std::convert::Into::into).collect())
     }
 }

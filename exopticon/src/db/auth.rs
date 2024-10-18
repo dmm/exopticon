@@ -88,38 +88,29 @@ impl Service {
         password: &str,
     ) -> Result<crate::api::auth::User, super::Error> {
         use crate::schema::users::dsl;
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                let u = dsl::users
-                    .filter(dsl::username.eq(username))
-                    .first::<User>(&mut conn)?;
+        let u = dsl::users
+            .filter(dsl::username.eq(username))
+            .first::<User>(&mut conn)?;
 
-                if let Ok(matching) = bcrypt::verify(password, &u.password) {
-                    if matching {
-                        return Ok(u.into());
-                    }
-                }
-                Err(super::Error::NotFound)
+        if let Ok(matching) = bcrypt::verify(password, &u.password) {
+            if matching {
+                return Ok(u.into());
             }
-            super::ServiceKind::Null(_) => todo!(),
         }
+        Err(super::Error::NotFound)
     }
 
     pub fn fetch_user(&self, user_id: Uuid) -> Result<crate::api::auth::User, super::Error> {
         use crate::schema::users::dsl;
-        match &self.pool {
-            crate::db::ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
-                let u = dsl::users
-                    .filter(dsl::id.eq(user_id))
-                    .first::<User>(&mut conn)?;
 
-                Ok(u.into())
-            }
-            crate::db::ServiceKind::Null(_) => todo!(),
-        }
+        let mut conn = self.pool.get()?;
+        let u = dsl::users
+            .filter(dsl::id.eq(user_id))
+            .first::<User>(&mut conn)?;
+
+        Ok(u.into())
     }
 
     pub fn create_user_session(
@@ -128,36 +119,26 @@ impl Service {
     ) -> Result<String, super::Error> {
         use crate::schema::user_sessions::dsl;
 
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                diesel::insert_into(dsl::user_sessions)
-                    .values((
-                        dsl::name.eq(&session.name),
-                        dsl::user_id.eq(&session.user_id),
-                        dsl::session_key.eq(&session.session_key),
-                        dsl::is_token.eq(&session.is_token),
-                        dsl::expiration.eq(&session.expiration),
-                    ))
-                    .execute(&mut conn)?;
-                Ok(session.session_key.clone())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        diesel::insert_into(dsl::user_sessions)
+            .values((
+                dsl::name.eq(&session.name),
+                dsl::user_id.eq(&session.user_id),
+                dsl::session_key.eq(&session.session_key),
+                dsl::is_token.eq(&session.is_token),
+                dsl::expiration.eq(&session.expiration),
+            ))
+            .execute(&mut conn)?;
+        Ok(session.session_key.clone())
     }
 
     pub fn delete_user_session(&self, session_id: Uuid) -> Result<(), super::Error> {
         use crate::schema::user_sessions::dsl::*;
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                diesel::delete(user_sessions.filter(id.eq(session_id))).execute(&mut conn)?;
-                Ok(())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        diesel::delete(user_sessions.filter(id.eq(session_id))).execute(&mut conn)?;
+        Ok(())
     }
 
     pub fn validate_user_session(
@@ -165,41 +146,30 @@ impl Service {
         session_key_text: &str,
     ) -> Result<crate::api::auth::User, super::Error> {
         use crate::schema::user_sessions::dsl::*;
-        match &self.pool {
-            crate::db::ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                // remove expired sessions
-                diesel::delete(user_sessions.filter(expiration.lt(Utc::now())))
-                    .execute(&mut conn)?;
-                let session = user_sessions
-                    .filter(session_key.eq(&session_key_text))
-                    .filter(expiration.gt(Utc::now()))
-                    .first::<UserSession>(&mut conn)?;
+        // remove expired sessions
+        diesel::delete(user_sessions.filter(expiration.lt(Utc::now()))).execute(&mut conn)?;
+        let session = user_sessions
+            .filter(session_key.eq(&session_key_text))
+            .filter(expiration.gt(Utc::now()))
+            .first::<UserSession>(&mut conn)?;
 
-                let user = crate::schema::users::dsl::users
-                    .filter(crate::schema::users::dsl::id.eq(session.user_id))
-                    .first::<User>(&mut conn)?;
+        let user = crate::schema::users::dsl::users
+            .filter(crate::schema::users::dsl::id.eq(session.user_id))
+            .first::<User>(&mut conn)?;
 
-                Ok(user.into())
-            }
-            crate::db::ServiceKind::Null(_) => todo!(),
-        }
+        Ok(user.into())
     }
 
     pub fn fetch_users_tokens(&self, user_id2: Uuid) -> Result<Vec<SlimAccessToken>, super::Error> {
         use crate::schema::user_sessions::dsl::*;
-        match &self.pool {
-            super::ServiceKind::Real(pool) => {
-                let mut conn = pool.get()?;
+        let mut conn = self.pool.get()?;
 
-                let sessions = user_sessions
-                    .filter(user_id.eq(user_id2))
-                    .filter(is_token.eq(true))
-                    .load::<UserSession>(&mut conn)?;
-                Ok(sessions.into_iter().map(std::convert::Into::into).collect())
-            }
-            super::ServiceKind::Null(_) => todo!(),
-        }
+        let sessions = user_sessions
+            .filter(user_id.eq(user_id2))
+            .filter(is_token.eq(true))
+            .load::<UserSession>(&mut conn)?;
+        Ok(sessions.into_iter().map(std::convert::Into::into).collect())
     }
 }
