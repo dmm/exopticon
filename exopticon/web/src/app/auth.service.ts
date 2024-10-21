@@ -32,7 +32,7 @@ export class AuthService {
   );
 
   get isLoggedIn() {
-    return this.http.get("/auth", { observe: "response" }).pipe(
+    return this.http.get("/v1/cameras", { observe: "response" }).pipe(
       mergeMap((response) => {
         this.loggedIn.next(response.ok);
         return this.loggedIn.asObservable();

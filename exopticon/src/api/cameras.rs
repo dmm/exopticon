@@ -220,7 +220,9 @@ pub async fn ptz_relative_move(
             .await;
 
         if let Err(_err) = con {
-            return Err(UserError::InternalError);
+            return Err(UserError::InternalError(
+                "begin continuous move failed".to_string(),
+            ));
         }
 
         // wait
@@ -230,7 +232,9 @@ pub async fn ptz_relative_move(
         let con = onvif_cam.stop(&camera.common.ptz_profile_token).await;
 
         if let Err(_err) = con {
-            return Err(UserError::InternalError);
+            return Err(UserError::InternalError(
+                "stop continuous move failed".to_string(),
+            ));
         }
     } else {
         // default to using a relative move
@@ -238,7 +242,7 @@ pub async fn ptz_relative_move(
             .relative_move(&camera.common.ptz_profile_token, x, y, zoom)
             .await
         {
-            return Err(UserError::InternalError);
+            return Err(UserError::InternalError("relative move failed".to_string()));
         }
     }
 

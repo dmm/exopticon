@@ -28,7 +28,7 @@ use crate::schema::{video_files, video_units};
 use super::Service;
 
 /// Full video unit model, represents entire database row
-#[derive(Identifiable, Associations, Serialize, Queryable, Clone)]
+#[derive(Identifiable, Insertable, Associations, Serialize, Queryable, Clone)]
 #[serde(rename_all = "camelCase")]
 #[diesel(belongs_to(Camera))]
 #[diesel(table_name = video_units)]
@@ -85,7 +85,7 @@ pub struct UpdateVideoUnit {
 }
 
 /// Full video file model, represents full database row
-#[derive(Queryable, Associations, Identifiable, Serialize)]
+#[derive(Queryable, Associations, Identifiable, Insertable, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[diesel(table_name = video_files)]
 #[diesel(belongs_to(VideoUnit))]
@@ -154,16 +154,17 @@ impl Service {
         let mut conn = self.pool.get()?;
         let res: (VideoUnit, VideoFile) = conn.transaction::<_, super::Error, _>(|conn| {
             let video_unit = diesel::insert_into(video_units::dsl::video_units)
-                .values(CreateVideoUnit {
+                .values(VideoUnit {
+                    id: Uuid::now_v7(),
                     camera_id: video_unit.camera_id,
                     begin_time: video_unit.begin_time,
                     end_time: video_unit.end_time,
-                    id: video_unit.id,
                 })
                 .get_result::<VideoUnit>(conn)?;
 
             let video_file = diesel::insert_into(video_files::dsl::video_files)
-                .values(CreateVideoFile {
+                .values(VideoFile {
+                    id: Uuid::now_v7(),
                     filename: video_file.filename,
                     size: video_file.size,
                     video_unit_id: video_unit.id,

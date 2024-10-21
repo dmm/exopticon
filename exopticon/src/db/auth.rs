@@ -46,7 +46,6 @@ impl From<User> for crate::api::auth::User {
         Self {
             id: user.id,
             username: user.username,
-            timezone: String::from("Etc/UTC"),
         }
     }
 }
@@ -99,6 +98,7 @@ impl Service {
                 return Ok(u.into());
             }
         }
+        error!("Validation faild :(");
         Err(super::Error::NotFound)
     }
 
@@ -123,6 +123,7 @@ impl Service {
 
         diesel::insert_into(dsl::user_sessions)
             .values((
+                dsl::id.eq(Uuid::now_v7()),
                 dsl::name.eq(&session.name),
                 dsl::user_id.eq(&session.user_id),
                 dsl::session_key.eq(&session.session_key),

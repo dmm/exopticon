@@ -45,7 +45,7 @@ pub enum UserError {
     /// validation error
     Validation(String),
     /// internal server error
-    InternalError,
+    InternalError(String),
 }
 
 impl Error for UserError {}
@@ -61,10 +61,13 @@ impl IntoResponse for UserError {
         let (status, message) = match self {
             Self::NotFound => (StatusCode::NOT_FOUND, "not found".to_owned()),
             Self::Validation(err_string) => (StatusCode::UNPROCESSABLE_ENTITY, err_string),
-            Self::InternalError => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal error".to_owned(),
-            ),
+            Self::InternalError(msg) => {
+                error!("Internal Server Error: {}", msg);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal server error".to_string(),
+                )
+            }
         };
 
         (status, message).into_response()
@@ -75,13 +78,15 @@ impl From<crate::db::Error> for UserError {
     fn from(err: crate::db::Error) -> Self {
         match err {
             crate::db::Error::NotFound => Self::NotFound,
-            crate::db::Error::Other(_) => Self::InternalError,
+            crate::db::Error::Other(other) => {
+                Self::InternalError(format!("other db error: {other}"))
+            }
         }
     }
 }
 impl From<JoinError> for UserError {
-    fn from(_: JoinError) -> Self {
-        Self::InternalError
+    fn from(err: JoinError) -> Self {
+        Self::InternalError(format!("JoinError: {err}"))
     }
 }
 
@@ -94,7 +99,7 @@ impl From<crate::business::Error> for UserError {
 }
 
 impl From<tokio::sync::mpsc::error::SendError<Command>> for UserError {
-    fn from(_: tokio::sync::mpsc::error::SendError<Command>) -> Self {
-        Self::InternalError
+    fn from(err: tokio::sync::mpsc::error::SendError<Command>) -> Self {
+        Self::InternalError(format!("tokio SendError: {err}"))
     }
 }

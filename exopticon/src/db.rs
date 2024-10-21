@@ -56,13 +56,14 @@ pub enum Error {
     Other(OtherError),
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum OtherError {
+    #[error("DbPoolError: {description:?} {cause:?}")]
     DbPoolError {
         description: String,
         cause: r2d2::Error,
     },
-
+    #[error("DbError: {description:?} {cause:?}")]
     DbError {
         description: String,
         cause: diesel::result::Error,

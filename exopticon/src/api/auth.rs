@@ -55,8 +55,6 @@ pub struct User {
     pub id: Uuid,
     /// username
     pub username: String,
-    /// Olson database timezone, e.g. America/Chicago
-    pub timezone: String,
 }
 
 /// Request to create new user session
@@ -96,14 +94,16 @@ pub async fn login(
     let db2 = state.db_service;
 
     let user = spawn_blocking(move || db.login(&auth_data.username, &auth_data.password)).await??;
-
+    error!("Auth success!");
     // We found a valid user with that password. Create a login session.
     let session_key = BASE64_STANDARD.encode(rand::thread_rng().gen::<[u8; 32]>());
     let valid_time = Duration::days(7);
     let expiration = match Utc::now().checked_add_signed(valid_time) {
         None => {
             error!("expiration date calculation failed!");
-            return Err(UserError::InternalError);
+            return Err(UserError::InternalError(
+                "expiration date calculation failed!".to_string(),
+            ));
         }
         Some(time) => time,
     };
@@ -115,6 +115,7 @@ pub async fn login(
         is_token: false,
         expiration,
     };
+    error!("creating session!");
     let session_token = spawn_blocking(move || db2.create_user_session(&session)).await??;
 
     let cookie_builder = Cookie::build((SESSION_COOKIE, session_token))
