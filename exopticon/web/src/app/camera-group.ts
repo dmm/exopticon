@@ -18,13 +18,17 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import { CameraId } from "./camera";
+
+export type CameraGroupId = string;
+
 export class CameraGroup {
-  id: number;
+  id?: CameraGroupId;
   name: string;
-  members: number[];
+  members: CameraId[];
 
   constructor() {
-    this.id = 0;
+    this.id = null;
     this.name = "";
     this.members = new Array();
   }

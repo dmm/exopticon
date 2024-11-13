@@ -3,7 +3,7 @@ import { FormArray, FormControl, FormGroup } from "@angular/forms";
 import { ActivatedRoute, ParamMap, Router } from "@angular/router";
 import { forkJoin, Observable, of, Subscription } from "rxjs";
 import { switchMap } from "rxjs/operators";
-import { Camera } from "../camera";
+import { Camera, CameraId } from "../camera";
 import { CameraGroup } from "../camera-group";
 import { CameraGroupService } from "../camera-group.service";
 import { CameraService } from "../camera.service";
@@ -19,11 +19,11 @@ export class CameraGroupDetailComponent implements OnInit {
 
   // form values
   public groupForm = new FormGroup({
-    id: new FormControl(0),
+    id: new FormControl(""),
     name: new FormControl(""),
     members: new FormArray([
       new FormGroup({
-        id: new FormControl(0),
+        id: new FormControl(""),
         name: new FormControl(""),
         include: new FormControl(false),
       }),
@@ -44,9 +44,7 @@ export class CameraGroupDetailComponent implements OnInit {
           let cameraGroup$: Observable<CameraGroup>;
           let id = params.get("id");
           if (id !== null) {
-            cameraGroup$ = this.cameraGroupService.getCameraGroup(
-              parseInt(id, 10),
-            );
+            cameraGroup$ = this.cameraGroupService.getCameraGroup(id);
           } else {
             // initialize empty form group
             cameraGroup$ = of(new CameraGroup());
@@ -102,7 +100,7 @@ export class CameraGroupDetailComponent implements OnInit {
   }
 
   setFormFromGroup(group: CameraGroup, cameras: Camera[]) {
-    let cameraMap: Map<Number, Camera> = new Map();
+    let cameraMap: Map<CameraId, Camera> = new Map();
     cameras.filter((c) => c.enabled).forEach((c) => cameraMap.set(c.id, c));
     let memberArray = new FormArray([]);
     // Add included cameras

@@ -18,37 +18,4 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { v4 as uuidv4 } from "uuid";
-
-export type CameraId = string;
-
-export class Camera {
-  id: CameraId;
-  storageGroupId: number;
-  name: string;
-  ip: string;
-  onvifPort: number;
-  mac: string;
-  username: string;
-  password: string;
-  rtspUrl: string;
-  ptzType: string;
-  ptzProfileToken: string;
-  ptzXStepSize: number;
-  ptzYStepSize: number;
-  enabled: boolean;
-  insertedAt: string;
-  updatedAt: string;
-}
-
-export class AnalysisConfiguration {
-  camera_id: number;
-  analysisConfig: AnalysisType;
-}
-
-export enum AnalysisType {
-  None = "none",
-  Motion = "motion",
-  Yolo = "yolo",
-  Coral = "coral",
-}
+export type UUID = `${string}-${string}-${string}-${string}-${string}`;

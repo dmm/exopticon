@@ -22,7 +22,7 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable, throwError as observableThrowError } from "rxjs";
 import { catchError, map } from "rxjs/operators";
-import { AnalysisConfiguration, Camera } from "./camera";
+import { AnalysisConfiguration, Camera, CameraId } from "./camera";
 
 export enum PtzDirection {
   left,
@@ -46,22 +46,22 @@ export class CameraService {
     );
   }
 
-  getCamera(id: number | string): Observable<Camera> {
+  getCamera(id: CameraId): Observable<Camera> {
     return this.http.get<Camera[]>(this.cameraUrl).pipe(
-      map((data: Camera[]) => data.find((c) => c.id == +id)),
+      map((data: Camera[]) => data.find((c) => c.id)),
       catchError(this.handleError),
     );
   }
 
   setCamera(camera: Camera): Observable<Camera> {
-    let url = this.cameraUrl + (camera.id == 0 ? "" : "/" + camera.id);
+    let url = this.cameraUrl + (camera.id === "" ? "" : "/" + camera.id);
     return this.http.post<Camera>(url, camera).pipe(
       map((data) => data),
       catchError(this.handleError),
     );
   }
 
-  ptz(cameraId: number, direction: PtzDirection) {
+  ptz(cameraId: CameraId, direction: PtzDirection) {
     let directionArg: string = PtzDirection[direction];
     this.http
       .post(`${this.cameraUrl}/${cameraId}/ptz/${directionArg}`, null)
@@ -72,34 +72,6 @@ export class CameraService {
       .subscribe(
         () => {},
         () => {},
-      );
-  }
-
-  getCameraAnalysisConfiguration(
-    camera_id: number | string,
-  ): Observable<AnalysisConfiguration> {
-    return this.http
-      .get<AnalysisConfiguration>(
-        this.cameraUrl + "/" + camera_id + "/analysis_configuration",
-      )
-      .pipe(
-        map((data) => data),
-        catchError(this.handleError),
-      );
-  }
-
-  setCameraAnalysisConfiguration(
-    camera_id: number | string,
-    configuration: AnalysisConfiguration,
-  ): Observable<AnalysisConfiguration> {
-    return this.http
-      .post<AnalysisConfiguration>(
-        this.cameraUrl + "/" + camera_id + "/analysis_configuration",
-        configuration,
-      )
-      .pipe(
-        map((data) => data),
-        catchError(this.handleError),
       );
   }
 

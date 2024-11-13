@@ -31,8 +31,6 @@ import {
 } from "@angular/core";
 import { Observable, Subscription } from "rxjs";
 import { Camera } from "../camera";
-import { CameraResolution, WsMessage } from "../frame-message";
-import { SubscriptionSubject, VideoService } from "../video.service";
 import { WebrtcService } from "../webrtc.service";
 
 enum CameraViewStatus {
@@ -50,8 +48,6 @@ export class CameraViewComponent implements OnInit {
   @Input() camera: Camera;
   @Input() selected: boolean;
   @Input() enabled: boolean;
-  @Input() videoService: VideoService;
-  @Input() resolution: CameraResolution;
 
   @Output() isVisible = new EventEmitter<boolean>();
 
@@ -61,8 +57,6 @@ export class CameraViewComponent implements OnInit {
 
   public status: string;
 
-  private videoSubject: SubscriptionSubject;
-  public frameService?: Observable<WsMessage>;
   private mediaStream?: MediaStream = undefined;
   private state: CameraViewStatus = CameraViewStatus.New;
   private subscription: Subscription = null;
@@ -125,12 +119,6 @@ export class CameraViewComponent implements OnInit {
   }
 
   activate() {
-    this.videoSubject = {
-      kind: "camera",
-      cameraId: this.camera.id,
-      resolution: this.resolution,
-    };
-    //    this.frameService = this.videoService.getObservable(this.videoSubject);
     this.subscription = this.webrtcService.subscribe(this.camera.id).subscribe(
       (m) => {
         this.mediaStream = m;

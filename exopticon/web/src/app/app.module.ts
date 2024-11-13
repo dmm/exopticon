@@ -30,8 +30,6 @@ import { BrowserModule } from "@angular/platform-browser";
 import { ServiceWorkerModule } from "@angular/service-worker";
 import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
 import { environment } from "../environments/environment";
-import { AlertViewComponent } from "./alert-view/alert-view.component";
-import { AnalysisPanelComponent } from "./analysis-panel/analysis-panel.component";
 import { AppRoutingModule } from "./app-routing.module";
 import { AppComponent } from "./app.component";
 import { AuthInterceptor } from "./auth.interceptor";
@@ -46,10 +44,8 @@ import { CameraViewComponent } from "./camera-view/camera-view.component";
 import { CameraService } from "./camera.service";
 import { EventListComponent } from "./event-list/event-list.component";
 import { LoginComponent } from "./login/login.component";
-import { PlaybackViewComponent } from "./playback-view/playback-view.component";
 import { TokenListComponent } from "./token-list/token-list.component";
 import { TokenService } from "./token.service";
-import { VideoViewComponent } from "./video-view/video-view.component";
 
 @NgModule({
   declarations: [
@@ -58,10 +54,6 @@ import { VideoViewComponent } from "./video-view/video-view.component";
     CameraViewComponent,
     CameraOverlayComponent,
     CameraStatusOverlayComponent,
-    AnalysisPanelComponent,
-    VideoViewComponent,
-    PlaybackViewComponent,
-    AlertViewComponent,
     LoginComponent,
     CameraListComponent,
     CameraDetailComponent,

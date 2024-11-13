@@ -58,17 +58,22 @@ impl Service {
         group: crate::business::camera_groups::CameraGroup,
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
         let mut conn = self.pool.get()?;
+        let new_group = CameraGroup {
+            id: Uuid::now_v7(),
+            name: group.name.clone(),
+        };
         conn.build_transaction()
             .serializable()
             .run::<_, super::Error, _>(|conn| {
                 let new_camera_group = diesel::insert_into(camera_groups::table)
-                    .values(&(vec![camera_groups::dsl::name.eq(group.name)]))
+                    .values(&new_group)
                     .get_result::<CameraGroup>(conn)?;
 
                 for (pos, m) in group.members.iter().enumerate() {
                     diesel::insert_into(camera_group_memberships::table)
                         .values(
                             &(vec![(
+                                camera_group_memberships::dsl::id.eq(Uuid::now_v7()),
                                 camera_group_memberships::dsl::camera_group_id
                                     .eq(new_camera_group.id),
                                 camera_group_memberships::dsl::camera_id.eq(m),

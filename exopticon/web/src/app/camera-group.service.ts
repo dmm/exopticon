@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable, throwError as observableThrowError } from "rxjs";
 import { catchError, map } from "rxjs/operators";
-import { CameraGroup } from "./camera-group";
+import { CameraGroup, CameraGroupId } from "./camera-group";
 
 @Injectable({
   providedIn: "root",
@@ -19,7 +19,7 @@ export class CameraGroupService {
     );
   }
 
-  getCameraGroup(id: Number): Observable<CameraGroup> {
+  getCameraGroup(id: CameraGroupId): Observable<CameraGroup> {
     return this.http.get<CameraGroup>(this.cameraGroupUrl + "/" + id).pipe(
       map((data) => data),
       catchError(this.handleError),
@@ -28,14 +28,14 @@ export class CameraGroupService {
 
   setCameraGroup(cameraGroup: CameraGroup): Observable<CameraGroup> {
     let obs: Observable<CameraGroup>;
-    if (cameraGroup.id == 0) {
+    if (cameraGroup.id === null) {
       obs = this.http.post<CameraGroup>(this.cameraGroupUrl, {
         name: cameraGroup.name,
         members: cameraGroup.members,
       });
     } else {
       obs = this.http.post<CameraGroup>(
-        this.cameraGroupUrl + "/" + cameraGroup.id.toString(),
+        this.cameraGroupUrl + "/" + cameraGroup.id,
         cameraGroup,
       );
     }
@@ -45,7 +45,7 @@ export class CameraGroupService {
     );
   }
 
-  deleteCameraGroup(cameraGroupId: Number): Observable<any> {
+  deleteCameraGroup(cameraGroupId: CameraGroupId): Observable<any> {
     return this.http.delete(this.cameraGroupUrl + "/" + cameraGroupId);
   }
 

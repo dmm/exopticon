@@ -3,7 +3,7 @@
     Back to Camera Groups
   </button>
   <button
-    *ngIf="groupForm.controls.id.value !== 0"
+    *ngIf="groupForm.controls.id.value !== null"
     class="delete"
     type="button"
     (click)="deleteCameraGroup({ id: groupForm.controls.id.value })"
@@ -50,7 +50,7 @@
     </div>
   </div>
   <button
-    *ngIf="groupForm.controls.id.value !== 0"
+    *ngIf="groupForm.controls.id.value !== null"
     type="button"
     class="submit"
     (click)="onSubmit()"
@@ -58,7 +58,7 @@
     Update Camera Group
   </button>
   <button
-    *ngIf="groupForm.controls.id.value == 0"
+    *ngIf="groupForm.controls.id.value === null"
     type="button"
     class="submit"
     (click)="onSubmit()"

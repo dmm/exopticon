@@ -29,8 +29,6 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { Camera } from "../camera";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
-import { CameraResolution } from "../frame-message";
-import { VideoService } from "../video.service";
 import { WebrtcService } from "../webrtc.service";
 
 @Component({
@@ -51,7 +49,6 @@ export class CameraPanelComponent implements OnInit {
   constructor(
     public cameraPanelService: CameraPanelService,
     private cameraService: CameraService,
-    public videoService: VideoService,
     public webrtcService: WebrtcService,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
@@ -76,16 +73,10 @@ export class CameraPanelComponent implements OnInit {
         this.cameraPanelService.setOffset(parseInt(params.get("offset"), 10));
       }
 
-      if (params.has("res")) {
-        if (params.get("res").toLowerCase() === "hd") {
-          this.cameraPanelService.setResolution(CameraResolution.Hd);
-        }
-      }
-
       if (params.has("group")) {
-        this.cameraPanelService.setDesiredCameraGroup(
-          parseInt(params.get("group"), 10),
-        );
+        this.cameraPanelService.setDesiredCameraGroup(params.get("group"));
+      } else {
+        this.cameraPanelService.setDesiredCameraGroup(null);
       }
     });
 
@@ -107,11 +98,11 @@ export class CameraPanelComponent implements OnInit {
     switch (event.keyCode) {
       case 78:
         // 'n'
-        offset++;
+        offset = (offset + 1) % this.cameraPanelService.cameras.length;
         break;
       case 80:
         // 'p'
-        offset--;
+        offset = (offset - 1) % this.cameraPanelService.cameras.length;
         break;
       case 65:
         // 'a'

@@ -41,23 +41,16 @@ export class CameraDetailComponent implements OnInit {
   ngOnInit(): void {
     this.camera$ = this.route.paramMap.pipe(
       switchMap((params: ParamMap) => {
-        if (params.get("id") !== "0") {
-          return this.cameraService.getCamera(+params.get("id"));
+        if (params.get("id") !== "") {
+          return this.cameraService.getCamera(params.get("id"));
         } else {
           let cam = new Camera();
-          cam.id = 0;
+          cam.id = "";
           cam.storageGroupId = 1;
           return of(cam);
         }
       }),
     );
-    //    this.analysisConfig$ = this.route.paramMap.pipe(
-    //      switchMap((params: ParamMap) => {
-    //        return this.cameraService.getCameraAnalysisConfiguration(
-    //          +params.get("id")
-    //        );
-    //      })
-    //    );
   }
 
   onSubmit(camera) {

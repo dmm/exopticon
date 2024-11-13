@@ -21,12 +21,10 @@
 import { Injectable } from "@angular/core";
 import { concat, defer, forkJoin, fromEvent, of } from "rxjs";
 import { map } from "rxjs/operators";
-import { Camera } from "./camera";
-import { CameraGroup } from "./camera-group";
+import { Camera, CameraId } from "./camera";
+import { CameraGroup, CameraGroupId } from "./camera-group";
 import { CameraGroupService } from "./camera-group.service";
 import { CameraService, PtzDirection } from "./camera.service";
-import { CameraResolution } from "./frame-message";
-import { VideoService } from "./video.service";
 import { WebrtcService } from "./webrtc.service";
 
 class PanelCamera {
@@ -59,44 +57,40 @@ export class CameraPanelService {
   columnCount: number = 1;
 
   // panel row count
-
   rowCount: number = -1;
 
   // camera offset
   offset: number = 0;
 
   // id of currently selected camera or -1
-  selectedCameraId: number = -1;
+  selectedCameraId: CameraId = null;
 
   // Whether camera was selected by touch or mouse
   selectedCameraMode = SelectionMode.Mouse;
 
   //
-  keyboardControlCameraId: number = 0;
-
-  // Current resolution
-  resolution: CameraResolution = CameraResolution.Sd;
+  keyboardControlCameraId: CameraId = null;
 
   // Active camera group id, 0 for all cameras aka no group
-  activeCameraGroupId: number = 0;
+  activeCameraGroupId?: CameraGroupId = null;
 
   activeCameraGroupName: string = "ALL";
 
-  desiredCameraGroupId: number = 0;
+  desiredCameraGroupId?: CameraGroupId = null;
 
-  nextCameraGroupId: number = 0;
+  nextCameraGroupId?: CameraGroupId = null;
 
-  prevCameraGroupId: number = 0;
+  prevCameraGroupId?: CameraGroupId = null;
 
   //
   // End public binding properties
   //
 
   // Unsorted cameras
-  private unsortedCameras: Map<number, PanelCamera> = new Map();
+  private unsortedCameras: Map<CameraId, PanelCamera> = new Map();
 
   // Camera groups
-  private cameraGroups: Map<number, CameraGroup> = new Map();
+  private cameraGroups: Map<CameraGroupId, CameraGroup> = new Map();
 
   // page visible observable
   private pageVisible$ = concat(
@@ -113,7 +107,6 @@ export class CameraPanelService {
   constructor(
     private cameraService: CameraService,
     private cameraGroupService: CameraGroupService,
-    private videoService: VideoService,
     private webrtcService: WebrtcService,
   ) {
     this.pageVisible$.subscribe((visible) => {
@@ -180,16 +173,6 @@ export class CameraPanelService {
           this.cameraGroups.set(group.id, group);
         });
 
-        // this.videoService
-        //   .getErrorObservable()
-        //   .toPromise()
-        //   .then(() => {
-        //     console.log("Caught error and restarting!");
-        //     // TODO: Should we implement exponential backoff? We probably
-        //     // need connection management in general.
-        //     this.registerSetCameras();
-        //   });
-
         this.projectCameras();
       })
       .catch((err) => {
@@ -212,7 +195,7 @@ export class CameraPanelService {
 
     this.setCameraGroup(this.desiredCameraGroupId);
     let groupCameras: PanelCamera[] = new Array();
-    if (this.activeCameraGroupId === 0) {
+    if (this.activeCameraGroupId === null) {
       groupCameras = Array.from(this.unsortedCameras.values());
     } else {
       let cameraGroup = this.cameraGroups.get(this.activeCameraGroupId);
@@ -240,7 +223,7 @@ export class CameraPanelService {
     ).slice(0, cameraCount);
 
     // this isn't great...
-    let activeCameraIds: number[] = new Array();
+    let activeCameraIds: CameraId[] = new Array();
     this.cameraDesiredState = this.cameras.map((c) => {
       let p = this.unsortedCameras.get(c.id);
       let active = p.inViewport && p.enabled && this.pageVisible;
@@ -261,17 +244,13 @@ export class CameraPanelService {
     this.columnCount = colCount;
   }
 
-  setResolution(resolution: CameraResolution) {
-    this.resolution = resolution;
-  }
-
   setOffset(offset: number) {
     this.offset = offset;
     this.projectCameras();
   }
 
   setCameraVisibility(
-    cameraId: number,
+    cameraId: CameraId,
     intersectionEvents: IntersectionObserverEntry[],
   ) {
     let panelCamera = this.unsortedCameras.get(cameraId);
@@ -287,11 +266,14 @@ export class CameraPanelService {
   }
 
   ptz(direction: PtzDirection) {
-    this.cameraService.ptz(this.keyboardControlCameraId, direction);
+    let camera = this.cameras.find((c) => c.id === this.selectedCameraId);
+    if (camera) {
+      this.cameraService.ptz(camera.id, direction);
+    }
   }
 
   // Event Handlers
-  touchCamera(cameraId: number) {
+  touchCamera(cameraId: CameraId) {
     if (this.selectedCameraId !== cameraId) {
       this.selectedCameraId = cameraId;
       this.keyboardControlCameraId = cameraId;
@@ -302,13 +284,13 @@ export class CameraPanelService {
       this.selectedCameraMode = SelectionMode.Touch;
     }
   }
-  mouseOver(cameraId: number) {
+  mouseOver(cameraId: CameraId) {
     if (
       this.selectedCameraId === cameraId &&
       this.selectedCameraMode === SelectionMode.Mouse
     ) {
       // clear selected camera on second touch
-      this.selectedCameraId = -1;
+      this.selectedCameraId = null;
     } else if (this.selectedCameraMode === SelectionMode.Mouse) {
       this.selectedCameraId = cameraId;
       this.keyboardControlCameraId = cameraId;
@@ -319,23 +301,23 @@ export class CameraPanelService {
   mouseLeave() {
     if (this.selectedCameraMode === SelectionMode.Mouse) {
       this.selectedCameraId = null;
-      this.keyboardControlCameraId = 0;
+      this.keyboardControlCameraId = null;
     }
   }
 
-  setDesiredCameraGroup(cameraGroupId: number) {
+  setDesiredCameraGroup(cameraGroupId: CameraGroupId) {
     this.desiredCameraGroupId = cameraGroupId;
     this.projectCameras();
   }
 
-  private setCameraGroup(cameraGroupId: number) {
+  private setCameraGroup(cameraGroupId: CameraGroupId) {
     // check validity of cameraGroupId
-    if (cameraGroupId !== 0 && !this.cameraGroups.has(cameraGroupId)) {
+    if (cameraGroupId !== null && !this.cameraGroups.has(cameraGroupId)) {
       return false;
     }
     this.activeCameraGroupId = cameraGroupId;
 
-    if (cameraGroupId !== 0) {
+    if (cameraGroupId !== null) {
       let cameraGroup = this.cameraGroups.get(cameraGroupId);
       this.activeCameraGroupName = cameraGroup.name;
     } else {
@@ -344,30 +326,31 @@ export class CameraPanelService {
     return true;
   }
 
-  nextCameraGroup(): number {
+  nextCameraGroup(): CameraGroupId {
     let ids = Array.from(this.cameraGroups.keys());
-    ids.sort((a, b) => a - b);
-    let next = ids.find((i) => i > this.activeCameraGroupId);
-
-    if (next === undefined) {
-      // start from the beginning
-      next = 0;
+    ids.sort();
+    let currentIndex = ids.indexOf(this.activeCameraGroupId);
+    let nextIndex = currentIndex + 1;
+    if (nextIndex >= ids.length) {
+      // ALL group
+      return null;
+    } else {
+      return ids[nextIndex];
     }
-    return next;
   }
 
-  prevCameraGroup(): number {
+  prevCameraGroup(): CameraGroupId {
     let ids = Array.from(this.cameraGroups.keys());
-    ids.sort((a, b) => a - b);
+    ids.sort();
     ids.reverse();
-    let prev = ids.find((i) => i < this.activeCameraGroupId);
+    let currentIndex = ids.indexOf(this.activeCameraGroupId);
+    let prevIndex = currentIndex + 1;
 
-    if (this.activeCameraGroupId == 0) {
-      prev = ids[0];
-    } else if (prev === undefined) {
-      // start from the beginning
-      prev = 0;
+    if (prevIndex >= ids.length) {
+      // ALL group
+      return null;
+    } else {
+      return ids[prevIndex];
     }
-    return prev;
   }
 }

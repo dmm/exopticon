@@ -1,6 +1,7 @@
 import { Injectable } from "@angular/core";
 import { Duration, Instant } from "@js-joda/core";
 import { ReplaySubject, BehaviorSubject } from "rxjs";
+import { CameraId } from "./camera";
 
 interface Subscription {
   id: number;
@@ -49,10 +50,10 @@ export class WebrtcService {
   });
   private peerConnection: RTCPeerConnection;
   private dataChannel?: RTCDataChannel;
-  private subscriptions: Map<number, Subscription> = new Map();
-  private transceivers: Map<number, RTCRtpTransceiver> = new Map();
-  private emitters: Map<number, ReplaySubject<MediaStream>> = new Map();
-  private activeCameras: Map<number, boolean> = new Map();
+  private subscriptions: Map<CameraId, Subscription> = new Map();
+  private transceivers: Map<CameraId, RTCRtpTransceiver> = new Map();
+  private emitters: Map<CameraId, ReplaySubject<MediaStream>> = new Map();
+  private activeCameras: Map<CameraId, boolean> = new Map();
   private enabled: boolean = false;
 
   private signalSocket?: WebSocket;
@@ -164,7 +165,7 @@ export class WebrtcService {
     this.updateState();
   }
 
-  updateActiveCameras(activeCameraIds: number[]) {
+  updateActiveCameras(activeCameraIds: CameraId[]) {
     for (let [id, _val] of this.activeCameras) {
       this.activeCameras.set(id, false);
     }
@@ -175,7 +176,7 @@ export class WebrtcService {
     this.updateState();
   }
 
-  subscribe(cameraId: number): ReplaySubject<MediaStream> {
+  subscribe(cameraId: CameraId): ReplaySubject<MediaStream> {
     if (this.emitters.has(cameraId)) {
       return this.emitters.get(cameraId);
     } else {
