@@ -58,7 +58,7 @@ pub async fn create(
     let db = state.db_service;
     let req = camera_group_request;
     let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
-    let camera_group = spawn_blocking(move || db.create_camera_group(camera_group)).await??;
+    let camera_group = spawn_blocking(move || db.create_camera_group(&camera_group)).await??;
     Ok(Json(camera_group))
 }
 

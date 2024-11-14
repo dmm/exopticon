@@ -55,7 +55,7 @@ struct CameraGroupMembership {
 impl Service {
     pub fn create_camera_group(
         &self,
-        group: crate::business::camera_groups::CameraGroup,
+        group: &crate::business::camera_groups::CameraGroup,
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
         let mut conn = self.pool.get()?;
         let new_group = CameraGroup {
