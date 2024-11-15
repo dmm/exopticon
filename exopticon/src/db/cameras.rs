@@ -18,12 +18,14 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use diesel::dsl::max;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use uuid::Uuid;
 
 use crate::db::storage_groups::StorageGroup;
-use crate::schema::cameras;
+use crate::schema::{camera_group_memberships, cameras};
 
+use super::camera_groups::ALL_GROUP_ID;
 use super::Service;
 
 /// Full camera model, represents database row
@@ -169,13 +171,38 @@ impl Service {
         &self,
         create_camera: crate::api::cameras::CreateCamera,
     ) -> Result<crate::api::cameras::Camera, super::Error> {
+        use diesel::OptionalExtension;
+
         let mut conn = self.pool.get()?;
 
-        let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
-            .values(&Into::<CreateCamera>::into(create_camera))
-            .get_result(&mut conn)?;
+        let new_camera = conn
+            .build_transaction()
+            .serializable()
+            .run::<_, super::Error, _>(|conn| {
+                let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
+                    .values(&Into::<CreateCamera>::into(create_camera))
+                    .get_result(conn)?;
 
-        Ok(c.into())
+                let max_order: i32 = camera_group_memberships::table
+                    .filter(camera_group_memberships::camera_id.eq(ALL_GROUP_ID))
+                    .select(max(camera_group_memberships::display_order))
+                    .first(conn)
+                    .optional()?
+                    .unwrap_or(None)
+                    .unwrap_or(0);
+
+                diesel::insert_into(camera_group_memberships::table)
+                    .values(&vec![(
+                        camera_group_memberships::dsl::id.eq(Uuid::now_v7()),
+                        camera_group_memberships::dsl::camera_group_id.eq(ALL_GROUP_ID),
+                        camera_group_memberships::dsl::camera_id.eq(c.id),
+                        camera_group_memberships::dsl::display_order.eq(max_order + 1),
+                    )])
+                    .execute(conn)?;
+                Ok(c)
+            })?;
+
+        Ok(new_camera.into())
     }
 
     pub fn update_camera(

@@ -27,6 +27,8 @@ import { CameraGroupService } from "./camera-group.service";
 import { CameraService, PtzDirection } from "./camera.service";
 import { WebrtcService } from "./webrtc.service";
 
+const ALL_GROUP_ID = "34e79812-df14-4773-a9f4-f766c799aa62";
+
 class PanelCamera {
   camera: Camera;
   inViewport: boolean;
@@ -72,15 +74,15 @@ export class CameraPanelService {
   keyboardControlCameraId: CameraId = null;
 
   // Active camera group id, 0 for all cameras aka no group
-  activeCameraGroupId?: CameraGroupId = null;
+  activeCameraGroupId: CameraGroupId = null;
 
   activeCameraGroupName: string = "ALL";
 
-  desiredCameraGroupId?: CameraGroupId = null;
+  desiredCameraGroupId: CameraGroupId = null;
 
-  nextCameraGroupId?: CameraGroupId = null;
+  nextCameraGroupId: CameraGroupId = null;
 
-  prevCameraGroupId?: CameraGroupId = null;
+  prevCameraGroupId: CameraGroupId = null;
 
   //
   // End public binding properties
@@ -192,20 +194,23 @@ export class CameraPanelService {
 
   private realProjectCameras() {
     this.projectCameraTimeout = null;
+    if (this.desiredCameraGroupId === null) {
+      this.desiredCameraGroupId = ALL_GROUP_ID;
+    }
+
+    if (this.activeCameraGroupId === null) {
+      this.activeCameraGroupId = ALL_GROUP_ID;
+    }
 
     this.setCameraGroup(this.desiredCameraGroupId);
     let groupCameras: PanelCamera[] = new Array();
-    if (this.activeCameraGroupId === null) {
-      groupCameras = Array.from(this.unsortedCameras.values());
-    } else {
-      let cameraGroup = this.cameraGroups.get(this.activeCameraGroupId);
-      cameraGroup.members.forEach((cameraId) => {
-        const c = this.unsortedCameras.get(cameraId);
-        if (c !== undefined) {
-          groupCameras.push(this.unsortedCameras.get(cameraId));
-        }
-      });
-    }
+    let cameraGroup = this.cameraGroups.get(this.activeCameraGroupId);
+    cameraGroup.members.forEach((cameraId) => {
+      const c = this.unsortedCameras.get(cameraId);
+      if (c !== undefined) {
+        groupCameras.push(this.unsortedCameras.get(cameraId));
+      }
+    });
 
     this.nextCameraGroupId = this.nextCameraGroup();
     this.prevCameraGroupId = this.prevCameraGroup();
@@ -333,7 +338,7 @@ export class CameraPanelService {
     let nextIndex = currentIndex + 1;
     if (nextIndex >= ids.length) {
       // ALL group
-      return null;
+      return ids[0];
     } else {
       return ids[nextIndex];
     }
@@ -348,7 +353,7 @@ export class CameraPanelService {
 
     if (prevIndex >= ids.length) {
       // ALL group
-      return null;
+      return ids[0];
     } else {
       return ids[prevIndex];
     }

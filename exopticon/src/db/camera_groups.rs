@@ -19,11 +19,13 @@
  */
 
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
+use uuid::{uuid, Uuid};
 
 use crate::schema::{camera_group_memberships, camera_groups};
 
 use super::Service;
+
+pub const ALL_GROUP_ID: Uuid = uuid!("34e79812-df14-4773-a9f4-f766c799aa62");
 
 //  What does the db infrastructure do?
 //
@@ -97,6 +99,10 @@ impl Service {
         id: Uuid,
         group: crate::business::camera_groups::CameraGroup,
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
+        if id == ALL_GROUP_ID && group.name != "ALL" {
+            return Err(super::Error::NotFound);
+        }
+
         let mut conn = self.pool.get()?;
         conn.build_transaction()
             .serializable()
@@ -114,6 +120,7 @@ impl Service {
                     diesel::insert_into(camera_group_memberships::table)
                         .values(
                             &(vec![(
+                                camera_group_memberships::dsl::id.eq(Uuid::now_v7()),
                                 camera_group_memberships::dsl::camera_group_id.eq(id),
                                 camera_group_memberships::dsl::camera_id.eq(m),
                                 camera_group_memberships::dsl::display_order.eq(i32::try_from(pos)
@@ -132,6 +139,10 @@ impl Service {
     }
 
     pub fn delete_camera_group(&self, id: Uuid) -> Result<(), super::Error> {
+        if id == ALL_GROUP_ID {
+            return Err(super::Error::NotFound);
+        }
+
         let mut conn = self.pool.get()?;
         conn.build_transaction()
             .serializable()
