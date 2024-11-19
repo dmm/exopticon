@@ -3,11 +3,6 @@ import { Duration, Instant } from "@js-joda/core";
 import { ReplaySubject, BehaviorSubject } from "rxjs";
 import { CameraId } from "./camera";
 
-interface Subscription {
-  id: number;
-  trackId: string;
-}
-
 type ServerMessage = NegotiationAnswer;
 
 interface NegotiationAnswer {
@@ -50,7 +45,6 @@ export class WebrtcService {
   });
   private peerConnection: RTCPeerConnection;
   private dataChannel?: RTCDataChannel;
-  private subscriptions: Map<CameraId, Subscription> = new Map();
   private transceivers: Map<CameraId, RTCRtpTransceiver> = new Map();
   private emitters: Map<CameraId, ReplaySubject<MediaStream>> = new Map();
   private activeCameras: Map<CameraId, boolean> = new Map();
@@ -360,7 +354,6 @@ export class WebrtcService {
       this.peerConnection = undefined;
       this.dataChannel = undefined;
     }
-    this.subscriptions.clear();
     this.transceivers.clear();
   }
 }
