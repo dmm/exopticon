@@ -31,7 +31,7 @@ export class VideoUnit {
   }
 
   id: string;
-  cameraId: number;
+  cameraId: string;
   beginTime: ZonedDateTime;
   endTime: ZonedDateTime;
   observations: Observation[];
