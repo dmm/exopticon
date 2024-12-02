@@ -72,6 +72,15 @@ pub struct CreateUserSession {
     pub expiration: DateTime<Utc>,
 }
 
+// Request to create personal access token
+#[derive(Clone, Deserialize)]
+pub struct CreatePersonalAccessToken {
+    /// token name
+    pub name: String,
+    /// Expiration timestamp
+    pub expiration: DateTime<Utc>,
+}
+
 /// Access Token model to return to user
 #[derive(Debug, Serialize)]
 pub struct SlimAccessToken {
@@ -131,17 +140,24 @@ pub async fn login(
 }
 
 pub async fn create_personal_access_token(
+    Extension(current_user): Extension<User>,
     State(state): State<AppState>,
-    Json(create_token_request): Json<CreateUserSession>,
+
+    Json(create_token_request): Json<CreatePersonalAccessToken>,
 ) -> Result<Json<String>, UserError> {
     let db = state.db_service;
 
-    // Ensure user session is a token
-    if !create_token_request.is_token {
-        return Err(UserError::Validation("Token flag must be set".to_string()));
-    }
+    let session_key = BASE64_STANDARD.encode(rand::thread_rng().gen::<[u8; 32]>());
 
-    let token = spawn_blocking(move || db.create_user_session(&create_token_request)).await??;
+    let new_session = CreateUserSession {
+        name: create_token_request.name,
+        user_id: current_user.id,
+        session_key,
+        is_token: true,
+        expiration: create_token_request.expiration,
+    };
+
+    let token = spawn_blocking(move || db.create_user_session(&new_session)).await??;
 
     Ok(Json(token))
 }

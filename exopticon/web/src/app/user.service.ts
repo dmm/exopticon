@@ -25,13 +25,13 @@ import { Observable } from "rxjs";
 import { map, publishReplay, refCount } from "rxjs/operators";
 
 interface UserDto {
-  id: number;
+  id: string;
   username: string;
   timezone: string;
 }
 
 export class User {
-  readonly id: number;
+  readonly id: string;
   readonly username: string;
   readonly timezone: ZoneId;
 

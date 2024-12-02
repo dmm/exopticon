@@ -25,15 +25,11 @@ import { Observable, throwError as observableThrowError } from "rxjs";
 import { catchError, map } from "rxjs/operators";
 
 export class Token {
-  id: number;
   name: string;
-  userId: number;
   expiration: LocalDate;
 
   constructor(dto: TokenDto) {
-    this.id = dto.id;
     this.name = dto.name;
-    this.userId = dto.user_id;
     this.expiration = Instant.parse(dto.expiration)
       .atZone(ZoneId.of("Z"))
       .toLocalDate();
@@ -41,15 +37,12 @@ export class Token {
 }
 
 export class CreateUserToken {
-  user_id: number;
   name: string;
   expiration: string;
 }
 
 interface TokenDto {
-  id: number;
   name: string;
-  user_id: number;
   expiration: string;
 }
 
@@ -70,7 +63,6 @@ export class TokenService {
 
   setToken(name: string, expiration: string): Observable<string> {
     let createUserToken: CreateUserToken = {
-      user_id: 0,
       name: name,
       expiration: expiration,
     };
