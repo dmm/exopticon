@@ -22,12 +22,10 @@ import { Injectable } from "@angular/core";
 import { concat, defer, forkJoin, fromEvent, of } from "rxjs";
 import { map } from "rxjs/operators";
 import { Camera, CameraId } from "./camera";
-import { CameraGroup, CameraGroupId } from "./camera-group";
+import { ALL_GROUP_ID, CameraGroup, CameraGroupId } from "./camera-group";
 import { CameraGroupService } from "./camera-group.service";
 import { CameraService, PtzDirection } from "./camera.service";
 import { WebrtcService } from "./webrtc.service";
-
-const ALL_GROUP_ID = "34e79812-df14-4773-a9f4-f766c799aa62";
 
 class PanelCamera {
   camera: Camera;

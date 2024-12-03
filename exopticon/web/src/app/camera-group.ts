@@ -20,6 +20,8 @@
 
 import { CameraId } from "./camera";
 
+export const ALL_GROUP_ID = "34e79812-df14-4773-a9f4-f766c799aa62";
+
 export type CameraGroupId = string;
 
 export class CameraGroup {

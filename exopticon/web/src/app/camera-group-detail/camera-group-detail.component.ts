@@ -4,7 +4,7 @@ import { ActivatedRoute, ParamMap, Router } from "@angular/router";
 import { forkJoin, Observable, of, Subscription } from "rxjs";
 import { switchMap } from "rxjs/operators";
 import { Camera, CameraId } from "../camera";
-import { CameraGroup } from "../camera-group";
+import { ALL_GROUP_ID, CameraGroup } from "../camera-group";
 import { CameraGroupService } from "../camera-group.service";
 import { CameraService } from "../camera.service";
 
@@ -16,6 +16,7 @@ import { CameraService } from "../camera.service";
 export class CameraGroupDetailComponent implements OnInit {
   public stuff$: Observable<any>;
   public stuffSubscription: Subscription;
+  public hideMembership = false;
 
   // form values
   public groupForm = new FormGroup({
@@ -100,6 +101,7 @@ export class CameraGroupDetailComponent implements OnInit {
   }
 
   setFormFromGroup(group: CameraGroup, cameras: Camera[]) {
+    this.hideMembership = group.id === ALL_GROUP_ID;
     let cameraMap: Map<CameraId, Camera> = new Map();
     cameras.filter((c) => c.enabled).forEach((c) => cameraMap.set(c.id, c));
     let memberArray = new FormArray([]);
