@@ -175,12 +175,29 @@ impl Service {
 
         let mut conn = self.pool.get()?;
 
+        let new_camera: Camera = Camera {
+            id: Uuid::now_v7(),
+            storage_group_id: create_camera.storage_group_id,
+            name: create_camera.name,
+            ip: create_camera.ip,
+            onvif_port: create_camera.onvif_port,
+            mac: create_camera.mac,
+            username: create_camera.username,
+            password: create_camera.password,
+            rtsp_url: create_camera.rtsp_url,
+            ptz_type: create_camera.ptz_type,
+            ptz_profile_token: create_camera.ptz_profile_token,
+            enabled: create_camera.enabled,
+            ptz_x_step_size: create_camera.ptz_x_step_size,
+            ptz_y_step_size: create_camera.ptz_y_step_size,
+        };
+
         let new_camera = conn
             .build_transaction()
             .serializable()
             .run::<_, super::Error, _>(|conn| {
                 let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
-                    .values(&Into::<CreateCamera>::into(create_camera))
+                    .values(&Into::<Camera>::into(new_camera))
                     .get_result(conn)?;
 
                 let max_order: i32 = camera_group_memberships::table
