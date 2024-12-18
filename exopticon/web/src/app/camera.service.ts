@@ -48,7 +48,7 @@ export class CameraService {
 
   getCamera(id: CameraId): Observable<Camera> {
     return this.http.get<Camera[]>(this.cameraUrl).pipe(
-      map((data: Camera[]) => data.find((c) => c.id)),
+      map((data: Camera[]) => data.find((c) => c.id === id)),
       catchError(this.handleError),
     );
   }
