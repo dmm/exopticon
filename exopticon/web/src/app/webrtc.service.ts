@@ -1,6 +1,6 @@
 import { Injectable } from "@angular/core";
 import { Duration, Instant } from "@js-joda/core";
-import { ReplaySubject, BehaviorSubject } from "rxjs";
+import { ReplaySubject, BehaviorSubject, Subject } from "rxjs";
 import { CameraId } from "./camera";
 
 type ServerMessage = NegotiationAnswer;
@@ -52,109 +52,26 @@ export class WebrtcService {
 
   private signalSocket?: WebSocket;
 
-  // status
-  private status: ClientStatus = { kind: "paused" };
-
   // status timer
-  private maxTimeout = 5000;
+  private retryAttempts = 0;
+  private readonly baseDelay = 100;
+  private readonly maxTimeout = 5000;
   private timeoutId: ReturnType<typeof setTimeout>;
 
   status$ = this.statusSubject.asObservable();
 
   constructor() {}
 
-  updateStatus(newStatus: ClientStatus) {
-    this.status = newStatus;
-    this.statusSubject.next(newStatus);
-  }
+  //
+  // public methods
+  //
 
-  updateState() {
-    let activeCameras = " [";
-    for (let [id, val] of this.activeCameras) {
-      if (val) {
-        activeCameras += id + ",";
-      }
-    }
-    activeCameras += "]";
-
-    console.log(
-      "updateState(): status: " +
-        this.status.kind +
-        ", Enabled? " +
-        this.enabled +
-        activeCameras,
-    );
-    clearTimeout(this.timeoutId);
-
-    if (!this.enabled) {
-      this.disconnect("not enabled");
-      return;
-    }
-
-    if (this.status.kind === "paused") {
-      this.connect();
-    } else if (this.status.kind === "signalChannelConnecting") {
-      let duration = Duration.between(this.status.since, Instant.now());
-      if (duration.toMillis() > this.maxTimeout) {
-        this.disconnect("signal Channel Connecting timeout");
-      }
-    } else if (this.status.kind === "webrtcConnecting") {
-      let duration = Duration.between(this.status.since, Instant.now());
-      if (duration.toMillis() > this.maxTimeout) {
-        this.sendOffer();
-      }
-    }
-
-    let s = "closed";
-    if (this.peerConnection) {
-      s = this.peerConnection.connectionState;
-    }
-    console.log("WEBRTC STATUS: " + s);
-    if (s === "new") {
-    } else if (s === "connecting") {
-      this.syncTracks();
-    } else if (s === "connected") {
-      this.syncTracks();
-    } else if (s === "disconnected") {
-    } else if (s === "failed") {
-    } else if (s === "closed") {
-    }
-
-    if (this.enabled === true) {
-      this.timeoutId = setTimeout(this.updateState.bind(this), this.maxTimeout);
-    }
-  }
-
-  syncTracks() {
-    if (
-      this.status.kind === "webrtcConnecting" ||
-      this.status.kind == "webrtcConnected"
-    ) {
-      // ensure every cameraId has a corresponding transceiver
-      for (let [cameraId, cameraActive] of this.activeCameras) {
-        let direction: RTCRtpTransceiverDirection = "recvonly";
-        let transceiver = this.transceivers.get(cameraId);
-        if (transceiver === undefined) {
-          console.log("CREATING tranceiver for " + cameraId);
-          let newTransceiver = this.peerConnection.addTransceiver("video", {
-            direction: direction,
-          });
-          this.transceivers.set(cameraId, newTransceiver);
-        }
-      }
-      this.updateMappings();
-    } else {
-      // clean up transceivers
-      this.transceivers.clear();
-    }
-  }
-
-  enable() {
+  enable(): void {
     this.enabled = true;
     this.updateState();
   }
 
-  disable() {
+  disable(): void {
     this.enabled = false;
     this.updateState();
   }
@@ -170,7 +87,7 @@ export class WebrtcService {
     this.updateState();
   }
 
-  subscribe(cameraId: CameraId): ReplaySubject<MediaStream> {
+  subscribe(cameraId: CameraId): Subject<MediaStream> {
     if (this.emitters.has(cameraId)) {
       return this.emitters.get(cameraId);
     } else {
@@ -180,65 +97,114 @@ export class WebrtcService {
     }
   }
 
-  private updateMappings() {
-    if (
-      this.status.kind === "paused" ||
-      this.status.kind === "signalChannelConnecting"
-    ) {
+  //
+  // private methods
+  //
+
+  private updateStatus(newStatus: ClientStatus): void {
+    this.statusSubject.next(newStatus);
+  }
+
+  /** Handles periodic state updates and transitions. */
+  private updateState(): void {
+    clearTimeout(this.timeoutId);
+
+    if (!this.enabled) {
+      this.disconnect("not enabled");
       return;
     }
 
-    let mappings = new Object();
+    switch (this.statusSubject.value.kind) {
+      case "paused":
+        this.connect();
+        break;
+      case "signalChannelConnecting":
+      case "webrtcConnecting":
+        if (this.hasExceededTimeout(this.statusSubject.value.since)) {
+          this.connect();
+        }
+        break;
+      default:
+        this.syncTracks();
+    }
 
-    for (let [cameraId, transceiver] of this.transceivers) {
-      let active = this.activeCameras.get(cameraId);
-      if (transceiver.mid !== null && active) {
+    this.timeoutId = setTimeout(() => this.updateState(), this.maxTimeout);
+  }
+
+  /** Checks if the WebRTC connection is in an active state. */
+  private isWebrtcActive(): boolean {
+    const status = this.statusSubject.value.kind;
+    return status === "webrtcConnecting" || status === "webrtcConnected";
+  }
+
+  /** Checks if a timeout duration has been exceeded. */
+  private hasExceededTimeout(since: Instant): boolean {
+    const duration = Duration.between(since, Instant.now()).toMillis();
+    return duration > this.maxTimeout;
+  }
+
+  /** Updates mappings between transceivers and cameras. */
+  private updateStreamMappings(): void {
+    if (this.statusSubject.value.kind === "paused" || !this.signalSocket)
+      return;
+
+    const mappings: Record<string, CameraId> = {};
+    for (const [cameraId, transceiver] of this.transceivers) {
+      if (transceiver.mid && this.activeCameras.get(cameraId)) {
         mappings[transceiver.mid] = cameraId;
       }
     }
-    this.signalSocket.send(
-      JSON.stringify({
-        kind: "streamMapping",
-        mappings: mappings,
-      }),
-    );
+
+    this.signalSocket.send(JSON.stringify({ kind: "streamMapping", mappings }));
   }
 
+  /** Synchronizes transceivers with active cameras. */
+  private syncTracks(): void {
+    if (this.isWebrtcActive()) {
+      for (const [cameraId, _] of this.activeCameras) {
+        if (!this.transceivers.has(cameraId)) {
+          const transceiver = this.peerConnection?.addTransceiver("video", {
+            direction: "recvonly",
+          });
+          this.transceivers.set(cameraId, transceiver!);
+        }
+      }
+      this.updateStreamMappings();
+    } else {
+      this.transceivers.clear();
+    }
+  }
+
+  /** Inititates WebRTC connection */
   private webrtcConnect() {
     this.peerConnection = new RTCPeerConnection();
 
-    this.status = { kind: "webrtcConnecting", since: Instant.now() };
+    this.updateStatus({ kind: "webrtcConnecting", since: Instant.now() });
 
     this.dataChannel = this.peerConnection.createDataChannel("foo");
-    this.dataChannel.onclose = () => console.log("sendChannel has closed");
+    this.dataChannel.onclose = () => {};
     let self = this;
-    this.dataChannel.onopen = () => {
-      console.log("sendChannel has opened");
-    };
-    this.dataChannel.onmessage = (e) => {};
+    this.dataChannel.onopen = () => {};
+
+    this.dataChannel.onmessage = (_) => {};
 
     this.peerConnection.onconnectionstatechange = (ev) => {
       switch (this.peerConnection.connectionState) {
         case "new":
         case "connecting":
-          console.log("WebRTC Connecting...");
           this.updateStatus({ kind: "webrtcConnecting", since: Instant.now() });
           break;
         case "connected":
-          console.log("Online **");
           this.updateStatus({ kind: "webrtcConnected", since: Instant.now() });
           self.updateState();
           break;
         case "disconnected":
-          console.log("Disconnecting...");
           this.disconnect("webrtc disconnecting");
           break;
         case "closed":
-          console.log("Connection Offline");
           this.disconnect("webrtc connection offline");
           break;
         case "failed":
-          console.log("Connection Error");
           this.disconnect("webrtc failed");
           break;
         default:
@@ -256,7 +222,6 @@ export class WebrtcService {
     };
 
     this.peerConnection.onnegotiationneeded = async (e) => {
-      console.log("Renegotiation requested... Creating offer!");
       this.sendOffer();
     };
 
@@ -266,7 +231,6 @@ export class WebrtcService {
     };
 
     this.peerConnection.ontrack = ({ transceiver, streams: [stream] }) => {
-      console.log("Got track! " + transceiver.mid);
       for (const [cameraId, tran] of this.transceivers) {
         if (tran.mid === transceiver.mid) {
           this.emitters.get(cameraId).next(stream);
@@ -275,6 +239,7 @@ export class WebrtcService {
     };
   }
 
+  /** Send webrtc offer to server */
   private async sendOffer() {
     try {
       let offer = await this.peerConnection.createOffer();
@@ -292,61 +257,57 @@ export class WebrtcService {
     }
   }
 
-  private connect() {
-    let url = "";
-    let parse = document.createElement("a");
-    parse.href = document.querySelector("base")["href"];
+  /** Builds WebSocket url from base.href */
+  private constructWebSocketUrl(): string {
+    const loc = window.location;
+    const basePath = document.querySelector("base")?.getAttribute("href") || "";
+    const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${loc.host}${basePath}v1/webrtc/connect`;
+  }
 
-    let loc = window.location;
-    if (loc.protocol === "https:") {
-      url = "wss:";
-    } else {
-      url = "ws:";
-    }
-    var pathname = parse.pathname === "/" ? "" : `/${parse.pathname}`;
-    url += `//${parse.host}${pathname}/v1/webrtc/connect`;
-
+  /** Initiates WebSocket connection */
+  private setupSignalSocket(): void {
+    const url = this.constructWebSocketUrl();
     this.signalSocket = new WebSocket(url);
 
+    this.signalSocket.onopen = () => this.webrtcConnect();
+    this.signalSocket.onclose = () => this.disconnect("signalSocket onclose");
+    this.signalSocket.onerror = () => this.updateStatus({ kind: "paused" });
+    this.signalSocket.onmessage = (event) => this.handleSocketMessage(event);
+  }
+
+  /** Handle messages from server over websocket */
+  private handleSocketMessage(event: MessageEvent): void {
+    const message: ServerMessage = JSON.parse(event.data);
+    if (message.kind === "negotiationAnswer") {
+      this.handleNegotiationAnswer(message);
+    }
+  }
+
+  private async handleNegotiationAnswer(
+    message: NegotiationAnswer,
+  ): Promise<void> {
+    try {
+      await this.peerConnection?.setRemoteDescription({
+        sdp: message.answer,
+        type: "answer",
+      });
+    } catch (err) {
+      console.error("Failed to handle negotiation answer:", err);
+      this.disconnect("message error");
+    }
+  }
+
+  private connect(): void {
+    this.setupSignalSocket();
     this.updateStatus({
       kind: "signalChannelConnecting",
       since: Instant.now(),
     });
-
-    this.signalSocket.onopen = (event) => {
-      this.webrtcConnect();
-    };
-
-    this.signalSocket.onclose = (event) => {
-      this.disconnect("signalSocket onclose");
-    };
-
-    this.signalSocket.onerror = (event) => {
-      this.updateStatus({ kind: "paused" });
-    };
-
-    this.signalSocket.onmessage = async (event) => {
-      let message: ServerMessage = JSON.parse(event.data);
-
-      try {
-        switch (message.kind) {
-          case "negotiationAnswer":
-            console.log("GOT ANSWER........");
-            await this.peerConnection.setRemoteDescription({
-              sdp: message.answer,
-              type: "answer",
-            });
-            break;
-        }
-      } catch (err) {
-        console.log("Message error! " + err);
-        this.disconnect("message error");
-      }
-    };
   }
 
   private disconnect(reason: string) {
-    console.log("disconnect( " + reason + " )....!");
+    console.log("WebRTC disconnected ( " + reason + " )....!");
     this.updateStatus({ kind: "paused" });
     this.signalSocket.close();
     if (this.peerConnection) {

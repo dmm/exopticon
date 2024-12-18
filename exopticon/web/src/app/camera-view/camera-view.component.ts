@@ -33,11 +33,20 @@ import { Observable, Subscription } from "rxjs";
 import { Camera } from "../camera";
 import { WebrtcService } from "../webrtc.service";
 
-enum CameraViewStatus {
-  New,
-  Connecting,
-  Playing,
+export interface NewState {
+  kind: "new";
 }
+
+export interface ConnectingState {
+  kind: "connecting";
+  lastTime: number;
+}
+
+export interface PlayingState {
+  kind: "playing";
+}
+
+type CameraViewStatus = NewState | ConnectingState | PlayingState;
 
 @Component({
   selector: "app-camera-view",
@@ -58,7 +67,7 @@ export class CameraViewComponent implements OnInit {
   public status: string;
 
   private mediaStream?: MediaStream = undefined;
-  private state: CameraViewStatus = CameraViewStatus.New;
+  private state: CameraViewStatus = { kind: "new" };
   private subscription: Subscription = null;
 
   constructor(
@@ -73,11 +82,14 @@ export class CameraViewComponent implements OnInit {
   }
 
   ngAfterViewInit() {
-    if (this.state === CameraViewStatus.New) {
+    if (this.state.kind === "new") {
       this.onVideoStatusChange("loading...");
       this.activate();
       this.setMediaSource();
-      this.state = CameraViewStatus.Connecting;
+      this.state = {
+        kind: "connecting",
+        lastTime: this.getVideoElement().currentTime,
+      };
     }
   }
 
@@ -95,38 +107,49 @@ export class CameraViewComponent implements OnInit {
     }
   }
 
+  getVideoElement(): HTMLVideoElement {
+    let video = this.videoElement.nativeElement as HTMLVideoElement;
+    return video;
+  }
+
   setMediaSource() {
     if (this.mediaStream) {
-      let video = this.videoElement.nativeElement as HTMLVideoElement;
+      let video = this.getVideoElement();
       video.srcObject = this.mediaStream;
       video.muted = true;
       video.autoplay = true;
-      video.onloadeddata = this.genStatusHandler("active");
+      //video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
 
       video.onended = () => {
-        this.state = CameraViewStatus.New;
+        this.state = { kind: "new" };
       };
 
       video.ontimeupdate = () => {
-        this.state = CameraViewStatus.Playing;
+        if (this.state.kind === "new") {
+          let currentTime = this.getVideoElement().currentTime;
+          console.log(`Current time! ${currentTime}`);
+          this.state = { kind: "playing" };
+        }
       };
     } else {
-      let video = this.videoElement.nativeElement as HTMLVideoElement;
-      video.pause();
-      video.srcObject = null;
+      //      let video = this.videoElement.nativeElement as HTMLVideoElement;
+      //      video.pause();
+      //      video.srcObject = null;
     }
   }
 
   activate() {
     this.subscription = this.webrtcService.subscribe(this.camera.id).subscribe(
       (m) => {
-        this.mediaStream = m;
+        if (m !== this.mediaStream) {
+          this.mediaStream = m;
+        }
         this.setMediaSource();
       },
       (_err) => {
-        this.mediaStream = undefined;
-        this.setMediaSource();
+        //        this.mediaStream = undefined;
+        //        this.setMediaSource();
       },
     );
   }
@@ -136,12 +159,12 @@ export class CameraViewComponent implements OnInit {
       this.subscription.unsubscribe();
     }
     if (this.videoElement !== undefined) {
-      let video = this.videoElement.nativeElement as HTMLVideoElement;
-      video.pause();
+      //      let video = this.videoElement.nativeElement as HTMLVideoElement;
+      //      video.pause();
     }
   }
 
-  setStatus(event) {
+  setStatus(_event) {
     this.status = "active";
   }
 
