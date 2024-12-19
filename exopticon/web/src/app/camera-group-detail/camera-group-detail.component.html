@@ -38,8 +38,13 @@
           UP
         </button>
         <input type="hidden" formControlName="id" />
-        <input formControlName="name" class="name" readonly=true />
-        <input type="checkbox" formControlName="include" class="include" [hidden]="hideMembership"/>
+        <input formControlName="name" class="name" readonly="true" />
+        <input
+          type="checkbox"
+          formControlName="include"
+          class="include"
+          [hidden]="hideMembership"
+        />
         <button
           type="button"
           class="down-button"

@@ -95,6 +95,6 @@ div.member-list > div > button.down-button {
   margin-left: 10px;
 }
 
-md-checkbox[ng-readonly="true"]{
-    z-index: -1;
+md-checkbox[ng-readonly="true"] {
+  z-index: -1;
 }
