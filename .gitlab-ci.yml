@@ -98,7 +98,6 @@ deploy:
     - scp ".prod.env" "$DEPLOY_HOST:.env"
     - scp docker-compose.db.yml docker-compose.yml docker-compose.web.yml "$DEPLOY_HOST:"
     - echo version is $RELEASE_VERSION
-    - ssh "$DEPLOY_HOST" "docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY; docker compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.web.yml pull;
-docker compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.web.yml build;  docker compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.web.yml up -d --force-recreate"
+    - ssh "$DEPLOY_HOST" "docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY; docker compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.web.yml pull; docker compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.web.yml build;  docker compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.web.yml up -d --force-recreate"
   only:
     - tags
