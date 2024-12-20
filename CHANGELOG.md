@@ -2,6 +2,28 @@
 
 <!--- next entry here -->
 
+## 0.33.0
+2024-12-20
+
+### Features
+
+- Add orderable "ALL" CameraGroup (6c590bc615fa4d133ffe3eca5407688f42972f9d)
+- Add deployment to ci (df21f0c82df8a93660e1a11a10bd4fcaad4c3d26)
+
+### Fixes
+
+- appease clippy (5ee59dc8d2505f9aa473a3ff5d2b197336bc0949)
+- "fix" db tests, remove nullable db (5a0da0ea7ad9a35c2e0d7ed1559041d517dd2273)
+- improve error logging (ae1e5f03dbda5e2d4138d2e7ee13094f6ae93d25)
+- switch to uuid for Cameras and CameraGroups (e6bacf626b78880e5d4d220e8c0ad8c333508554)
+- Remove unused subscription fields (44f1902d3ad735fb4e03768cc626878c987b12c0)
+- camera creation api (fb0e80c3cba6bf541656146b77c431f8b3ab13c7)
+- CameraGroup editing (1f3c542de03bee23bfa25e52ed6c9bda6f1c429e)
+- camera service filtering (c9f022c2aeb4d7ba81c340baa58a244fe58c56f1)
+- gitlab-ci formatting (44de047d9de10888d00e77c838d0fe6e884b12ef)
+- remove deploy job (073a36986f99f0b0480867d0507725c6a5a0b9d1)
+- CameraGroupDetailComponent formatting (e7f9c12ce3bba268dc18c0031ff677b91f5505c6)
+
 ## 0.32.2
 2024-10-02
 
