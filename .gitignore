@@ -6,3 +6,4 @@
 **/core
 
 /testdata
+/docker/.env.dev
