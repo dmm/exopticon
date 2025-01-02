@@ -27,6 +27,9 @@ use std::{
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
+use metrics::{counter, Counter};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use tokio::{
     fs,
     process::{self, Child, ChildStdin, ChildStdout},
@@ -78,16 +81,20 @@ pub struct CaptureActor {
     sender: broadcast::Sender<VideoPacket>,
     /// Supervisor command channel
     command_receiver: mpsc::Receiver<Command>,
+    /// counter to track lost packets
+    lost_packet_counter: Counter,
 }
 
 impl CaptureActor {
-    pub const fn new(
+    pub fn new(
         db: crate::db::Service,
         camera: Camera,
         storage_group: StorageGroup,
         command_receiver: mpsc::Receiver<Command>,
         sender: broadcast::Sender<VideoPacket>,
     ) -> Self {
+        let camera_name = camera.common.name.clone();
+        let camera_id = camera.id.clone();
         Self {
             state: State::Ready,
             db,
@@ -97,6 +104,7 @@ impl CaptureActor {
             video_segment_id: None,
             command_receiver,
             sender,
+            lost_packet_counter: counter!("lost_packet_count", "camera_id" => camera_id.to_string(), "camera_name" => camera_name),
         }
     }
 
@@ -198,6 +206,19 @@ impl CaptureActor {
             // );
         }
     }
+
+    fn check_log_for_lost_packets(log: &str) -> Option<u32> {
+        static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"RTP: missed ([0-9]+) packets").unwrap());
+        let Some(caps) = RE.captures(log) else {
+            return None;
+        };
+
+        if let Ok(num) = &caps[1].trim().parse::<u32>() {
+            return Some(*num);
+        } else {
+            return None;
+        }
+    }
     async fn message_to_action(&mut self, msg: CaptureMessage) -> anyhow::Result<()> {
         match msg {
             CaptureMessage::Log { level, message } => {
@@ -206,8 +227,12 @@ impl CaptureActor {
                     "capture worker {} {} log: {}",
                     self.camera.id,
                     self.camera.common.name,
-                    message
+                    &message
                 );
+
+                if let Some(packet_count) = CaptureActor::check_log_for_lost_packets(&message) {
+                    self.lost_packet_counter.increment(packet_count.into());
+                }
             }
             CaptureMessage::Frame {
                 jpeg: _,
