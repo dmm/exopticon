@@ -2,6 +2,19 @@
 
 <!--- next entry here -->
 
+## 0.34.0
+2025-01-02
+
+### Features
+
+- Create metrics to track rtp packets lost by CaptureWorker (3a54d6cdaab754b6845e451d4de5443040f86555)
+- Switch to pgautoupgrade (75db711f7dda347c2d680205fe28a550c2974005)
+
+### Fixes
+
+- fix typo in tag attribute name (a56cbdbcc12cec14339fe55ed417d62df4ff53e1)
+- appease clippy (0977d2f825fad43ca82506fad837bb590abeb433)
+
 ## 0.33.0
 2024-12-20
 
