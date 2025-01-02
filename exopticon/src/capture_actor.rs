@@ -94,7 +94,7 @@ impl CaptureActor {
         sender: broadcast::Sender<VideoPacket>,
     ) -> Self {
         let camera_name = camera.common.name.clone();
-        let camera_id = camera.id.clone();
+        let camera_id = camera.id;
         Self {
             state: State::Ready,
             db,
@@ -209,15 +209,13 @@ impl CaptureActor {
 
     fn check_log_for_lost_packets(log: &str) -> Option<u32> {
         static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"RTP: missed ([0-9]+) packets").unwrap());
-        let Some(caps) = RE.captures(log) else {
-            return None;
-        };
+        let caps = RE.captures(log)?;
 
-        if let Ok(num) = &caps[1].trim().parse::<u32>() {
-            return Some(*num);
-        } else {
-            return None;
-        }
+        caps[1]
+            .trim()
+            .parse::<u32>()
+            .as_ref()
+            .map_or(None, |num| Some(*num))
     }
     async fn message_to_action(&mut self, msg: CaptureMessage) -> anyhow::Result<()> {
         match msg {
@@ -230,7 +228,7 @@ impl CaptureActor {
                     &message
                 );
 
-                if let Some(packet_count) = CaptureActor::check_log_for_lost_packets(&message) {
+                if let Some(packet_count) = Self::check_log_for_lost_packets(&message) {
                     self.lost_packet_counter.increment(packet_count.into());
                 }
             }
