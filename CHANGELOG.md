@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.35.0
+2025-01-07
+
+### Features
+
+- switch to mold for development (8c328ef81a383b91e5c019415c07bacea788706c)
+
 ## 0.34.0
 2025-01-02
 
