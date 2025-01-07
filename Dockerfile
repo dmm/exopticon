@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   curl python3-pil python3-lxml \
   python3 python3-dev python3-pip python3-setuptools python3-wheel \
   git libopencv-dev python3-opencv python3-scipy cmake \
+  mold clang \
   # ffmpeg
   ffmpeg libavformat-dev libswscale-dev libavutil-dev libavcodec-dev libavfilter-dev \
   # hwaccel
@@ -125,6 +126,11 @@ RUN mkdir -p /cargo /exopticon/target \
  && chown exopticon:plugdev /cargo /exopticon/target
 
 USER exopticon:plugdev
+
+# configure mold linker
+RUN mkdir ~/.cargo
+RUN echo "[target.x86_64-unknown-linux-gnu]" >> ~/.cargo/config.toml
+RUN echo "rustflags = [\"-C\", \"linker=clang\", \"-C\", \"link-arg=--ld-path=/usr/bin/mold\"]" >> ~/.cargo/config.toml
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]
 
