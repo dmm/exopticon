@@ -77,13 +77,6 @@ RUN mkdir /node && cd /node \
     && rm -rf node.tar.xz
 ENV PATH=/node/bin:$PATH
 
-# Install cargo-make
-RUN mkdir cm && cd cm \
-  && curl -L https://github.com/sagiegurari/cargo-make/releases/download/0.35.0/cargo-make-v0.35.0-x86_64-unknown-linux-musl.zip > cargo-make.zip \
-  && echo "429c60665b20d43c6492045539add3f41a6339a0fb83d3d7d5bb66f926ccff36  cargo-make.zip" | sha256sum -c \
-  && unzip cargo-make.zip && cp cargo-make-*/cargo-make /usr/local/bin/cargo-make \
-  && cd .. && rm -r cm/
-
 RUN mkdir /cargo && mkdir /rust
 RUN chown 1000:1000 /cargo /rust
 
@@ -100,7 +93,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && /cargo/bin/rustup toolchain install 1.78.0 \
   && /cargo/bin/rustup default 1.78.0 \
   && /cargo/bin/rustup component add clippy
-#RUN /cargo/bin/cargo uninstall --force cargo-make
 
 RUN pip3 install msgpack imutils numpy pathspec==0.9.0 dvc[s3]==1.11.16 importlib-metadata
 RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
@@ -140,7 +132,7 @@ USER exopticon:plugdev
 
 COPY --chown=exopticon:exopticon . ./
 
-RUN cargo make --profile release ci-flow
+RUN make ci-flow
 
 FROM $RUNTIMEBASE AS exopticon-runtime
 WORKDIR /exopticon

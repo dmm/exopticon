@@ -8,8 +8,8 @@
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e",
-    "format": "prettier --write src",
-    "check-format": "prettier --check src"
+    "format": "npx prettier --write src",
+    "check-format": "npx prettier --check src"
   },
   "private": true,
   "dependencies": {
