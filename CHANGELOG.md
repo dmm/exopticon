@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.35.1
+2025-01-12
+
+### Fixes
+
+- switch from cargo make to gnu make (8bcb089c244aed8f54bd2bb43a509274434cfbc6)
+
 ## 0.35.0
 2025-01-07
 
