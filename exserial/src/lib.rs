@@ -230,7 +230,6 @@ pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) {
 ///
 /// label must be null-terminated
 ///
-
 #[no_mangle]
 pub unsafe extern "C" fn send_metric_report(
     label: *const c_char,

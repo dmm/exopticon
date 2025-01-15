@@ -615,7 +615,7 @@ impl Camera {
         let timeout_body = if timeout == 0.0 {
             String::new()
         } else {
-            format!(r#"<Timeout>PT{}S</Timeout>"#, timeout / 1000.0)
+            format!(r"<Timeout>PT{}S</Timeout>", timeout / 1000.0)
         };
         let body = format!(
             r#"
