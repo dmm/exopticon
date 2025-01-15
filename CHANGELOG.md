@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.35.2
+2025-01-15
+
+### Fixes
+
+- update rust to 1.84.0 (74d6778f49d4ae3537d39f54ded88f41ba3947b8)
+- appease clippy (5c9424698f70903f5eabb2cb17493942a62e1bd4)
+
 ## 0.35.1
 2025-01-12
 
