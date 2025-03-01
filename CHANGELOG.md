@@ -2,6 +2,20 @@
 
 <!--- next entry here -->
 
+## 0.36.0
+2025-03-01
+
+### Features
+
+- Add levels to captureworker logs (8345a0d7d0393d1ee47c5629da809d40c85d9ec7)
+- Update to Rust 2024 edition (9357e82b259c062a19ab3d801e4e80d4b1fe0701)
+
+### Fixes
+
+- Prepare for 2024 edition (0b25914b8b2bb0645f356a0f008a0a8b7265ca00)
+- Update base docker images (24cc17e3e9b17c2a29327d7866f56d5201543eab)
+- Update to Rust 1.85.0 (9fe6beb94139ef77b9c39a38e2daf247e98af1f2)
+
 ## 0.35.2
 2025-01-15
 
