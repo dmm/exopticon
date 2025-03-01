@@ -8,7 +8,7 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 keywords = ["camera", "cctv", "onvif"]
 categories = ["api-wrapper", "network-programming"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 base64 = "0.9"
