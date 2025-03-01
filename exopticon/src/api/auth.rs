@@ -105,7 +105,7 @@ pub async fn login(
     let user = spawn_blocking(move || db.login(&auth_data.username, &auth_data.password)).await??;
     error!("Auth success!");
     // We found a valid user with that password. Create a login session.
-    let session_key = BASE64_STANDARD.encode(rand::thread_rng().gen::<[u8; 32]>());
+    let session_key = BASE64_STANDARD.encode(rand::thread_rng().r#gen::<[u8; 32]>());
     let valid_time = Duration::days(7);
     let expiration = match Utc::now().checked_add_signed(valid_time) {
         None => {
@@ -147,7 +147,7 @@ pub async fn create_personal_access_token(
 ) -> Result<Json<String>, UserError> {
     let db = state.db_service;
 
-    let session_key = BASE64_STANDARD.encode(rand::thread_rng().gen::<[u8; 32]>());
+    let session_key = BASE64_STANDARD.encode(rand::thread_rng().r#gen::<[u8; 32]>());
 
     let new_session = CreateUserSession {
         name: create_token_request.name,

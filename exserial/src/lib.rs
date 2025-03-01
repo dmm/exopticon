@@ -55,8 +55,8 @@ pub fn print_message(message: CaptureMessage) {
 ///
 /// frame pointer must be to a valid, aligned FrameMessage.
 ///
-#[no_mangle]
-pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) { unsafe {
     let frame = {
         assert!(!frame.is_null());
         &*frame
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
         unscaled_width: frame.unscaled_width,
     };
     print_message(frame);
-}
+}}
 
 /// Take FrameMessage struct and write a framed scaled, message to stdout
 ///
@@ -81,8 +81,8 @@ pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
 ///
 /// frame pointer must be to a valid, aligned FrameMessage.
 ///
-#[no_mangle]
-pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _height: i32) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _height: i32) { unsafe {
     let frame = {
         assert!(!frame.is_null());
         &*frame
@@ -100,7 +100,7 @@ pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _
     };
 
     print_message(frame);
-}
+}}
 
 /// Send a packet of compressed video
 ///
@@ -109,8 +109,8 @@ pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _
 /// data pointer must be valid and point to an allocation `size` in
 /// length
 ///
-#[no_mangle]
-pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64, duration: i64) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64, duration: i64) { unsafe {
     assert!(!data.is_null());
 
     let data_slice = slice::from_raw_parts(data, size as usize);
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64,
     };
 
     print_message(message);
-}
+}}
 
 /// Send a message signaling a new file was created.
 ///
@@ -130,11 +130,11 @@ pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64,
 ///
 /// filename and iso_begin_time must be null-terminated character arrays.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn send_new_file_message(
     filename: *const c_char,
     iso_begin_time: *const c_char,
-) {
+) { unsafe {
     let filename = {
         assert!(!filename.is_null());
 
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn send_new_file_message(
     };
 
     print_message(message);
-}
+}}
 
 /// Send a message signaling the closing of a file.
 ///
@@ -163,11 +163,11 @@ pub unsafe extern "C" fn send_new_file_message(
 ///
 /// filename and iso_end_time must be null-terminated character arrays.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn send_end_file_message(
     filename: *const c_char,
     iso_end_time: *const c_char,
-) {
+) { unsafe {
     let filename = {
         assert!(!filename.is_null());
 
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn send_end_file_message(
     };
 
     print_message(message);
-}
+}}
 
 /// Send a log message
 ///
@@ -194,8 +194,8 @@ pub unsafe extern "C" fn send_end_file_message(
 ///
 /// message must be a null-terminated character arrays.
 ///
-#[no_mangle]
-pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) { unsafe {
     let message = {
         assert!(!message.is_null());
 
@@ -222,7 +222,7 @@ pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) {
     };
 
     print_message(capture_message);
-}
+}}
 
 /// Send a metrics report
 ///
@@ -230,12 +230,12 @@ pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) {
 ///
 /// label must be null-terminated
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn send_metric_report(
     label: *const c_char,
     values: *const f64,
     value_count: u64,
-) {
+) { unsafe {
     assert!(!values.is_null());
     assert!(value_count > 0);
 
@@ -252,7 +252,7 @@ pub unsafe extern "C" fn send_metric_report(
     };
 
     print_message(message);
-}
+}}
 
 #[cfg(test)]
 mod tests {

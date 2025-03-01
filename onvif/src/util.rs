@@ -47,7 +47,7 @@ fn generate_password_digest(password: &str, offset: Duration) -> Result<Password
     };
 
     let mut rng = rand::thread_rng();
-    let nonce: [u8; 16] = rng.gen();
+    let nonce: [u8; 16] = rng.r#gen();
 
     let mut hasher = Sha1::new();
     hasher.input(&nonce);

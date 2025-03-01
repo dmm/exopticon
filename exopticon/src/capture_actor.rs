@@ -285,7 +285,7 @@ impl CaptureActor {
     }
 
     async fn select_next(&mut self) -> anyhow::Result<bool> {
-        if let Some((child, _, framed_stream)) = &mut self.child {
+        match &mut self.child { Some((child, _, framed_stream)) => {
             tokio::select! {
                 biased;
                 _ = child.wait() => {
@@ -304,12 +304,12 @@ impl CaptureActor {
                 Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
                 else => return Ok(false)
             }
-        } else {
+        } _ => {
             tokio::select! {
                 Some(Command::Stop) = self.command_receiver.recv() => return Ok(false),
                 else => return Ok(false),
             }
-        }
+        }}
 
         Ok(true)
     }
