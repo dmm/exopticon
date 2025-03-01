@@ -72,7 +72,7 @@ static const int MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 int64_t timespec_to_ms(const struct timespec time);
 char *timespec_to_8601(struct timespec *ts);
-void bs_log(const char *const fmt, ...);
+void ex_log(int level, const char *const fmt, ...);
 
 struct CameraState {
         time_t timenow, timestart;
@@ -140,11 +140,11 @@ static void my_av_log_callback(__attribute__((unused)) void *avcl, int level, co
         return;
 }
 
-void bs_log(const char *const fmt, ...)
+void ex_log(int level, const char *const fmt, ...)
 {
         va_list ap;
         va_start(ap, fmt);
-        my_av_log_callback(NULL, AV_LOG_DEBUG, fmt, ap);
+        my_av_log_callback(NULL, level, fmt, ap);
 }
 
 void report_new_file(char *filename, struct timespec begin_time)
@@ -167,14 +167,6 @@ time_t get_time()
         gettimeofday(&tv, NULL);
 
         return tv.tv_sec;
-}
-
-void free_buffer(void *opaque, uint8_t *data)
-{
-        // Silence unused parameter warning for callback
-        (void)(opaque);
-
-        tjFree(data);
 }
 
 char *timespec_to_8601(struct timespec *ts)
@@ -228,10 +220,10 @@ char *generate_output_name(const char *output_directory_name, time_t time)
 
         int ret = snprintf(name, size, "%s/%lld_%s_%d.mkv", output_directory_name,
                            (long long)time, isotime, nonce);
-        bs_log("Generated filename: %s", name);
+        ex_log(AV_LOG_INFO, "Generated filename: %s", name);
         if (ret < 0 || ret > size) {
                 // An error occured...
-                bs_log("Error creating output filename, snprintf "
+                ex_log(AV_LOG_ERROR, "Error creating output filename, snprintf "
                        "return value: %d",
                        ret);
         }
@@ -346,7 +338,7 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
                 // close file
                 int ret = ex_close_output_stream(out);
                 if (ret != 0) {
-                        bs_log("Error closing output stream!");
+                        ex_log(AV_LOG_ERROR, "Error closing output stream!");
                         return 1;
                 }
                 struct timespec end_time;
@@ -363,10 +355,10 @@ int handle_output_file(struct in_context *in, struct out_context *out, AVPacket 
                 char *fn = generate_output_name(output_directory, get_time());
                 struct timespec begin_time;
                 clock_gettime(CLOCK_REALTIME, &begin_time);
-                bs_log("Opening file: %s\n", fn);
+                ex_log(AV_LOG_ERROR, "Opening file: %s\n", fn);
                 int ret = ex_open_output_stream(in, out, fn);
                 if (ret != 0) {
-                        bs_log("Error opening output stream!");
+                        ex_log(AV_LOG_ERROR, "Error opening output stream!");
                         return 2;
                 }
                 pkt->stream_index = in->stream_index;
@@ -408,7 +400,7 @@ int main(int argc, char *argv[])
 
         int open_ret = ex_open_input_stream(input_uri, &cam.in);
         if (open_ret> 0) {
-                bs_log("Error opening stream, %s, error %d!", input_uri, open_ret);
+                ex_log(AV_LOG_ERROR, "Error opening stream, %s, error %d!", input_uri, open_ret);
                 goto cleanup;
         }
 
@@ -420,11 +412,11 @@ int main(int argc, char *argv[])
                         record_metric_start(&cam, LOOP_TIME);
                         int handle_ret = handle_output_file(&cam.in, &cam.out, &cam.pkt, cam.output_directory_name);
                         if (handle_ret != 0) {
-                                bs_log("Handle error!");
+                                ex_log(AV_LOG_ERROR, "Handle error!");
                                 goto cleanup;
                         }
                         if (cam.out.fcx == NULL) {
-                                bs_log("FCX null???");
+                                ex_log(AV_LOG_ERROR, "FCX null???");
                                 continue;
                         }
 
@@ -433,7 +425,7 @@ int main(int argc, char *argv[])
                         ex_send_packet(&cam.in, &cam.pkt);
                         int write_ret = ex_write_output_packet(&cam.out, cam.in.st->time_base, &cam.pkt);
                         if (write_ret != 0) {
-                                bs_log("Write Error!");
+                                ex_log(AV_LOG_ERROR, "Write Error!");
                                 goto cleanup;
                         }
                         clock_gettime(CLOCK_MONOTONIC, &(cam.in.last_frame_time));
@@ -447,10 +439,10 @@ int main(int argc, char *argv[])
 
         char buf[1024];
         av_strerror(ret, buf, sizeof(buf));
-        bs_log("av_read_frame returned %d, %s exiting...", ret, buf);
+        ex_log(AV_LOG_ERROR, "av_read_frame returned %d, %s exiting...", ret, buf);
 
 cleanup:
-        bs_log("Cleaning up!");
+        ex_log(AV_LOG_INFO, "Cleaning up!");
         ex_free_input(&cam.in);
 
         avformat_network_deinit();
