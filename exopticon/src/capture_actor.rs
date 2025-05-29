@@ -122,9 +122,7 @@ impl CaptureActor {
             // is fine, otherwise we fail later.
         }
         let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
-        let executable_path: PathBuf = [worker_path, "cworkers/captureworker".to_string()]
-            .iter()
-            .collect();
+        let executable_path: PathBuf = [worker_path, "capture_worker".to_string()].iter().collect();
 
         let hwaccel_method =
             env::var("EXOPTICON_HWACCEL_METHOD").unwrap_or_else(|_| "none".to_string());
@@ -285,31 +283,34 @@ impl CaptureActor {
     }
 
     async fn select_next(&mut self) -> anyhow::Result<bool> {
-        match &mut self.child { Some((child, _, framed_stream)) => {
-            tokio::select! {
-                biased;
-                _ = child.wait() => {
-                    info!(
-                        "Capture process for {} {} died. Restarting...",
-                        self.camera.id, self.camera.common.name,
-                    );
-                    return Ok(false);
+        match &mut self.child {
+            Some((child, _, framed_stream)) => {
+                tokio::select! {
+                    biased;
+                    _ = child.wait() => {
+                        info!(
+                            "Capture process for {} {} died. Restarting...",
+                            self.camera.id, self.camera.common.name,
+                        );
+                        return Ok(false);
+                    }
+                    Some(Command::Stop) = self.command_receiver.recv() => {
+                        info!("Received stop command for {} {}.",
+                              self.camera.id, self.camera.common.name,
+                        );
+                        return Ok(false)
+                    }
+                    Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
+                    else => return Ok(false)
                 }
-                Some(Command::Stop) = self.command_receiver.recv() => {
-                    info!("Received stop command for {} {}.",
-                          self.camera.id, self.camera.common.name,
-                    );
-                    return Ok(false)
+            }
+            _ => {
+                tokio::select! {
+                    Some(Command::Stop) = self.command_receiver.recv() => return Ok(false),
+                    else => return Ok(false),
                 }
-                Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
-                else => return Ok(false)
             }
-        } _ => {
-            tokio::select! {
-                Some(Command::Stop) = self.command_receiver.recv() => return Ok(false),
-                else => return Ok(false),
-            }
-        }}
+        }
 
         Ok(true)
     }

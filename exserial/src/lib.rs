@@ -26,9 +26,11 @@ use std::slice;
 //
 use bincode::serialize;
 use libc::c_char;
+use log::Level;
 
 use crate::models::{CaptureMessage, FrameMessage};
 
+pub mod exlog;
 pub mod models;
 
 pub fn print_message(message: CaptureMessage) {
@@ -56,24 +58,26 @@ pub fn print_message(message: CaptureMessage) {
 /// frame pointer must be to a valid, aligned FrameMessage.
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) { unsafe {
-    let frame = {
-        assert!(!frame.is_null());
-        &*frame
-    };
-    let jpeg = {
-        assert!(!frame.jpeg.is_null());
-        slice::from_raw_parts(frame.jpeg, frame.jpeg_size as usize)
-    };
+pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
+    unsafe {
+        let frame = {
+            assert!(!frame.is_null());
+            &*frame
+        };
+        let jpeg = {
+            assert!(!frame.jpeg.is_null());
+            slice::from_raw_parts(frame.jpeg, frame.jpeg_size as usize)
+        };
 
-    let frame = CaptureMessage::Frame {
-        jpeg: jpeg.to_vec(),
-        offset: frame.offset,
-        unscaled_height: frame.unscaled_height,
-        unscaled_width: frame.unscaled_width,
-    };
-    print_message(frame);
-}}
+        let frame = CaptureMessage::Frame {
+            jpeg: jpeg.to_vec(),
+            offset: frame.offset,
+            unscaled_height: frame.unscaled_height,
+            unscaled_width: frame.unscaled_width,
+        };
+        print_message(frame);
+    }
+}
 
 /// Take FrameMessage struct and write a framed scaled, message to stdout
 ///
@@ -82,25 +86,27 @@ pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) { unsafe
 /// frame pointer must be to a valid, aligned FrameMessage.
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _height: i32) { unsafe {
-    let frame = {
-        assert!(!frame.is_null());
-        &*frame
-    };
-    let jpeg = {
-        assert!(!frame.jpeg.is_null());
-        slice::from_raw_parts(frame.jpeg, frame.jpeg_size as usize)
-    };
+pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _height: i32) {
+    unsafe {
+        let frame = {
+            assert!(!frame.is_null());
+            &*frame
+        };
+        let jpeg = {
+            assert!(!frame.jpeg.is_null());
+            slice::from_raw_parts(frame.jpeg, frame.jpeg_size as usize)
+        };
 
-    let frame = CaptureMessage::ScaledFrame {
-        jpeg: jpeg.to_vec(),
-        offset: frame.offset,
-        unscaled_height: frame.unscaled_height,
-        unscaled_width: frame.unscaled_width,
-    };
+        let frame = CaptureMessage::ScaledFrame {
+            jpeg: jpeg.to_vec(),
+            offset: frame.offset,
+            unscaled_height: frame.unscaled_height,
+            unscaled_width: frame.unscaled_width,
+        };
 
-    print_message(frame);
-}}
+        print_message(frame);
+    }
+}
 
 /// Send a packet of compressed video
 ///
@@ -110,19 +116,21 @@ pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _
 /// length
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64, duration: i64) { unsafe {
-    assert!(!data.is_null());
+pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64, duration: i64) {
+    unsafe {
+        assert!(!data.is_null());
 
-    let data_slice = slice::from_raw_parts(data, size as usize);
-    let message = CaptureMessage::Packet {
-        //        encoding: models::PacketEncoding::H264,
-        data: data_slice.to_vec(),
-        timestamp,
-        duration,
-    };
+        let data_slice = slice::from_raw_parts(data, size as usize);
+        let message = CaptureMessage::Packet {
+            //        encoding: models::PacketEncoding::H264,
+            data: data_slice.to_vec(),
+            timestamp,
+            duration,
+        };
 
-    print_message(message);
-}}
+        print_message(message);
+    }
+}
 
 /// Send a message signaling a new file was created.
 ///
@@ -134,28 +142,30 @@ pub unsafe extern "C" fn send_packet(data: *const u8, size: u64, timestamp: i64,
 pub unsafe extern "C" fn send_new_file_message(
     filename: *const c_char,
     iso_begin_time: *const c_char,
-) { unsafe {
-    let filename = {
-        assert!(!filename.is_null());
+) {
+    unsafe {
+        let filename = {
+            assert!(!filename.is_null());
 
-        CStr::from_ptr(filename).to_string_lossy().into_owned()
-    };
+            CStr::from_ptr(filename).to_string_lossy().into_owned()
+        };
 
-    let iso_begin_time = {
-        assert!(!iso_begin_time.is_null());
+        let iso_begin_time = {
+            assert!(!iso_begin_time.is_null());
 
-        CStr::from_ptr(iso_begin_time)
-            .to_string_lossy()
-            .into_owned()
-    };
+            CStr::from_ptr(iso_begin_time)
+                .to_string_lossy()
+                .into_owned()
+        };
 
-    let message = CaptureMessage::NewFile {
-        filename,
-        begin_time: iso_begin_time,
-    };
+        let message = CaptureMessage::NewFile {
+            filename,
+            begin_time: iso_begin_time,
+        };
 
-    print_message(message);
-}}
+        print_message(message);
+    }
+}
 
 /// Send a message signaling the closing of a file.
 ///
@@ -167,26 +177,28 @@ pub unsafe extern "C" fn send_new_file_message(
 pub unsafe extern "C" fn send_end_file_message(
     filename: *const c_char,
     iso_end_time: *const c_char,
-) { unsafe {
-    let filename = {
-        assert!(!filename.is_null());
+) {
+    unsafe {
+        let filename = {
+            assert!(!filename.is_null());
 
-        CStr::from_ptr(filename).to_string_lossy().into_owned()
-    };
+            CStr::from_ptr(filename).to_string_lossy().into_owned()
+        };
 
-    let iso_end_time = {
-        assert!(!iso_end_time.is_null());
+        let iso_end_time = {
+            assert!(!iso_end_time.is_null());
 
-        CStr::from_ptr(iso_end_time).to_string_lossy().into_owned()
-    };
+            CStr::from_ptr(iso_end_time).to_string_lossy().into_owned()
+        };
 
-    let message = CaptureMessage::EndFile {
-        filename,
-        end_time: iso_end_time,
-    };
+        let message = CaptureMessage::EndFile {
+            filename,
+            end_time: iso_end_time,
+        };
 
-    print_message(message);
-}}
+        print_message(message);
+    }
+}
 
 /// Send a log message
 ///
@@ -195,34 +207,36 @@ pub unsafe extern "C" fn send_end_file_message(
 /// message must be a null-terminated character arrays.
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) { unsafe {
-    let message = {
-        assert!(!message.is_null());
+pub unsafe extern "C" fn send_log_message(level: i32, message: *const c_char) {
+    unsafe {
+        let message = {
+            assert!(!message.is_null());
 
-        CStr::from_ptr(message).to_string_lossy().into_owned()
-    };
+            CStr::from_ptr(message).to_string_lossy().into_owned()
+        };
 
-    let log_level = match level {
-        // error, fatal, panic
-        16 | 8 | 0 => log::Level::Error,
-        // warning
-        24 => log::Level::Warn,
-        // info
-        32 => log::Level::Info,
-        // verbose, debug
-        40 | 48 => log::Level::Debug,
-        // trace
-        56 => log::Level::Trace,
-        _ => log::Level::Trace,
-    };
+        let log_level = match level {
+            // error, fatal, panic
+            16 | 8 | 0 => Level::Error,
+            // warning
+            24 => Level::Warn,
+            // info
+            32 => Level::Info,
+            // verbose, debug
+            40 | 48 => Level::Debug,
+            // trace
+            56 => Level::Trace,
+            _ => Level::Trace,
+        };
 
-    let capture_message = CaptureMessage::Log {
-        level: log_level,
-        message,
-    };
+        let capture_message = CaptureMessage::Log {
+            level: log_level,
+            message,
+        };
 
-    print_message(capture_message);
-}}
+        print_message(capture_message);
+    }
+}
 
 /// Send a metrics report
 ///
@@ -235,24 +249,26 @@ pub unsafe extern "C" fn send_metric_report(
     label: *const c_char,
     values: *const f64,
     value_count: u64,
-) { unsafe {
-    assert!(!values.is_null());
-    assert!(value_count > 0);
+) {
+    unsafe {
+        assert!(!values.is_null());
+        assert!(value_count > 0);
 
-    let label = {
-        assert!(!label.is_null());
-        CStr::from_ptr(label).to_string_lossy().into_owned()
-    };
+        let label = {
+            assert!(!label.is_null());
+            CStr::from_ptr(label).to_string_lossy().into_owned()
+        };
 
-    let values_slice = slice::from_raw_parts(values, value_count as usize);
+        let values_slice = slice::from_raw_parts(values, value_count as usize);
 
-    let message = CaptureMessage::Metric {
-        label,
-        values: values_slice.to_vec(),
-    };
+        let message = CaptureMessage::Metric {
+            label,
+            values: values_slice.to_vec(),
+        };
 
-    print_message(message);
-}}
+        print_message(message);
+    }
+}
 
 #[cfg(test)]
 mod tests {
