@@ -218,13 +218,13 @@ fn main() {
 
         let (depayloader_name, parser_name) = match (&media, &encoding_name) {
             (&"video", &"H264") => (Some("rtph264depay"), Some("h264parse")),
-            (&"video", &"H265") => (Some("rtph265depay"), Some("h265parse")),
-            (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
-            (&"audio", &"MPEG4-GENERIC") | (&"audio", &"AAC") => {
-                (Some("rtpmp4gdepay"), Some("aacparse"))
-            }
-            (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
-            (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
+            // (&"video", &"H265") => (Some("rtph265depay"), Some("h265parse")),
+            // (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
+            // (&"audio", &"MPEG4-GENERIC") | (&"audio", &"AAC") => {
+            //     (Some("rtpmp4gdepay"), Some("aacparse"))
+            // }
+            // (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
+            // (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
             _ => (None, None),
         };
 
@@ -264,6 +264,7 @@ fn main() {
                     .name(parser_name)
                     .build()
                     .expect("Failed to build parser");
+
                 pipeline
                     .add_many(&[&parser])
                     .expect("Failed to add depay & parser to pipeline");
@@ -271,9 +272,31 @@ fn main() {
                     .sync_state_with_parent()
                     .expect("parser failed sync state with parent");
                 depay.link(&parser).expect("Failed to link depay to parser");
+
+                // Create a caps filter for Annex B format
+                let h264_caps = gst::Caps::builder("video/x-h264")
+                    .field("alignment", "au")
+                    .field("stream-format", "byte-stream") // This is the Annex B format
+                    .build();
+
+                // Get the source pad from parser
+
+                let capsfilter = gst::ElementFactory::make("capsfilter")
+                    .property("caps", h264_caps)
+                    .build()
+                    .expect("Failed to create capsfilter");
+
+                pipeline
+                    .add_many(&[&capsfilter])
+                    .expect("Failed to add capsfilter");
+                capsfilter.sync_state_with_parent().expect("Failed sync");
+
                 parser
+                    .link(&capsfilter)
+                    .expect("Failed to link parser to capsfilter");
+                capsfilter
                     .static_pad("src")
-                    .expect("Failed to get parser src pad.")
+                    .expect("failed to get caps filter static sink pad")
             } else {
                 // we don't need a parser, for pcm-a or pcm-u
                 depay.static_pad("src").expect("Failed to get depay src")
@@ -294,10 +317,7 @@ fn main() {
                     .expect("failed to link new_src_pad to bin_sink_pad");
 
                 // the bin pipeline to appsink
-                let appsink = AppSink::builder()
-                    //                    .caps(&new_pad_caps)
-                    .name("video_appsink")
-                    .build();
+                let appsink = AppSink::builder().name("video_appsink").build();
 
                 pipeline
                     .add_many(&[appsink.upcast_ref::<gst::Element>()])
@@ -320,25 +340,31 @@ fn main() {
                                 if let Ok(sample) = appsink.pull_sample() {
                                     let buffer =
                                         sample.buffer().expect("failed to get sample buffer");
-                                    let caps = sample.segment().expect("failed to get sample caps");
-                                    //                                    let nal = buffer.map().unwrap().as_slice();
-                                    let nal =
+                                    let map =
                                         buffer.map_readable().expect("failed to get buffer map");
+                                    let data = map.as_slice();
                                     let pts_90khz = buffer
                                         .pts()
                                         .map(|pts| pts.nseconds() * 90_000 / 1_000_000_000)
                                         .expect("failed to get buffer pts");
+
+                                    let mut nal_count = 0;
+                                    //                                    for nal in extract_nals(data) {
                                     let msg = CaptureMessage::Packet {
-                                        data: nal.to_vec(),
+                                        data: data.to_owned(),
                                         timestamp: i64::try_from(pts_90khz).expect("i64 overflow"),
-                                        duration: 0,
+                                        duration: 100,
                                     };
                                     exserial::print_message(msg);
+                                    nal_count += 1;
+                                    //                                  }
+
                                     debug!(
-                                        "SAMPLE PTS: {} 90Hz pts: {:?} offset: {}",
+                                        "SAMPLE PTS: {} 90Hz pts: {:?} offset: {}, NAL COUNT: {}",
                                         buffer.pts().expect("failed to get pts"),
                                         pts_90khz,
-                                        buffer.offset()
+                                        buffer.offset(),
+                                        nal_count
                                     );
                                 }
                             } else {
@@ -403,7 +429,6 @@ fn main() {
     let bus = pipeline.bus().unwrap();
     for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
         use gstreamer::MessageView;
-        info!("LOOP!!!! {:?}", msg.type_());
         match msg.view() {
             MessageView::Error(err) => {
                 error!(
