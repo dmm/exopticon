@@ -134,6 +134,38 @@ fn create_video_branch() -> Bin {
     bin
 }
 
+// Extract the video sample handling into a separate function
+fn handle_video_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowError> {
+    if let Ok(sample) = appsink.pull_sample() {
+        let buffer = sample.buffer().expect("failed to get sample buffer");
+        let map = buffer.map_readable().expect("failed to get buffer map");
+        let data = map.as_slice();
+        let pts_90khz = buffer
+            .pts()
+            .map(|pts| pts.nseconds() * 90_000 / 1_000_000_000)
+            .expect("failed to get buffer pts");
+
+        let mut nal_count = 0;
+        let msg = CaptureMessage::Packet {
+            data: data.to_owned(),
+            timestamp: i64::try_from(pts_90khz).expect("i64 overflow"),
+            duration: 100,
+        };
+        exserial::print_message(msg);
+        nal_count += 1;
+
+        debug!(
+            "SAMPLE PTS: {} 90Hz pts: {:?} offset: {}, NAL COUNT: {}",
+            buffer.pts().expect("failed to get pts"),
+            pts_90khz,
+            buffer.offset(),
+            nal_count
+        );
+    }
+    
+    Ok(gst::FlowSuccess::Ok)
+}
+
 fn main() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Info))
@@ -337,41 +369,11 @@ fn main() {
                             };
 
                             if let Some(appsink) = appsink {
-                                if let Ok(sample) = appsink.pull_sample() {
-                                    let buffer =
-                                        sample.buffer().expect("failed to get sample buffer");
-                                    let map =
-                                        buffer.map_readable().expect("failed to get buffer map");
-                                    let data = map.as_slice();
-                                    let pts_90khz = buffer
-                                        .pts()
-                                        .map(|pts| pts.nseconds() * 90_000 / 1_000_000_000)
-                                        .expect("failed to get buffer pts");
-
-                                    let mut nal_count = 0;
-                                    //                                    for nal in extract_nals(data) {
-                                    let msg = CaptureMessage::Packet {
-                                        data: data.to_owned(),
-                                        timestamp: i64::try_from(pts_90khz).expect("i64 overflow"),
-                                        duration: 100,
-                                    };
-                                    exserial::print_message(msg);
-                                    nal_count += 1;
-                                    //                                  }
-
-                                    debug!(
-                                        "SAMPLE PTS: {} 90Hz pts: {:?} offset: {}, NAL COUNT: {}",
-                                        buffer.pts().expect("failed to get pts"),
-                                        pts_90khz,
-                                        buffer.offset(),
-                                        nal_count
-                                    );
-                                }
+                                handle_video_sample(&appsink)
                             } else {
                                 error!("APPSINK IS NONE");
+                                Ok(gst::FlowSuccess::Ok)
                             }
-
-                            Ok(gst::FlowSuccess::Ok)
                         })
                         .build(),
                 );
