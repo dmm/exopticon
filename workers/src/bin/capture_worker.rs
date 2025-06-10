@@ -3,11 +3,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use chrono::{SecondsFormat, Utc};
 use exserial::{exlog::ExLog, models::CaptureMessage};
 use gstreamer::{
     self as gst,
     glib::object::{Cast, ObjectExt},
-    prelude::{ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
+    prelude::{
+        ElementExt, ElementExtManual, GObjectExtManualGst, GstBinExtManual, GstObjectExt, PadExt,
+    },
     Bin,
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
@@ -20,6 +23,7 @@ static LOGGER: ExLog = ExLog;
 struct CustomData {
     video_appsink: Option<AppSink>,
     audio_appsink: Option<AppSink>,
+    current_filename: Option<String>,
 }
 
 impl CustomData {
@@ -27,6 +31,7 @@ impl CustomData {
         Self {
             video_appsink: None,
             audio_appsink: None,
+            current_filename: None,
         }
     }
 }
@@ -45,8 +50,36 @@ fn uuid_to_filename(parent_path: &std::path::Path, uuid: Uuid) -> std::path::Pat
     parent_path.join(&path).into()
 }
 
-fn create_video_branch() -> Bin {
+fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
     let bin = gst::Bin::with_name("video_sink_bin");
+
+    let depay = gst::ElementFactory::make(&depay_name)
+        .name(depay_name)
+        .build()
+        .expect("Failed to build depay element.");
+
+    let tee_parser = gst::ElementFactory::make(&parser_name)
+        .name("tee_parser")
+        .build()
+        .expect("failed to create tee parser");
+
+    bin.add_many(&[&depay, &tee_parser])
+        .expect("Failed to add depay");
+
+    tee_parser.set_property("disable-passthrough", true);
+    tee_parser.set_property("config-interval", -1i32);
+
+    depay
+        .sync_state_with_parent()
+        .expect("Failed to sync depay state with parent");
+
+    tee_parser
+        .sync_state_with_parent()
+        .expect("Failed to sync tee_parser state with parent");
+
+    let depay_sink_pad = depay
+        .static_pad("sink")
+        .expect("Failed to get depay sink pad.");
 
     let tee = gst::ElementFactory::make("tee")
         .name("video_tee")
@@ -65,6 +98,9 @@ fn create_video_branch() -> Bin {
 
     bin.add_many([&tee, &mkv_queue, &app_queue])
         .expect("Failed to add elements to bin");
+
+    gst::Element::link_many([&depay, &tee_parser, &tee])
+        .expect("failed to link depay,tee_parser,tee");
 
     let tee_mkv_pad = tee
         .request_pad_simple("src_%u")
@@ -90,19 +126,67 @@ fn create_video_branch() -> Bin {
         .link(&app_queue_pad)
         .expect("failed to link tee app pad");
 
-    // Ghost Pads
-    let tee_sink = tee.static_pad("sink").expect("failed to get tee sink");
+    let mkv_parser = gst::ElementFactory::make(parser_name)
+        .name("mkv_parser")
+        .build()
+        .expect("failed to build mkv parser");
 
-    let ghost_sink = gst::GhostPad::builder_with_target(&tee_sink)
+    let appsink_parser = gst::ElementFactory::make(parser_name)
+        .name("appsink_parser")
+        .build()
+        .expect("failed to build appsink parser");
+
+    bin.add_many([&mkv_parser, &appsink_parser])
+        .expect("failed to add video bin parsers");
+
+    appsink_parser.set_property("config-interval", -1i32);
+    appsink_parser.set_property("disable-passthrough", true);
+
+    mkv_parser
+        .sync_state_with_parent()
+        .expect("Failed to sync mkv_parser state with parent");
+
+    appsink_parser
+        .sync_state_with_parent()
+        .expect("Failed to sync appsink_parser state with parent");
+
+    mkv_queue
+        .link(&mkv_parser)
+        .expect("failed to link mkv parser");
+
+    // For appsink video we need to add a caps filter to ensure the
+    // NALs are in the annexb format.
+
+    // Create a caps filter for Annex B format
+    let h264_caps = gst::Caps::builder("video/x-h264")
+        .field("alignment", "au")
+        .field("stream-format", "byte-stream") // This is the Annex B format
+        .build();
+
+    let capsfilter = gst::ElementFactory::make("capsfilter")
+        .property("caps", h264_caps)
+        .build()
+        .expect("Failed to create capsfilter");
+
+    bin.add_many(&[&capsfilter])
+        .expect("Failed to add capsfilter");
+    capsfilter.sync_state_with_parent().expect("Failed sync");
+
+    gstreamer::Element::link_many([&app_queue, &appsink_parser, &capsfilter])
+        .expect("failed to link mkv queue");
+
+    // Ghost Pads
+
+    let ghost_sink = gst::GhostPad::builder_with_target(&depay_sink_pad)
         .expect("failed to get ghost sink builder")
         .name("sink")
         .build();
 
     bin.add_pad(&ghost_sink).expect("failed to add ghost sink");
 
-    let mkv_src = mkv_queue
+    let mkv_src = mkv_parser
         .static_pad("src")
-        .expect("failed to get mkv queue src pad");
+        .expect("failed to get mkv parser src pad");
 
     let ghost_src = gst::GhostPad::builder_with_target(&mkv_src)
         .expect("Failed to get ghost src builder")
@@ -115,7 +199,7 @@ fn create_video_branch() -> Bin {
 
     bin.add_pad(&ghost_src).expect("failed to add ghost src");
 
-    let app_src = app_queue
+    let app_src = capsfilter
         .static_pad("src")
         .expect("failed to get app queue src pad");
 
@@ -162,7 +246,7 @@ fn handle_video_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowE
             nal_count
         );
     }
-    
+
     Ok(gst::FlowSuccess::Ok)
 }
 
@@ -209,18 +293,42 @@ fn main() {
         .request_pad_simple("video")
         .expect("Failed to get video sink pad from convert");
 
+    let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(CustomData::new()));
+    let data_weak_mkv_sink = Arc::downgrade(&data);
+    let data_weak = Arc::downgrade(&data);
+    let data_weak2 = Arc::downgrade(&data);
+
     mkv_sink.connect("format-location-full", false, move |_el| {
+        let data = data_weak_mkv_sink
+            .upgrade()
+            .expect("failed to get data for format-location-full");
+
+        let mut d = data.lock().unwrap();
+
+        let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+
+        if let Some(current_filename) = &d.current_filename {
+            let msg = CaptureMessage::EndFile {
+                filename: current_filename.clone(),
+                end_time: timestamp.clone(),
+            };
+            exserial::print_message(msg);
+        }
+
         let id = Uuid::now_v7();
         let path = uuid_to_filename(&storage_path, id);
         let parent = path.parent().expect("failed to get new file parent");
         create_dir_all(parent).expect("failed to create parent directory");
         info!("New file: {}", path.display());
+
+        let msg = CaptureMessage::NewFile {
+            filename: path.to_string_lossy().to_string(),
+            begin_time: timestamp,
+        };
+        exserial::print_message(msg);
+        d.current_filename = Some(path.to_string_lossy().to_string());
         Some(path.into())
     });
-
-    let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(CustomData::new()));
-    let data_weak = Arc::downgrade(&data);
-    let data_weak2 = Arc::downgrade(&data);
 
     // Connect the pad-added signal
     source.connect_pad_added(move |src, src_pad| {
@@ -251,12 +359,12 @@ fn main() {
         let (depayloader_name, parser_name) = match (&media, &encoding_name) {
             (&"video", &"H264") => (Some("rtph264depay"), Some("h264parse")),
             // (&"video", &"H265") => (Some("rtph265depay"), Some("h265parse")),
-            // (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
-            // (&"audio", &"MPEG4-GENERIC") | (&"audio", &"AAC") => {
-            //     (Some("rtpmp4gdepay"), Some("aacparse"))
-            // }
-            // (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
-            // (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
+            (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
+            (&"audio", &"MPEG4-GENERIC") | (&"audio", &"AAC") => {
+                (Some("rtpmp4gdepay"), Some("aacparse"))
+            }
+            (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
+            (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
             _ => (None, None),
         };
 
@@ -270,153 +378,100 @@ fn main() {
         };
         let mut d = data.lock().unwrap();
 
-        if let Some(depay_name) = depayloader_name {
-            let depay = gst::ElementFactory::make(&depay_name)
-                .name(depay_name)
-                .build()
-                .expect("Failed to build depay element.");
+        if let ("video", Some(depay_name), Some(parser_name), &None) =
+            (media, depayloader_name, parser_name, &d.video_appsink)
+        {
+            let bin = create_video_branch(&depay_name, parser_name);
             let pipeline = src
                 .parent()
                 .expect("Failed to get src parent")
                 .downcast::<gst::Pipeline>()
-                .unwrap();
-            pipeline.add_many(&[&depay]).expect("Failed to add depay");
-            depay
-                .sync_state_with_parent()
-                .expect("Failed to sync depay state with parent");
-            let depay_sink_pad = depay
-                .static_pad("sink")
-                .expect("Failed to get depay sink pad.");
+                .expect("failed to get unwrap src parent");
+
+            pipeline.add_many(&[&bin]).expect("Failed to add bin");
+
+            let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
+
+            let bin_mkv_src_pad = bin
+                .static_pad("mkv_src")
+                .expect("failed to get bin src pad");
+
             src_pad
-                .link(&depay_sink_pad)
-                .expect("Failed to link new src and depay");
+                .link(&bin_sink_pad)
+                .expect("failed to link new_src_pad to bin_sink_pad");
 
-            let new_src_pad = if let Some(parser_name) = parser_name {
-                let parser = gst::ElementFactory::make(&parser_name)
-                    .name(parser_name)
-                    .build()
-                    .expect("Failed to build parser");
+            // the bin pipeline to appsink
+            let appsink = AppSink::builder().name("video_appsink").sync(false).build();
 
-                pipeline
-                    .add_many(&[&parser])
-                    .expect("Failed to add depay & parser to pipeline");
-                parser
-                    .sync_state_with_parent()
-                    .expect("parser failed sync state with parent");
-                depay.link(&parser).expect("Failed to link depay to parser");
+            pipeline
+                .add_many(&[appsink.upcast_ref::<gst::Element>()])
+                .expect("failed to add video appsink to pipeline");
 
-                // Create a caps filter for Annex B format
-                let h264_caps = gst::Caps::builder("video/x-h264")
-                    .field("alignment", "au")
-                    .field("stream-format", "byte-stream") // This is the Annex B format
-                    .build();
+            let value = data_weak2.clone();
+            appsink.set_callbacks(
+                AppSinkCallbacks::builder()
+                    .new_sample(move |_| {
+                        let Some(data) = value.upgrade() else {
+                            return Ok(gst::FlowSuccess::Ok);
+                        };
 
-                // Get the source pad from parser
+                        let appsink = {
+                            let data = data.lock().unwrap();
+                            data.video_appsink.clone()
+                        };
 
-                let capsfilter = gst::ElementFactory::make("capsfilter")
-                    .property("caps", h264_caps)
-                    .build()
-                    .expect("Failed to create capsfilter");
+                        if let Some(appsink) = appsink {
+                            handle_video_sample(&appsink)
+                        } else {
+                            error!("APPSINK IS NONE");
+                            Ok(gst::FlowSuccess::Ok)
+                        }
+                    })
+                    .build(),
+            );
 
-                pipeline
-                    .add_many(&[&capsfilter])
-                    .expect("Failed to add capsfilter");
-                capsfilter.sync_state_with_parent().expect("Failed sync");
+            let bin_app_src_pad = bin
+                .static_pad("app_src")
+                .expect("failed to get bin app_src pad");
+            let appsink_sink_pad = appsink
+                .static_pad("sink")
+                .expect("failed to get appsink src pad");
+            bin_app_src_pad
+                .link(&appsink_sink_pad)
+                .expect("failed to link appsink_sink_pad");
+            appsink
+                .sync_state_with_parent()
+                .expect("failed to sync video appsink state");
+            d.video_appsink = Some(appsink);
 
-                parser
-                    .link(&capsfilter)
-                    .expect("Failed to link parser to capsfilter");
-                capsfilter
-                    .static_pad("src")
-                    .expect("failed to get caps filter static sink pad")
-            } else {
-                // we don't need a parser, for pcm-a or pcm-u
-                depay.static_pad("src").expect("Failed to get depay src")
-            };
-
-            if media.starts_with("video") {
-                let bin = create_video_branch();
-                pipeline.add_many(&[&bin]).expect("Failed to add bin");
-
-                let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
-
-                let bin_mkv_src_pad = bin
-                    .static_pad("mkv_src")
-                    .expect("failed to get bin src pad");
-
-                new_src_pad
-                    .link(&bin_sink_pad)
-                    .expect("failed to link new_src_pad to bin_sink_pad");
-
-                // the bin pipeline to appsink
-                let appsink = AppSink::builder().name("video_appsink").build();
-
-                pipeline
-                    .add_many(&[appsink.upcast_ref::<gst::Element>()])
-                    .expect("failed to add video appsink to pipeline");
-
-                let value = data_weak2.clone();
-                appsink.set_callbacks(
-                    AppSinkCallbacks::builder()
-                        .new_sample(move |_| {
-                            let Some(data) = value.upgrade() else {
-                                return Ok(gst::FlowSuccess::Ok);
-                            };
-
-                            let appsink = {
-                                let data = data.lock().unwrap();
-                                data.video_appsink.clone()
-                            };
-
-                            if let Some(appsink) = appsink {
-                                handle_video_sample(&appsink)
-                            } else {
-                                error!("APPSINK IS NONE");
-                                Ok(gst::FlowSuccess::Ok)
-                            }
-                        })
-                        .build(),
-                );
-
-                let bin_app_src_pad = bin
-                    .static_pad("app_src")
-                    .expect("failed to get bin app_src pad");
-                let appsink_sink_pad = appsink
-                    .static_pad("sink")
-                    .expect("failed to get appsink src pad");
-                bin_app_src_pad
-                    .link(&appsink_sink_pad)
-                    .expect("failed to link appsink_sink_pad");
-                appsink
-                    .sync_state_with_parent()
-                    .expect("failed to sync video appsink state");
-                d.video_appsink = Some(appsink);
-
-                // link the bin pipeline to the mkv splitmuxsink
-                let res = bin_mkv_src_pad.link(&video_sink_pad);
-                if res.is_err() {
-                    info!("Type is {new_pad_type} but link failed.");
-                } else {
-                    info!("Link succeeded (type {new_pad_type}).");
-                }
-
-                bin.sync_state_with_parent()
-                    .expect("failed to sync bin state");
-            } else {
-
-                // let audio_tee_sink = audio_tee
-                //     .request_pad_simple("sink")
-                //     .expect("Failed to get audio tee sink pad");
-                // let res = new_src_pad.link(&audio_tee_sink);
-                // audio_tee
-                //     .link_pads(Some("src_%u"), &mkv_sink, Some("audio_%u"))
-                //     .expect("Failed to link audio_tee pads");
-                // if res.is_err() {
-                //     println!("Type is {new_pad_type} but link failed.");
-                // } else {
-                //     println!("Link succeeded (type {new_pad_type}).");
-                // }
+            // link the bin pipeline to the mkv splitmuxsink
+            let res = bin_mkv_src_pad.link(&video_sink_pad);
+            if let Result::Err(err) = res {
+                error!("LINK ERROR: {}", err);
             }
+            if res.is_err() {
+                panic!("Type is {new_pad_type} but link failed.");
+            } else {
+                info!("Link succeeded (type {new_pad_type}).");
+            }
+
+            bin.sync_state_with_parent()
+                .expect("failed to sync bin state");
+        //            } else {
+
+        // let audio_tee_sink = audio_tee
+        //     .request_pad_simple("sink")
+        //     .expect("Failed to get audio tee sink pad");
+        // let res = new_src_pad.link(&audio_tee_sink);
+        // audio_tee
+        //     .link_pads(Some("src_%u"), &mkv_sink, Some("audio_%u"))
+        //     .expect("Failed to link audio_tee pads");
+        // if res.is_err() {
+        //     println!("Type is {new_pad_type} but link failed.");
+        // } else {
+        //     println!("Link succeeded (type {new_pad_type}).");
+        // }
+        //          }
         } else {
             error!("Unknown RTP encoding: {} / {}", media, encoding_name);
         }
