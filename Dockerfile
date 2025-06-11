@@ -103,7 +103,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 RUN pip3 install msgpack imutils numpy pathspec==0.9.0 dvc[s3]==1.11.16 importlib-metadata
 RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
 
-ENV EXOPTICONWORKERS=/exopticon/target/assets/workers
+ENV EXOPTICONWORKERS=/exopticon/target/debug/
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV CUDA_HOME=/usr/local/cuda-12.2
 ENV CUDA_PATH=/usr/local/cuda-12.2/bin
@@ -181,7 +181,7 @@ FROM exopticon-runtime AS exopticon-cuda
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
 
-COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/assets/workers ./workers
+COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/capture_worker .
 
 # Copy ffmpeg libraries
 #RUN mkdir -p /usr/local/lib /usr/local/bin \
@@ -189,7 +189,7 @@ COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/assets/work
 #COPY --from=exopticon-build /usr/local/lib/lib* /usr/local/lib/
 COPY --from=exopticon-build /usr/local/bin /usr/local/bin
 
-ENV EXOPTICONWORKERS=/exopticon/workers/
+ENV EXOPTICONWORKERS=/exopticon/
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV PATH=/exopticon:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/lib
