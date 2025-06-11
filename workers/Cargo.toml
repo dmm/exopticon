@@ -25,13 +25,5 @@ gstreamer-video = "0.23.5"
 log = "0.4.27"
 uuid = { version = "^1", features = ["serde", "v4", "v7"] }
 
-[dev-dependencies]
-criterion = "0.3"
-tempfile = "3.13.0"
-
 [build-dependencies]
 exserial = { path = "../exserial" }
-
-[[bench]]
-name = "captureworker_benchmark"
-harness = false
