@@ -434,7 +434,7 @@ impl Camera {
     ///
     pub fn parse_get_ntp(body: Vec<u8>) -> Result<NtpSettings, Error> {
         let string_body = String::from_utf8(body)?;
-        info!("{}", string_body);
+        info!("{string_body}");
         let doc = parser::parse(&string_body)?;
         let doc = doc.as_document();
 
@@ -644,7 +644,7 @@ impl Camera {
     ///
     pub fn parse_continuous_move(body: Vec<u8>) -> Result<(), Error> {
         let string_body = String::from_utf8(body)?;
-        debug!("ContinuousMove Response: {}", string_body);
+        debug!("ContinuousMove Response: {string_body}");
         let _doc = parser::parse(&string_body)?.as_document();
 
         Ok(())
