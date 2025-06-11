@@ -42,6 +42,7 @@
 #![allow(clippy::expect_used)]
 #![allow(clippy::future_not_send)]
 #![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
+#![allow(clippy::uninlined_format_args)]
 
 #[macro_use]
 extern crate diesel;
