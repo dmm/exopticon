@@ -18,6 +18,23 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#![deny(
+    nonstandard_style,
+    warnings,
+    rust_2018_idioms,
+    unused,
+    future_incompatible,
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo
+)]
+#![allow(clippy::arithmetic_side_effects)]
+#![allow(clippy::integer_division)]
+#![allow(clippy::implicit_return)]
+#![allow(clippy::print_stdout)]
+
+
 fn main() {
     println!("Hello, world!");
 }

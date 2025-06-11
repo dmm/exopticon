@@ -8,9 +8,7 @@ use exserial::{exlog::ExLog, models::CaptureMessage};
 use gstreamer::{
     self as gst,
     glib::object::{Cast, ObjectExt},
-    prelude::{
-        ElementExt, ElementExtManual, GObjectExtManualGst, GstBinExtManual, GstObjectExt, PadExt,
-    },
+    prelude::{ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
     Bin,
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
@@ -22,7 +20,7 @@ static LOGGER: ExLog = ExLog;
 #[derive(Debug)]
 struct CustomData {
     video_appsink: Option<AppSink>,
-    audio_appsink: Option<AppSink>,
+    //    audio_appsink: Option<AppSink>,
     current_filename: Option<String>,
 }
 
@@ -30,7 +28,7 @@ impl CustomData {
     pub fn new() -> Self {
         Self {
             video_appsink: None,
-            audio_appsink: None,
+            //            audio_appsink: None,
             current_filename: None,
         }
     }
@@ -47,23 +45,23 @@ fn uuid_to_filename(parent_path: &std::path::Path, uuid: Uuid) -> std::path::Pat
 
     let path = format!("{}/{}.mkv", ts.format("%Y/%m/%d/%H"), uuid);
 
-    parent_path.join(&path).into()
+    parent_path.join(&path)
 }
 
 fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
     let bin = gst::Bin::with_name("video_sink_bin");
 
-    let depay = gst::ElementFactory::make(&depay_name)
+    let depay = gst::ElementFactory::make(depay_name)
         .name(depay_name)
         .build()
         .expect("Failed to build depay element.");
 
-    let tee_parser = gst::ElementFactory::make(&parser_name)
+    let tee_parser = gst::ElementFactory::make(parser_name)
         .name("tee_parser")
         .build()
         .expect("failed to create tee parser");
 
-    bin.add_many(&[&depay, &tee_parser])
+    bin.add_many([&depay, &tee_parser])
         .expect("Failed to add depay");
 
     tee_parser.set_property("disable-passthrough", true);
@@ -168,7 +166,7 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
         .build()
         .expect("Failed to create capsfilter");
 
-    bin.add_many(&[&capsfilter])
+    bin.add_many([&capsfilter])
         .expect("Failed to add capsfilter");
     capsfilter.sync_state_with_parent().expect("Failed sync");
 
@@ -381,14 +379,14 @@ fn main() {
         if let ("video", Some(depay_name), Some(parser_name), &None) =
             (media, depayloader_name, parser_name, &d.video_appsink)
         {
-            let bin = create_video_branch(&depay_name, parser_name);
+            let bin = create_video_branch(depay_name, parser_name);
             let pipeline = src
                 .parent()
                 .expect("Failed to get src parent")
                 .downcast::<gst::Pipeline>()
                 .expect("failed to get unwrap src parent");
 
-            pipeline.add_many(&[&bin]).expect("Failed to add bin");
+            pipeline.add_many([&bin]).expect("Failed to add bin");
 
             let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
 
@@ -404,7 +402,7 @@ fn main() {
             let appsink = AppSink::builder().name("video_appsink").sync(false).build();
 
             pipeline
-                .add_many(&[appsink.upcast_ref::<gst::Element>()])
+                .add_many([appsink.upcast_ref::<gst::Element>()])
                 .expect("failed to add video appsink to pipeline");
 
             let value = data_weak2.clone();
@@ -445,15 +443,11 @@ fn main() {
             d.video_appsink = Some(appsink);
 
             // link the bin pipeline to the mkv splitmuxsink
-            let res = bin_mkv_src_pad.link(&video_sink_pad);
-            if let Result::Err(err) = res {
-                error!("LINK ERROR: {}", err);
-            }
-            if res.is_err() {
-                panic!("Type is {new_pad_type} but link failed.");
-            } else {
-                info!("Link succeeded (type {new_pad_type}).");
-            }
+            bin_mkv_src_pad
+                .link(&video_sink_pad)
+                .expect("linking bin to video sink failed");
+
+            info!("Link succeeded (type {new_pad_type}).");
 
             bin.sync_state_with_parent()
                 .expect("failed to sync bin state");
