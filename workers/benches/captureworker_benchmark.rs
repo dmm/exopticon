@@ -1,7 +1,7 @@
 use std::env;
 use std::process::{Command, Stdio};
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use tempfile::tempdir;
 
 pub fn run_captureworker(input_filename: &str, hwaccel_type: &str) {

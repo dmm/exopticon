@@ -21,14 +21,14 @@
 use std::time::Duration;
 
 use axum::{
-    extract::{Path, State},
     Json, Router,
+    extract::{Path, State},
 };
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 use uuid::Uuid;
 
-use crate::{capture_supervisor::Command, AppState};
+use crate::{AppState, capture_supervisor::Command};
 
 use super::UserError;
 
@@ -207,7 +207,7 @@ pub async fn ptz_relative_move(
         _ => {
             return Err(UserError::Validation(
                 "invalid direction provided".to_string(),
-            ))
+            ));
         }
     };
 

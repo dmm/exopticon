@@ -27,7 +27,7 @@ use std::{
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
-use metrics::{counter, Counter};
+use metrics::{Counter, counter};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use tokio::{
@@ -36,7 +36,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::spawn_blocking,
 };
-use tokio_util::codec::{length_delimited, FramedRead, LengthDelimitedCodec};
+use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
 use uuid::Uuid;
 
 use crate::api::{

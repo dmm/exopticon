@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{dsl::sum, ExpressionMethods, QueryDsl, RunQueryDsl};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, dsl::sum};
 use uuid::Uuid;
 
 use crate::{

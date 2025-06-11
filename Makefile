@@ -44,7 +44,7 @@ clippy:
 
 .PHONY: check-format
 check-format:
-	rustfmt --check
+	cargo fmt --check
 	cd exopticon/web; npm run check-format
 
 .PHONY: cworkers

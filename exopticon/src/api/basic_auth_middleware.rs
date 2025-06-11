@@ -20,9 +20,9 @@
 use std::env;
 
 use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
-use axum_extra::headers::authorization::Basic;
-use axum_extra::headers::Authorization;
 use axum_extra::TypedHeader;
+use axum_extra::headers::Authorization;
+use axum_extra::headers::authorization::Basic;
 
 pub async fn metrics_auth_middleware(
     TypedHeader(auth_header): TypedHeader<Authorization<Basic>>,

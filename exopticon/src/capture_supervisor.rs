@@ -21,11 +21,11 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
-use tokio::task::{spawn_blocking, JoinError};
+use tokio::task::{JoinError, spawn_blocking};
 use uuid::Uuid;
 
 use crate::api::cameras::Camera;

@@ -19,14 +19,14 @@
  */
 
 use axum::{
-    extract::{ws::WebSocket, State, WebSocketUpgrade},
-    response::IntoResponse,
     Router,
+    extract::{State, WebSocketUpgrade, ws::WebSocket},
+    response::IntoResponse,
 };
 
 use serde::{Deserialize, Serialize};
 
-use crate::{webrtc_client::Client, AppState};
+use crate::{AppState, webrtc_client::Client};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RtcSessionDescriptionInit {

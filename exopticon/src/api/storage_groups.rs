@@ -19,8 +19,8 @@
  */
 
 use axum::{
-    extract::{Path, State},
     Json, Router,
+    extract::{Path, State},
 };
 use tokio::task::spawn_blocking;
 use uuid::Uuid;

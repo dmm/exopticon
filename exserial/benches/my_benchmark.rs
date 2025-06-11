@@ -21,7 +21,7 @@
 use std::time::Duration;
 
 use bincode::{deserialize, serialize};
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 use exserial::models::{CameraFrame, FrameResolution, FrameSource};
 

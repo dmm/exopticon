@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use bcrypt::{hash, DEFAULT_COST};
+use bcrypt::{DEFAULT_COST, hash};
 use std::env;
 
 use crate::errors::ServiceError;

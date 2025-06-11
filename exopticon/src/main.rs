@@ -79,18 +79,18 @@ use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
 use crate::file_deletion_supervisor::FileDeletionSupervisor;
 
 use axum::routing::{get, post};
-use axum::{middleware, Router};
+use axum::{Router, middleware};
 use axum_prometheus::PrometheusMetricLayer;
 use capture_actor::VideoPacket;
 use capture_supervisor::Command;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenv::dotenv;
 use tokio::net::UdpSocket;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing_subscriber::{EnvFilter, Layer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use std::env;
 use std::net::SocketAddr;

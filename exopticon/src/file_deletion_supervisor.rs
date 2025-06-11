@@ -18,8 +18,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use futures::{stream::FuturesUnordered, StreamExt};
-use tokio::task::{spawn_blocking, JoinHandle};
+use futures::{StreamExt, stream::FuturesUnordered};
+use tokio::task::{JoinHandle, spawn_blocking};
 
 use crate::file_deletion_actor;
 

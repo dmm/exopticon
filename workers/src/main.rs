@@ -34,7 +34,6 @@
 #![allow(clippy::implicit_return)]
 #![allow(clippy::print_stdout)]
 
-
 fn main() {
     println!("Hello, world!");
 }

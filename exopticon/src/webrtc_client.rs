@@ -28,13 +28,13 @@ use std::{
 use axum::extract::ws::{self, WebSocket};
 use metrics::gauge;
 use str0m::{
+    Candidate, Input, Rtc,
     change::SdpOffer,
     format::PayloadParams,
     media::{Frequency, MediaTime, Mid},
     net::Protocol,
-    Candidate, Input, Rtc,
 };
-use tokio::net::{lookup_host, UdpSocket};
+use tokio::net::{UdpSocket, lookup_host};
 use uuid::Uuid;
 
 use crate::capture_actor::VideoPacket;

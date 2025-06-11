@@ -19,14 +19,14 @@
  */
 
 use axum::{
+    Extension, Json, Router,
     extract::{Path, State},
     http::StatusCode,
     middleware::Next,
     routing::get,
-    Extension, Json, Router,
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 use tokio::task::spawn_blocking;

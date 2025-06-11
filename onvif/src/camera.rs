@@ -25,7 +25,7 @@ use chrono::{DateTime, Datelike, Timelike, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 use sxd_document::parser;
-use sxd_xpath::{evaluate_xpath, Value};
+use sxd_xpath::{Value, evaluate_xpath};
 
 use crate::error::Error;
 use crate::util::{envelope_footer, envelope_header, soap_request};
@@ -259,7 +259,7 @@ impl Camera {
         let camera_datetime = match Utc.with_ymd_and_hms(year, month, day, hour, minute, second) {
             chrono::LocalResult::Single(datetime) => datetime,
             chrono::LocalResult::None | chrono::LocalResult::Ambiguous(_, _) => {
-                return Err(Error::InvalidArgument)
+                return Err(Error::InvalidArgument);
             }
         };
 
