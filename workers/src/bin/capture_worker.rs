@@ -6,10 +6,9 @@ use std::{
 use chrono::{SecondsFormat, Utc};
 use exserial::{exlog::ExLog, models::CaptureMessage};
 use gstreamer::{
-    self as gst,
+    self as gst, Bin,
     glib::object::{Cast, ObjectExt},
     prelude::{ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
-    Bin,
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use log::{debug, error, info};
