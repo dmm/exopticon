@@ -22,7 +22,7 @@ ci-flow:
 .PHONY: watch-web
 watch-web:
 	cd exopticon/web; npm install
-	cd exopticon/web;	npm run build -- --deploy-url assets --watch
+	cd exopticon/web;	npm run build -- --deploy-url assets/ --watch
 
 .PHONY: build-web
 build-web:
