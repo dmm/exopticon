@@ -19,6 +19,11 @@ ci-flow:
 	$(MAKE) target/release/exopticon
 	$(MAKE) clippy
 
+.PHONY: run
+run:
+	cargo build
+	cargo run
+
 .PHONY: watch-web
 watch-web:
 	cd exopticon/web; npm install
