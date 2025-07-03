@@ -43,42 +43,36 @@ pub enum Error {
 }
 
 impl From<hyper::Error> for Error {
-    #[must_use]
     fn from(_err: hyper::Error) -> Self {
         Self::ConnectionFailed
     }
 }
 
 impl From<std::string::FromUtf8Error> for Error {
-    #[must_use]
     fn from(_err: std::string::FromUtf8Error) -> Self {
         Self::InvalidResponse
     }
 }
 
 impl From<sxd_document::parser::Error> for Error {
-    #[must_use]
     fn from(_err: sxd_document::parser::Error) -> Self {
         Self::InvalidResponse
     }
 }
 
 impl From<sxd_xpath::Error> for Error {
-    #[must_use]
     fn from(_err: sxd_xpath::Error) -> Self {
         Self::InvalidResponse
     }
 }
 
 impl From<std::num::ParseIntError> for Error {
-    #[must_use]
     fn from(_err: std::num::ParseIntError) -> Self {
         Self::InvalidResponse
     }
 }
 
 impl From<std::str::ParseBoolError> for Error {
-    #[must_use]
     fn from(_err: std::str::ParseBoolError) -> Self {
         Self::InvalidResponse
     }

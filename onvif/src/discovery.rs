@@ -101,7 +101,7 @@ impl ProbeServer {
         {
             Ok(_) => (),
             Err(err) => return Err(err),
-        };
+        }
 
         self.start = Some(Instant::now());
 

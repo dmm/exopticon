@@ -28,7 +28,6 @@ use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 use metrics::{Counter, counter};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use tokio::{
     fs,
@@ -206,7 +205,7 @@ impl CaptureActor {
     }
 
     fn check_log_for_lost_packets(log: &str) -> Option<u32> {
-        static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"RTP: missed ([0-9]+) packets").unwrap());
+        static RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"RTP: missed ([0-9]+) packets").unwrap());
         let caps = RE.captures(log)?;
 
         caps[1]

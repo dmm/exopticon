@@ -24,8 +24,8 @@ pub mod cameras;
 pub mod storage_groups;
 pub mod video_units;
 
-use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
+use diesel::PgConnection;
 use thiserror::Error;
 
 #[derive(Clone)]
@@ -71,7 +71,6 @@ pub enum OtherError {
 }
 
 impl From<r2d2::Error> for Error {
-    #[must_use]
     fn from(err: r2d2::Error) -> Self {
         Self::Other(OtherError::DbPoolError {
             description: err.to_string(),
@@ -81,7 +80,6 @@ impl From<r2d2::Error> for Error {
 }
 
 impl From<diesel::result::Error> for Error {
-    #[must_use]
     fn from(err: diesel::result::Error) -> Self {
         if err == diesel::result::Error::NotFound {
             Self::NotFound

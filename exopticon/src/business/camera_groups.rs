@@ -74,7 +74,7 @@ mod tests {
         let res = CameraGroup::new("TestGroup", members.clone());
 
         // Assert
-        assert_eq!(members, res.unwrap().members)
+        assert_eq!(members, res.unwrap().members);
     }
 
     #[test]
@@ -98,7 +98,7 @@ mod tests {
         // Arrange
         let mut members = Vec::new();
 
-        for _i in 0..MAX_MEMBER_COUNT + 1 {
+        for _i in 0..=MAX_MEMBER_COUNT {
             members.push(Uuid::new_v4());
         }
 

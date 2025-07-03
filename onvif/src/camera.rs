@@ -111,7 +111,6 @@ pub struct DeviceDateAndTime {
 
 impl Default for DeviceDateAndTime {
     /// Returns new `DeviceDateAndTime` struct
-    #[must_use]
     fn default() -> Self {
         Self {
             time_type: TimeType::Manual,
