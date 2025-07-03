@@ -1,3 +1,48 @@
+/*
+ * Exopticon - A free video surveillance system.
+ * Copyright (C) 2025 David Matthew Mattli <dmm@mattli.us>
+ *
+ * This file is part of Exopticon.
+ *
+ * Exopticon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Exopticon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+//! Exopticon is a free video surveillance system
+
+// to avoid the warning from diesel macros
+#![allow(proc_macro_derive_resolution_fallback)]
+#![deny(
+    nonstandard_style,
+    warnings,
+    rust_2018_idioms,
+    unused,
+    future_incompatible,
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo
+)]
+#![allow(clippy::arithmetic_side_effects)]
+#![allow(clippy::integer_division)]
+#![allow(clippy::missing_inline_in_public_items)]
+#![allow(clippy::multiple_crate_versions)]
+#![allow(clippy::implicit_return)]
+#![allow(clippy::print_stdout)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::future_not_send)]
+#![allow(clippy::too_many_lines)]
+
 use std::{
     fs::create_dir_all,
     sync::{Arc, Mutex},
@@ -24,7 +69,7 @@ struct CustomData {
 }
 
 impl CustomData {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             video_appsink: None,
             audio_appsink: None,
@@ -404,7 +449,7 @@ fn main() {
     let mkv_sink = gst::ElementFactory::make("splitmuxsink")
         .name("sink")
         .property("async-finalize", true)
-        .property("max-size-bytes", 15000000u64)
+        .property("max-size-bytes", 15_000_000u64)
         .property_from_str("muxer-factory", "matroskamux")
         .build()
         .expect("Could not create sink element.");
@@ -452,6 +497,7 @@ fn main() {
         };
         exserial::print_message(msg);
         d.current_filename = Some(path.to_string_lossy().to_string());
+        drop(d);
         Some(path.into())
     });
 
@@ -485,9 +531,7 @@ fn main() {
             (&"video", &"H264") => (Some("rtph264depay"), Some("h264parse")),
             // (&"video", &"H265") => (Some("rtph265depay"), Some("h265parse")),
             (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
-            (&"audio", &"MPEG4-GENERIC") | (&"audio", &"AAC") => {
-                (Some("rtpmp4gdepay"), Some("aacparse"))
-            }
+            (&"audio", &"MPEG4-GENERIC" | &"AAC") => (Some("rtpmp4gdepay"), Some("aacparse")),
             (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
             (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
             _ => (None, None),
@@ -552,6 +596,7 @@ fn main() {
                 .sync_state_with_parent()
                 .expect("failed to sync video appsink state");
             d.video_appsink = Some(appsink);
+            drop(d);
 
             // link the bin pipeline to the mkv splitmuxsink
             bin_mkv_src_pad
@@ -611,7 +656,7 @@ fn main() {
                 .sync_state_with_parent()
                 .expect("failed to sync video appsink state");
             d.audio_appsink = Some(appsink);
-
+            drop(d);
             let audio_sink_pad = mkv_sink
                 .request_pad_simple("audio_%u")
                 .expect("Failed to get video sink pad from convert");
@@ -626,7 +671,7 @@ fn main() {
             bin.sync_state_with_parent()
                 .expect("failed to sync bin state");
         } else {
-            error!("Unknown RTP encoding: {} / {}", media, encoding_name);
+            error!("Unknown RTP encoding: {media} / {encoding_name}");
         }
     });
 
@@ -643,14 +688,14 @@ fn main() {
             MessageView::Error(err) => {
                 error!(
                     "Error received from element {:?} {}",
-                    err.src().map(|s| s.path_string()),
+                    err.src().map(gstreamer::prelude::GstObjectExt::path_string),
                     err.error()
                 );
                 error!("Debugging information: {:?}", err.debug());
                 break;
             }
             MessageView::StateChanged(state_changed) => {
-                if state_changed.src().map(|s| s == &pipeline).unwrap_or(false) {
+                if state_changed.src().is_some_and(|s| s == &pipeline) {
                     info!(
                         "Pipeline state changed from {:?} to {:?}",
                         state_changed.old(),
