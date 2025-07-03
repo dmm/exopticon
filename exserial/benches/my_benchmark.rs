@@ -18,10 +18,10 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::time::Duration;
+use std::{hint::black_box, time::Duration};
 
 use bincode::{deserialize, serialize};
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 
 use exserial::models::{CameraFrame, FrameResolution, FrameSource};
 
