@@ -1038,7 +1038,6 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid 1.11.0",
- "workers",
 ]
 
 [[package]]

@@ -16,7 +16,6 @@ default-run = "exopticon"
 [dependencies]
 onvif = { path = "../onvif" }
 exserial = { path = "../exserial" }
-workers = { path = "../workers" }
 axum = { version = "0.7", features = ["ws"]}
 axum-extra = { version = "0.9", features = ["cookie", "typed-header"]}
 axum-macros = "0.4"
