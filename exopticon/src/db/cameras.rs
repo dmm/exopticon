@@ -25,8 +25,8 @@ use uuid::Uuid;
 use crate::db::storage_groups::StorageGroup;
 use crate::schema::{camera_group_memberships, cameras};
 
-use super::camera_groups::ALL_GROUP_ID;
 use super::Service;
+use super::camera_groups::ALL_GROUP_ID;
 
 /// Full camera model, represents database row
 #[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]

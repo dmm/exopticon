@@ -24,8 +24,8 @@ pub mod cameras;
 pub mod storage_groups;
 pub mod video_units;
 
-use diesel::r2d2::ConnectionManager;
 use diesel::PgConnection;
+use diesel::r2d2::ConnectionManager;
 use thiserror::Error;
 
 #[derive(Clone)]

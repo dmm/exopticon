@@ -205,7 +205,8 @@ impl CaptureActor {
     }
 
     fn check_log_for_lost_packets(log: &str) -> Option<u32> {
-        static RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"RTP: missed ([0-9]+) packets").unwrap());
+        static RE: std::sync::LazyLock<Regex> =
+            std::sync::LazyLock::new(|| Regex::new(r"RTP: missed ([0-9]+) packets").unwrap());
         let caps = RE.captures(log)?;
 
         caps[1]

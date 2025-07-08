@@ -19,7 +19,7 @@
  */
 
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::{uuid, Uuid};
+use uuid::{Uuid, uuid};
 
 use crate::schema::{camera_group_memberships, camera_groups};
 
