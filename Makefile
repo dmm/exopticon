@@ -16,8 +16,8 @@ release: target/release/exopticon
 ci-flow:
 	$(MAKE) check-format
 	$(MAKE) build-web
-	$(MAKE) target/release/exopticon
 	$(MAKE) clippy
+	$(MAKE) target/release/exopticon
 
 .PHONY: run
 run:
