@@ -52,22 +52,15 @@ check-format:
 	cargo fmt --check
 	cd exopticon/web; npm run check-format
 
-.PHONY: cworkers
-cworkers: target/debug/exopticon
-	$(MAKE) -C workers/cworkers all
-
 .PHONY: target/debug/exopticon
 target/debug/exopticon: build-web
 	cargo build
-	$(MAKE) -C workers/cworkers all
 
 .PHONY: target/release/exopticon
 target/release/exopticon: build-web
 	cargo build --release
-	CARGO_TARGET_DIR=../../target/release $(MAKE) -C workers/cworkers all
 
 .PHONY: clean
 clean:
 	rm -rf exopticon/web/dist
-	$(MAKE) -C workers/cworkers clean
 	cargo clean

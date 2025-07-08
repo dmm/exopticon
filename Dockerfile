@@ -183,12 +183,6 @@ COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exo
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/capture_worker .
 
-# Copy ffmpeg libraries
-#RUN mkdir -p /usr/local/lib /usr/local/bin \
-#  && apt-get install $(apt-cache depends ffmpeg | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ')
-#COPY --from=exopticon-build /usr/local/lib/lib* /usr/local/lib/
-COPY --from=exopticon-build /usr/local/bin /usr/local/bin
-
 ENV EXOPTICONWORKERS=/exopticon/
 ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV PATH=/exopticon:$PATH
