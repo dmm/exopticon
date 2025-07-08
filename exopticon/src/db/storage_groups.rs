@@ -18,9 +18,9 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, dsl::sum};
-use uuid::Uuid;
+use diesel::{dsl::sum, ExpressionMethods, QueryDsl, RunQueryDsl};
 
+use super::uuid::Uuid;
 use crate::{
     db::{
         cameras::Camera,
@@ -47,7 +47,7 @@ pub struct StorageGroup {
 impl From<StorageGroup> for crate::api::storage_groups::StorageGroup {
     fn from(g: StorageGroup) -> Self {
         Self {
-            id: g.id,
+            id: g.id.into(),
             name: g.name,
             storage_path: g.storage_path,
             max_storage_size: g.max_storage_size,

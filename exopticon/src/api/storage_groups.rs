@@ -19,8 +19,8 @@
  */
 
 use axum::{
-    Json, Router,
     extract::{Path, State},
+    Json, Router,
 };
 use tokio::task::spawn_blocking;
 use uuid::Uuid;
@@ -89,7 +89,7 @@ pub async fn update(
     let db = state.db_service;
 
     let updated_group =
-        spawn_blocking(move || db.update_storage_group(id, update_request)).await??;
+        spawn_blocking(move || db.update_storage_group(id.into(), update_request)).await??;
 
     Ok(Json(updated_group))
 }
@@ -97,7 +97,7 @@ pub async fn update(
 pub async fn delete(Path(id): Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
     let db = state.db_service;
 
-    spawn_blocking(move || db.delete_storage_group(id)).await??;
+    spawn_blocking(move || db.delete_storage_group(id.into())).await??;
 
     Ok(())
 }
@@ -108,7 +108,7 @@ pub async fn fetch(
 ) -> Result<Json<StorageGroup>, UserError> {
     let db = state.db_service;
 
-    let storage_group = spawn_blocking(move || db.fetch_storage_group(id)).await??;
+    let storage_group = spawn_blocking(move || db.fetch_storage_group(id.into())).await??;
 
     Ok(Json(storage_group))
 }

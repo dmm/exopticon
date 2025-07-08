@@ -19,8 +19,8 @@
  */
 use chrono::{DateTime, Utc};
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
 
+use super::uuid::Uuid;
 use crate::{
     api::auth::SlimAccessToken,
     schema::{user_sessions, users},
@@ -44,7 +44,7 @@ pub struct User {
 impl From<User> for crate::api::auth::User {
     fn from(user: User) -> Self {
         Self {
-            id: user.id,
+            id: user.id.into(),
             username: user.username,
         }
     }
@@ -72,9 +72,9 @@ pub struct UserSession {
 impl From<UserSession> for SlimAccessToken {
     fn from(u: UserSession) -> Self {
         Self {
-            id: u.id,
+            id: u.id.into(),
             name: u.name,
-            user_id: u.user_id,
+            user_id: u.user_id.into(),
             expiration: u.expiration,
         }
     }
@@ -125,7 +125,7 @@ impl Service {
             .values((
                 dsl::id.eq(Uuid::now_v7()),
                 dsl::name.eq(&session.name),
-                dsl::user_id.eq(&session.user_id),
+                dsl::user_id.eq(&session.user_id.into()),
                 dsl::session_key.eq(&session.session_key),
                 dsl::is_token.eq(&session.is_token),
                 dsl::expiration.eq(&session.expiration),
@@ -168,7 +168,7 @@ impl Service {
         let mut conn = self.pool.get()?;
 
         let sessions = user_sessions
-            .filter(user_id.eq(user_id2))
+            .filter(user_id.eq(user_id2.into()))
             .filter(is_token.eq(true))
             .load::<UserSession>(&mut conn)?;
         Ok(sessions.into_iter().map(std::convert::Into::into).collect())

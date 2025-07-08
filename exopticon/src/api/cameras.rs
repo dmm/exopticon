@@ -21,14 +21,14 @@
 use std::time::Duration;
 
 use axum::{
-    Json, Router,
     extract::{Path, State},
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 use uuid::Uuid;
 
-use crate::{AppState, capture_supervisor::Command};
+use crate::{capture_supervisor::Command, AppState};
 
 use super::UserError;
 
@@ -45,9 +45,9 @@ pub struct Camera {
 impl From<crate::db::cameras::Camera> for Camera {
     fn from(c: crate::db::cameras::Camera) -> Self {
         Self {
-            id: c.id,
+            id: c.id.into(),
             common: CreateCamera {
-                storage_group_id: c.storage_group_id,
+                storage_group_id: c.storage_group_id.into(),
                 name: c.name,
                 ip: c.ip,
                 onvif_port: c.onvif_port,
@@ -148,7 +148,8 @@ pub async fn update(
 ) -> Result<Json<Camera>, UserError> {
     let db = state.db_service;
 
-    let updated_camera = spawn_blocking(move || db.update_camera(id, update_request)).await??;
+    let updated_camera =
+        spawn_blocking(move || db.update_camera(id.into(), update_request)).await??;
 
     info!("Sending capture restart signal command");
     state.capture_channel.send(Command::RestartAll).await?;
@@ -159,7 +160,7 @@ pub async fn update(
 pub async fn delete(Path(id): Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
     let db = state.db_service;
 
-    spawn_blocking(move || db.delete_camera(id)).await??;
+    spawn_blocking(move || db.delete_camera(id.into())).await??;
     Ok(())
 }
 
@@ -169,7 +170,7 @@ pub async fn fetch(
 ) -> Result<Json<Camera>, UserError> {
     let db = state.db_service;
 
-    let camera = spawn_blocking(move || db.fetch_camera(id)).await??;
+    let camera = spawn_blocking(move || db.fetch_camera(id.into())).await??;
 
     Ok(Json(camera))
 }
@@ -189,7 +190,7 @@ pub async fn ptz_relative_move(
     let zoom = 0.0;
 
     let db = state.db_service.clone();
-    let camera = spawn_blocking(move || db.fetch_camera(id)).await??;
+    let camera = spawn_blocking(move || db.fetch_camera(id.into())).await??;
     let onvif_cam = onvif::camera::Camera {
         host: camera.common.ip,
         port: camera.common.onvif_port,

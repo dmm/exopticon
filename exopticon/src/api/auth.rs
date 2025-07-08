@@ -19,14 +19,14 @@
  */
 
 use axum::{
-    Extension, Json, Router,
     extract::{Path, State},
     http::StatusCode,
     middleware::Next,
     routing::get,
+    Extension, Json, Router,
 };
-use axum_extra::extract::{CookieJar, cookie::Cookie};
-use base64::prelude::{BASE64_STANDARD, Engine as _};
+use axum_extra::extract::{cookie::Cookie, CookieJar};
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 use tokio::task::spawn_blocking;
@@ -168,7 +168,7 @@ pub async fn delete_personal_access_token(
 ) -> Result<(), UserError> {
     let db = state.db_service;
 
-    spawn_blocking(move || db.delete_user_session(id)).await??;
+    spawn_blocking(move || db.delete_user_session(id.into())).await??;
     Ok(())
 }
 
@@ -178,7 +178,7 @@ pub async fn fetch_personal_access_tokens(
 ) -> Result<Json<Vec<SlimAccessToken>>, UserError> {
     let db = state.db_service;
 
-    let tokens = spawn_blocking(move || db.fetch_users_tokens(user.id)).await??;
+    let tokens = spawn_blocking(move || db.fetch_users_tokens(user.id.into())).await??;
 
     Ok(Json(tokens))
 }

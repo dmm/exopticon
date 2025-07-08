@@ -20,13 +20,13 @@
 
 use diesel::dsl::max;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
 
 use crate::db::storage_groups::StorageGroup;
 use crate::schema::{camera_group_memberships, cameras};
 
-use super::Service;
 use super::camera_groups::ALL_GROUP_ID;
+use super::uuid::Uuid;
+use super::Service;
 
 /// Full camera model, represents database row
 #[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
@@ -98,7 +98,7 @@ pub struct CreateCamera {
 impl From<crate::api::cameras::CreateCamera> for CreateCamera {
     fn from(c: crate::api::cameras::CreateCamera) -> Self {
         Self {
-            storage_group_id: c.storage_group_id,
+            storage_group_id: c.storage_group_id.into(),
             name: c.name,
             ip: c.ip,
             onvif_port: c.onvif_port,
@@ -148,8 +148,12 @@ pub struct UpdateCamera {
 
 impl From<crate::api::cameras::UpdateCamera> for UpdateCamera {
     fn from(u: crate::api::cameras::UpdateCamera) -> Self {
+        let storage_group_id: Option<super::uuid::Uuid> = match u.storage_group_id {
+            Some(id) => Some(id.into()),
+            None => None,
+        };
         Self {
-            storage_group_id: u.storage_group_id,
+            storage_group_id: storage_group_id,
             name: u.name,
             ip: u.ip,
             onvif_port: u.onvif_port,
@@ -177,7 +181,7 @@ impl Service {
 
         let new_camera: Camera = Camera {
             id: Uuid::now_v7(),
-            storage_group_id: create_camera.storage_group_id,
+            storage_group_id: create_camera.storage_group_id.into(),
             name: create_camera.name,
             ip: create_camera.ip,
             onvif_port: create_camera.onvif_port,
@@ -192,32 +196,29 @@ impl Service {
             ptz_y_step_size: create_camera.ptz_y_step_size,
         };
 
-        let new_camera = conn
-            .build_transaction()
-            .serializable()
-            .run::<_, super::Error, _>(|conn| {
-                let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
-                    .values(&Into::<Camera>::into(new_camera))
-                    .get_result(conn)?;
+        let new_camera = conn.immediate_transaction::<_, super::Error, _>(|conn| {
+            let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
+                .values(&Into::<Camera>::into(new_camera))
+                .get_result(conn)?;
 
-                let max_order: i32 = camera_group_memberships::table
-                    .filter(camera_group_memberships::camera_id.eq(ALL_GROUP_ID))
-                    .select(max(camera_group_memberships::display_order))
-                    .first(conn)
-                    .optional()?
-                    .unwrap_or(None)
-                    .unwrap_or(0);
+            let max_order: i32 = camera_group_memberships::table
+                .filter(camera_group_memberships::camera_id.eq(ALL_GROUP_ID.into()))
+                .select(max(camera_group_memberships::display_order))
+                .first(conn)
+                .optional()?
+                .unwrap_or(None)
+                .unwrap_or(0);
 
-                diesel::insert_into(camera_group_memberships::table)
-                    .values(&vec![(
-                        camera_group_memberships::dsl::id.eq(Uuid::now_v7()),
-                        camera_group_memberships::dsl::camera_group_id.eq(ALL_GROUP_ID),
-                        camera_group_memberships::dsl::camera_id.eq(c.id),
-                        camera_group_memberships::dsl::display_order.eq(max_order + 1),
-                    )])
-                    .execute(conn)?;
-                Ok(c)
-            })?;
+            diesel::insert_into(camera_group_memberships::table)
+                .values(&vec![(
+                    camera_group_memberships::dsl::id.eq(Uuid::now_v7()),
+                    camera_group_memberships::dsl::camera_group_id.eq(ALL_GROUP_ID.into()),
+                    camera_group_memberships::dsl::camera_id.eq(c.id),
+                    camera_group_memberships::dsl::display_order.eq(max_order + 1),
+                )])
+                .execute(conn)?;
+            Ok(c)
+        })?;
 
         Ok(new_camera.into())
     }

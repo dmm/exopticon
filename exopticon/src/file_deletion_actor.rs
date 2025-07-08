@@ -80,8 +80,9 @@ impl FileDeletionActor {
     async fn work(&self) -> anyhow::Result<()> {
         let db = self.db.clone();
         let storage_group_id = self.storage_group_id;
-        let files = spawn_blocking(move || db.fetch_storage_group_old_units(storage_group_id, 100))
-            .await??;
+        let files =
+            spawn_blocking(move || db.fetch_storage_group_old_units(storage_group_id.into(), 100))
+                .await??;
         self.handle_files(files).await?;
 
         Ok(())

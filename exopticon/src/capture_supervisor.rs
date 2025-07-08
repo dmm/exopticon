@@ -21,11 +21,11 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use futures::StreamExt;
 use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
-use tokio::task::{JoinError, spawn_blocking};
+use tokio::task::{spawn_blocking, JoinError};
 use uuid::Uuid;
 
 use crate::api::cameras::Camera;
@@ -95,7 +95,8 @@ impl CaptureSupervisor {
     async fn start_camera(&mut self, c: Camera) -> anyhow::Result<()> {
         let db = self.db.clone();
         let storage_group =
-            spawn_blocking(move || db.fetch_storage_group(c.common.storage_group_id)).await??;
+            spawn_blocking(move || db.fetch_storage_group(c.common.storage_group_id.into()))
+                .await??;
         let id = c.id;
         let (command_sender, command_receiver) = mpsc::channel(1);
         let actor = capture_actor::CaptureActor::new(

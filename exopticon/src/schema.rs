@@ -1,83 +1,107 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     camera_group_memberships (id) {
-        id -> Uuid,
-        camera_group_id -> Uuid,
-        camera_id -> Uuid,
-        display_order -> Int4,
+        id -> Binary,
+        camera_group_id -> Binary,
+        camera_id -> Binary,
+        display_order -> Integer,
     }
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     camera_groups (id) {
-        id -> Uuid,
+        id -> Binary,
         name -> Text,
     }
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     cameras (id) {
-        id -> Uuid,
-        storage_group_id -> Uuid,
+        id -> Binary,
+        storage_group_id -> Binary,
         name -> Text,
         ip -> Text,
-        onvif_port -> Int4,
+        onvif_port -> Integer,
         mac -> Text,
         username -> Text,
         password -> Text,
         rtsp_url -> Text,
         ptz_type -> Text,
         ptz_profile_token -> Text,
-        enabled -> Bool,
-        ptz_x_step_size -> Int2,
-        ptz_y_step_size -> Int2,
+        enabled -> Integer,
+        ptz_x_step_size -> Integer,
+        ptz_y_step_size -> Integer,
     }
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     storage_groups (id) {
-        id -> Uuid,
+        id -> Binary,
         name -> Text,
         storage_path -> Text,
-        max_storage_size -> Int8,
+        max_storage_size -> Integer,
     }
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     user_sessions (id) {
-        id -> Uuid,
+        id -> Binary,
         name -> Text,
-        user_id -> Uuid,
+        user_id -> Binary,
         session_key -> Text,
-        is_token -> Bool,
-        expiration -> Timestamptz,
+        is_token -> Integer,
+        expiration -> Text,
     }
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     users (id) {
-        id -> Uuid,
+        id -> Binary,
         username -> Text,
         password -> Text,
     }
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     video_files (id) {
-        id -> Uuid,
+        id -> Binary,
+        video_unit_id -> Binary,
         filename -> Text,
-        size -> Int4,
-        video_unit_id -> Uuid,
+        size -> Integer,
     }
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use crate::db::uuid::*;
+
     video_units (id) {
-        id -> Uuid,
-        camera_id -> Uuid,
-        begin_time -> Timestamptz,
-        end_time -> Timestamptz,
+        id -> Binary,
+        camera_id -> Binary,
+        begin_time -> Text,
+        end_time -> Text,
     }
 }
 

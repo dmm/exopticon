@@ -20,11 +20,11 @@
 
 use chrono::{DateTime, Utc};
 use diesel::{BelongingToDsl, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
 
 use crate::db::cameras::Camera;
 use crate::schema::{video_files, video_units};
 
+use super::uuid::Uuid;
 use super::Service;
 
 /// Full video unit model, represents entire database row
@@ -46,8 +46,8 @@ pub struct VideoUnit {
 impl From<VideoUnit> for crate::api::video_units::VideoUnit {
     fn from(v: VideoUnit) -> Self {
         Self {
-            id: v.id,
-            camera_id: v.camera_id,
+            id: v.id.into(),
+            camera_id: v.camera_id.into(),
             begin_time: v.begin_time,
             end_time: v.end_time,
         }
@@ -103,10 +103,10 @@ pub struct VideoFile {
 impl From<VideoFile> for crate::api::video_units::VideoFile {
     fn from(v: VideoFile) -> Self {
         Self {
-            id: v.id,
+            id: v.id.into(),
             filename: v.filename,
             size: v.size,
-            video_unit_id: v.video_unit_id,
+            video_unit_id: v.video_unit_id.into(),
         }
     }
 }
@@ -155,8 +155,8 @@ impl Service {
         let res: (VideoUnit, VideoFile) = conn.transaction::<_, super::Error, _>(|conn| {
             let video_unit = diesel::insert_into(video_units::dsl::video_units)
                 .values(VideoUnit {
-                    id: Uuid::now_v7(),
-                    camera_id: video_unit.camera_id,
+                    id: Uuid::now_v7().into(),
+                    camera_id: video_unit.camera_id.into(),
                     begin_time: video_unit.begin_time,
                     end_time: video_unit.end_time,
                 })

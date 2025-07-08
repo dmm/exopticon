@@ -19,9 +19,9 @@
  */
 
 use axum::{
-    Json, Router,
     extract::{Path, State},
     routing::get,
+    Json, Router,
 };
 use tokio::task::spawn_blocking;
 use uuid::Uuid;
@@ -70,13 +70,13 @@ pub async fn update(
     let req = camera_group_request;
     let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
     let camera_group =
-        spawn_blocking(move || db.update_camera_group(req.id, camera_group)).await??;
+        spawn_blocking(move || db.update_camera_group(req.id.into(), camera_group)).await??;
     Ok(Json(camera_group))
 }
 
 pub async fn delete(id: Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
     let db = state.db_service;
-    spawn_blocking(move || db.delete_camera_group(id.0)).await??;
+    spawn_blocking(move || db.delete_camera_group(id.0.into())).await??;
     Ok(())
 }
 
@@ -85,7 +85,7 @@ pub async fn fetch(
     State(state): State<AppState>,
 ) -> Result<Json<CameraGroup>, UserError> {
     let db = state.db_service;
-    let camera_group = spawn_blocking(move || db.fetch_camera_group(id.0)).await??;
+    let camera_group = spawn_blocking(move || db.fetch_camera_group(id.0.into())).await??;
     Ok(Json(camera_group))
 }
 

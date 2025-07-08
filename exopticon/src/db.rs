@@ -22,20 +22,42 @@ pub mod auth;
 pub mod camera_groups;
 pub mod cameras;
 pub mod storage_groups;
+pub mod uuid;
 pub mod video_units;
 
-use diesel::PgConnection;
-use diesel::r2d2::ConnectionManager;
+use diesel::{connection::SimpleConnection, r2d2::ConnectionManager, SqliteConnection};
 use thiserror::Error;
+
+#[derive(Debug, Clone)]
+pub struct ConnectionCustomizer {}
+
+impl diesel::r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error>
+    for ConnectionCustomizer
+{
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        (|| {
+            conn.batch_execute("PRAGMA busy_timeout = 2000;")?;
+            conn.batch_execute("PRAGMA journal_mode = WAL;")?;
+            conn.batch_execute("PRAGMA synchronous = NORMAL;")?;
+            conn.batch_execute("PRAGMA foreign_keys = ON;")?;
+            conn.batch_execute("PRAGMA wal_autocheckpoint = 1000;")?;
+            conn.batch_execute("PRAGMA wal_checkpoint(TRUNCATE);")?;
+
+            Ok(())
+        })()
+        .map_err(diesel::r2d2::Error::QueryError)
+    }
+}
 
 #[derive(Clone)]
 pub struct Service {
-    pub pool: r2d2::Pool<ConnectionManager<diesel::PgConnection>>,
+    pub pool: r2d2::Pool<ConnectionManager<diesel::SqliteConnection>>,
 }
 
-fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::PgConnection>> {
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
+fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::SqliteConnection>> {
+    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
     r2d2::Pool::builder()
+        .connection_customizer(Box::new(ConnectionCustomizer {}))
         .build(manager)
         .expect("Failed to create pool.")
 }

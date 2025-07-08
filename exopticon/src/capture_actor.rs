@@ -27,7 +27,7 @@ use std::{
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
-use metrics::{Counter, counter};
+use metrics::{counter, Counter};
 use regex::Regex;
 use tokio::{
     fs,
@@ -35,7 +35,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     task::spawn_blocking,
 };
-use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
+use tokio_util::codec::{length_delimited, FramedRead, LengthDelimitedCodec};
 use uuid::Uuid;
 
 use crate::api::{
@@ -184,7 +184,12 @@ impl CaptureActor {
             let db = self.db.clone();
             let file_size: i32 = metadata.len().try_into().unwrap_or(-1);
             spawn_blocking(move || {
-                db.close_video_segment(video_unit_id, video_file_id, end_time, file_size)
+                db.close_video_segment(
+                    video_unit_id.into(),
+                    video_file_id.into(),
+                    end_time,
+                    file_size,
+                )
             })
             .await??;
         }

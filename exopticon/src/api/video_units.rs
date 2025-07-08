@@ -19,9 +19,9 @@
  */
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     routing::get,
+    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use tokio::task::spawn_blocking;
@@ -97,7 +97,7 @@ pub async fn fetch_video_units_between(
     let db = state.db_service;
 
     let video_units = spawn_blocking(move || {
-        db.fetch_video_units_between(camera_id, interval.begin_time, interval.end_time)
+        db.fetch_video_units_between(camera_id.into(), interval.begin_time, interval.end_time)
     })
     .await??;
 
