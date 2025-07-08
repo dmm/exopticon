@@ -45,13 +45,15 @@
 
 use std::{
     fs::create_dir_all,
-    sync::{Arc, Mutex},
+    path::PathBuf,
+    sync::{Arc, Mutex, Weak},
+    time::{Duration, Instant},
 };
 
 use chrono::{SecondsFormat, Utc};
 use exserial::{exlog::ExLog, models::CaptureMessage};
 use gstreamer::{
-    self as gst, Bin,
+    self as gst, Bin, Element, Pad,
     glib::object::{Cast, ObjectExt},
     prelude::{ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
 };
@@ -60,20 +62,52 @@ use log::{debug, error, info};
 use uuid::Uuid;
 
 static LOGGER: ExLog = ExLog;
+static TIMEOUT: Duration = Duration::from_secs(10);
 
+/// `CaptureWorker` state
 #[derive(Debug)]
 struct CustomData {
+    /// top level path to write video for this stream
+    storage_path: PathBuf,
+    /// splitmuxsink and associated video sink pad, used by gstreamer
+    /// callbacks
+    mkv_sink_pad: (Element, Pad),
+    /// set once video pad is connected
     video_appsink: Option<AppSink>,
+    /// set if audio stream is provided
     audio_appsink: Option<AppSink>,
+    /// current filename
     current_filename: Option<String>,
+    /// `last_frame_time` is set to detect a hung process not
+    /// producing frames
+    last_frame_time: Instant,
 }
 
 impl CustomData {
-    pub const fn new() -> Self {
+    pub fn new(storage_path: PathBuf) -> Self {
+        let mkv_sink = gst::ElementFactory::make("splitmuxsink")
+            .name("sink")
+            .property("async-finalize", true)
+            .property("max-size-bytes", 15_000_000u64)
+            .property_from_str("muxer-factory", "matroskamux")
+            .build()
+            .expect("Could not create sink element.");
+
+        // We request the video pad here because if we wait until we
+        // get the on_pad_connect signal from `rtspsrc` then we might
+        // get the audio first if you try to sink video after audio
+        // `splitmuxsink` complains it already set the headers.
+        let video_sink_pad = mkv_sink
+            .request_pad_simple("video")
+            .expect("Failed to get video sink pad from convert");
+
         Self {
+            storage_path,
+            mkv_sink_pad: (mkv_sink, video_sink_pad),
             video_appsink: None,
             audio_appsink: None,
             current_filename: None,
+            last_frame_time: Instant::now(),
         }
     }
 }
@@ -384,7 +418,18 @@ fn create_audio_branch(depay_name: &str, parser_name: Option<&str>) -> Bin {
     bin
 }
 
-fn handle_video_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowError> {
+fn handle_video_sample(
+    data_weak: &Weak<Mutex<CustomData>>,
+    appsink: &AppSink,
+) -> Result<gst::FlowSuccess, gst::FlowError> {
+    let Some(data) = data_weak.upgrade() else {
+        error!("Failed to upgrade the weak reference");
+        return Err(gst::FlowError::CustomError);
+    };
+    let mut d = data.lock().unwrap();
+    d.last_frame_time = Instant::now();
+    drop(d);
+
     let sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
     let buffer = sample.buffer().expect("failed to get sample buffer");
     let map = buffer.map_readable().expect("failed to get buffer map");
@@ -421,6 +466,212 @@ fn handle_audio_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowE
     Ok(gst::FlowSuccess::Ok)
 }
 
+fn handle_file_location_request(data_weak: &Weak<Mutex<CustomData>>) -> gstreamer::glib::Value {
+    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+
+    let Some(data) = data_weak.upgrade() else {
+        panic!("Failed to upgrade the weak reference");
+    };
+    let mut d = data.lock().unwrap();
+
+    if let Some(current_filename) = &d.current_filename {
+        let msg = CaptureMessage::EndFile {
+            filename: current_filename.clone(),
+            end_time: timestamp.clone(),
+        };
+        exserial::print_message(msg);
+    }
+
+    let id = Uuid::now_v7();
+    let path = uuid_to_filename(&d.storage_path, id);
+    let parent = path.parent().expect("failed to get new file parent");
+    create_dir_all(parent).expect("failed to create parent directory");
+    info!("New file: {}", path.display());
+
+    let msg = CaptureMessage::NewFile {
+        filename: path.to_string_lossy().to_string(),
+        begin_time: timestamp,
+    };
+    exserial::print_message(msg);
+    d.current_filename = Some(path.to_string_lossy().to_string());
+    drop(d);
+    path.into()
+}
+
+fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, src_pad: &Pad) {
+    info!("Received new pad {} from {}", src_pad.name(), src.name());
+
+    let Some(data) = data_weak.upgrade() else {
+        error!("Failed to upgrade the weak reference");
+        return;
+    };
+    let mut d = data.lock().unwrap();
+
+    src.downcast_ref::<gstreamer::Bin>()
+        .expect("src downcast failed.")
+        .debug_to_dot_file_with_ts(gstreamer::DebugGraphDetails::all(), "pad-added");
+
+    let new_pad_caps = src_pad
+        .current_caps()
+        .expect("Failed to get caps of new pad.");
+    let new_pad_struct = new_pad_caps
+        .structure(0)
+        .expect("Failed to get first structure of caps.");
+    let new_pad_type = new_pad_struct.name();
+
+    let media = new_pad_struct.get::<&str>("media").unwrap_or_default();
+    let encoding_name = new_pad_struct
+        .get::<&str>("encoding-name")
+        .unwrap_or_default();
+
+    if media == "video" && d.video_appsink.is_some() {
+        info!("Video is already linked. Ignoring.");
+        return;
+    }
+
+    let (depayloader_name, parser_name) = match (&media, &encoding_name) {
+        (&"video", &"H264") => (Some("rtph264depay"), Some("h264parse")),
+        // (&"video", &"H265") => (Some("rtph265depay"), Some("h265parse")),
+        (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
+        (&"audio", &"MPEG4-GENERIC" | &"AAC") => (Some("rtpmp4gdepay"), Some("aacparse")),
+        (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
+        (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
+        _ => (None, None),
+    };
+
+    info!(
+        "New pad type {}, {} {}",
+        &new_pad_type, &media, &encoding_name
+    );
+
+    if let ("video", Some(depay_name), Some(parser_name), &None) =
+        (media, depayloader_name, parser_name, &d.video_appsink)
+    {
+        let bin = create_video_branch(depay_name, parser_name);
+        let pipeline = src
+            .parent()
+            .expect("Failed to get src parent")
+            .downcast::<gst::Pipeline>()
+            .expect("failed to get unwrap src parent");
+
+        pipeline.add_many([&bin]).expect("Failed to add bin");
+
+        let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
+
+        let bin_mkv_src_pad = bin
+            .static_pad("mkv_src")
+            .expect("failed to get bin src pad");
+
+        src_pad
+            .link(&bin_sink_pad)
+            .expect("failed to link new_src_pad to bin_sink_pad");
+
+        // the bin pipeline to appsink
+        let appsink = AppSink::builder().name("video_appsink").sync(false).build();
+
+        pipeline
+            .add_many([appsink.upcast_ref::<gst::Element>()])
+            .expect("failed to add video appsink to pipeline");
+
+        appsink.set_callbacks(
+            AppSinkCallbacks::builder()
+                .new_sample(move |appsink: &AppSink| {
+                    handle_video_sample(&data_weak.clone(), appsink)
+                })
+                .build(),
+        );
+
+        let bin_app_src_pad = bin
+            .static_pad("app_src")
+            .expect("failed to get bin app_src pad");
+        let appsink_sink_pad = appsink
+            .static_pad("sink")
+            .expect("failed to get appsink src pad");
+        bin_app_src_pad
+            .link(&appsink_sink_pad)
+            .expect("failed to link appsink_sink_pad");
+        appsink
+            .sync_state_with_parent()
+            .expect("failed to sync video appsink state");
+        d.video_appsink = Some(appsink);
+
+        // link the bin pipeline to the mkv splitmuxsink
+        bin_mkv_src_pad
+            .link(&d.mkv_sink_pad.1)
+            .expect("linking bin to video sink failed");
+
+        info!("Link succeeded (type {new_pad_type}).");
+
+        bin.sync_state_with_parent()
+            .expect("failed to sync bin state");
+    } else if let ("audio", Some(depay_name), &None) = (media, depayloader_name, &d.audio_appsink) {
+        let bin = create_audio_branch(depay_name, parser_name);
+
+        let pipeline = src
+            .parent()
+            .expect("Failed to get src parent")
+            .downcast::<gst::Pipeline>()
+            .expect("failed to get unwrap src parent");
+
+        pipeline.add_many([&bin]).expect("Failed to add bin");
+
+        let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
+
+        let bin_mkv_src_pad = bin
+            .static_pad("mkv_src")
+            .expect("failed to get bin src pad");
+
+        src_pad
+            .link(&bin_sink_pad)
+            .expect("failed to link new_src_pad to bin_sink_pad");
+
+        // the bin pipeline to appsink
+        let appsink = AppSink::builder().name("audio_appsink").sync(false).build();
+
+        pipeline
+            .add_many([appsink.upcast_ref::<gst::Element>()])
+            .expect("failed to add audio appsink to pipeline");
+
+        appsink.set_callbacks(
+            AppSinkCallbacks::builder()
+                .new_sample(handle_audio_sample)
+                .build(),
+        );
+
+        let bin_app_src_pad = bin
+            .static_pad("app_src")
+            .expect("failed to get bin app_src pad");
+        let appsink_sink_pad = appsink
+            .static_pad("sink")
+            .expect("failed to get appsink src pad");
+        bin_app_src_pad
+            .link(&appsink_sink_pad)
+            .expect("failed to link appsink_sink_pad");
+        appsink
+            .sync_state_with_parent()
+            .expect("failed to sync video appsink state");
+        d.audio_appsink = Some(appsink);
+
+        let audio_sink_pad = d
+            .mkv_sink_pad
+            .0
+            .request_pad_simple("audio_%u")
+            .expect("Failed to get video sink pad from convert");
+        drop(d);
+        // link the bin pipeline to the mkv splitmuxsink
+        bin_mkv_src_pad
+            .link(&audio_sink_pad)
+            .expect("linking bin to audio sink failed");
+
+        info!("Link succeeded (type {new_pad_type}).");
+
+        bin.sync_state_with_parent()
+            .expect("failed to sync bin state");
+    } else {
+        error!("Unknown RTP encoding: {media} / {encoding_name}");
+    }
+}
+
 fn main() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Info))
@@ -439,6 +690,7 @@ fn main() {
         .nth(2)
         .expect("Failed to get storage path")
         .into();
+    let data = CustomData::new(storage_path);
 
     let source = gst::ElementFactory::make("rtspsrc")
         .name("source")
@@ -446,232 +698,32 @@ fn main() {
         .build()
         .expect("Could not create source element.");
 
-    let mkv_sink = gst::ElementFactory::make("splitmuxsink")
-        .name("sink")
-        .property("async-finalize", true)
-        .property("max-size-bytes", 15_000_000u64)
-        .property_from_str("muxer-factory", "matroskamux")
-        .build()
-        .expect("Could not create sink element.");
-
     let pipeline = gst::Pipeline::with_name("capture-pipeline");
 
     pipeline
-        .add_many([&source, &mkv_sink])
+        .add_many([&source, &data.mkv_sink_pad.0])
         .expect("Failed to add elements to pipeline.");
 
-    let video_sink_pad = mkv_sink
-        .request_pad_simple("video")
-        .expect("Failed to get video sink pad from convert");
-
-    let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(CustomData::new()));
-    let data_weak_mkv_sink = Arc::downgrade(&data);
+    let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(data));
     let data_weak = Arc::downgrade(&data);
 
-    mkv_sink.connect("format-location-full", false, move |_el| {
-        let data = data_weak_mkv_sink
-            .upgrade()
-            .expect("failed to get data for format-location-full");
+    data.lock()
+        .unwrap()
+        .mkv_sink_pad
+        .0
+        .connect("format-location-full", false, {
+            let data_weak = data_weak.clone();
 
-        let mut d = data.lock().unwrap();
-
-        let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-
-        if let Some(current_filename) = &d.current_filename {
-            let msg = CaptureMessage::EndFile {
-                filename: current_filename.clone(),
-                end_time: timestamp.clone(),
-            };
-            exserial::print_message(msg);
-        }
-
-        let id = Uuid::now_v7();
-        let path = uuid_to_filename(&storage_path, id);
-        let parent = path.parent().expect("failed to get new file parent");
-        create_dir_all(parent).expect("failed to create parent directory");
-        info!("New file: {}", path.display());
-
-        let msg = CaptureMessage::NewFile {
-            filename: path.to_string_lossy().to_string(),
-            begin_time: timestamp,
-        };
-        exserial::print_message(msg);
-        d.current_filename = Some(path.to_string_lossy().to_string());
-        drop(d);
-        Some(path.into())
-    });
+            move |_el| -> Option<gstreamer::glib::Value> {
+                Some(handle_file_location_request(&data_weak.clone()))
+            }
+        });
 
     // Connect the pad-added signal
-    source.connect_pad_added(move |src, src_pad| {
-        info!("Received new pad {} from {}", src_pad.name(), src.name());
-
-        src.downcast_ref::<gstreamer::Bin>()
-            .expect("src downcast failed.")
-            .debug_to_dot_file_with_ts(gstreamer::DebugGraphDetails::all(), "pad-added");
-
-        let new_pad_caps = src_pad
-            .current_caps()
-            .expect("Failed to get caps of new pad.");
-        let new_pad_struct = new_pad_caps
-            .structure(0)
-            .expect("Failed to get first structure of caps.");
-        let new_pad_type = new_pad_struct.name();
-
-        let media = new_pad_struct.get::<&str>("media").unwrap_or_default();
-        let encoding_name = new_pad_struct
-            .get::<&str>("encoding-name")
-            .unwrap_or_default();
-
-        if media == "video" && video_sink_pad.is_linked() {
-            info!("Video is already linked. Ignoring.");
-            return;
-        }
-
-        let (depayloader_name, parser_name) = match (&media, &encoding_name) {
-            (&"video", &"H264") => (Some("rtph264depay"), Some("h264parse")),
-            // (&"video", &"H265") => (Some("rtph265depay"), Some("h265parse")),
-            (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
-            (&"audio", &"MPEG4-GENERIC" | &"AAC") => (Some("rtpmp4gdepay"), Some("aacparse")),
-            (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
-            (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
-            _ => (None, None),
-        };
-
-        info!(
-            "New pad type {}, {} {}",
-            &new_pad_type, &media, &encoding_name
-        );
-
-        let Some(data) = data_weak.upgrade() else {
-            error!("Failed to upgrade the weak reference");
-            return;
-        };
-        let mut d = data.lock().unwrap();
-
-        if let ("video", Some(depay_name), Some(parser_name), &None) =
-            (media, depayloader_name, parser_name, &d.video_appsink)
-        {
-            let bin = create_video_branch(depay_name, parser_name);
-            let pipeline = src
-                .parent()
-                .expect("Failed to get src parent")
-                .downcast::<gst::Pipeline>()
-                .expect("failed to get unwrap src parent");
-
-            pipeline.add_many([&bin]).expect("Failed to add bin");
-
-            let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
-
-            let bin_mkv_src_pad = bin
-                .static_pad("mkv_src")
-                .expect("failed to get bin src pad");
-
-            src_pad
-                .link(&bin_sink_pad)
-                .expect("failed to link new_src_pad to bin_sink_pad");
-
-            // the bin pipeline to appsink
-            let appsink = AppSink::builder().name("video_appsink").sync(false).build();
-
-            pipeline
-                .add_many([appsink.upcast_ref::<gst::Element>()])
-                .expect("failed to add video appsink to pipeline");
-
-            appsink.set_callbacks(
-                AppSinkCallbacks::builder()
-                    .new_sample(handle_video_sample)
-                    .build(),
-            );
-
-            let bin_app_src_pad = bin
-                .static_pad("app_src")
-                .expect("failed to get bin app_src pad");
-            let appsink_sink_pad = appsink
-                .static_pad("sink")
-                .expect("failed to get appsink src pad");
-            bin_app_src_pad
-                .link(&appsink_sink_pad)
-                .expect("failed to link appsink_sink_pad");
-            appsink
-                .sync_state_with_parent()
-                .expect("failed to sync video appsink state");
-            d.video_appsink = Some(appsink);
-            drop(d);
-
-            // link the bin pipeline to the mkv splitmuxsink
-            bin_mkv_src_pad
-                .link(&video_sink_pad)
-                .expect("linking bin to video sink failed");
-
-            info!("Link succeeded (type {new_pad_type}).");
-
-            bin.sync_state_with_parent()
-                .expect("failed to sync bin state");
-        } else if let ("audio", Some(depay_name), &None) =
-            (media, depayloader_name, &d.audio_appsink)
-        {
-            let bin = create_audio_branch(depay_name, parser_name);
-
-            let pipeline = src
-                .parent()
-                .expect("Failed to get src parent")
-                .downcast::<gst::Pipeline>()
-                .expect("failed to get unwrap src parent");
-
-            pipeline.add_many([&bin]).expect("Failed to add bin");
-
-            let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
-
-            let bin_mkv_src_pad = bin
-                .static_pad("mkv_src")
-                .expect("failed to get bin src pad");
-
-            src_pad
-                .link(&bin_sink_pad)
-                .expect("failed to link new_src_pad to bin_sink_pad");
-
-            // the bin pipeline to appsink
-            let appsink = AppSink::builder().name("audio_appsink").sync(false).build();
-
-            pipeline
-                .add_many([appsink.upcast_ref::<gst::Element>()])
-                .expect("failed to add audio appsink to pipeline");
-
-            appsink.set_callbacks(
-                AppSinkCallbacks::builder()
-                    .new_sample(handle_audio_sample)
-                    .build(),
-            );
-
-            let bin_app_src_pad = bin
-                .static_pad("app_src")
-                .expect("failed to get bin app_src pad");
-            let appsink_sink_pad = appsink
-                .static_pad("sink")
-                .expect("failed to get appsink src pad");
-            bin_app_src_pad
-                .link(&appsink_sink_pad)
-                .expect("failed to link appsink_sink_pad");
-            appsink
-                .sync_state_with_parent()
-                .expect("failed to sync video appsink state");
-            d.audio_appsink = Some(appsink);
-            drop(d);
-            let audio_sink_pad = mkv_sink
-                .request_pad_simple("audio_%u")
-                .expect("Failed to get video sink pad from convert");
-
-            // link the bin pipeline to the mkv splitmuxsink
-            bin_mkv_src_pad
-                .link(&audio_sink_pad)
-                .expect("linking bin to audio sink failed");
-
-            info!("Link succeeded (type {new_pad_type}).");
-
-            bin.sync_state_with_parent()
-                .expect("failed to sync bin state");
-        } else {
-            error!("Unknown RTP encoding: {media} / {encoding_name}");
+    source.connect_pad_added({
+        let data_weak = data_weak.clone();
+        move |src, src_pad| {
+            handle_connect_pad_added(data_weak.clone(), src, src_pad);
         }
     });
 
@@ -682,33 +734,52 @@ fn main() {
 
     // Wait until error or EOS
     let bus = pipeline.bus().unwrap();
-    for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
-        use gstreamer::MessageView;
-        match msg.view() {
-            MessageView::Error(err) => {
+    loop {
+        let data_weak = data_weak.clone();
+        if let Some(msg) = bus.timed_pop(gstreamer::ClockTime::from_seconds(3)) {
+            use gstreamer::MessageView;
+            match msg.view() {
+                MessageView::Error(err) => {
+                    error!(
+                        "Error received from element {:?} {}",
+                        err.src().map(gstreamer::prelude::GstObjectExt::path_string),
+                        err.error()
+                    );
+                    error!("Debugging information: {:?}", err.debug());
+                    break;
+                }
+                MessageView::StateChanged(state_changed) => {
+                    if state_changed.src().is_some_and(|s| s == &pipeline) {
+                        info!(
+                            "Pipeline state changed from {:?} to {:?}",
+                            state_changed.old(),
+                            state_changed.current()
+                        );
+                    }
+                }
+                MessageView::Eos(..) => break,
+
+                MessageView::Progress(_progress) => {
+                    info!("PROGRESS");
+                }
+                _ => {}
+            }
+        } else {
+            // Timeout occurrred - check for hung stream
+            let data = data_weak.upgrade().expect("failed to get data for timeout");
+
+            let d = data.lock().unwrap();
+
+            let last_frame_duration = Instant::now().duration_since(d.last_frame_time);
+            drop(d);
+            if last_frame_duration > TIMEOUT {
                 error!(
-                    "Error received from element {:?} {}",
-                    err.src().map(gstreamer::prelude::GstObjectExt::path_string),
-                    err.error()
+                    "Haven't received frame for {} seconds. Which is longer than the configured timeout {} seconds. Exiting...",
+                    last_frame_duration.as_secs(),
+                    TIMEOUT.as_secs()
                 );
-                error!("Debugging information: {:?}", err.debug());
                 break;
             }
-            MessageView::StateChanged(state_changed) => {
-                if state_changed.src().is_some_and(|s| s == &pipeline) {
-                    info!(
-                        "Pipeline state changed from {:?} to {:?}",
-                        state_changed.old(),
-                        state_changed.current()
-                    );
-                }
-            }
-            MessageView::Eos(..) => break,
-
-            MessageView::Progress(_progress) => {
-                info!("PROGRESS");
-            }
-            _ => {}
         }
     }
 
