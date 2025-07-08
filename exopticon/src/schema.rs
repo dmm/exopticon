@@ -66,7 +66,7 @@ diesel::table! {
         user_id -> Binary,
         session_key -> Text,
         is_token -> Integer,
-        expiration -> Text,
+        expiration -> TimestamptzSqlite,
     }
 }
 
@@ -100,8 +100,8 @@ diesel::table! {
     video_units (id) {
         id -> Binary,
         camera_id -> Binary,
-        begin_time -> Text,
-        end_time -> Text,
+        begin_time -> TimestamptzSqlite,
+        end_time -> TimestamptzSqlite,
     }
 }
 

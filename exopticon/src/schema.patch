@@ -1,0 +1,36 @@
+diff --git a/exopticon/src/schema.rs b/exopticon/src/schema.rs
+index 0fce8f9..9273a97 100644
+--- a/exopticon/src/schema.rs
++++ b/exopticon/src/schema.rs
+@@ -63,13 +63,13 @@ diesel::table! {
+     user_sessions (id) {
+         id -> Binary,
+         name -> Text,
+         user_id -> Binary,
+         session_key -> Text,
+         is_token -> Integer,
+-        expiration -> Timestamp,
++        expiration -> TimestamptzSqlite,
+     }
+ }
+ 
+ diesel::table! {
+     use diesel::sql_types::*;
+     use crate::db::uuid::*;
+@@ -97,14 +97,14 @@ diesel::table! {
+     use diesel::sql_types::*;
+     use crate::db::uuid::*;
+ 
+     video_units (id) {
+         id -> Binary,
+         camera_id -> Binary,
+-        begin_time -> Timestamp,
+-        end_time -> Timestamp,
++        begin_time -> TimestamptzSqlite,
++        end_time -> TimestamptzSqlite,
+     }
+ }
+ 
+ diesel::joinable!(camera_group_memberships -> camera_groups (camera_group_id));
+ diesel::joinable!(camera_group_memberships -> cameras (camera_id));
+ diesel::joinable!(cameras -> storage_groups (storage_group_id));
