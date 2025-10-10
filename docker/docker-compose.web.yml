@@ -9,12 +9,12 @@ services:
       - 443:443
     volumes:
       - caddy:/data
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:Z
     environment:
-      - DOMAIN
-      - PORT
-      - EMAIL
-      - DESEC_TOKEN
+      DOMAIN: ${DOMAIN}
+      PORT: ${PORT}
+      EMAIL: ${EMAIL}
+      DESEC_TOKEN: ${DESEC_TOKEN}
 
 volumes:
   caddy:

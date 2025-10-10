@@ -1,39 +1,44 @@
 version: '2.4'
 
+x-podman:
+  in_pod: false
+
 services:
+#  db:
+#    userns_mode: "keep-id:uid=1000,gid=1000"
+#  caddy:
+#    userns_mode: "keep-id:uid=1000,gid=1000"
   exopticon:
     build:
       context: ..
       target: development
+    userns_mode: "keep-id:uid=1000,gid=1000"
     environment:
-      - DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
-      - TEST_DATABASE_URL=postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@testdb
-      - ROOT_URL="https://${DOMAIN}"
-      - DOMAIN
-      - EXOPTICON_NAME
-      - EXOPTICON_SHORT_NAME
-      - RUST_LOG
-      - EXOPTICON_METRICS_ENABLED
-      - EXOPTICON_METRICS_USERNAME
-      - EXOPTICON_METRICS_PASSWORD
-      - EXOPTICON_WEBRTC_IPS
-      - EXOPTICON_WEBRTC_BUFFER_SIZE
+      DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
+      TEST_DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@testdb
+      ROOT_URL: "https://${DOMAIN}"
+      DOMAIN: ${DOMAIN}
+      EXOPTICON_NAME: ${EXOPTICON_NAME}
+      EXOPTICON_SHORT_NAME: ${EXOPTICON_SHORT_NAME}
+      RUST_LOG: ${RUST_LOG}
+      EXOPTICON_METRICS_ENABLED: ${EXOPTICON_METRICS_ENABLED}
+      EXOPTICON_METRICS_USERNAME: ${EXOPTICON_METRICS_USERNAME}
+      EXOPTICON_METRICS_PASSWORD: ${EXOPTICON_METRICS_PASSWORD}
+      EXOPTICON_WEBRTC_IPS: ${EXOPTICON_WEBRTC_IPS}
+      EXOPTICON_WEBRTC_BUFFER_SIZE: ${EXOPTICON_WEBRTC_BUFFER_SIZE}
     ports:
       - 3000:3000
       - "4000:4000/udp"
     restart: always
-    device_cgroup_rules:
-      - 'a 189:* rwm'
     devices: []
 #      - /dev/apex_0:/dev/apex_0
     volumes:
       - cargo_home:/cargo
       - target:/exopticon/target
-      - /dev/bus/usb:/dev/bus/usb
-      - ..:/exopticon # map source directory for development
-      - $EXOPTICON_VIDEO_PATH:/video
+      - ..:/exopticon:Z # map source directory for development
+      - $EXOPTICON_VIDEO_PATH:/video:Z
   testdb:
-    image: postgres:17
+    image: docker.io/pgautoupgrade/pgautoupgrade:17-bookworm
     restart: always
     environment:
       POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}

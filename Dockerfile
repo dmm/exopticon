@@ -1,7 +1,7 @@
 # nvidia/cuda:12.8.0-cudnn8-runtime-ubuntu22.04
-ARG RUNTIMEBASE=nvidia/cuda@sha256:05de765c12d993316f770e8e4396b9516afe38b7c52189bce2d5b64ef812db58
+ARG RUNTIMEBASE=docker.io/nvidia/cuda@sha256:05de765c12d993316f770e8e4396b9516afe38b7c52189bce2d5b64ef812db58
 # nvidia/cuda:12.8.0-cudnn8-devel-ubuntu22.04
-ARG DEVELBASE=nvidia/cuda@sha256:2a015be069bda4de48d677b6e3f271a2794560c7d788a39a18ecf218cae0751d
+ARG DEVELBASE=docker.io/nvidia/cuda@sha256:2a015be069bda4de48d677b6e3f271a2794560c7d788a39a18ecf218cae0751d
 
 FROM $DEVELBASE AS exopticon-build
 

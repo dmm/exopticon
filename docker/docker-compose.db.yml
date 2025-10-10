@@ -5,17 +5,9 @@ services:
     depends_on:
       - db
   db:
-    image: pgautoupgrade/pgautoupgrade:17-bookworm
+    image: docker.io/pgautoupgrade/pgautoupgrade:17-bookworm
     restart: always
     environment:
       POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}
     volumes:
-      - type: bind
-        source: ${EXOPTICON_DB_PATH}
-        target: /var/lib/postgresql/data
-  dbmetrics:
-    image: quay.io/prometheuscommunity/postgres-exporter
-    restart: always
-    environment:
-      DATA_SOURCE_NAME: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db?sslmode=disable
-      PG_EXPORTER_INCLUDE_DATABASES: postgres
+      - ${EXOPTICON_DB_PATH}:/var/lib/postgresql/data:Z
