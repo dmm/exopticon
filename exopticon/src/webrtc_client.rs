@@ -19,7 +19,7 @@
  */
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
@@ -34,10 +34,15 @@ use str0m::{
     media::{Frequency, MediaTime, Mid},
     net::Protocol,
 };
-use tokio::net::{UdpSocket, lookup_host};
+use tokio::{
+    net::{UdpSocket, lookup_host},
+    sync::mpsc,
+};
 use uuid::Uuid;
 
-use crate::capture_actor::VideoPacket;
+use crate::{capture_actor::VideoPacket, video_router::VideoRouter};
+
+pub type ClientId = Uuid;
 
 /// Messages from client
 #[derive(Deserialize)]
@@ -45,7 +50,7 @@ use crate::capture_actor::VideoPacket;
 #[serde(rename_all = "camelCase")]
 pub enum ClientMessage {
     #[serde(rename_all = "camelCase")]
-    SubscriptionUpdate { subscribed_camera_ids: Vec<Uuid> },
+    SubscriptionUpdate { _subscribed_camera_ids: Vec<Uuid> },
     #[serde(rename_all = "camelCase")]
     NegotiationRequest { offer: String },
     /// Maps camera id to Mid
@@ -63,15 +68,17 @@ pub enum ServerMessage {
 }
 
 pub struct Client {
+    client_id: ClientId,
     websocket: WebSocket,
     /// used only to send messages
     udp_socket: Arc<UdpSocket>,
     udp_receiver: tokio::sync::broadcast::Receiver<(usize, SocketAddr, Vec<u8>)>,
-    video_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
+    video_receiver: mpsc::Receiver<VideoPacket>,
+    video_sender: mpsc::Sender<VideoPacket>,
+    video_router: Arc<VideoRouter>,
     candidate_ips: Vec<String>,
     candidate_socketaddrs: Vec<SocketAddr>,
     rtc: Rtc,
-    subscribed_ids: HashSet<Uuid>,
     camera_mapping: HashMap<Uuid, Mid>,
 }
 
@@ -79,7 +86,9 @@ impl Client {
     pub fn new(
         websocket: WebSocket,
         udp_receiver: tokio::sync::broadcast::Receiver<(usize, SocketAddr, Vec<u8>)>,
-        video_receiver: tokio::sync::broadcast::Receiver<VideoPacket>,
+        video_receiver: mpsc::Receiver<VideoPacket>,
+        video_sender: mpsc::Sender<VideoPacket>,
+        video_router: Arc<VideoRouter>,
         udp_socket: Arc<UdpSocket>,
         candidate_ips: Vec<String>,
     ) -> Self {
@@ -92,14 +101,16 @@ impl Client {
             .build();
 
         Self {
+            client_id: Uuid::new_v4(),
             websocket,
-            udp_receiver,
             udp_socket,
+            udp_receiver,
             video_receiver,
+            video_sender,
+            video_router,
             candidate_ips,
             candidate_socketaddrs: Vec::new(),
             rtc,
-            subscribed_ids: HashSet::new(),
             camera_mapping: HashMap::new(),
         }
     }
@@ -157,9 +168,11 @@ impl Client {
 
         match message {
             ClientMessage::SubscriptionUpdate {
-                subscribed_camera_ids,
+                _subscribed_camera_ids: _,
             } => {
-                self.subscribed_ids = subscribed_camera_ids.into_iter().collect();
+                // NOT USED
+                // TODO REMOVE ME
+                error!("ClientMessage::SubscriptionUpdate, we shouldn't get this...");
             }
             ClientMessage::NegotiationRequest { offer } => {
                 let spd_offer =
@@ -194,10 +207,20 @@ impl Client {
             }
             ClientMessage::StreamMapping { mappings } => {
                 self.camera_mapping.clear();
-                for (mid_string, camera_id) in mappings {
+                for (mid_string, camera_id) in &mappings {
                     let m: Mid = Mid::from(mid_string.as_str());
-                    self.camera_mapping.insert(camera_id, m);
+                    self.camera_mapping.insert(camera_id.clone(), m);
                 }
+
+                error!("SENDING UPDATE SUBSCRIPTION!");
+                self.video_router
+                    .update_subscriptions(
+                        self.client_id,
+                        mappings.into_values().collect(),
+                        self.video_sender.clone(),
+                    )
+                    .await;
+                error!("DOOOOOONE UPDATE SUBSCRIPTION!");
             }
         }
         Ok(())
@@ -306,26 +329,92 @@ impl Client {
     pub async fn run(mut self) {
         let gauge = gauge!("webrtc_sessions");
         gauge.increment(1);
-        let mut timeout = Duration::from_millis(100);
+        let mut timeout = Duration::from_millis(200);
         self.parse_candidates().await;
+
         loop {
-            tokio::select! {
-                // websocket control messages
-                Some(msg) = self.websocket.recv() => {
-                    if self.handle_websocket(msg).await.is_err() {
-                        info!("Got websocket error, exiting...");
+            // Process up to N events before checking RTC state
+            const MAX_EVENTS_PER_BATCH: usize = 16;
+            let mut events_processed = 0;
+            let mut should_exit = false;
+
+            // Process events in batch
+            while events_processed < MAX_EVENTS_PER_BATCH {
+                tokio::select! {
+                    biased; // Process in order of priority
+
+                    // High priority: websocket control messages
+                    Some(msg) = self.websocket.recv() => {
+                        if self.handle_websocket(msg).await.is_err() {
+                            should_exit = true;
+                            break;
+                        }
+                        events_processed += 1;
+                    },
+
+                    // Medium priority: UDP packets (time-sensitive)
+                    Ok(udp_msg) = self.udp_receiver.recv() => {
+                        self.handle_udp(udp_msg);
+                        events_processed += 1;
+
+                        // Try to drain more UDP packets without yielding
+                        loop {
+                            match self.udp_receiver.try_recv() {
+                                Ok(msg) => {
+                                    self.handle_udp(msg);
+                                    events_processed += 1;
+                                    if events_processed >= MAX_EVENTS_PER_BATCH {
+                                        break;
+                                    }
+                                }
+                                _ => break,
+                            }
+                        }
+                    },
+
+                    // Lower priority: video packets (buffer exists)
+                    Some(msg) = self.video_receiver.recv() => {
+                        self.handle_video(msg);
+                        events_processed += 1;
+
+                        // Try to drain more video packets without yielding
+                        loop {
+                            match self.video_receiver.try_recv() {
+                                Ok(msg) => {
+                                    self.handle_video(msg);
+                                    events_processed += 1;
+                                    if events_processed >= MAX_EVENTS_PER_BATCH {
+                                        break;
+                                    }
+                                }
+                                _ => break,
+                            }
+                        }
+
+                        // Immediately flush to network. This prevents
+                        // event batching from introducing video
+                        // latency. Otherwise, video would buffer
+                        // until =process_client_events()= is called
+                        // once the event limit is reached.
+                        timeout = match self.process_client_events().await {
+                            Ok(t) => t,
+                            Err(()) => break,
+                        };
+
+                    },
+
+                    // Timeout: process RTC state even if no events
+                    () = tokio::time::sleep(timeout) => {
                         break;
-                    }
-                },
-                // webrtc udp packets
-                Ok(udp_msg) = self.udp_receiver.recv() => self.handle_udp(udp_msg),
-                // video packets
-                Ok(msg) = self.video_receiver.recv() => self.handle_video(msg),
-                // timeout
-                 () = tokio::time::sleep(timeout) => {
+                     }
                 }
             }
 
+            if should_exit {
+                break;
+            }
+
+            // Process RTC state machine after batch
             timeout = match self.process_client_events().await {
                 Ok(t) => t,
                 Err(()) => break,
@@ -335,6 +424,9 @@ impl Client {
                 break;
             }
         }
+
+        self.video_router.unsubscribe(self.client_id).await;
+
         gauge.decrement(1);
     }
 }

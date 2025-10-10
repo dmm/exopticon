@@ -73,6 +73,7 @@ mod capture_actor;
 mod capture_supervisor;
 mod file_deletion_actor;
 mod file_deletion_supervisor;
+mod video_router;
 mod webrtc_client;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
@@ -82,7 +83,6 @@ use crate::file_deletion_supervisor::FileDeletionSupervisor;
 use axum::routing::{get, post};
 use axum::{Router, middleware};
 use axum_prometheus::PrometheusMetricLayer;
-use capture_actor::VideoPacket;
 use capture_supervisor::Command;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenv::dotenv;
@@ -92,6 +92,7 @@ use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, Layer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use video_router::VideoRouter;
 
 use std::env;
 use std::net::SocketAddr;
@@ -112,7 +113,7 @@ pub struct AppState {
     pub udp_channel: broadcast::Sender<(usize, SocketAddr, Vec<u8>)>,
     pub db_service: crate::db::Service,
     pub capture_channel: mpsc::Sender<Command>,
-    pub video_sender: broadcast::Sender<VideoPacket>,
+    pub video_router: Arc<VideoRouter>,
 }
 
 fn parse_candidate_ips() -> Vec<String> {
@@ -150,10 +151,10 @@ async fn udp_listener(
 async fn main() {
     //    console_subscriber::init();
 
-    //    let console_layer = console_subscriber::spawn();
+    let console_layer = console_subscriber::spawn();
     let filter = EnvFilter::from_default_env();
     tracing_subscriber::registry()
-        //        .with(console_layer)
+        .with(console_layer)
         .with(
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
@@ -214,7 +215,9 @@ async fn main() {
     tokio::spawn(udp_listener(udp_socket.clone(), udp_channel.clone()));
 
     // Start capture supervisor
-    let capture_supervisor = capture_supervisor::CaptureSupervisor::new(db_service.clone());
+    let video_router = Arc::new(VideoRouter::new());
+    let capture_supervisor =
+        capture_supervisor::CaptureSupervisor::new(db_service.clone(), video_router.clone());
     let capture_channel = capture_supervisor.get_command_channel();
 
     let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone());
@@ -225,7 +228,7 @@ async fn main() {
         udp_channel,
         db_service,
         capture_channel,
-        video_sender: capture_supervisor.get_packet_sender(),
+        video_router,
     };
 
     // TODO: watch this future for exit...

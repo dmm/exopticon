@@ -22,6 +22,7 @@ use std::{
     env,
     path::{Path, PathBuf},
     process::Stdio,
+    sync::Arc,
 };
 
 use bytes::BytesMut;
@@ -32,16 +33,19 @@ use regex::Regex;
 use tokio::{
     fs,
     process::{self, Child, ChildStdin, ChildStdout},
-    sync::{broadcast, mpsc},
+    sync::mpsc,
     task::spawn_blocking,
 };
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
 use uuid::Uuid;
 
-use crate::api::{
-    cameras::Camera,
-    storage_groups::StorageGroup,
-    video_units::{CreateVideoFile, CreateVideoUnit},
+use crate::{
+    api::{
+        cameras::Camera,
+        storage_groups::StorageGroup,
+        video_units::{CreateVideoFile, CreateVideoUnit},
+    },
+    video_router::VideoRouter,
 };
 use exserial::models::CaptureMessage;
 
@@ -76,8 +80,8 @@ pub struct CaptureActor {
     )>,
     video_segment_id: Option<(Uuid, Uuid)>,
 
-    /// Video Packet Sender
-    sender: broadcast::Sender<VideoPacket>,
+    /// Video Packet Router
+    video_router: Arc<VideoRouter>,
     /// Supervisor command channel
     command_receiver: mpsc::Receiver<Command>,
     /// counter to track lost packets
@@ -90,7 +94,7 @@ impl CaptureActor {
         camera: Camera,
         storage_group: StorageGroup,
         command_receiver: mpsc::Receiver<Command>,
-        sender: broadcast::Sender<VideoPacket>,
+        video_router: Arc<VideoRouter>,
     ) -> Self {
         let camera_name = camera.common.name.clone();
         let camera_id = camera.id;
@@ -102,7 +106,7 @@ impl CaptureActor {
             child: None,
             video_segment_id: None,
             command_receiver,
-            sender,
+            video_router,
             lost_packet_counter: counter!("lost_packet_count", "camera_id" => camera_id.to_string(), "camera_name" => camera_name),
         }
     }
@@ -190,18 +194,14 @@ impl CaptureActor {
         }
         Ok(())
     }
-    fn handle_packet(&self, data: Vec<u8>, timestamp: i64, duration: i64) {
-        if let Err(_e) = self.sender.send(VideoPacket {
+    async fn handle_packet(&self, data: Vec<u8>, timestamp: i64, duration: i64) {
+        let packet = VideoPacket {
             camera_id: self.camera.id,
             data,
             timestamp,
             duration,
-        }) {
-            // error!(
-            //     "Error sending packet! Camera: {}, {}, {} ",
-            //     self.camera.id, self.camera.common.name, e
-            // );
-        }
+        };
+        self.video_router.send_video(packet).await;
     }
 
     fn check_log_for_lost_packets(log: &str) -> Option<u32> {
@@ -248,7 +248,7 @@ impl CaptureActor {
                 duration,
             } => {
                 // TODO handle packets...
-                self.handle_packet(data, timestamp, duration);
+                self.handle_packet(data, timestamp, duration).await;
             }
             CaptureMessage::NewFile {
                 filename,

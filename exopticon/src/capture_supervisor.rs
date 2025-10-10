@@ -19,18 +19,19 @@
  */
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::task::{JoinError, spawn_blocking};
 use uuid::Uuid;
 
 use crate::api::cameras::Camera;
 use crate::capture_actor;
-use crate::capture_actor::VideoPacket;
+use crate::video_router::VideoRouter;
 
 pub enum Command {
     RestartAll,
@@ -52,13 +53,12 @@ pub struct CaptureSupervisor {
     command_receiver: mpsc::Receiver<Command>,
     capture_channels: HashMap<Uuid, mpsc::Sender<capture_actor::Command>>,
     capture_handles: FuturesUnordered<JoinHandle<Uuid>>,
-    packet_sender: broadcast::Sender<VideoPacket>,
+    video_router: Arc<VideoRouter>,
 }
 
 impl CaptureSupervisor {
-    pub fn new(db: crate::db::Service) -> Self {
+    pub fn new(db: crate::db::Service, video_router: Arc<VideoRouter>) -> Self {
         let (command_sender, command_receiver) = mpsc::channel(1);
-        let (packet_sender, _packet_receiver) = broadcast::channel(10);
 
         Self {
             state: State::Ready,
@@ -68,16 +68,12 @@ impl CaptureSupervisor {
             command_receiver,
             capture_channels: HashMap::new(),
             capture_handles: FuturesUnordered::new(),
-            packet_sender,
+            video_router,
         }
     }
 
     pub fn get_command_channel(&self) -> mpsc::Sender<Command> {
         self.command_sender.clone()
-    }
-
-    pub fn get_packet_sender(&self) -> broadcast::Sender<VideoPacket> {
-        self.packet_sender.clone()
     }
 
     async fn stop_cameras(&mut self) -> anyhow::Result<()> {
@@ -103,7 +99,7 @@ impl CaptureSupervisor {
             c,
             storage_group,
             command_receiver,
-            self.packet_sender.clone(),
+            self.video_router.clone(),
         );
         self.capture_channels.insert(id, command_sender);
         let fut = tokio::spawn(actor.run());

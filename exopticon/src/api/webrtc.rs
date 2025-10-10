@@ -24,26 +24,22 @@ use axum::{
     response::IntoResponse,
 };
 
-use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 
 use crate::{AppState, webrtc_client::Client};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RtcSessionDescriptionInit {
-    #[serde(rename(serialize = "type", deserialize = "type"))]
-    kind: String,
-    sdp: String,
-}
-
 async fn handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> impl IntoResponse {
     let udp_receiver = state.udp_channel.subscribe();
-    let video_receiver = state.video_sender.subscribe();
     let candidate_ips = state.candidate_ips;
     ws.on_upgrade(move |websocket: WebSocket| async move {
+        let (video_tx, video_rx) = mpsc::channel(500);
+
         let client = Client::new(
             websocket,
             udp_receiver,
-            video_receiver,
+            video_rx,
+            video_tx,
+            state.video_router,
             state.udp_socket,
             candidate_ips,
         );
