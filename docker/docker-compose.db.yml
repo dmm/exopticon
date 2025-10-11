@@ -1,9 +1,6 @@
 version: '2.4'
 
 services:
-  exopticon:
-    depends_on:
-      - db
   db:
     image: docker.io/pgautoupgrade/pgautoupgrade:17-bookworm
     restart: always
