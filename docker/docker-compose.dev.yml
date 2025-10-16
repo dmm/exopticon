@@ -7,7 +7,8 @@ services:
   exopticon:
     build:
       context: ..
-      target: development
+      dockerfile: Dockerfile
+      target: exopticon-development
     userns_mode: "keep-id:uid=1000,gid=1000"
     environment:
       DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
@@ -22,6 +23,8 @@ services:
       EXOPTICON_METRICS_PASSWORD: ${EXOPTICON_METRICS_PASSWORD}
       EXOPTICON_WEBRTC_IPS: ${EXOPTICON_WEBRTC_IPS}
       EXOPTICON_WEBRTC_BUFFER_SIZE: ${EXOPTICON_WEBRTC_BUFFER_SIZE}
+      CARGO_TARGET_DIR: /target
+      EXOPTICONWORKERS: /target/debug
     ports:
       - 3000:3000
       - "4000:4000/udp"
@@ -29,10 +32,10 @@ services:
     devices: []
 #      - /dev/apex_0:/dev/apex_0
     volumes:
-      - cargo_home:/cargo
-      - target:/exopticon/target
       - ..:/exopticon:Z # map source directory for development
       - $EXOPTICON_VIDEO_PATH:/video:Z
+      - cargo_home:/cargo
+      - target:/target
   testdb:
     image: docker.io/pgautoupgrade/pgautoupgrade:17-bookworm
     restart: always

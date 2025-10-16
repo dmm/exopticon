@@ -147,25 +147,31 @@ async fn udp_listener(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() {
-    //    console_subscriber::init();
-
-    let console_layer = console_subscriber::spawn();
     let filter = EnvFilter::from_default_env();
-    tracing_subscriber::registry()
-        .with(console_layer)
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_ansi(false)
-                .with_filter(filter),
-        )
-        .init();
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_ansi(false)
+        .with_filter(filter);
+
+    #[cfg(feature = "console")]
+    {
+        let console_layer = console_subscriber::spawn();
+        tracing_subscriber::registry()
+            .with(console_layer)
+            .with(fmt_layer)
+            .init();
+    }
+
+    #[cfg(not(feature = "console"))]
+    {
+        tracing_subscriber::registry().with(fmt_layer).init();
+    }
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-    // create db connection pool
     let db_service = crate::db::Service::new(&database_url);
     let pool = db_service.clone().pool;
 

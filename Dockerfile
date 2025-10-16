@@ -1,96 +1,118 @@
-# nvidia/cuda:12.8.0-cudnn8-runtime-ubuntu22.04
-ARG RUNTIMEBASE=docker.io/nvidia/cuda@sha256:05de765c12d993316f770e8e4396b9516afe38b7c52189bce2d5b64ef812db58
-# nvidia/cuda:12.8.0-cudnn8-devel-ubuntu22.04
-ARG DEVELBASE=docker.io/nvidia/cuda@sha256:2a015be069bda4de48d677b6e3f271a2794560c7d788a39a18ecf218cae0751d
+FROM docker.io/almalinux:10 as base
 
-FROM $DEVELBASE AS exopticon-build
+# Install EPEL
+RUN  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+
+ENV CUDA_VERSION 13.0.1
+ENV CUDA_MAJOR 13
+ENV CUDA_MINOR 0
+ENV CUDA_REPO_URL https://developer.download.nvidia.com/compute/cuda/repos/rhel10
+ENV NV_CUDA_CUDART_VERSION 13.0.88-1
+
+RUN echo "[cuda]" > /etc/yum.repos.d/cuda.repo
+RUN echo "name=cuda" >> /etc/yum.repos.d/cuda.repo
+RUN echo "baseurl=https://developer.download.nvidia.com/compute/cuda/repos/rhel10/x86_64" >> /etc/yum.repos.d/cuda.repo
+RUN echo "enabled=1" >> /etc/yum.repos.d/cuda.repo
+RUN echo "gpgcheck=1" >> /etc/yum.repos.d/cuda.repo
+RUN echo "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" >> /etc/yum.repos.d/cuda.repo
+
+LABEL maintainer "David Matthew Mattli <dmm@mattli.us>"
+RUN NVIDIA_GPGKEY_SUM=afbea87d3b979b3788ef34223aeeb323ade481128e2c133723ae99b8a51368bb && \
+    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/rhel10/x86_64/CDF6BA43.pub | sed '/^Version/d' > /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA && \
+    echo "$NVIDIA_GPGKEY_SUM  /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" | sha256sum -c --strict -
+
+RUN dnf upgrade -y \
+    && dnf install -y cuda-cudart-13-0 cuda-compat-13-0 \
+    && dnf clean all \
+    && rm -rf /var/cache/yum/*
+# For libraries in the cuda-compat-* package: https://docs.nvidia.com/cuda/eula/index.html#attachment-a
+# RUN yum upgrade -y && yum install -y \
+#     cuda-cudart-${CUDA_MAJOR}-${CUDA_MINOR}-${NV_CUDA_CUDART_VERSION} \
+#     cuda-compat-${CUDA_MAJOR}-${CUDA_MINOR \
+# {% if ( cuda.version.major | int ) == 11 and ( cuda.version.minor | int ) <= 2 %}
+#     && ln -s cuda-{{ cuda.version.major }}.{{ cuda.version.minor }} /usr/local/cuda \
+# {% endif %}
+#     && yum clean all \
+#     && rm -rf /var/cache/yum/*
+
+# nvidia-docker 1.0
+RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
+    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
+
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+
+FROM base as cuda-runtime
+
+RUN dnf install -y \
+    cuda-libraries-13-0 \
+    cuda-nvtx-13-0 \
+    libnpp-13-0 \
+    libcublas-13-0 \
+    libnccl \
+    cudnn \
+    && dnf clean all \
+    && rm -rf /var/cache/yum/*
+
+
+FROM cuda-runtime as cuda-devel
+
+RUN dnf install -y \
+    cuda-command-line-tools-13-0 \
+    cuda-libraries-devel-13-0 \
+    cuda-minimal-build-13-0 \
+    cuda-cudart-devel-13-0 \
+    cuda-nvml-devel-13-0 \
+    libcublas-devel-13-0 \
+    libnpp-devel-13-0 \
+    libnccl-devel \
+    libcudnn9-devel-cuda-13 \
+    libcudnn9-headers-cuda-13 \
+    && dnf clean all \
+    && rm -rf /var/cache/yum/*
+
+FROM cuda-devel as exopticon-build
 
 WORKDIR /exopticon
 
-ENV DEBIAN_FRONTEND=noninteractive
+RUN dnf install -y \
+    make \
+    mold \
+    clang \
+    git \
+    gstreamer1 \
+    gstreamer1-devel \
+    gstreamer1-plugins-bad-free-devel \
+    gstreamer1-plugins-base-devel \
+    gstreamer1-plugins-good \
+    gstreamer1-plugins-ugly-free \
+    libpq-devel \
+    nodejs \
+    nodejs-npm \
+    python3-pip \
+    # for Rust openssl crate:
+    pkgconf \
+    perl-FindBin \
+    perl-IPC-Cmd \
+    openssl-devel \
+    perl-File-Compare \
+    perl-File-Copy \
+    && dnf clean all \
+    && rm -rf /var/cache/yum/*
 
-# Install system packages
-#RUN echo 'deb http://http.debian.net/debian bullseye main contrib non-free' >> /etc/apt/sources.list
-RUN apt-get update && apt-get install --no-install-recommends -y \
-  # Exopticon Build Dependencies
-  bzip2 unzip \
-  dpkg-dev file imagemagick libz3-dev libc6-dev \
-  libcurl4-openssl-dev libdb-dev libevent-dev libffi-dev\
-  libgdbm-dev libgeoip-dev libglib2.0-dev libjpeg-dev \
-  libkrb5-dev liblzma-dev libmagickcore-dev libmagickwand-dev\
-  libncurses5-dev libncursesw5-dev libpng-dev libpq-dev \
-  libreadline-dev libsqlite3-dev libssl-dev libtool libwebp-dev \
-  libxml2-dev libxslt-dev libyaml-dev make patch xz-utils \
-  zlib1g-dev default-libmysqlclient-dev \
-  curl python3-pil python3-lxml \
-  python3 python3-dev python3-pip python3-setuptools python3-wheel \
-  git libopencv-dev python3-opencv python3-scipy cmake \
-  mold clang \
-  # ffmpeg
-  ffmpeg libavformat-dev libswscale-dev libavutil-dev libavcodec-dev libavfilter-dev \
-  # hwaccel
-  intel-media-va-driver-non-free i965-va-driver-shaders \
-  # gstreamer
-  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-  gstreamer1.0-libav libgstrtspserver-1.0-dev libges-1.0-dev \
-  libgstreamer-plugins-bad1.0-dev \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
-# # Install nvdec headers
-# RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git \
-#     && cd nv-codec-headers \
-#     && make \
-#     && make install
-
-# # Build ffmpeg
-# RUN apt-get update && apt-get -y build-dep ffmpeg \
-#     && git clone https://github.com/FFmpeg/FFmpeg -b master ffmpeg \
-#     && cd ffmpeg && git checkout f1357274e912b40928ed4dc100b4c1de8750508b # just the latest commit at this time
-
-# RUN cd ffmpeg && ./configure \
-#        --disable-sdl2 \
-#        --disable-alsa \
-#        --disable-xlib \
-#        --disable-sndio \
-#        --disable-libxcb \
-#        --disable-libxcb-shm \
-#        --disable-libxcb-xfixes \
-#        --disable-libxcb-shape \
-#        --disable-libass \
-#        --enable-cuvid \
-#        --enable-nvdec \
-#        --enable-gpl \
-#        --enable-vaapi \
-#        --enable-libfreetype \
-#        --enable-libmp3lame \
-#        --enable-libopus \
-#        --enable-libtheora \
-#        --enable-libvorbis \
-#        --enable-libvpx \
-#        --enable-libx264 \
-#        --enable-shared \
-#     && make -j`getconf _NPROCESSORS_ONLN` \
-#     && make install
-
-# install node.js and npm
-RUN mkdir /node && cd /node \
-    && curl https://nodejs.org/dist/v20.11.1/node-v20.11.1-linux-x64.tar.xz > node.tar.xz \
-    && tar xf node.tar.xz \
-    && mv node*/* . \
-    && rm -rf node.tar.xz
-ENV PATH=/node/bin:$PATH
 
 RUN mkdir /cargo && mkdir /rust
 RUN chown 1000:1000 /cargo /rust
 
 # configure run user
-RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon -G plugdev --uid 1000 exopticon
+RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
 RUN chown exopticon:exopticon /exopticon
 
-USER exopticon:plugdev
+USER exopticon:exopticon
 
 ENV CARGO_HOME=/cargo
 ENV RUST_HOME=/rust
@@ -103,91 +125,59 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 RUN pip3 install msgpack imutils numpy pathspec==0.9.0 dvc[s3]==1.11.16 importlib-metadata
 RUN /home/exopticon/.local/bin/dvc config --global core.analytics false
 
-ENV EXOPTICONWORKERS=/exopticon/target/debug/
-ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
-ENV CUDA_HOME=/usr/local/cuda-12.2
-ENV CUDA_PATH=/usr/local/cuda-12.2/bin
-ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-12.2
-ENV CUDACXX=/usr/local/cuda-12.2/bin/nvcc
+ENV EXOPTICONWORKERS=/target/debug/
+#ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
+ENV CUDA_HOME=/usr/local/cuda-13.0
+ENV CUDA_PATH=/usr/local/cuda-13.0/bin
+ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-13.0
+ENV CUDACXX=/usr/local/cuda-13.0/bin/nvcc
 ENV PATH=$CUDA_PATH:/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:/home/exopticon/.local/bin/:$PATH
 
-WORKDIR /exopticon
+FROM exopticon-build as exopticon-development
 
-FROM exopticon-build AS development
-# This state is just used for local development
-# configure environment
+ENTRYPOINT ["sleep", "infinity"]
 
-USER root
+FROM exopticon-build as prod-build
 
-# Create volume mount paths and set ownership
-RUN mkdir -p /cargo /exopticon/target \
- && chown exopticon:plugdev /cargo /exopticon/target
-
-USER exopticon:plugdev
-
-# configure mold linker
-RUN mkdir ~/.cargo
-RUN echo "[target.x86_64-unknown-linux-gnu]" >> ~/.cargo/config.toml
-RUN echo "rustflags = [\"-C\", \"linker=clang\", \"-C\", \"link-arg=--ld-path=/usr/bin/mold\"]" >> ~/.cargo/config.toml
-
-ENTRYPOINT ["tail", "-f", "/dev/null"]
-
-FROM exopticon-build AS prod-build
-
-USER exopticon:plugdev
+USER exopticon:exopticon
 
 COPY --chown=exopticon:exopticon . ./
 
 RUN make ci-flow
 
-FROM $RUNTIMEBASE AS exopticon-runtime
+FROM cuda-runtime as exopticon-prod
+
 WORKDIR /exopticon
 
 USER root
 
-ENV FLASK_ENV=development
-ENV DEBIAN_FRONTEND=noninteractive
-# Install packages for apt repo
-RUN apt-get -qq update \
-# ffmpeg
-  && apt-get install --no-install-recommends -y \
-  bzip2 libssl3 \
-  libbz2-1.0 libc6 \
-  libcurl4 libevent-2.1-7 libffi7 \
-  libgdbm6 libgeoip1 libglib2.0 \
-  libkrb5-3 liblzma5 libmagickcore-6.q16-6 libmagickwand-6.q16-6 \
-  libncurses5 libncursesw5 libpng16-16 libpq5 \
-  libreadline8 libsqlite3-0 \
-  libxml2 libxslt1.1 libyaml-0-2 \
-  python3-opencv \
-  # ffmpeg runtime deps
-  ffmpeg \
-  # Add imutils and numpy
-  && apt-get install --no-install-recommends -y \
-  python3-setuptools python3-pip python3-wheel python3-pillow python3-scipy \
-  && pip3 install imutils numpy \
-  && apt-get purge -y python3-setuptools python3-pip python3-wheel \
-  # clean up
-  && apt-get autoremove -y \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/* \ # /wheels \
-  && (apt-get autoremove -y; apt-get autoclean -y)
+RUN dnf install -y \
+    gstreamer1 \
+    gstreamer1-plugins-bad-free \
+    gstreamer1-plugins-base \
+    gstreamer1-plugins-good \
+    gstreamer1-plugins-ugly-free \
+    libpq \
+    # for Rust openssl crate:
+    openssl \
+    && dnf clean all \
+    && rm -rf /var/cache/yum/*
+
+FROM exopticon-prod AS exopticon-cuda
+
+WORKDIR /exopticon
 
 # configure run user
 RUN groupadd -r -g 1000 exopticon && useradd --no-log-init -m -g exopticon --uid 1000 exopticon
-RUN chown exopticon:exopticon /exopticon
-
-FROM exopticon-runtime AS exopticon-cuda
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/exopticon .
 
 COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/capture_worker .
 
 ENV EXOPTICONWORKERS=/exopticon/
-ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV PATH=/exopticon:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-USER exopticon:plugdev
+USER exopticon:exopticon
 
 ENTRYPOINT /exopticon/exopticon
