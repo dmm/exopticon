@@ -93,10 +93,10 @@ impl Service {
             .filter(dsl::username.eq(username))
             .first::<User>(&mut conn)?;
 
-        if let Ok(matching) = bcrypt::verify(password, &u.password) {
-            if matching {
-                return Ok(u.into());
-            }
+        if let Ok(matching) = bcrypt::verify(password, &u.password)
+            && matching
+        {
+            return Ok(u.into());
         }
         error!("Validation faild :(");
         Err(super::Error::NotFound)

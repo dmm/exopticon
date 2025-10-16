@@ -24,9 +24,12 @@ use tokio::sync::{RwLock, mpsc};
 use uuid::Uuid;
 
 use crate::{capture_actor::VideoPacket, webrtc_client::ClientId};
+
+type VideoPacketVec = Vec<(ClientId, mpsc::Sender<VideoPacket>)>;
+
 pub struct VideoRouter {
     // camera_id → list of (client_id, sender) pairs
-    subscriptions: Arc<RwLock<HashMap<Uuid, Vec<(ClientId, mpsc::Sender<VideoPacket>)>>>>,
+    subscriptions: Arc<RwLock<HashMap<Uuid, VideoPacketVec>>>,
 }
 
 impl VideoRouter {
@@ -73,5 +76,11 @@ impl VideoRouter {
                 let _ = tx.try_send(packet.clone());
             }
         }
+    }
+}
+
+impl Default for VideoRouter {
+    fn default() -> Self {
+        Self::new()
     }
 }

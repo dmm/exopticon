@@ -59,12 +59,8 @@ impl ProbeServer {
 
     /// Calculates time left in probe interval
     fn time_left(&self) -> Option<Duration> {
-        let start = match self.start {
-            None => {
-                return None;
-            }
-            Some(time) => time,
-        };
+        let start = self.start?;
+
         self.timeout
             .checked_sub(Instant::now().duration_since(start))
     }
@@ -121,7 +117,7 @@ impl ProbeServer {
 
 /// Returns number of discovered devices
 pub async fn probe(timeout: Duration) -> Result<usize, io::Error> {
-    let local_addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+    let local_addr: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
     let socket = UdpSocket::bind(&local_addr).await?;
 
     let mut p = ProbeServer {

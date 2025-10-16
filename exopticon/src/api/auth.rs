@@ -107,14 +107,11 @@ pub async fn login(
     // We found a valid user with that password. Create a login session.
     let session_key = BASE64_STANDARD.encode(rand::thread_rng().r#gen::<[u8; 32]>());
     let valid_time = Duration::days(7);
-    let expiration = match Utc::now().checked_add_signed(valid_time) {
-        None => {
-            error!("expiration date calculation failed!");
-            return Err(UserError::InternalError(
-                "expiration date calculation failed!".to_string(),
-            ));
-        }
-        Some(time) => time,
+    let Some(expiration) = Utc::now().checked_add_signed(valid_time) else {
+        error!("expiration date calculation failed!");
+        return Err(UserError::InternalError(
+            "expiration date calculation failed!".to_string(),
+        ));
     };
 
     let session = CreateUserSession {

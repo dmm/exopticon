@@ -68,7 +68,7 @@ pub enum ServerMessage {
 }
 
 pub struct Client {
-    client_id: ClientId,
+    id: ClientId,
     websocket: WebSocket,
     /// used only to send messages
     udp_socket: Arc<UdpSocket>,
@@ -101,7 +101,7 @@ impl Client {
             .build();
 
         Self {
-            client_id: Uuid::new_v4(),
+            id: Uuid::new_v4(),
             websocket,
             udp_socket,
             udp_receiver,
@@ -209,13 +209,13 @@ impl Client {
                 self.camera_mapping.clear();
                 for (mid_string, camera_id) in &mappings {
                     let m: Mid = Mid::from(mid_string.as_str());
-                    self.camera_mapping.insert(camera_id.clone(), m);
+                    self.camera_mapping.insert(*camera_id, m);
                 }
 
                 error!("SENDING UPDATE SUBSCRIPTION!");
                 self.video_router
                     .update_subscriptions(
-                        self.client_id,
+                        self.id,
                         mappings.into_values().collect(),
                         self.video_sender.clone(),
                     )
@@ -258,21 +258,19 @@ impl Client {
     }
 
     fn handle_video(&mut self, msg: VideoPacket) {
-        if true {
-            if let Some(mid) = self.camera_mapping.get(&msg.camera_id) {
-                let Some(writer) = self.rtc.writer(*mid) else {
-                    return;
-                };
-                let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
-                let timestamp: u64 = msg.timestamp.try_into().unwrap_or(0);
-                let rtp_time = MediaTime::new(timestamp, Frequency::NINETY_KHZ);
-                // debug!(
-                //     "Writing packet for camera id {} to mid {}, time {}",
-                //     msg.camera_id, mid, msg.timestamp
-                // );
-                if let Err(_e) = writer.write(pt, Instant::now(), rtp_time, msg.data) {
-                    error!("Error writing video packet! ");
-                }
+        if let Some(mid) = self.camera_mapping.get(&msg.camera_id) {
+            let Some(writer) = self.rtc.writer(*mid) else {
+                return;
+            };
+            let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
+            let timestamp: u64 = msg.timestamp.try_into().unwrap_or(0);
+            let rtp_time = MediaTime::new(timestamp, Frequency::NINETY_KHZ);
+            // debug!(
+            //     "Writing packet for camera id {} to mid {}, time {}",
+            //     msg.camera_id, mid, msg.timestamp
+            // );
+            if let Err(_e) = writer.write(pt, Instant::now(), rtp_time, msg.data) {
+                error!("Error writing video packet! ");
             }
         }
     }
@@ -358,16 +356,11 @@ impl Client {
                         events_processed += 1;
 
                         // Try to drain more UDP packets without yielding
-                        loop {
-                            match self.udp_receiver.try_recv() {
-                                Ok(msg) => {
-                                    self.handle_udp(msg);
-                                    events_processed += 1;
-                                    if events_processed >= MAX_EVENTS_PER_BATCH {
-                                        break;
-                                    }
-                                }
-                                _ => break,
+                        while let Ok(msg) = self.udp_receiver.try_recv() {
+                            self.handle_udp(msg);
+                            events_processed += 1;
+                            if events_processed >= MAX_EVENTS_PER_BATCH {
+                                break;
                             }
                         }
                     },
@@ -378,16 +371,11 @@ impl Client {
                         events_processed += 1;
 
                         // Try to drain more video packets without yielding
-                        loop {
-                            match self.video_receiver.try_recv() {
-                                Ok(msg) => {
-                                    self.handle_video(msg);
-                                    events_processed += 1;
-                                    if events_processed >= MAX_EVENTS_PER_BATCH {
-                                        break;
-                                    }
-                                }
-                                _ => break,
+                        while let Ok(msg) = self.video_receiver.try_recv() {
+                            self.handle_video(msg);
+                            events_processed += 1;
+                            if events_processed >= MAX_EVENTS_PER_BATCH {
+                                break;
                             }
                         }
 
@@ -425,7 +413,7 @@ impl Client {
             }
         }
 
-        self.video_router.unsubscribe(self.client_id).await;
+        self.video_router.unsubscribe(self.id).await;
 
         gauge.decrement(1);
     }
