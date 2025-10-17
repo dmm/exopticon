@@ -2,6 +2,45 @@
 
 <!--- next entry here -->
 
+## 0.37.0
+2025-10-17
+
+### Features
+
+- initial capture_worker, file only output (8e8be89041f9b9d80377d40736e44565c370bf6c)
+- Add basic appsink/packet output (0e7de428b7a4a1c3303036907a64a721ecc424c8)
+- Enable str0m loss based congestion control (f1790290894e2cb3de82599677c05675dbb2b192)
+- **capture_worker:** capture and save audio (6519e70207dc8ac0db9cd83ea7eb3fd708a722c0)
+- **make:** Add run target (710becaefb5c6881f5638c31fa2ee0d3d7ae1502)
+- extract a few functions and implement frame timeout (2ac7aea3f457b364603d38e60d9de45546c88cf8)
+- remove cworkers (7779d02c12c7ec865d8129501b497acacd4a956c)
+
+### Fixes
+
+- **capture_worker:** fix NAL unit output, force annexB (31dedadf7f706c18c051d05daceae07a97576d67)
+- **capture_worker:** extract AppSink callback (b5ab40a0f51adfa4325cec3ccc246c5510fff4ea)
+- **capture_worker:** Fix NAL formats on tee output (c131d011d39574f3e56852fa80bbfe20c98f2343)
+- **capture_worker:** appease clippy (322504daa11169d7f67060efa8549c9b14baa89a)
+- Add workers as a dependency (a2d324666c19a4c3f46a5d4d1950119368587006)
+- Fix worker path in Dockerfile (f71af95ffc15d0adfb1a167d7f20d926f77e078e)
+- **onvif:** Fix inline formatting (01621e68b9b7008effdbae1e77c5d08c72138f32)
+- Switch to 2024 edition styling (863ebc6d8ecf44888afc9f7b0372194e278b7723)
+- remove itertools 0.10 dep (60fda6173b0345789731d9987647279966a3e893)
+- Allow uninlined format args (ad639f07497c1ae20b1c87642c3eacaf322c56de)
+- watch-web target (865f88825a46749b6cc64819c8c9c35f9ca0a6de)
+- Use 2024 edition formatting (e98a476f6d37732e505c740f6b1eba361463f266)
+- remove invalid binary dependency producing build warning (ea92db87f6fd8ccbbe783ac0b18ee666431f72d2)
+- Upgrade Rust to 1.88.0 and appease clippy (bb0e73ad4c76e3bbaaaa017e9f553f8a05598a83)
+- fix benchmark warnings (73dd0b09cd5d8220d6b17e53a9210cac8a5b025f)
+- Add deny warnings and clippy to capture_worker (ed87e5cf040e6563121771d743dda31e8f3c8e6d)
+- 2024 edition formatting (a1875be2b5a1c1bd62d3079caa2f35798217baff)
+- run clippy before build in ci-flow target (509a75c04e08aca5c6a1864da54513d8a43aff28)
+- Fix docker podman compatibility (0138d418f1c6cfefe55610937f6320a8243076bc)
+- **webrtc_client:** process multiple events per wakeup (3f1ff64d20626c586066c84e9e9b008f8157a087)
+- update to rust 1.90.0 (e4087f2f6d9a64fbed8d1c41f2db19a3fb78021d)
+- Appease clippy (bedfaf669a9dddf25fa0cf8e09ac0a63ca7c871f)
+- Switch to alma (c2bdfd57fb21eefcad997d45941fa49c4e9c5803)
+
 ## 0.36.0
 2025-03-01
 
