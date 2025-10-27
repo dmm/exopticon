@@ -486,7 +486,7 @@ fn handle_file_location_request(data_weak: &Weak<Mutex<CustomData>>) -> gstreame
     let path = uuid_to_filename(&d.storage_path, id);
     let parent = path.parent().expect("failed to get new file parent");
     create_dir_all(parent).expect("failed to create parent directory");
-    info!("New file: {}", path.display());
+    debug!("New file: {}", path.display());
 
     let msg = CaptureMessage::NewFile {
         filename: path.to_string_lossy().to_string(),
