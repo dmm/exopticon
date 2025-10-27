@@ -30,33 +30,71 @@ interface WebrtcConnected {
   since: Instant;
 }
 
+type TimeoutId = ReturnType<typeof setTimeout>;
+
 type ClientStatus =
   | Paused
   | SignalChannelConnecting
   | WebrtcConnecting
   | WebrtcConnected;
 
+// Events
+type WebRtcEvent =
+  | { type: "ENABLE" }
+  | { type: "DISABLE" }
+  | { type: "WEBSOCKET_OPEN" }
+  | { type: "WEBSOCKET_CLOSE"; reason: string }
+  | { type: "WEBSOCKET_ERROR" }
+  | { type: "WEBRTC_CONNECTING" }
+  | { type: "WEBRTC_CONNECTED" }
+  | { type: "WEBRTC_DISCONNECTED" }
+  | { type: "WEBRTC_FAILED" }
+  | { type: "ICE_CONNECTED" }
+  | { type: "ICE_DISCONNECTED" }
+  | { type: "ICE_FAILED" }
+  | { type: "NEGOTIATION_NEEDED" }
+  | { type: "NEGOTIATION_ANSWER"; answer: string }
+  | {
+      type: "TRACK_RECEIVED";
+      transceiver: RTCRtpTransceiver;
+      stream: MediaStream;
+    }
+  | { type: "TIMEOUT"; state: State }
+  | { type: "UPDATE_CAMERAS"; cameras: CameraId[] };
+
+// States
+type State =
+  | { kind: "disabled" }
+  | {
+      kind: "connecting_signal";
+      since: Instant;
+      timeoutId: TimeoutId;
+    }
+  | { kind: "connecting_webrtc"; since: Instant; timeoutId: TimeoutId }
+  | { kind: "connected"; since: Instant }
+  | { kind: "reconnecting"; attempt: number; timeoutId: TimeoutId };
+
 @Injectable({
   providedIn: "root",
 })
 export class WebrtcService {
-  statusSubject: BehaviorSubject<ClientStatus> = new BehaviorSubject({
-    kind: "paused",
-  });
+  private state: State = { kind: "disabled" };
+  private eventQueue: WebRtcEvent[] = [];
+  private processing = false;
+
   private peerConnection: RTCPeerConnection;
+  private signalSocket?: WebSocket;
+
   private dataChannel?: RTCDataChannel;
   private transceivers: Map<CameraId, RTCRtpTransceiver> = new Map();
   private emitters: Map<CameraId, ReplaySubject<MediaStream>> = new Map();
   private activeCameras: Map<CameraId, boolean> = new Map();
-  private enabled: boolean = false;
 
-  private signalSocket?: WebSocket;
+  statusSubject: BehaviorSubject<State> = new BehaviorSubject(this.state);
 
   // status timer
-  private retryAttempts = 0;
   private readonly baseDelay = 100;
   private readonly maxTimeout = 5000;
-  private timeoutId: ReturnType<typeof setTimeout>;
 
   status$ = this.statusSubject.asObservable();
 
@@ -67,24 +105,15 @@ export class WebrtcService {
   //
 
   enable(): void {
-    this.enabled = true;
-    this.updateState();
+    this.enqueueEvent({ type: "ENABLE" });
   }
 
   disable(): void {
-    this.enabled = false;
-    this.updateState();
+    this.enqueueEvent({ type: "DISABLE" });
   }
 
   updateActiveCameras(activeCameraIds: CameraId[]) {
-    for (let [id, _val] of this.activeCameras) {
-      this.activeCameras.set(id, false);
-    }
-
-    activeCameraIds.map((id) => {
-      this.activeCameras.set(id, true);
-    });
-    this.updateState();
+    this.enqueueEvent({ type: "UPDATE_CAMERAS", cameras: activeCameraIds });
   }
 
   subscribe(cameraId: CameraId): Subject<MediaStream> {
@@ -101,43 +130,288 @@ export class WebrtcService {
   // private methods
   //
 
-  private updateStatus(newStatus: ClientStatus): void {
-    this.statusSubject.next(newStatus);
+  private enqueueEvent(event: WebRtcEvent): void {
+    this.eventQueue.push(event);
+    this.processEvents();
   }
 
-  /** Handles periodic state updates and transitions. */
-  private updateState(): void {
-    clearTimeout(this.timeoutId);
+  private async processEvents(): Promise<void> {
+    if (this.processing) return;
+    this.processing = true;
 
-    if (!this.enabled) {
-      this.disconnect("not enabled");
+    while (this.eventQueue.length > 0) {
+      const event = this.eventQueue.shift()!;
+      await this.handleEvent(event);
+    }
+
+    this.processing = false;
+  }
+
+  private async handleEvent(event: WebRtcEvent): Promise<void> {
+    console.log(`[${this.state.kind}] Processing event:`, event.type);
+
+    const prevState = this.state.kind;
+
+    switch (this.state.kind) {
+      case "disabled":
+        this.state = this.handleDisabledState(event);
+        break;
+      case "connecting_signal":
+        this.state = await this.handleConnectingSignalState(event);
+        break;
+      case "connecting_webrtc":
+        this.state = await this.handleConnectingWebrtcState(event);
+        break;
+      case "connected":
+        this.state = await this.handleConnectedState(event);
+        break;
+      case "reconnecting":
+        this.state = await this.handleReconnectingState(event);
+        break;
+    }
+
+    if (prevState !== this.state.kind) {
+      console.log(`State transition: ${prevState} -> ${this.state.kind}`);
+      this.statusSubject.next(this.state);
+
+      // Handle state entry actions
+      await this.onStateEnter(this.state);
+    }
+  }
+
+  // State handlers
+  private handleDisabledState(event: WebRtcEvent): State {
+    if (this.state.kind !== "disabled") {
+      console.error(`invalid state handler called: ${this.state.kind}`);
       return;
     }
 
-    switch (this.statusSubject.value.kind) {
-      case "paused":
-        this.connect();
-        break;
-      case "signalChannelConnecting":
-      case "webrtcConnecting":
-        if (this.hasExceededTimeout(this.statusSubject.value.since)) {
-          this.connect();
-        }
-        break;
+    switch (event.type) {
+      case "ENABLE":
+        return {
+          kind: "connecting_signal",
+          since: Instant.now(),
+          timeoutId: null,
+        };
+      case "DISABLE":
+        return this.state;
       default:
-        this.syncTracks();
+        console.warn(`Ignoring event ${event.type}, in disabled state.`);
+        return this.state;
+    }
+  }
+
+  private async handleConnectingSignalState(
+    event: WebRtcEvent,
+  ): Promise<State> {
+    if (this.state.kind !== "connecting_signal") {
+      console.error(`invalid state handler called: ${this.state.kind}`);
+      return;
     }
 
-    this.timeoutId = setTimeout(() => this.updateState(), this.maxTimeout);
+    switch (event.type) {
+      case "DISABLE":
+        this.cleanupTimeout(this.state.timeoutId);
+        await this.cleanup();
+        return { kind: "disabled" };
+
+      case "UPDATE_CAMERAS":
+        console.log(`ACTIVE CAMERAS: ${event.cameras}`);
+        this.syncTracks(event.cameras);
+        return this.state;
+
+      case "WEBSOCKET_OPEN":
+        this.cleanupTimeout(this.state.timeoutId);
+        return {
+          kind: "connecting_webrtc",
+          since: Instant.now(),
+          timeoutId: null,
+        };
+
+      case "WEBSOCKET_CLOSE":
+      case "WEBSOCKET_ERROR":
+        this.cleanupTimeout(this.state.timeoutId);
+        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+
+      case "TIMEOUT":
+        console.warn("Signal connection timeout");
+        await this.cleanup();
+        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+
+      default:
+        return this.state;
+    }
   }
 
-  /** Checks if the WebRTC connection is in an active state. */
-  private isWebrtcActive(): boolean {
-    const status = this.statusSubject.value.kind;
-    return status === "webrtcConnecting" || status === "webrtcConnected";
+  private async handleConnectingWebrtcState(
+    event: WebRtcEvent,
+  ): Promise<State> {
+    if (this.state.kind !== "connecting_webrtc") {
+      console.error(`invalid state handler called: ${this.state.kind}`);
+      return;
+    }
+
+    switch (event.type) {
+      case "DISABLE":
+        this.cleanupTimeout(this.state.timeoutId);
+        await this.cleanup();
+        return { kind: "disabled" };
+
+      case "UPDATE_CAMERAS":
+        console.log(`ACTIVE CAMERAS: ${event.cameras}`);
+        this.syncTracks(event.cameras);
+        this.updateStreamMappings();
+        return this.state;
+
+      case "WEBRTC_CONNECTED":
+        this.cleanupTimeout(this.state.timeoutId);
+        return { kind: "connected", since: Instant.now() };
+
+      case "WEBRTC_FAILED":
+      case "WEBSOCKET_CLOSE":
+        this.cleanupTimeout(this.state.timeoutId);
+        await this.cleanup();
+        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+
+      case "TIMEOUT":
+        console.warn("WebRTC connection timeout");
+        await this.cleanup();
+        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+
+      case "NEGOTIATION_ANSWER":
+        await this.handleNegotiationAnswer(event.answer);
+        return this.state;
+
+      default:
+        return this.state;
+    }
   }
 
-  /** Checks if a timeout duration has been exceeded. */
+  private async handleConnectedState(event: WebRtcEvent): Promise<State> {
+    if (this.state.kind !== "connected") {
+      console.error(`invalid state handler called: ${this.state.kind}`);
+      return;
+    }
+
+    switch (event.type) {
+      case "DISABLE":
+        await this.cleanup();
+        return { kind: "disabled" };
+
+      case "UPDATE_CAMERAS":
+        console.log(`ACTIVE CAMERAS: ${event.cameras}`);
+        this.syncTracks(event.cameras);
+        this.updateStreamMappings();
+        return this.state;
+
+      case "WEBRTC_CONNECTED":
+        // We got a WEBRTC_CONNECTED when we're already in the
+        // connected state. This happens when we renegotiate another
+        // stream, so update the stream mappings.
+        this.updateStreamMappings();
+        return this.state;
+
+      case "WEBRTC_DISCONNECTED":
+      case "WEBRTC_FAILED":
+      case "WEBSOCKET_CLOSE":
+        await this.cleanup();
+        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+
+      case "NEGOTIATION_ANSWER":
+        await this.handleNegotiationAnswer(event.answer);
+        return this.state;
+
+      default:
+        return this.state;
+    }
+  }
+
+  private async handleReconnectingState(event: WebRtcEvent): Promise<State> {
+    if (this.state.kind !== "reconnecting") {
+      console.error(`invalid state handler called: ${this.state.kind}`);
+      return;
+    }
+
+    switch (event.type) {
+      case "DISABLE":
+        this.cleanupTimeout(this.state.timeoutId);
+        return { kind: "disabled" };
+
+      case "UPDATE_CAMERAS":
+        console.log(`ACTIVE CAMERAS: ${event.cameras}`);
+        this.syncTracks(event.cameras);
+        return this.state;
+
+      case "TIMEOUT":
+        // Retry logic here
+        if (this.state.attempt < 5) {
+          return {
+            kind: "connecting_signal",
+            since: Instant.now(),
+            timeoutId: null,
+          };
+        } else {
+          console.error("Max reconnection attempts reached");
+          return { kind: "disabled" };
+        }
+
+      default:
+        return this.state;
+    }
+  }
+
+  // State entry handler
+  private async onStateEnter(state: State): Promise<void> {
+    switch (state.kind) {
+      case "disabled":
+        // Ensure cleanup
+        await this.cleanup();
+        break;
+
+      case "connecting_signal":
+        this.setupSignalSocket();
+        // Set timeout for this state
+        const timeoutId = setTimeout(() => {
+          this.enqueueEvent({ type: "TIMEOUT", state });
+        }, this.maxTimeout);
+        this.state = { ...state, timeoutId };
+        break;
+
+      case "connecting_webrtc":
+        this.webrtcConnect();
+        const webrtcTimeoutId = setTimeout(() => {
+          this.enqueueEvent({ type: "TIMEOUT", state });
+        }, this.maxTimeout);
+        this.state = { ...state, timeoutId: webrtcTimeoutId };
+        break;
+
+      case "connected":
+        this.updateStreamMappings();
+        break;
+
+      case "reconnecting":
+        const delay = Math.min(1000 * Math.pow(2, state.attempt - 1), 30000);
+        const reconnectTimeoutId = setTimeout(() => {
+          this.enqueueEvent({ type: "TIMEOUT", state });
+        }, delay);
+        this.state = { ...state, timeoutId: reconnectTimeoutId };
+        break;
+    }
+  }
+
+  private setupSignalSocket(): void {
+    const url = this.constructWebSocketUrl();
+    this.signalSocket = new WebSocket(url);
+
+    this.signalSocket.onopen = () =>
+      this.enqueueEvent({ type: "WEBSOCKET_OPEN" });
+    this.signalSocket.onclose = () =>
+      this.enqueueEvent({ type: "WEBSOCKET_CLOSE", reason: "closed" });
+    this.signalSocket.onerror = () =>
+      this.enqueueEvent({ type: "WEBSOCKET_ERROR" });
+    this.signalSocket.onmessage = (event) => this.handleSocketMessage(event);
+  }
+
   private hasExceededTimeout(since: Instant): boolean {
     const duration = Duration.between(since, Instant.now()).toMillis();
     return duration > this.maxTimeout;
@@ -145,9 +419,6 @@ export class WebrtcService {
 
   /** Updates mappings between transceivers and cameras. */
   private updateStreamMappings(): void {
-    if (this.statusSubject.value.kind === "paused" || !this.signalSocket)
-      return;
-
     const mappings: Record<string, CameraId> = {};
     for (const [cameraId, transceiver] of this.transceivers) {
       if (transceiver.mid && this.activeCameras.get(cameraId)) {
@@ -159,19 +430,19 @@ export class WebrtcService {
   }
 
   /** Synchronizes transceivers with active cameras. */
-  private syncTracks(): void {
-    if (this.isWebrtcActive()) {
-      for (const [cameraId, _] of this.activeCameras) {
-        if (!this.transceivers.has(cameraId)) {
-          const transceiver = this.peerConnection?.addTransceiver("video", {
-            direction: "recvonly",
-          });
-          this.transceivers.set(cameraId, transceiver!);
-        }
+  private syncTracks(activeCameras: CameraId[]): void {
+    for (let [id, _val] of this.activeCameras) {
+      this.activeCameras.set(id, false);
+    }
+
+    for (const cameraId of activeCameras) {
+      this.activeCameras.set(cameraId, true);
+      if (!this.transceivers.has(cameraId)) {
+        const transceiver = this.peerConnection?.addTransceiver("video", {
+          direction: "recvonly",
+        });
+        this.transceivers.set(cameraId, transceiver!);
       }
-      this.updateStreamMappings();
-    } else {
-      this.transceivers.clear();
     }
   }
 
@@ -179,49 +450,39 @@ export class WebrtcService {
   private webrtcConnect() {
     this.peerConnection = new RTCPeerConnection();
 
-    this.updateStatus({ kind: "webrtcConnecting", since: Instant.now() });
-
     this.dataChannel = this.peerConnection.createDataChannel("foo");
     this.dataChannel.onclose = () => {};
-    let self = this;
     this.dataChannel.onopen = () => {};
 
     this.dataChannel.onmessage = (_) => {};
 
-    this.peerConnection.onconnectionstatechange = (ev) => {
-      switch (this.peerConnection.connectionState) {
-        case "new":
-        case "connecting":
-          this.updateStatus({ kind: "webrtcConnecting", since: Instant.now() });
-          break;
+    this.peerConnection.onconnectionstatechange = () => {
+      console.log(
+        `CONNECTION STATE CHANGE: ${this.peerConnection.connectionState}`,
+      );
+      switch (this.peerConnection?.connectionState) {
         case "connected":
-          this.updateStatus({ kind: "webrtcConnected", since: Instant.now() });
-          self.updateState();
+          this.enqueueEvent({ type: "WEBRTC_CONNECTED" });
           break;
         case "disconnected":
-          this.disconnect("webrtc disconnecting");
-          break;
         case "closed":
-          this.disconnect("webrtc connection offline");
+          this.enqueueEvent({ type: "WEBRTC_DISCONNECTED" });
           break;
         case "failed":
-          this.disconnect("webrtc failed");
-          break;
-        default:
-          console.log("Unknown");
+          this.enqueueEvent({ type: "WEBRTC_FAILED" });
           break;
       }
     };
 
-    this.peerConnection.oniceconnectionstatechange = (e) => {
+    this.peerConnection.oniceconnectionstatechange = (_e) => {
       let state = this.peerConnection.iceConnectionState;
       if (state === "connected") {
       } else if (state === "disconnected" || state === "failed") {
       }
-      this.updateState();
+      //      this.updateState();
     };
 
-    this.peerConnection.onnegotiationneeded = async (e) => {
+    this.peerConnection.onnegotiationneeded = async (_e) => {
       this.sendOffer();
     };
 
@@ -233,6 +494,7 @@ export class WebrtcService {
     this.peerConnection.ontrack = ({ transceiver, streams: [stream] }) => {
       for (const [cameraId, tran] of this.transceivers) {
         if (tran.mid === transceiver.mid) {
+          console.log(`FETCHING EMITTER FOR CAMERA ID: ${cameraId}`);
           this.emitters.get(cameraId).next(stream);
         }
       }
@@ -265,31 +527,18 @@ export class WebrtcService {
     return `${protocol}//${loc.host}${basePath}v1/webrtc/connect`;
   }
 
-  /** Initiates WebSocket connection */
-  private setupSignalSocket(): void {
-    const url = this.constructWebSocketUrl();
-    this.signalSocket = new WebSocket(url);
-
-    this.signalSocket.onopen = () => this.webrtcConnect();
-    this.signalSocket.onclose = () => this.disconnect("signalSocket onclose");
-    this.signalSocket.onerror = () => this.updateStatus({ kind: "paused" });
-    this.signalSocket.onmessage = (event) => this.handleSocketMessage(event);
-  }
-
   /** Handle messages from server over websocket */
   private handleSocketMessage(event: MessageEvent): void {
     const message: ServerMessage = JSON.parse(event.data);
     if (message.kind === "negotiationAnswer") {
-      this.handleNegotiationAnswer(message);
+      this.handleNegotiationAnswer(message.answer);
     }
   }
 
-  private async handleNegotiationAnswer(
-    message: NegotiationAnswer,
-  ): Promise<void> {
+  private async handleNegotiationAnswer(answer: string): Promise<void> {
     try {
       await this.peerConnection?.setRemoteDescription({
-        sdp: message.answer,
+        sdp: answer,
         type: "answer",
       });
     } catch (err) {
@@ -298,17 +547,18 @@ export class WebrtcService {
     }
   }
 
-  private connect(): void {
-    this.setupSignalSocket();
-    this.updateStatus({
-      kind: "signalChannelConnecting",
-      since: Instant.now(),
-    });
+  private async disconnect(reason: string) {
+    console.log("WebRTC disconnected ( " + reason + " )....!");
   }
 
-  private disconnect(reason: string) {
-    console.log("WebRTC disconnected ( " + reason + " )....!");
-    this.updateStatus({ kind: "paused" });
+  private cleanupTimeout(timeoutId: TimeoutId) {
+    clearTimeout(timeoutId);
+  }
+
+  private async cleanup() {
+    if (this.signalSocket) {
+      this.signalSocket.close();
+    }
     this.signalSocket.close();
     if (this.peerConnection) {
       this.peerConnection.close();

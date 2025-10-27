@@ -36,7 +36,7 @@
 </div>
 <div class="panel" waIntersectionObserver waIntersectionThreshold="0.1">
   <div
-    *ngIf="(webrtcService.status$ | async).kind != 'webrtcConnected'"
+    *ngIf="(webrtcService.status$ | async).kind != 'connected'"
     class="webrtc-status"
   >
     CONNECTING: {{ (webrtcService.status$ | async).kind }}
