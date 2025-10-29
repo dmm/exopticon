@@ -41,17 +41,13 @@ export class CameraOverlayComponent implements OnInit {
 
   ngOnInit() {}
 
-  handleTouch() {
-    // If the touch event was triggered by touching an overlay button, ignore
-    // the event, otherwise toggle the overlay.
-    if (!this.ptzActivated) {
-      this.cameraPanelService.touchCamera(this.camera.id);
-    }
-    this.ptzActivated = false;
+  ptz(event: PointerEvent, direction: PtzDirection) {
+    event.stopImmediatePropagation();
+    event.stopPropagation();
+    this.cameraService.ptz(this.camera.id, direction);
   }
 
-  ptz(direction: PtzDirection) {
-    this.ptzActivated = true;
-    this.cameraService.ptz(this.camera.id, direction);
+  stopPropagation(event: PointerEvent) {
+    event.stopImmediatePropagation();
   }
 }

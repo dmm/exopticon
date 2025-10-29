@@ -17,33 +17,37 @@
     You should have received a copy of the GNU General Public License
     along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<div (touch)="handleTouch()">
+<div>
   <div class="camera-name">{{ camera.name }}</div>
   <div class="ptz-overlay" *ngIf="camera.ptzType !== 'none'">
     <div
-      (click)="ptz(directions.left)"
-      (touchstart)="ptz(directions.left); $event.stopPropagation()"
+      (pointerdown)="ptz($event, directions.left)"
+      (touchstart)="stopPropagation($event)"
+      (touchend)="stopPropagation($event)"
       class="overlay-button ptz-arrow ptz-left"
     >
       ◀
     </div>
     <div
-      (click)="ptz(directions.right)"
-      (touchstart)="ptz(directions.right); $event.stopPropagation()"
+      (pointerdown)="ptz($event, directions.right)"
+      (touchstart)="stopPropagation($event)"
+      (touchend)="stopPropagation($event)"
       class="overlay-button ptz-arrow ptz-right"
     >
       ▶
     </div>
     <div
-      (click)="ptz(directions.up)"
-      (touchstart)="ptz(directions.up); $event.stopPropagation()"
+      (pointerdown)="ptz($event, directions.up)"
+      (touchstart)="stopPropagation($event)"
+      (touchend)="stopPropagation($event)"
       class="overlay-button ptz-arrow ptz-up"
     >
       ▲
     </div>
     <div
-      (click)="ptz(directions.down)"
-      (touchstart)="ptz(directions.down); $event.stopPropagation()"
+      (pointerdown)="ptz($event, directions.down)"
+      (touchstart)="stopPropagation($event)"
+      (touchend)="stopPropagation($event)"
       class="overlay-button ptz-arrow ptz-down"
     >
       ▼
