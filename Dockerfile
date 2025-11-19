@@ -101,6 +101,7 @@ RUN dnf install -y \
     openssl-devel \
     perl-File-Compare \
     perl-File-Copy \
+    perl-Time-Piece \
     && dnf clean all \
     && rm -rf /var/cache/yum/*
 
