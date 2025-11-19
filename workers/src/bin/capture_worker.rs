@@ -434,6 +434,12 @@ fn handle_video_sample(
     let buffer = sample.buffer().expect("failed to get sample buffer");
     let map = buffer.map_readable().expect("failed to get buffer map");
     let data = map.as_slice();
+
+    if let None = buffer.pts() {
+        error!("Buffer without pts!");
+        return Ok(gst::FlowSuccess::Ok);
+    }
+
     let pts_90khz = buffer
         .pts()
         .map(|pts| pts.nseconds() * 90_000 / 1_000_000_000)
