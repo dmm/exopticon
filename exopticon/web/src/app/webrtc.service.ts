@@ -308,6 +308,11 @@ export class WebrtcService {
         // We got a WEBRTC_CONNECTED when we're already in the
         // connected state. This happens when we renegotiate another
         // stream, so update the stream mappings.
+        const map1 = new Map(
+          [...this.activeCameras].filter(([_k, v]) => v === true),
+        );
+        this.syncTracks(Array.from(map1.keys()));
+
         this.updateStreamMappings();
         return this.state;
 
@@ -386,6 +391,11 @@ export class WebrtcService {
         break;
 
       case "connected":
+        const map1 = new Map(
+          [...this.activeCameras].filter(([_k, v]) => v === true),
+        );
+        this.syncTracks(Array.from(map1.keys()));
+
         this.updateStreamMappings();
         break;
 
@@ -474,7 +484,11 @@ export class WebrtcService {
       }
     };
 
-    this.peerConnection.oniceconnectionstatechange = (_e) => {
+    this.peerConnection.oniceconnectionstatechange = (e) => {
+      console.log(
+        `ICE CONNECTION STATE CHANGE: ${this.peerConnection.iceConnectionState}`,
+      );
+
       let state = this.peerConnection.iceConnectionState;
       if (state === "connected") {
       } else if (state === "disconnected" || state === "failed") {
@@ -483,6 +497,7 @@ export class WebrtcService {
     };
 
     this.peerConnection.onnegotiationneeded = async (_e) => {
+      console.log(`ICE negotiation requested`);
       this.sendOffer();
     };
 

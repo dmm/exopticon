@@ -203,6 +203,9 @@ export class CameraPanelService {
     this.setCameraGroup(this.desiredCameraGroupId);
     let groupCameras: PanelCamera[] = new Array();
     let cameraGroup = this.cameraGroups.get(this.activeCameraGroupId);
+    if (cameraGroup === undefined) {
+      return;
+    }
     cameraGroup.members.forEach((cameraId) => {
       const c = this.unsortedCameras.get(cameraId);
       if (c !== undefined) {
