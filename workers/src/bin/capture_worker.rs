@@ -435,7 +435,7 @@ fn handle_video_sample(
     let map = buffer.map_readable().expect("failed to get buffer map");
     let data = map.as_slice();
 
-    if let None = buffer.pts() {
+    if buffer.pts().is_none() {
         error!("Buffer without pts!");
         return Ok(gst::FlowSuccess::Ok);
     }
