@@ -2,6 +2,20 @@
 
 <!--- next entry here -->
 
+## 0.37.1
+2025-11-24
+
+### Fixes
+
+- Switch webrtc.client to use explicit events (51d3c6c3b84a948f06a64c6e84c340de9e7d923e)
+- **capture_worker:** make new file log debug instead of info (b710383764f2c1584f1092a0f7f956b1b92d71dd)
+- double click on mobile ptz buttons (54dbfa6b7bddcb17c11fb238b131a67fc56c6f28)
+- Update console-subscriber (cd5dc75410428241baf0de474304300b7fbd603d)
+- **web:** tweak camera and webrtc service state (8d234b4f1c59c1b40e14ff36de9680fdff6cff4f)
+- Add Docker build dep (dee4208157bad9445c137c5b52128b56e64810b9)
+- **capture_worker:** handle buffer without pts (be1efc49add63a09066f8b232aa231c3662e43ea)
+- **capture_worker:** appease clippy (f521fab07de7d2d63dfa7a46f72848f42fc53fc7)
+
 ## 0.37.0
 2025-10-17
 
