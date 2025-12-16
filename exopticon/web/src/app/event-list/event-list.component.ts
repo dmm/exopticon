@@ -32,9 +32,10 @@ enum EventListState {
 }
 
 @Component({
-  selector: "app-event-list",
-  templateUrl: "./event-list.component.html",
-  styleUrls: ["./event-list.component.css"],
+    selector: "app-event-list",
+    templateUrl: "./event-list.component.html",
+    styleUrls: ["./event-list.component.css"],
+    standalone: false
 })
 export class EventListComponent implements OnInit {
   public eventListState = EventListState;

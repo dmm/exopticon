@@ -9,9 +9,10 @@ import { CameraGroupService } from "../camera-group.service";
 import { CameraService } from "../camera.service";
 
 @Component({
-  selector: "app-camera-group-detail",
-  templateUrl: "./camera-group-detail.component.html",
-  styleUrls: ["./camera-group-detail.component.css"],
+    selector: "app-camera-group-detail",
+    templateUrl: "./camera-group-detail.component.html",
+    styleUrls: ["./camera-group-detail.component.css"],
+    standalone: false
 })
 export class CameraGroupDetailComponent implements OnInit {
   public stuff$: Observable<any>;
