@@ -1,35 +1,39 @@
 <!--
-    Exopticon - A free video surveillance system.
-    Copyright (C) 2022 David Matthew Mattli <dmm@mattli.us>
+Exopticon - A free video surveillance system.
+Copyright (C) 2022 David Matthew Mattli <dmm@mattli.us>
 
-    This file is part of Exopticon.
+This file is part of Exopticon.
 
-    Exopticon is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Exopticon is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-    Exopticon is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+Exopticon is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <h2>PERSONAL ACCESS TOKENS</h2>
 <div class="main">
-  <div class="show-token" *ngIf="newToken">
-    Your new personal access token:
-    <input readonly type="text" value="{{ newToken }}" />
-    <button type="button" (click)="copyToken()">Copy Token</button>
-    <p>Make sure to save it. You won't be able to access it again</p>
-  </div>
+  @if (newToken) {
+    <div class="show-token">
+      Your new personal access token:
+      <input readonly type="text" value="{{ newToken }}" />
+      <button type="button" (click)="copyToken()">Copy Token</button>
+      <p>Make sure to save it. You won't be able to access it again</p>
+    </div>
+  }
 
   <div class="new-token section">
     <h2 class="section-title">CREATE NEW TOKEN</h2>
-    <div *ngIf="error">{{ error }}</div>
+    @if (error) {
+      <div>{{ error }}</div>
+    }
 
     <form>
       <label>Token Name:</label>
@@ -41,7 +45,7 @@
         type="date"
         name="expiration"
         min="{{ minDate }}"
-      />
+        />
 
       <button type="submit" (click)="onSubmit()">Create New Token</button>
     </form>
@@ -55,17 +59,19 @@
         <th>Expires</th>
         <th></th>
       </thead>
-      <tr *ngFor="let token of tokens$ | async">
-        <td>
-          {{ token.name }}
-        </td>
-        <td>
-          {{ token.expiration }}
-        </td>
-        <td>
-          <button type="button" (click)="onDelete(token.id)">Revoke</button>
-        </td>
-      </tr>
+      @for (token of tokens$ | async; track token) {
+        <tr>
+          <td>
+            {{ token.name }}
+          </td>
+          <td>
+            {{ token.expiration }}
+          </td>
+          <td>
+            <button type="button" (click)="onDelete(token.id)">Revoke</button>
+          </td>
+        </tr>
+      }
     </table>
   </div>
 </div>

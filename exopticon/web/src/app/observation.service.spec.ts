@@ -25,7 +25,7 @@ describe("ObservationService", () => {
   beforeEach(() => TestBed.configureTestingModule({}));
 
   it("should be created", () => {
-    const service: ObservationService = TestBed.get(ObservationService);
+    const service: ObservationService = TestBed.inject(ObservationService);
     expect(service).toBeTruthy();
   });
 });

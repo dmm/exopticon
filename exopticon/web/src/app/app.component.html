@@ -1,52 +1,56 @@
 <!--
-    Exopticon - A free video surveillance system.
-    Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+Exopticon - A free video surveillance system.
+Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
 
-    This file is part of Exopticon.
+This file is part of Exopticon.
 
-    Exopticon is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Exopticon is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-    Exopticon is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+Exopticon is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<div class="top-menu" *ngIf="!fullscreen && isLoggedIn$ | async">
-  <div class="logo">
-    <img src="assets/assets/logo.png" alt="EXOPTICON" (click)="redirect()" />
+@if (!fullscreen && isLoggedIn$ | async) {
+  <div class="top-menu">
+    <div class="logo">
+      <img src="assets/assets/logo.png" alt="EXOPTICON" (click)="redirect()" />
+    </div>
+    <button type="button" class="menu-button" (click)="handleClick('main')">
+      MENU
+    </button>
+    <button type="button" class="arm-button" [routerLink]="['/events']">
+      EVENTS
+    </button>
   </div>
-  <button type="button" class="menu-button" (click)="handleClick('main')">
-    MENU
-  </button>
-  <button type="button" class="arm-button" [routerLink]="['/events']">
-    EVENTS
-  </button>
-</div>
-<div *ngIf="this.menuState == this.menuStates.Main" id="menu">
-  <div class="menu-wrapper">
-    <h2>MAIN MENU</h2>
-    <div class="button-wrapper">
-      <button (click)="closeMenu()" [routerLink]="['/camera_panel']">
-        CAMERA PANEL
-      </button>
-      <button (click)="closeMenu()" [routerLink]="['/cameras']">
-        CAMERA ADMIN
-      </button>
-      <button (click)="closeMenu()" [routerLink]="['/tokens']">
-        TOKEN ADMIN
-      </button>
-      <button (click)="closeMenu()" [routerLink]="['/camera_groups']">
-        CAMERA GROUPS
-      </button>
+}
+@if (this.menuState == this.menuStates.Main) {
+  <div id="menu">
+    <div class="menu-wrapper">
+      <h2>MAIN MENU</h2>
+      <div class="button-wrapper">
+        <button (click)="closeMenu()" [routerLink]="['/camera_panel']">
+          CAMERA PANEL
+        </button>
+        <button (click)="closeMenu()" [routerLink]="['/cameras']">
+          CAMERA ADMIN
+        </button>
+        <button (click)="closeMenu()" [routerLink]="['/tokens']">
+          TOKEN ADMIN
+        </button>
+        <button (click)="closeMenu()" [routerLink]="['/camera_groups']">
+          CAMERA GROUPS
+        </button>
+      </div>
     </div>
   </div>
-</div>
+}
 <div class="main-content">
   <router-outlet></router-outlet>
 </div>

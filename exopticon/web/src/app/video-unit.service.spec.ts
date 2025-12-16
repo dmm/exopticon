@@ -25,7 +25,7 @@ describe("VideoUnitService", () => {
   beforeEach(() => TestBed.configureTestingModule({}));
 
   it("should be created", () => {
-    const service: VideoUnitService = TestBed.get(VideoUnitService);
+    const service: VideoUnitService = TestBed.inject(VideoUnitService);
     expect(service).toBeTruthy();
   });
 });

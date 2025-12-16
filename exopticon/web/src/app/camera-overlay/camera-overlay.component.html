@@ -1,56 +1,58 @@
 <!--
-    Exopticon - A free video surveillance system.
-    Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+Exopticon - A free video surveillance system.
+Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
 
-    This file is part of Exopticon.
+This file is part of Exopticon.
 
-    Exopticon is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Exopticon is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-    Exopticon is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+Exopticon is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <div>
   <div class="camera-name">{{ camera.name }}</div>
-  <div class="ptz-overlay" *ngIf="camera.ptzType !== 'none'">
-    <div
-      (pointerdown)="ptz($event, directions.left)"
-      (touchstart)="stopPropagation($event)"
-      (touchend)="stopPropagation($event)"
-      class="overlay-button ptz-arrow ptz-left"
-    >
-      ◀
+  @if (camera.ptzType !== 'none') {
+    <div class="ptz-overlay">
+      <div
+        (pointerdown)="ptz($event, directions.left)"
+        (touchstart)="stopPropagation($event)"
+        (touchend)="stopPropagation($event)"
+        class="overlay-button ptz-arrow ptz-left"
+        >
+        ◀
+      </div>
+      <div
+        (pointerdown)="ptz($event, directions.right)"
+        (touchstart)="stopPropagation($event)"
+        (touchend)="stopPropagation($event)"
+        class="overlay-button ptz-arrow ptz-right"
+        >
+        ▶
+      </div>
+      <div
+        (pointerdown)="ptz($event, directions.up)"
+        (touchstart)="stopPropagation($event)"
+        (touchend)="stopPropagation($event)"
+        class="overlay-button ptz-arrow ptz-up"
+        >
+        ▲
+      </div>
+      <div
+        (pointerdown)="ptz($event, directions.down)"
+        (touchstart)="stopPropagation($event)"
+        (touchend)="stopPropagation($event)"
+        class="overlay-button ptz-arrow ptz-down"
+        >
+        ▼
+      </div>
     </div>
-    <div
-      (pointerdown)="ptz($event, directions.right)"
-      (touchstart)="stopPropagation($event)"
-      (touchend)="stopPropagation($event)"
-      class="overlay-button ptz-arrow ptz-right"
-    >
-      ▶
-    </div>
-    <div
-      (pointerdown)="ptz($event, directions.up)"
-      (touchstart)="stopPropagation($event)"
-      (touchend)="stopPropagation($event)"
-      class="overlay-button ptz-arrow ptz-up"
-    >
-      ▲
-    </div>
-    <div
-      (pointerdown)="ptz($event, directions.down)"
-      (touchstart)="stopPropagation($event)"
-      (touchend)="stopPropagation($event)"
-      class="overlay-button ptz-arrow ptz-down"
-    >
-      ▼
-    </div>
-  </div>
+  }
 </div>

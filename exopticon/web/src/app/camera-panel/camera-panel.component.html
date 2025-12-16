@@ -1,50 +1,53 @@
 <!--
-    Exopticon - A free video surveillance system.
-    Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
+Exopticon - A free video surveillance system.
+Copyright (C) 2020 David Matthew Mattli <dmm@mattli.us>
 
-    This file is part of Exopticon.
+This file is part of Exopticon.
 
-    Exopticon is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Exopticon is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-    Exopticon is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+Exopticon is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<div *ngIf="!fullscreen" class="group-selector">
-  <button
-    class="prev"
-    type="button"
-    (click)="setCameraGroup(this.cameraPanelService.prevCameraGroupId)"
-  >
-    PREV GROUP
-  </button>
-  <div class="group-name">{{ cameraPanelService.activeCameraGroupName }}</div>
-  <button
-    class="next"
-    type="button"
-    (click)="setCameraGroup(this.cameraPanelService.nextCameraGroupId)"
-  >
-    NEXT GROUP
-  </button>
-</div>
-<div class="panel" waIntersectionObserver waIntersectionThreshold="0.1">
-  <div
-    *ngIf="(webrtcService.status$ | async).kind != 'connected'"
-    class="webrtc-status"
-  >
-    CONNECTING: {{ (webrtcService.status$ | async).kind }}
+@if (!fullscreen) {
+  <div class="group-selector">
+    <button
+      class="prev"
+      type="button"
+      (click)="setCameraGroup(this.cameraPanelService.prevCameraGroupId)"
+      >
+      PREV GROUP
+    </button>
+    <div class="group-name">{{ cameraPanelService.activeCameraGroupName }}</div>
+    <button
+      class="next"
+      type="button"
+      (click)="setCameraGroup(this.cameraPanelService.nextCameraGroupId)"
+      >
+      NEXT GROUP
+    </button>
   </div>
+}
+<div class="panel" waIntersectionObserver waIntersectionThreshold="0.1">
+  @if ((webrtcService.status$ | async).kind != 'connected') {
+    <div
+      class="webrtc-status"
+      >
+      CONNECTING: {{ (webrtcService.status$ | async).kind }}
+    </div>
+  }
 
-  <div
-    *ngFor="let camera of cameraPanelService.cameras; index as i"
-    class="wrapper"
+  @for (camera of cameraPanelService.cameras; track camera; let i = $index) {
+    <div
+      class="wrapper"
     (touchstart)="
       cameraPanelService.touchCamera(camera.id); $event.stopPropagation()
     "
@@ -54,24 +57,27 @@
     (mouseleave)="
       cameraPanelService.mouseLeave(camera.id); $event.stopPropagation()
     "
-    [style.width.%]="100 / cameraPanelService.columnCount"
-    [style.height.vh]="100 / cameraPanelService.rowCount"
-  >
-    <div class="camera-width" *ngIf="cameraPanelService.rowCount === -1"></div>
-    <div
-      class="content"
+      [style.width.%]="100 / cameraPanelService.columnCount"
+      [style.height.vh]="100 / cameraPanelService.rowCount"
+      >
+      @if (cameraPanelService.rowCount === -1) {
+        <div class="camera-width"></div>
+      }
+      <div
+        class="content"
       (waIntersectionObservee)="
         cameraPanelService.setCameraVisibility(camera.id, $event)
       "
-    >
-      <app-camera-view
-        [camera]="camera"
-        [selected]="cameraPanelService.selectedCameraId === camera.id"
-        [enabled]="cameraPanelService.cameraDesiredState[i]"
-        [videoService]="videoService"
-        [resolution]="cameraPanelService.resolution"
-      >
-      </app-camera-view>
+        >
+        <app-camera-view
+          [camera]="camera"
+          [selected]="cameraPanelService.selectedCameraId === camera.id"
+          [enabled]="cameraPanelService.cameraDesiredState[i]"
+          [videoService]="videoService"
+          [resolution]="cameraPanelService.resolution"
+          >
+        </app-camera-view>
+      </div>
     </div>
-  </div>
+  }
 </div>

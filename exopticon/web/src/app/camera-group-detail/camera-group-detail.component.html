@@ -2,14 +2,15 @@
   <button type="button" class="back" (click)="returnToCameraGroups()">
     Back to Camera Groups
   </button>
-  <button
-    *ngIf="groupForm.controls.id.value !== null"
-    class="delete"
-    type="button"
-    (click)="deleteCameraGroup({ id: groupForm.controls.id.value })"
-  >
-    Delete
-  </button>
+  @if (groupForm.controls.id.value !== null) {
+    <button
+      class="delete"
+      type="button"
+      (click)="deleteCameraGroup({ id: groupForm.controls.id.value })"
+      >
+      Delete
+    </button>
+  }
 </div>
 <form [formGroup]="groupForm">
   <input type="hidden" formControlName="id" />
@@ -22,53 +23,56 @@
       maxlength="15"
       formControlName="name"
       [readonly]="hideMembership"
-    />
+      />
   </div>
   <div class="members" formArrayName="members">
-    <div
-      *ngFor="let member of members.controls; let i = index"
-      class="member-list"
-    >
-      <div [formGroupName]="i">
-        <button
-          type="button"
-          class="up-button"
-          (click)="memberUp({ index: i })"
+    @for (member of members.controls; track member; let i = $index) {
+      <div
+        class="member-list"
         >
-          UP
-        </button>
-        <input type="hidden" formControlName="id" />
-        <input formControlName="name" class="name" readonly="true" />
-        <input
-          type="checkbox"
-          formControlName="include"
-          class="include"
-          [hidden]="hideMembership"
-        />
-        <button
-          type="button"
-          class="down-button"
-          (click)="memberDown({ index: i })"
-        >
-          DOWN
-        </button>
+        <div [formGroupName]="i">
+          <button
+            type="button"
+            class="up-button"
+            (click)="memberUp({ index: i })"
+            >
+            UP
+          </button>
+          <input type="hidden" formControlName="id" />
+          <input formControlName="name" class="name" readonly="true" />
+          <input
+            type="checkbox"
+            formControlName="include"
+            class="include"
+            [hidden]="hideMembership"
+            />
+          <button
+            type="button"
+            class="down-button"
+            (click)="memberDown({ index: i })"
+            >
+            DOWN
+          </button>
+        </div>
       </div>
-    </div>
+    }
   </div>
-  <button
-    *ngIf="groupForm.controls.id.value !== null"
-    type="button"
-    class="submit"
-    (click)="onSubmit()"
-  >
-    Update Camera Group
-  </button>
-  <button
-    *ngIf="groupForm.controls.id.value === null"
-    type="button"
-    class="submit"
-    (click)="onSubmit()"
-  >
-    Create Camera Group
-  </button>
+  @if (groupForm.controls.id.value !== null) {
+    <button
+      type="button"
+      class="submit"
+      (click)="onSubmit()"
+      >
+      Update Camera Group
+    </button>
+  }
+  @if (groupForm.controls.id.value === null) {
+    <button
+      type="button"
+      class="submit"
+      (click)="onSubmit()"
+      >
+      Create Camera Group
+    </button>
+  }
 </form>
