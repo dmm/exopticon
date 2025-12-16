@@ -756,7 +756,7 @@ fn main() {
                 }
                 MessageView::StateChanged(state_changed) => {
                     if state_changed.src().is_some_and(|s| s == &pipeline) {
-                        info!(
+                        debug!(
                             "Pipeline state changed from {:?} to {:?}",
                             state_changed.old(),
                             state_changed.current()
@@ -765,9 +765,7 @@ fn main() {
                 }
                 MessageView::Eos(..) => break,
 
-                MessageView::Progress(_progress) => {
-                    info!("PROGRESS");
-                }
+                MessageView::Progress(_progress) => {}
                 _ => {}
             }
         } else {
