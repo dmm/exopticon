@@ -41,7 +41,7 @@ pre-release:
 
 build-image:
   stage: image
-  image: docker:stable
+  image: docker:29-dind
   services:
   - docker:dind
   script:
