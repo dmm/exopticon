@@ -32,10 +32,10 @@ enum EventListState {
 }
 
 @Component({
-    selector: "app-event-list",
-    templateUrl: "./event-list.component.html",
-    styleUrls: ["./event-list.component.css"],
-    standalone: false
+  selector: "app-event-list",
+  templateUrl: "./event-list.component.html",
+  styleUrls: ["./event-list.component.css"],
+  standalone: false,
 })
 export class EventListComponent implements OnInit {
   public eventListState = EventListState;
@@ -80,7 +80,7 @@ export class EventListComponent implements OnInit {
     this.state = EventListState.Loading;
     this.selectedEvent = -1;
     this.user$.subscribe((user) => {
-      this.now = ZonedDateTime.now(user.timezone).minusDays(this.offset);
+      this.now = ZonedDateTime.now().minusDays(this.offset);
       let startOfDay = this.now
         .withHour(0)
         .withMinute(0)

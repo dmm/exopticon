@@ -18,7 +18,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 import { ElementRef, Inject, Injectable, DOCUMENT } from "@angular/core";
 import { combineLatest, concat, defer, fromEvent, Observable, of } from "rxjs";
 import { distinctUntilChanged, flatMap, map } from "rxjs/operators";

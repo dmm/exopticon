@@ -7,7 +7,7 @@
       class="delete"
       type="button"
       (click)="deleteCameraGroup({ id: groupForm.controls.id.value })"
-      >
+    >
       Delete
     </button>
   }
@@ -23,19 +23,17 @@
       maxlength="15"
       formControlName="name"
       [readonly]="hideMembership"
-      />
+    />
   </div>
   <div class="members" formArrayName="members">
     @for (member of members.controls; track member; let i = $index) {
-      <div
-        class="member-list"
-        >
+      <div class="member-list">
         <div [formGroupName]="i">
           <button
             type="button"
             class="up-button"
             (click)="memberUp({ index: i })"
-            >
+          >
             UP
           </button>
           <input type="hidden" formControlName="id" />
@@ -45,12 +43,12 @@
             formControlName="include"
             class="include"
             [hidden]="hideMembership"
-            />
+          />
           <button
             type="button"
             class="down-button"
             (click)="memberDown({ index: i })"
-            >
+          >
             DOWN
           </button>
         </div>
@@ -58,20 +56,12 @@
     }
   </div>
   @if (groupForm.controls.id.value !== null) {
-    <button
-      type="button"
-      class="submit"
-      (click)="onSubmit()"
-      >
+    <button type="button" class="submit" (click)="onSubmit()">
       Update Camera Group
     </button>
   }
   @if (groupForm.controls.id.value === null) {
-    <button
-      type="button"
-      class="submit"
-      (click)="onSubmit()"
-      >
+    <button type="button" class="submit" (click)="onSubmit()">
       Create Camera Group
     </button>
   }

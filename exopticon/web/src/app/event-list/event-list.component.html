@@ -40,9 +40,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </div>
 @if (state === eventListState.Loading) {
-  <div class="events_wrapper">
-    Loading...
-  </div>
+  <div class="events_wrapper">Loading...</div>
 }
 <div class="events-wrapper">
   @for (event of events$ | async; track event; let index = $index) {
@@ -54,24 +52,13 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="ratio">
         @if (selectedEvent != index) {
-          <img
-            src="/v1/events/{{ event.id }}/snapshot"
-            />
+          <img src="/v1/events/{{ event.id }}/snapshot" />
         }
         @if (selectedEvent != index) {
-          <div
-            class="playbutton"
-            (click)="onEventClick(index)"
-            >
-            &#9654;
-          </div>
+          <div class="playbutton" (click)="onEventClick(index)">&#9654;</div>
         }
         @if (selectedEvent == index && event.observations.length > 0) {
-          <video
-            controls
-            autoplay
-            loop
-            >
+          <video controls autoplay loop>
             <source src="/v1/events/{{ event.id }}/clip" type="video/mp4" />
           </video>
         }

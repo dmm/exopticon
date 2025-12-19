@@ -25,10 +25,10 @@ import { CameraGroup } from "../camera-group";
 import { CameraGroupService } from "../camera-group.service";
 
 @Component({
-    selector: "app-camera-group-list",
-    templateUrl: "./camera-group-list.component.html",
-    styleUrls: ["./camera-group-list.component.css"],
-    standalone: false
+  selector: "app-camera-group-list",
+  templateUrl: "./camera-group-list.component.html",
+  styleUrls: ["./camera-group-list.component.css"],
+  standalone: false,
 })
 export class CameraGroupListComponent implements OnInit {
   cameraGroups$: Observable<CameraGroup[]>;

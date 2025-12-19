@@ -19,8 +19,6 @@ import { HttpClient } from "@angular/common/http";
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 import { Injectable } from "@angular/core";
-import { ZoneId } from "@js-joda/core";
-import "@js-joda/timezone";
 import { Observable } from "rxjs";
 import { map, publishReplay, refCount } from "rxjs/operators";
 
@@ -33,12 +31,10 @@ interface UserDto {
 export class User {
   readonly id: string;
   readonly username: string;
-  readonly timezone: ZoneId;
 
   constructor(dto: UserDto) {
     this.id = dto.id;
     this.username = dto.username;
-    this.timezone = ZoneId.of(dto.timezone);
   }
 }
 

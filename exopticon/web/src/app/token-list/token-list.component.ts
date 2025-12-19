@@ -25,10 +25,10 @@ import { Observable } from "rxjs";
 import { Token, TokenService } from "../token.service";
 
 @Component({
-    selector: "app-token-list",
-    templateUrl: "./token-list.component.html",
-    styleUrls: ["./token-list.component.css"],
-    standalone: false
+  selector: "app-token-list",
+  templateUrl: "./token-list.component.html",
+  styleUrls: ["./token-list.component.css"],
+  standalone: false,
 })
 export class TokenListComponent implements OnInit {
   tokenName: string;

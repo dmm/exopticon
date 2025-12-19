@@ -21,7 +21,6 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { ZonedDateTime } from "@js-joda/core";
-import "@js-joda/timezone";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
 import { Observation } from "./observation";

@@ -49,10 +49,10 @@ export interface PlayingState {
 type CameraViewStatus = NewState | ConnectingState | PlayingState;
 
 @Component({
-    selector: "app-camera-view",
-    templateUrl: "./camera-view.component.html",
-    styleUrls: ["./camera-view.component.css"],
-    standalone: false
+  selector: "app-camera-view",
+  templateUrl: "./camera-view.component.html",
+  styleUrls: ["./camera-view.component.css"],
+  standalone: false,
 })
 export class CameraViewComponent implements OnInit {
   @Input() camera: Camera;

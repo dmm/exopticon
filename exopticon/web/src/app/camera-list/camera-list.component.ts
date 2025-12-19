@@ -24,10 +24,10 @@ import { Camera } from "../camera";
 import { CameraService } from "../camera.service";
 
 @Component({
-    selector: "app-camera-list",
-    templateUrl: "./camera-list.component.html",
-    styleUrls: ["./camera-list.component.css"],
-    standalone: false
+  selector: "app-camera-list",
+  templateUrl: "./camera-list.component.html",
+  styleUrls: ["./camera-list.component.css"],
+  standalone: false,
 })
 export class CameraListComponent implements OnInit {
   cameras$: Observable<Camera[]>;

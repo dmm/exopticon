@@ -19,14 +19,14 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <div>
   <div class="camera-name">{{ camera.name }}</div>
-  @if (camera.ptzType !== 'none') {
+  @if (camera.ptzType !== "none") {
     <div class="ptz-overlay">
       <div
         (pointerdown)="ptz($event, directions.left)"
         (touchstart)="stopPropagation($event)"
         (touchend)="stopPropagation($event)"
         class="overlay-button ptz-arrow ptz-left"
-        >
+      >
         ◀
       </div>
       <div
@@ -34,7 +34,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         (touchstart)="stopPropagation($event)"
         (touchend)="stopPropagation($event)"
         class="overlay-button ptz-arrow ptz-right"
-        >
+      >
         ▶
       </div>
       <div
@@ -42,7 +42,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         (touchstart)="stopPropagation($event)"
         (touchend)="stopPropagation($event)"
         class="overlay-button ptz-arrow ptz-up"
-        >
+      >
         ▲
       </div>
       <div
@@ -50,7 +50,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         (touchstart)="stopPropagation($event)"
         (touchend)="stopPropagation($event)"
         class="overlay-button ptz-arrow ptz-down"
-        >
+      >
         ▼
       </div>
     </div>

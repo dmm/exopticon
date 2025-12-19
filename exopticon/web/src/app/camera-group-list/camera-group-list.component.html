@@ -21,9 +21,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 <button type="button" (click)="createNewGroup()">Create New</button>
 <div class="camera-groups">
   @for (group of cameraGroups$ | async; track group) {
-    <div
-      [routerLink]="['/camera_groups', group.id]"
-      >
+    <div [routerLink]="['/camera_groups', group.id]">
       <span>{{ group.name }}</span>
       <button type="button" [routerLink]="['/camera_groups', group.id]">
         EDIT

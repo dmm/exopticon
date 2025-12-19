@@ -32,11 +32,11 @@ import { CameraService, PtzDirection } from "../camera.service";
 import { WebrtcService } from "../webrtc.service";
 
 @Component({
-    selector: "app-camera-panel",
-    templateUrl: "./camera-panel.component.html",
-    styleUrls: ["./camera-panel.component.css"],
-    providers: [CameraPanelService],
-    standalone: false
+  selector: "app-camera-panel",
+  templateUrl: "./camera-panel.component.html",
+  styleUrls: ["./camera-panel.component.css"],
+  providers: [CameraPanelService],
+  standalone: false,
 })
 export class CameraPanelComponent implements OnInit {
   cameras: Camera[];
