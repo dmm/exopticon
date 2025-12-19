@@ -1,13 +1,13 @@
-FROM docker.io/almalinux:10 as base
+FROM docker.io/almalinux:10 AS base
 
 # Install EPEL
 RUN  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
 
-ENV CUDA_VERSION 13.0.1
-ENV CUDA_MAJOR 13
-ENV CUDA_MINOR 0
-ENV CUDA_REPO_URL https://developer.download.nvidia.com/compute/cuda/repos/rhel10
-ENV NV_CUDA_CUDART_VERSION 13.0.88-1
+ENV CUDA_VERSION=13.0.1
+ENV CUDA_MAJOR=13
+ENV CUDA_MINOR=0
+ENV CUDA_REPO_URL=https://developer.download.nvidia.com/compute/cuda/repos/rhel10
+ENV NV_CUDA_CUDART_VERSION=13.0.88-1
 
 RUN echo "[cuda]" > /etc/yum.repos.d/cuda.repo
 RUN echo "name=cuda" >> /etc/yum.repos.d/cuda.repo
@@ -16,7 +16,7 @@ RUN echo "enabled=1" >> /etc/yum.repos.d/cuda.repo
 RUN echo "gpgcheck=1" >> /etc/yum.repos.d/cuda.repo
 RUN echo "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" >> /etc/yum.repos.d/cuda.repo
 
-LABEL maintainer "David Matthew Mattli <dmm@mattli.us>"
+LABEL MAINTAINER "David Matthew Mattli <dmm@mattli.us>"
 RUN NVIDIA_GPGKEY_SUM=afbea87d3b979b3788ef34223aeeb323ade481128e2c133723ae99b8a51368bb && \
     curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/rhel10/x86_64/CDF6BA43.pub | sed '/^Version/d' > /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA && \
     echo "$NVIDIA_GPGKEY_SUM  /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" | sha256sum -c --strict -
@@ -43,10 +43,10 @@ ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
 # nvidia-container-runtime
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-FROM base as cuda-runtime
+FROM base AS cuda-runtime
 
 RUN dnf install -y \
     cuda-libraries-13-0 \
@@ -59,7 +59,7 @@ RUN dnf install -y \
     && rm -rf /var/cache/yum/*
 
 
-FROM cuda-runtime as cuda-devel
+FROM cuda-runtime AS cuda-devel
 
 RUN dnf install -y \
     cuda-command-line-tools-13-0 \
@@ -75,7 +75,7 @@ RUN dnf install -y \
     && dnf clean all \
     && rm -rf /var/cache/yum/*
 
-FROM cuda-devel as exopticon-build
+FROM cuda-devel AS exopticon-build
 
 WORKDIR /exopticon
 
@@ -134,11 +134,11 @@ ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-13.0
 ENV CUDACXX=/usr/local/cuda-13.0/bin/nvcc
 ENV PATH=$CUDA_PATH:/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:/home/exopticon/.local/bin/:$PATH
 
-FROM exopticon-build as exopticon-development
+FROM exopticon-build AS exopticon-development
 
 ENTRYPOINT ["sleep", "infinity"]
 
-FROM exopticon-build as prod-build
+FROM exopticon-build AS prod-build
 
 USER exopticon:exopticon
 
@@ -146,7 +146,7 @@ COPY --chown=exopticon:exopticon . ./
 
 RUN make ci-flow
 
-FROM cuda-runtime as exopticon-prod
+FROM cuda-runtime AS exopticon-prod
 
 WORKDIR /exopticon
 
@@ -181,4 +181,4 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 
 USER exopticon:exopticon
 
-ENTRYPOINT /exopticon/exopticon
+ENTRYPOINT ["/exopticon/exopticon"]
