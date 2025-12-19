@@ -30,9 +30,9 @@ version:
 
 pre-release:
   stage: build
-  image: docker:stable
+  image: docker:29-dind
   services:
-  - docker:dind
+    - docker:29-dind
   script:
   - docker build .
   only:
@@ -44,7 +44,7 @@ build-image:
   stage: image
   image: docker:29-dind
   services:
-  - docker:dind
+    - docker:29-dind
   script:
   - rm -f build_info
   - echo "RELEASE_URL=https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/release" > build_info
