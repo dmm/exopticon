@@ -47,6 +47,11 @@ check-web:
 clippy:
 	cargo clippy
 
+.PHONY: format
+format:
+	cargo fmt
+	cd exopticon/web; npm run format
+
 .PHONY: check-format
 check-format:
 	cargo fmt --check

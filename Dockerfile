@@ -16,7 +16,7 @@ RUN echo "enabled=1" >> /etc/yum.repos.d/cuda.repo
 RUN echo "gpgcheck=1" >> /etc/yum.repos.d/cuda.repo
 RUN echo "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" >> /etc/yum.repos.d/cuda.repo
 
-LABEL MAINTAINER "David Matthew Mattli <dmm@mattli.us>"
+LABEL MAINTAINER="David Matthew Mattli <dmm@mattli.us>"
 RUN NVIDIA_GPGKEY_SUM=afbea87d3b979b3788ef34223aeeb323ade481128e2c133723ae99b8a51368bb && \
     curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/rhel10/x86_64/CDF6BA43.pub | sed '/^Version/d' > /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA && \
     echo "$NVIDIA_GPGKEY_SUM  /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" | sha256sum -c --strict -
@@ -39,8 +39,8 @@ RUN dnf upgrade -y \
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES=all
