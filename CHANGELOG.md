@@ -2,6 +2,22 @@
 
 <!--- next entry here -->
 
+## 0.37.2
+2026-01-07
+
+### Fixes
+
+- cleanup capture_worker logging (2e0a0a9e3b69a558ac69158f08855f4a5008f76d)
+- upgrade to Angular v19 (5607070bf81e1032ba715077bf3879c7d3325e8b)
+- Update to Angular v20 (14a538a55819d402c9b5c19d9dfa54fca2431cfe)
+- Upgrade to Angular v21 (a35a863e296c03e449ef6672084cdf403923fe91)
+- Switch build image to dind-29 (f1004258ea4403511cf5a9fd4adbfd39a3f42688)
+- enable FF_NETWORK_PER_BUILD (221b1b6448b9a0fce95327b6a658d764ad829042)
+- change docker image tag (247503694f5b6c82ff287e191d6dd75173b32816)
+- fix web formatting (1b945e382dabed777f1d7024771ac98105084680)
+- cleanup Dockerfile (6a4b96ccd68a99ff46afee9044cb2225a76469ae)
+- Add format target to Makefile (94930c97b0f1fb3eaa36830ae78525ba07179f2b)
+
 ## 0.37.1
 2025-11-24
 
