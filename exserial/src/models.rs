@@ -63,13 +63,13 @@ pub enum FrameSource {
     },
 }
 
-// #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
-// #[serde(rename_all = "camelCase")]
-// #[serde(tag = "kind")]
-// pub enum PacketEncoding {
-//     /// H264 Video
-//     H264,
-// }
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AudioCodec {
+    Opus,
+    Pcma,
+    Pcmu,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 /// Message from captureworker
@@ -92,7 +92,7 @@ pub enum CaptureMessage {
         unscaled_width: i32,
         unscaled_height: i32,
     },
-    /// Packet of compress audio/video
+    /// Packet of compress video
     Packet {
         /// compression codec used
         //        encoding: PacketEncoding,
@@ -103,6 +103,16 @@ pub enum CaptureMessage {
         timestamp: i64,
         /// duration in microseconds
         duration: i64,
+    },
+    /// Audio Packet
+    AudioPacket {
+        /// Audio codec
+        codec: AudioCodec,
+        #[serde(with = "serde_bytes")]
+        /// compressed audio data
+        data: Vec<u8>,
+        /// 90kHz timestamp
+        timestamp: i64,
     },
     /// New file indication
     NewFile {

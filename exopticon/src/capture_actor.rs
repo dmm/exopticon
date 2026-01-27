@@ -254,7 +254,6 @@ impl CaptureActor {
                 filename,
                 begin_time,
             } => self.handle_new_file(filename, begin_time).await?,
-
             CaptureMessage::EndFile { filename, end_time } => {
                 let end_time = end_time.parse::<DateTime<Utc>>().expect("Parse failure!");
                 self.handle_close_file(&filename, end_time).await?;
@@ -265,6 +264,11 @@ impl CaptureActor {
             } => {
                 debug!("got capture metrics");
             }
+            CaptureMessage::AudioPacket {
+                codec: _,
+                data: _,
+                timestamp: _,
+            } => {}
         }
         Ok(())
     }

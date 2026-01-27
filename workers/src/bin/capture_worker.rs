@@ -51,7 +51,10 @@ use std::{
 };
 
 use chrono::{SecondsFormat, Utc};
-use exserial::{exlog::ExLog, models::CaptureMessage};
+use exserial::{
+    exlog::ExLog,
+    models::{self, CaptureMessage},
+};
 use gstreamer::{
     self as gst, Bin, Element, Pad,
     glib::object::{Cast, ObjectExt},
@@ -465,9 +468,27 @@ fn handle_video_sample(
     Ok(gst::FlowSuccess::Ok)
 }
 
-fn handle_audio_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowError> {
-    let _sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
-    // yeah we got an audio sample!
+fn handle_audio_sample(
+    codec: models::AudioCodec,
+    appsink: &AppSink,
+) -> Result<gst::FlowSuccess, gst::FlowError> {
+    let sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
+    let buffer = sample.buffer().expect("failed to get audio sample buffer");
+    let map = buffer
+        .map_readable()
+        .expect("failed to get audio buffer map");
+    let data = map.as_slice();
+
+    let pts_90khz = buffer
+        .pts()
+        .map_or(0, |pts| pts.nseconds() * 90_000 / 1_000_000_000);
+
+    let msg = CaptureMessage::AudioPacket {
+        codec,
+        data: data.to_owned(),
+        timestamp: i64::try_from(pts_90khz).unwrap_or(0),
+    };
+    exserial::print_message(msg);
 
     Ok(gst::FlowSuccess::Ok)
 }
@@ -611,6 +632,13 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
         bin.sync_state_with_parent()
             .expect("failed to sync bin state");
     } else if let ("audio", Some(depay_name), &None) = (media, depayloader_name, &d.audio_appsink) {
+        // Determine fi this is a WebRTC-compatible codec
+        let audio_codec = match encoding_name {
+            "OPUS" => Some(models::AudioCodec::Opus),
+            "PCMA" => Some(models::AudioCodec::Pcma),
+            "PCMU" => Some(models::AudioCodec::Pcmu),
+            _ => None,
+        };
         let bin = create_audio_branch(depay_name, parser_name);
 
         let pipeline = src
@@ -638,11 +666,25 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
             .add_many([appsink.upcast_ref::<gst::Element>()])
             .expect("failed to add audio appsink to pipeline");
 
-        appsink.set_callbacks(
-            AppSinkCallbacks::builder()
-                .new_sample(handle_audio_sample)
-                .build(),
-        );
+        if let Some(codec) = audio_codec {
+            appsink.set_callbacks(
+                AppSinkCallbacks::builder()
+                    .new_sample(move |appsink: &AppSink| {
+                        handle_audio_sample(codec.clone(), appsink)
+                    })
+                    .build(),
+            );
+        } else {
+            // For non-webrtc compatible codecs, just draint the samples
+            appsink.set_callbacks(
+                AppSinkCallbacks::builder()
+                    .new_sample(|appsink: &AppSink| {
+                        let _ = appsink.pull_sample();
+                        Ok(gst::FlowSuccess::Ok)
+                    })
+                    .build(),
+            );
+        }
 
         let bin_app_src_pad = bin
             .static_pad("app_src")
