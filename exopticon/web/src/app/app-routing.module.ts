@@ -28,6 +28,7 @@ import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { EventListComponent } from "./event-list/event-list.component";
 import { LoginComponent } from "./login/login.component";
 import { TokenListComponent } from "./token-list/token-list.component";
+import { CompatibilityCheckComponent } from "./compatibility-check/compatibility-check.component";
 
 const routes: Routes = [
   { path: "login", component: LoginComponent },
@@ -39,6 +40,7 @@ const routes: Routes = [
   { path: "camera_groups/:id", component: CameraGroupDetailComponent },
   { path: "events", component: EventListComponent },
   { path: "tokens", component: TokenListComponent },
+  { path: "compatibility", component: CompatibilityCheckComponent },
   { path: "", redirectTo: "/camera_panel", pathMatch: "full" },
   { path: "**", redirectTo: "/camera_panel", pathMatch: "full" },
 ];

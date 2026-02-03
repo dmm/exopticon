@@ -1,0 +1,40 @@
+
+<h3>api compatibility</h3>
+<table>
+  <thead>
+    <tr>
+      <td>api name</td>
+      <td>supported?</td>
+    </tr>
+  </thead>
+  <tbody>
+  <tr [ngClass]="{'not-supported' : !webTransportSupported }">
+    <td>WebTransport</td>
+    <td>{{ webTransportSupported }}</td>
+  </tr>
+  <tr [ngClass]="{'not-supported' : !webCodecSupported }">
+    <td>WebCodec</td>
+    <td>{{ webCodecSupported }}</td>
+  </tr>
+  </tbody>
+</table>
+
+<h3>codec support</h3>
+<table>
+  <thead>
+    <tr>
+      <td>Codec</td>
+      <td>supported?</td>
+    </tr>
+  </thead>
+  <tbody>
+@if (supportedCodecs$ | async; as supportedCodecs) {
+  @for (item of supportedCodecs | keyvalue; track item.key) {
+  <tr [ngClass]="{'not-supported' : !item.value }">
+    <td>{{ item.key }}</td>
+    <td>{{ item.value }}</td>
+  </tr>
+  }
+}
+  </tbody>
+</table>
