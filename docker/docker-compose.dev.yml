@@ -26,7 +26,8 @@ services:
       CARGO_TARGET_DIR: /target
       EXOPTICONWORKERS: /target/debug
     ports:
-      - 3000:3000
+      - 443:3000
+      - "433:3000/udp"
       - "4000:4000/udp"
     restart: always
     devices: []

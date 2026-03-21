@@ -105,5 +105,5 @@ pub async fn fetch_video_units_between(
 }
 
 pub fn router() -> Router<AppState> {
-    Router::<AppState>::new().route("/:camera_id", get(fetch_video_units_between))
+    Router::<AppState>::new().route("/{camera_id}", get(fetch_video_units_between))
 }

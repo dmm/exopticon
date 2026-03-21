@@ -1,0 +1,11 @@
+domains:
+  - name: "exopticon.org"
+    fqdns:
+      - "dev.exopticon.org"
+    commands:
+      - "--dns"
+      - "desec"
+global:
+  LEGO_EMAIL:
+  DESEC_TOKEN:
+  DESEC_PROPAGATION_TIMEOUT: 300

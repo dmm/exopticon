@@ -210,5 +210,5 @@ pub fn personal_access_token_router() -> Router<AppState> {
             "/",
             get(fetch_personal_access_tokens).post(create_personal_access_token),
         )
-        .route("/:id", axum::routing::delete(delete_personal_access_token))
+        .route("/{id}", axum::routing::delete(delete_personal_access_token))
 }

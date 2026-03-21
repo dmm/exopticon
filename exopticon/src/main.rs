@@ -83,6 +83,7 @@ use crate::file_deletion_supervisor::FileDeletionSupervisor;
 use axum::routing::{get, post};
 use axum::{Router, middleware};
 use axum_prometheus::PrometheusMetricLayer;
+use axum_server::tls_rustls::RustlsConfig;
 use capture_supervisor::Command;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenv::dotenv;
@@ -269,10 +270,10 @@ async fn main() {
         .route("/auth", post(auth::login))
         .route("/index.html", get(index_file_handler))
         .route("/manifest.webmanifest", get(manifest_file_handler))
-        .route("/assets/*path", get(static_file_handler))
-        .route("/icons/:path", get(static_file_handler))
+        .route("/assets/{*path}", get(static_file_handler))
+        .route("/icons/{path}", get(static_file_handler))
         .route("/", get(index_file_handler))
-        .route("/*path", get(index_file_handler))
+        .route("/{*path}", get(index_file_handler))
         .with_state(state)
         .layer(
             TraceLayer::new_for_http()
@@ -281,10 +282,16 @@ async fn main() {
         )
         .layer(prometheus_layer);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-        .await
-        .expect("to listen on 0.0.0.0:3000");
-    axum::serve(listener, app.into_make_service())
+    let config = RustlsConfig::from_pem_file(
+        env::var("CERT_PEM_PATH").expect("CERT_PEM_PATH not set"),
+        env::var("KEY_PEM_PATH").expect("KEY_PEM_PATH not set"),
+    )
+    .await
+    .expect("failed to open pem files");
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    axum_server::bind_rustls(addr, config)
+        .serve(app.into_make_service())
         .await
         .expect("to start server");
 }

@@ -1,23 +1,22 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 
-import { CompatibilityCheckComponent } from './compatibility-check.component';
+import { CompatibilityCheckComponent } from "./compatibility-check.component";
 
-describe('CompatibilityCheckComponent', () => {
+describe("CompatibilityCheckComponent", () => {
   let component: CompatibilityCheckComponent;
   let fixture: ComponentFixture<CompatibilityCheckComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CompatibilityCheckComponent]
-    })
-    .compileComponents();
+      imports: [CompatibilityCheckComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(CompatibilityCheckComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
   });
 });

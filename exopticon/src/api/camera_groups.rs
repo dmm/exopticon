@@ -98,7 +98,7 @@ pub async fn fetch_all(State(state): State<AppState>) -> Result<Json<Vec<CameraG
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
         .route("/", get(fetch_all).post(create))
-        .route("/:id", get(fetch).post(update).delete(delete))
+        .route("/{id}", get(fetch).post(update).delete(delete))
 }
 
 #[cfg(test)]

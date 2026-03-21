@@ -1,20 +1,40 @@
 version: '2.4'
 
 services:
-  caddy:
-    image: quay.io/fariszr/caddy-dns:desec
-    restart: always
-    ports:
-      - 80:80  # Needed for the ACME HTTP-01 challenge.
-      - 443:443
-    volumes:
-      - caddy:/data
-      - ./Caddyfile:/etc/caddy/Caddyfile:Z
+  lego:
+    image: "docker.io/11notes/lego:4.32.0"
+    dns:
+      - "8.8.8.8"
+      - "9.9.9.9"
+    read_only: true
+    userns_mode: "keep-id:uid=1000,gid=1000"
     environment:
-      DOMAIN: ${DOMAIN}
-      PORT: ${PORT}
-      EMAIL: ${EMAIL}
-      DESEC_TOKEN: ${DESEC_TOKEN}
+      TZ: "Etc/UTC"
+      LEGO_CONFIG: |-
+        domains:
+          - name: ${DOMAIN}
+            fqdns:
+              - ${DOMAIN}
+            commands:
+              - "--dns"
+              - "desec"
+        global:
+          LEGO_EMAIL: ${LETSENCRYPT_EMAIL}
+          DESEC_TOKEN: ${DESEC_TOKEN}
+          DESEC_POLLING_INTERVAL: 30
+          DESEC_PROPAGATION_TIMEOUT: 300
+    volumes:
+      - "lego.etc:/lego/etc"
+      - "lego.var:/lego/var"
+    restart: "always"
+
+  exopticon:
+    environment:
+      CERT_PEM_PATH: "/lego/var/${DOMAIN}/certificates/${DOMAIN}.pem"
+      KEY_PEM_PATH: "/lego/var/${DOMAIN}/certificates/${DOMAIN}.key"
+    volumes:
+      - "lego.var:/lego/var"
 
 volumes:
-  caddy:
+  lego.etc:
+  lego.var:

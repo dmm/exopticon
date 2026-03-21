@@ -253,11 +253,11 @@ pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
         .route("/", axum::routing::get(fetch_all).post(create))
         .route(
-            "/:id",
+            "/{id}",
             axum::routing::get(fetch).post(update).delete(delete),
         )
         .route(
-            "/:id/ptz/:direction",
+            "/{id}/ptz/{direction}",
             axum::routing::post(ptz_relative_move),
         )
 }

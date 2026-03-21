@@ -9,9 +9,9 @@ table {
 }
 
 thead {
-    border-top: 2px solid #00ff00;
-    border-bottom: 2px solid #00ff00;
-    font-weight: bold;
+  border-top: 2px solid #00ff00;
+  border-bottom: 2px solid #00ff00;
+  font-weight: bold;
 }
 
 th,
@@ -21,7 +21,7 @@ td {
 }
 
 .not-supported {
-color: red;
+  color: red;
 }
 
 tr :nth-child(2),
