@@ -20,24 +20,6 @@
 
 use serde::{Deserialize, Serialize};
 
-#[repr(C)]
-pub struct FrameMessage {
-    pub jpeg: *const u8,
-    pub jpeg_size: i32,
-    pub offset: i64,
-    pub unscaled_height: i32,
-    pub unscaled_width: i32,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum FrameResolution {
-    /// Standard definition frame, 480p
-    SD,
-    /// High definition frame, camera native resolution
-    HD,
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
@@ -76,22 +58,6 @@ pub enum AudioCodec {
 pub enum CaptureMessage {
     /// Log
     Log { level: log::Level, message: String },
-    /// Full jpeg frame
-    Frame {
-        #[serde(with = "serde_bytes")]
-        jpeg: Vec<u8>,
-        offset: i64,
-        unscaled_width: i32,
-        unscaled_height: i32,
-    },
-    /// 480p jpeg frame
-    ScaledFrame {
-        #[serde(with = "serde_bytes")]
-        jpeg: Vec<u8>,
-        offset: i64,
-        unscaled_width: i32,
-        unscaled_height: i32,
-    },
     /// Packet of compress video
     Packet {
         /// compression codec used
@@ -123,22 +89,4 @@ pub enum CaptureMessage {
     EndFile { filename: String, end_time: String },
     /// metric report
     Metric { label: String, values: Vec<f64> },
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CameraFrame {
-    /// id of camera that produced frame
-    pub camera_id: i32,
-    /// jpeg image data
-    pub jpeg: Vec<u8>,
-    /// resolution of frame
-    pub resolution: FrameResolution,
-    /// source of frame
-    pub source: FrameSource,
-    /// offset from beginning of video unit
-    pub offset: i64,
-    /// original width of image
-    pub unscaled_width: i32,
-    /// original height of image,
-    pub unscaled_height: i32,
 }

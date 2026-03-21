@@ -28,7 +28,7 @@ use bincode::serialize;
 use libc::c_char;
 use log::Level;
 
-use crate::models::{CaptureMessage, FrameMessage};
+use crate::models::CaptureMessage;
 
 pub mod exlog;
 pub mod models;
@@ -49,63 +49,6 @@ pub fn print_message(message: CaptureMessage) {
     handle
         .write_all(serialized.as_slice())
         .expect("unable to write frame!");
-}
-
-/// Take FrameMessage struct and write a framed message to stdout
-///
-/// # Safety
-///
-/// frame pointer must be to a valid, aligned FrameMessage.
-///
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn send_frame_message(frame: *const FrameMessage) {
-    unsafe {
-        let frame = {
-            assert!(!frame.is_null());
-            &*frame
-        };
-        let jpeg = {
-            assert!(!frame.jpeg.is_null());
-            slice::from_raw_parts(frame.jpeg, frame.jpeg_size as usize)
-        };
-
-        let frame = CaptureMessage::Frame {
-            jpeg: jpeg.to_vec(),
-            offset: frame.offset,
-            unscaled_height: frame.unscaled_height,
-            unscaled_width: frame.unscaled_width,
-        };
-        print_message(frame);
-    }
-}
-
-/// Take FrameMessage struct and write a framed scaled, message to stdout
-///
-/// # Safety
-///
-/// frame pointer must be to a valid, aligned FrameMessage.
-///
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn send_scaled_frame_message(frame: *const FrameMessage, _height: i32) {
-    unsafe {
-        let frame = {
-            assert!(!frame.is_null());
-            &*frame
-        };
-        let jpeg = {
-            assert!(!frame.jpeg.is_null());
-            slice::from_raw_parts(frame.jpeg, frame.jpeg_size as usize)
-        };
-
-        let frame = CaptureMessage::ScaledFrame {
-            jpeg: jpeg.to_vec(),
-            offset: frame.offset,
-            unscaled_height: frame.unscaled_height,
-            unscaled_width: frame.unscaled_width,
-        };
-
-        print_message(frame);
-    }
 }
 
 /// Send a packet of compressed video

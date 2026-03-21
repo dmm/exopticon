@@ -230,18 +230,6 @@ impl CaptureActor {
                     self.lost_packet_counter.increment(packet_count.into());
                 }
             }
-            CaptureMessage::Frame {
-                jpeg: _,
-                offset: _,
-                unscaled_width: _,
-                unscaled_height: _,
-            }
-            | CaptureMessage::ScaledFrame {
-                jpeg: _,
-                offset: _,
-                unscaled_width: _,
-                unscaled_height: _,
-            } => {}
             CaptureMessage::Packet {
                 data,
                 timestamp,
