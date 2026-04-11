@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.37.3
+2026-04-11
+
+### Fixes
+
+- Assign pts to pts-less buffers (97842012f1f0408441a54c8ff6eebafb1ae66402)
+
 ## 0.37.2
 2026-01-07
 
