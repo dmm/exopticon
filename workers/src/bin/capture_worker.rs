@@ -53,9 +53,11 @@ use std::{
 use chrono::{SecondsFormat, Utc};
 use exserial::{exlog::ExLog, models::CaptureMessage};
 use gstreamer::{
-    self as gst, Bin, Element, Pad,
+    self as gst, Bin, Element, Pad, PadProbeReturn, PadProbeType,
     glib::object::{Cast, ObjectExt},
-    prelude::{ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
+    prelude::{
+        ClockExt, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt, PadExtManual,
+    },
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use log::{debug, error, info};
@@ -162,6 +164,29 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
         .name("video_tee")
         .build()
         .expect("Failed to create video_tee element");
+
+    let tee_sink_pad = tee.static_pad("sink").expect("failed to get tee sink pad");
+    tee_sink_pad.add_probe(PadProbeType::BUFFER, move |pad, info| {
+        let Some(buffer) = info.buffer_mut() else {
+            return PadProbeReturn::Ok;
+        };
+        if buffer.pts().is_none() {
+            let pts = (|| {
+                let element = pad.parent_element()?;
+                let clock = element.clock()?;
+                let base_time = element.base_time()?;
+                Some(clock.time()?.saturating_sub(base_time))
+            })();
+            match pts {
+                Some(rt) => {
+                    debug!("Assigning running time PTS {rt} to PTS-less buffer");
+                    buffer.make_mut().set_pts(rt);
+                }
+                None => return PadProbeReturn::Drop,
+            }
+        }
+        PadProbeReturn::Ok
+    });
 
     let mkv_queue = gst::ElementFactory::make("queue")
         .name("mkv_video_queue")
@@ -436,7 +461,7 @@ fn handle_video_sample(
     let data = map.as_slice();
 
     if buffer.pts().is_none() {
-        error!("Buffer without pts!");
+        error!("Buffer without pts despite pad probe — dropping");
         return Ok(gst::FlowSuccess::Ok);
     }
 
