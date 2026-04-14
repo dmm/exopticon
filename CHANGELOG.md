@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.37.5
+2026-04-14
+
+### Fixes
+
+- **capture_worker:** ignore `codec_data` cap, sometimes left out (a53f6d4dab757eafae660aa7f729c3123c05abe8)
+
 ## 0.37.4
 2026-04-14
 
