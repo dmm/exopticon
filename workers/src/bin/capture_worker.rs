@@ -54,9 +54,13 @@ use chrono::{SecondsFormat, Utc};
 use exserial::{exlog::ExLog, models::CaptureMessage};
 use gstreamer::{
     self as gst, Bin, Element, Pad, PadProbeReturn, PadProbeType,
-    glib::object::{Cast, ObjectExt},
+    glib::{
+        self,
+        object::{Cast, ObjectExt},
+    },
     prelude::{
-        ClockExt, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt, PadExtManual,
+        ClockExt, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, GstValueExt, PadExt,
+        PadExtManual,
     },
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
@@ -126,6 +130,48 @@ fn uuid_to_filename(parent_path: &std::path::Path, uuid: Uuid) -> std::path::Pat
     let path = format!("{}/{}.mkv", ts.format("%Y/%m/%d/%H"), uuid);
 
     parent_path.join(&path)
+}
+
+fn caps_are_compatible(old: &gst::CapsRef, new: &gst::CapsRef) -> bool {
+    let (Some(old_s), Some(new_s)) = (old.structure(0), new.structure(0)) else {
+        return false;
+    };
+
+    let significant_fields = [
+        "width",
+        "height",
+        "profile",
+        "level",
+        "codec_data",
+        "stream-format",
+        "chroma-format",
+        "bit-depth-luma",
+        "bit-depth-chroma",
+    ];
+
+    for field in &significant_fields {
+        let old_serialized = old_s
+            .value_by_quark(glib::Quark::from_str(*field))
+            .ok()
+            .map(|v| v.serialize().ok());
+
+        let new_serialized = new_s
+            .value_by_quark(glib::Quark::from_str(*field))
+            .ok()
+            .map(|v| v.serialize().ok());
+
+        match (&old_serialized, &new_serialized) {
+            (Some(o), Some(n)) => {
+                if o != n {
+                    return false;
+                }
+            }
+            (None, None) => {} // both absent, fine
+            _ => return false, // one present, one absent
+        }
+    }
+
+    true
 }
 
 fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
@@ -233,12 +279,24 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
         .build()
         .expect("failed to build mkv parser");
 
+    let mkv_capsfilter = gst::ElementFactory::make("capsfilter")
+        .name("mkv_capsfilter")
+        .property(
+            "caps",
+            gst::Caps::builder("video/x-h264")
+                .field("stream-format", "avc")
+                .field("alignment", "au")
+                .build(),
+        )
+        .build()
+        .expect("Failed to create mkv capsfilter");
+
     let appsink_parser = gst::ElementFactory::make(parser_name)
         .name("appsink_parser")
         .build()
         .expect("failed to build appsink parser");
 
-    bin.add_many([&mkv_parser, &appsink_parser])
+    bin.add_many([&mkv_parser, &mkv_capsfilter, &appsink_parser])
         .expect("failed to add video bin parsers");
 
     appsink_parser.set_property("config-interval", -1i32);
@@ -248,13 +306,69 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
         .sync_state_with_parent()
         .expect("Failed to sync mkv_parser state with parent");
 
+    mkv_capsfilter
+        .sync_state_with_parent()
+        .expect("Failed to sync mkv_capsfilter");
+
     appsink_parser
         .sync_state_with_parent()
         .expect("Failed to sync appsink_parser state with parent");
 
-    mkv_queue
-        .link(&mkv_parser)
-        .expect("failed to link mkv parser");
+    let mkv_capsfilter_sink = mkv_capsfilter
+        .static_pad("sink")
+        .expect("failed to get capsfilter sink pad");
+
+    let initial_caps: Arc<Mutex<Option<gst::Caps>>> = Arc::new(Mutex::new(None));
+
+    mkv_capsfilter_sink.add_probe(PadProbeType::EVENT_DOWNSTREAM, move |pad, info| {
+        let Some(event) = info.event() else {
+            return PadProbeReturn::Ok;
+        };
+        let gst::EventView::Caps(caps_ev) = event.view() else {
+            return PadProbeReturn::Ok;
+        };
+
+        let mut stored = initial_caps.lock().unwrap();
+        let new_caps = caps_ev.caps();
+
+        match stored.as_ref() {
+            None => {
+                // First caps — allow through
+                *stored = Some(new_caps.to_owned());
+                drop(stored);
+                PadProbeReturn::Ok
+            }
+            Some(old_caps) if caps_are_compatible(old_caps, new_caps) => {
+                // Harmless change (e.g., framerate drift) — suppress it
+                log::info!("Suppressing compatible caps renegotiation");
+                PadProbeReturn::Drop
+            }
+            Some(old_caps) => {
+                // Significant change — post an error to trigger clean shutdown
+                log::error!(
+                    "Incompatible caps change detected.\n  Old: {old_caps}\n  New: {new_caps}"
+                );
+
+                if let Some(element) = pad.parent_element()
+                    && let Err(e) = element.post_message(
+                        gst::message::Error::builder(
+                            gst::ResourceError::Failed,
+                            "Video parameters changed, restarting capture",
+                        )
+                        .build(),
+                    )
+                {
+                    panic!("Error posting Video parameters changed message. Time to die! {e}");
+                }
+
+                PadProbeReturn::Drop
+            }
+        }
+    });
+
+    // Link: mkv_queue → mkv_parser → mkv_capsfilter (→ ghost pad → splitmuxsink)
+    gst::Element::link_many([&mkv_queue, &mkv_parser, &mkv_capsfilter])
+        .expect("failed to link mkv branch");
 
     // For appsink video we need to add a caps filter to ensure the
     // NALs are in the annexb format.
@@ -286,7 +400,7 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
 
     bin.add_pad(&ghost_sink).expect("failed to add ghost sink");
 
-    let mkv_src = mkv_parser
+    let mkv_src = mkv_capsfilter
         .static_pad("src")
         .expect("failed to get mkv parser src pad");
 
