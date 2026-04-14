@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.37.4
+2026-04-14
+
+### Fixes
+
+- **capture_worker:** gracefully handle caps changes (b2f6f6a5e0077bebf2ad42c30a6ef219f4503bb6)
+
 ## 0.37.3
 2026-04-11
 
