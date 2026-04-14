@@ -137,12 +137,12 @@ fn caps_are_compatible(old: &gst::CapsRef, new: &gst::CapsRef) -> bool {
         return false;
     };
 
+    // Fields where presence/absence matters and values must match
     let significant_fields = [
         "width",
         "height",
         "profile",
         "level",
-        "codec_data",
         "stream-format",
         "chroma-format",
         "bit-depth-luma",
@@ -166,8 +166,8 @@ fn caps_are_compatible(old: &gst::CapsRef, new: &gst::CapsRef) -> bool {
                     return false;
                 }
             }
-            (None, None) => {} // both absent, fine
-            _ => return false, // one present, one absent
+            (None, None) => {}
+            _ => return false,
         }
     }
 
