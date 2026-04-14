@@ -178,6 +178,7 @@ COPY --chown=exopticon:exopticon --from=prod-build /exopticon/target/release/cap
 ENV EXOPTICONWORKERS=/exopticon/
 ENV PATH=/exopticon:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV HOME=/home/exopticon
 
 USER exopticon:exopticon
 
