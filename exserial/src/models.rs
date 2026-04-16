@@ -20,15 +20,6 @@
 
 use serde::{Deserialize, Serialize};
 
-#[repr(C)]
-pub struct FrameMessage {
-    pub jpeg: *const u8,
-    pub jpeg_size: i32,
-    pub offset: i64,
-    pub unscaled_height: i32,
-    pub unscaled_width: i32,
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FrameResolution {
@@ -76,22 +67,6 @@ pub enum AudioCodec {
 pub enum CaptureMessage {
     /// Log
     Log { level: log::Level, message: String },
-    /// Full jpeg frame
-    Frame {
-        #[serde(with = "serde_bytes")]
-        jpeg: Vec<u8>,
-        offset: i64,
-        unscaled_width: i32,
-        unscaled_height: i32,
-    },
-    /// 480p jpeg frame
-    ScaledFrame {
-        #[serde(with = "serde_bytes")]
-        jpeg: Vec<u8>,
-        offset: i64,
-        unscaled_width: i32,
-        unscaled_height: i32,
-    },
     /// Packet of compress video
     Packet {
         /// compression codec used
