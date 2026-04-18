@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.37.6
+2026-04-18
+
+### Fixes
+
+- switch to str0m rtx ssrc fork (4337752b9c5f5291768689ce09216b3370098ee8)
+
 ## 0.37.5
 2026-04-14
 
