@@ -55,7 +55,7 @@ serde_derive="1.0"
 serde_repr = "0.1"
 serde_json="1.0"
 serde = { version = "1.0", features = ["derive"] }
-str0m = "^0.6.3"
+str0m = { git = "https://github.com/dmm/str0m.git", branch = "rtx-ssrc-flag" }
 socket2 = "0.5"
 url = "^2.5"
 uuid = { version = "^1", features = ["serde", "v4", "v7"] }

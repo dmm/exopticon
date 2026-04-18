@@ -97,8 +97,7 @@ impl Client {
             .set_reordering_size_video(500)
             .clear_codecs()
             .enable_h264(true)
-            .enable_experimental_loss_based_bwe(true)
-            .build();
+            .build(Instant::now());
 
         Self {
             id: Uuid::new_v4(),
