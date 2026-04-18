@@ -391,11 +391,10 @@ export class WebrtcService {
         break;
 
       case "connected":
-        const map1 = new Map(
-          [...this.activeCameras].filter(([_k, v]) => v === true),
-        );
-        this.syncTracks(Array.from(map1.keys()));
-
+        const active = [...this.activeCameras]
+          .filter(([_, v]) => v)
+          .map(([k]) => k);
+        this.syncTracks(active);
         this.updateStreamMappings();
         break;
 
@@ -447,7 +446,7 @@ export class WebrtcService {
 
     for (const cameraId of activeCameras) {
       this.activeCameras.set(cameraId, true);
-      if (!this.transceivers.has(cameraId)) {
+      if (!this.transceivers.has(cameraId) && this.peerConnection) {
         const transceiver = this.peerConnection?.addTransceiver("video", {
           direction: "recvonly",
         });
@@ -572,9 +571,13 @@ export class WebrtcService {
 
   private async cleanup() {
     if (this.signalSocket) {
+      this.signalSocket.onopen = null;
+      this.signalSocket.onclose = null;
+      this.signalSocket.onerror = null;
+      this.signalSocket.onmessage = null;
       this.signalSocket.close();
+      this.signalSocket = undefined;
     }
-    this.signalSocket.close();
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = undefined;
