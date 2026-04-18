@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.37.7
+2026-04-18
+
+### Fixes
+
+- **webrtcservice:** Fix race condition with syncTracks (3ea476c179584eea123a66c374df52accd940734)
+
 ## 0.37.6
 2026-04-18
 
