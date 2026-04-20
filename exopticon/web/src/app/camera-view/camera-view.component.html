@@ -20,7 +20,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 <div #wrapperDiv>
   <video #videoElement (play)="setStatus($event)"></video>
 
-  @if (selected) {
+  @if (selected && status === "active") {
     <app-camera-overlay
       [camera]="camera"
       [muted]="muted"
