@@ -10,33 +10,7 @@ interface NegotiationAnswer {
   answer: string;
 }
 
-// ClientStatus
-interface Paused {
-  kind: "paused";
-}
-
-interface SignalChannelConnecting {
-  kind: "signalChannelConnecting";
-  since: Instant;
-}
-
-interface WebrtcConnecting {
-  kind: "webrtcConnecting";
-  since: Instant;
-}
-
-interface WebrtcConnected {
-  kind: "webrtcConnected";
-  since: Instant;
-}
-
 type TimeoutId = ReturnType<typeof setTimeout>;
-
-type ClientStatus =
-  | Paused
-  | SignalChannelConnecting
-  | WebrtcConnecting
-  | WebrtcConnected;
 
 // Events
 type WebRtcEvent =
@@ -49,17 +23,15 @@ type WebRtcEvent =
   | { type: "WEBRTC_CONNECTED" }
   | { type: "WEBRTC_DISCONNECTED" }
   | { type: "WEBRTC_FAILED" }
-  | { type: "ICE_CONNECTED" }
-  | { type: "ICE_DISCONNECTED" }
-  | { type: "ICE_FAILED" }
   | { type: "NEGOTIATION_NEEDED" }
+  | { type: "NEGOTIATION_FAILED" }
   | { type: "NEGOTIATION_ANSWER"; answer: string }
   | {
       type: "TRACK_RECEIVED";
       transceiver: RTCRtpTransceiver;
       stream: MediaStream;
     }
-  | { type: "TIMEOUT"; state: State }
+  | { type: "TIMEOUT" }
   | { type: "UPDATE_CAMERAS"; cameras: CameraId[] };
 
 // States
@@ -67,11 +39,16 @@ type State =
   | { kind: "disabled" }
   | {
       kind: "connecting_signal";
-      since: Instant;
+      socket: WebSocket;
       timeoutId: TimeoutId;
     }
-  | { kind: "connecting_webrtc"; since: Instant; timeoutId: TimeoutId }
-  | { kind: "connected"; since: Instant }
+  | {
+      kind: "connecting_webrtc";
+      socket: WebSocket;
+      pc: RTCPeerConnection;
+      timeoutId: TimeoutId;
+    }
+  | { kind: "connected"; socket: WebSocket; pc: RTCPeerConnection }
   | { kind: "reconnecting"; attempt: number; timeoutId: TimeoutId };
 
 @Injectable({
@@ -82,10 +59,6 @@ export class WebrtcService {
   private eventQueue: WebRtcEvent[] = [];
   private processing = false;
 
-  private peerConnection: RTCPeerConnection;
-  private signalSocket?: WebSocket;
-
-  private dataChannel?: RTCDataChannel;
   private transceivers: Map<CameraId, RTCRtpTransceiver> = new Map();
   private emitters: Map<CameraId, ReplaySubject<MediaStream>> = new Map();
   private activeCameras: Map<CameraId, boolean> = new Map();
@@ -93,7 +66,6 @@ export class WebrtcService {
   statusSubject: BehaviorSubject<State> = new BehaviorSubject(this.state);
 
   // status timer
-  private readonly baseDelay = 100;
   private readonly maxTimeout = 5000;
 
   status$ = this.statusSubject.asObservable();
@@ -139,12 +111,14 @@ export class WebrtcService {
     if (this.processing) return;
     this.processing = true;
 
-    while (this.eventQueue.length > 0) {
-      const event = this.eventQueue.shift()!;
-      await this.handleEvent(event);
+    try {
+      while (this.eventQueue.length > 0) {
+        const event = this.eventQueue.shift()!;
+        await this.handleEvent(event);
+      }
+    } finally {
+      this.processing = false;
     }
-
-    this.processing = false;
   }
 
   private async handleEvent(event: WebRtcEvent): Promise<void> {
@@ -173,13 +147,16 @@ export class WebrtcService {
     if (prevState !== this.state.kind) {
       console.log(`State transition: ${prevState} -> ${this.state.kind}`);
       this.statusSubject.next(this.state);
-
-      // Handle state entry actions
-      await this.onStateEnter(this.state);
     }
   }
 
   // State handlers
+  //
+  // All manipulation of state (RTCPeerConnection, WebSocket, etc) must occur
+  // with these state handlers. Callbacks must only enqueue events. This ensures
+  // we are always acting on the latest version of objects, and not state
+  // references.
+
   private handleDisabledState(event: WebRtcEvent): State {
     if (this.state.kind !== "disabled") {
       console.error(`invalid state handler called: ${this.state.kind}`);
@@ -190,8 +167,10 @@ export class WebrtcService {
       case "ENABLE":
         return {
           kind: "connecting_signal",
-          since: Instant.now(),
-          timeoutId: null,
+          socket: this.setupSignalSocket(),
+          timeoutId: setTimeout(() => {
+            this.enqueueEvent({ type: "TIMEOUT" });
+          }, this.maxTimeout),
         };
       case "DISABLE":
         return this.state;
@@ -201,9 +180,7 @@ export class WebrtcService {
     }
   }
 
-  private async handleConnectingSignalState(
-    event: WebRtcEvent,
-  ): Promise<State> {
+  private handleConnectingSignalState(event: WebRtcEvent): State {
     if (this.state.kind !== "connecting_signal") {
       console.error(`invalid state handler called: ${this.state.kind}`);
       return;
@@ -212,7 +189,7 @@ export class WebrtcService {
     switch (event.type) {
       case "DISABLE":
         this.cleanupTimeout(this.state.timeoutId);
-        await this.cleanup();
+        this.cleanup(this.state.socket, null);
         return { kind: "disabled" };
 
       case "UPDATE_CAMERAS":
@@ -222,30 +199,36 @@ export class WebrtcService {
 
       case "WEBSOCKET_OPEN":
         this.cleanupTimeout(this.state.timeoutId);
+        const pc = this.webrtcConnect(this.state.socket);
+        const active = [...this.activeCameras]
+          .filter(([_, v]) => v)
+          .map(([k]) => k);
+        this.syncTracks(active, pc);
         return {
           kind: "connecting_webrtc",
-          since: Instant.now(),
-          timeoutId: null,
+          socket: this.state.socket,
+          pc: pc,
+          timeoutId: setTimeout(() => {
+            this.enqueueEvent({ type: "TIMEOUT" });
+          }, this.maxTimeout),
         };
 
       case "WEBSOCKET_CLOSE":
       case "WEBSOCKET_ERROR":
         this.cleanupTimeout(this.state.timeoutId);
-        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+        return this.generateReconnectState(1);
 
       case "TIMEOUT":
         console.warn("Signal connection timeout");
-        await this.cleanup();
-        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+        this.cleanup(this.state.socket, null);
+        return this.generateReconnectState(1);
 
       default:
         return this.state;
     }
   }
 
-  private async handleConnectingWebrtcState(
-    event: WebRtcEvent,
-  ): Promise<State> {
+  private handleConnectingWebrtcState(event: WebRtcEvent): State {
     if (this.state.kind !== "connecting_webrtc") {
       console.error(`invalid state handler called: ${this.state.kind}`);
       return;
@@ -254,32 +237,47 @@ export class WebrtcService {
     switch (event.type) {
       case "DISABLE":
         this.cleanupTimeout(this.state.timeoutId);
-        await this.cleanup();
+        this.cleanup(this.state.socket, this.state.pc);
         return { kind: "disabled" };
 
       case "UPDATE_CAMERAS":
         console.log(`ACTIVE CAMERAS: ${event.cameras}`);
-        this.syncTracks(event.cameras);
-        this.updateStreamMappings();
+        this.syncTracks(event.cameras, this.state.pc);
+        this.updateStreamMappings(this.state.socket);
         return this.state;
 
       case "WEBRTC_CONNECTED":
         this.cleanupTimeout(this.state.timeoutId);
-        return { kind: "connected", since: Instant.now() };
+        const active = [...this.activeCameras]
+          .filter(([_, v]) => v)
+          .map(([k]) => k);
+        this.syncTracks(active, this.state.pc);
+        this.updateStreamMappings(this.state.socket);
+
+        return {
+          kind: "connected",
+          socket: this.state.socket,
+          pc: this.state.pc,
+        };
 
       case "WEBRTC_FAILED":
+      case "WEBSOCKET_ERROR":
       case "WEBSOCKET_CLOSE":
         this.cleanupTimeout(this.state.timeoutId);
-        await this.cleanup();
-        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+        this.cleanup(this.state.socket, this.state.pc);
+        return this.generateReconnectState(1);
 
       case "TIMEOUT":
         console.warn("WebRTC connection timeout");
-        await this.cleanup();
-        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+        this.cleanup(this.state.socket, this.state.pc);
+        return this.generateReconnectState(1);
+
+      case "NEGOTIATION_NEEDED":
+        this.sendOffer(this.state.socket, this.state.pc);
+        return this.state;
 
       case "NEGOTIATION_ANSWER":
-        await this.handleNegotiationAnswer(event.answer);
+        this.handleNegotiationAnswer(this.state.pc, event.answer);
         return this.state;
 
       default:
@@ -287,7 +285,7 @@ export class WebrtcService {
     }
   }
 
-  private async handleConnectedState(event: WebRtcEvent): Promise<State> {
+  private handleConnectedState(event: WebRtcEvent): State {
     if (this.state.kind !== "connected") {
       console.error(`invalid state handler called: ${this.state.kind}`);
       return;
@@ -295,13 +293,13 @@ export class WebrtcService {
 
     switch (event.type) {
       case "DISABLE":
-        await this.cleanup();
+        this.cleanup(this.state.socket, this.state.pc);
         return { kind: "disabled" };
 
       case "UPDATE_CAMERAS":
         console.log(`ACTIVE CAMERAS: ${event.cameras}`);
-        this.syncTracks(event.cameras);
-        this.updateStreamMappings();
+        this.syncTracks(event.cameras, this.state.pc);
+        this.updateStreamMappings(this.state.socket);
         return this.state;
 
       case "WEBRTC_CONNECTED":
@@ -311,19 +309,24 @@ export class WebrtcService {
         const map1 = new Map(
           [...this.activeCameras].filter(([_k, v]) => v === true),
         );
-        this.syncTracks(Array.from(map1.keys()));
+        this.syncTracks(Array.from(map1.keys()), this.state.pc);
 
-        this.updateStreamMappings();
+        this.updateStreamMappings(this.state.socket);
         return this.state;
 
       case "WEBRTC_DISCONNECTED":
       case "WEBRTC_FAILED":
       case "WEBSOCKET_CLOSE":
-        await this.cleanup();
-        return { kind: "reconnecting", attempt: 1, timeoutId: null };
+      case "NEGOTIATION_FAILED":
+        this.cleanup(this.state.socket, this.state.pc);
+        return this.generateReconnectState(1);
+
+      case "NEGOTIATION_NEEDED":
+        this.sendOffer(this.state.socket, this.state.pc);
+        return this.state;
 
       case "NEGOTIATION_ANSWER":
-        await this.handleNegotiationAnswer(event.answer);
+        this.handleNegotiationAnswer(this.state.pc, event.answer);
         return this.state;
 
       default:
@@ -331,7 +334,7 @@ export class WebrtcService {
     }
   }
 
-  private async handleReconnectingState(event: WebRtcEvent): Promise<State> {
+  private handleReconnectingState(event: WebRtcEvent): State {
     if (this.state.kind !== "reconnecting") {
       console.error(`invalid state handler called: ${this.state.kind}`);
       return;
@@ -349,76 +352,45 @@ export class WebrtcService {
 
       case "TIMEOUT":
         // Retry logic here
-        if (this.state.attempt < 5) {
-          return {
-            kind: "connecting_signal",
-            since: Instant.now(),
-            timeoutId: null,
-          };
-        } else {
-          console.error("Max reconnection attempts reached");
-          return { kind: "disabled" };
-        }
+        return {
+          kind: "connecting_signal",
+          socket: this.setupSignalSocket(),
+          timeoutId: setTimeout(() => {
+            this.enqueueEvent({ type: "TIMEOUT" });
+          }, this.maxTimeout),
+        };
 
       default:
         return this.state;
     }
   }
 
-  // State entry handler
-  private async onStateEnter(state: State): Promise<void> {
-    switch (state.kind) {
-      case "disabled":
-        // Ensure cleanup
-        await this.cleanup();
-        break;
+  private generateReconnectState(attempt: number): State {
+    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
+    const reconnectTimeoutId = setTimeout(() => {
+      this.enqueueEvent({ type: "TIMEOUT" });
+    }, delay);
 
-      case "connecting_signal":
-        this.setupSignalSocket();
-        // Set timeout for this state
-        const timeoutId = setTimeout(() => {
-          this.enqueueEvent({ type: "TIMEOUT", state });
-        }, this.maxTimeout);
-        this.state = { ...state, timeoutId };
-        break;
-
-      case "connecting_webrtc":
-        this.webrtcConnect();
-        const webrtcTimeoutId = setTimeout(() => {
-          this.enqueueEvent({ type: "TIMEOUT", state });
-        }, this.maxTimeout);
-        this.state = { ...state, timeoutId: webrtcTimeoutId };
-        break;
-
-      case "connected":
-        const active = [...this.activeCameras]
-          .filter(([_, v]) => v)
-          .map(([k]) => k);
-        this.syncTracks(active);
-        this.updateStreamMappings();
-        break;
-
-      case "reconnecting":
-        const delay = Math.min(1000 * Math.pow(2, state.attempt - 1), 30000);
-        const reconnectTimeoutId = setTimeout(() => {
-          this.enqueueEvent({ type: "TIMEOUT", state });
-        }, delay);
-        this.state = { ...state, timeoutId: reconnectTimeoutId };
-        break;
-    }
+    return {
+      kind: "reconnecting",
+      attempt: attempt,
+      timeoutId: reconnectTimeoutId,
+    };
   }
 
-  private setupSignalSocket(): void {
+  private setupSignalSocket(): WebSocket {
     const url = this.constructWebSocketUrl();
-    this.signalSocket = new WebSocket(url);
+    let signalSocket = new WebSocket(url);
 
-    this.signalSocket.onopen = () =>
-      this.enqueueEvent({ type: "WEBSOCKET_OPEN" });
-    this.signalSocket.onclose = () =>
+    // WebSocket callbacks must only enqueue events, not carry references which
+    // may become stale.
+    signalSocket.onopen = () => this.enqueueEvent({ type: "WEBSOCKET_OPEN" });
+    signalSocket.onclose = () =>
       this.enqueueEvent({ type: "WEBSOCKET_CLOSE", reason: "closed" });
-    this.signalSocket.onerror = () =>
-      this.enqueueEvent({ type: "WEBSOCKET_ERROR" });
-    this.signalSocket.onmessage = (event) => this.handleSocketMessage(event);
+    signalSocket.onerror = () => this.enqueueEvent({ type: "WEBSOCKET_ERROR" });
+    signalSocket.onmessage = (event) => this.handleSocketMessage(event);
+
+    return signalSocket;
   }
 
   private hasExceededTimeout(since: Instant): boolean {
@@ -426,8 +398,8 @@ export class WebrtcService {
     return duration > this.maxTimeout;
   }
 
-  /** Updates mappings between transceivers and cameras. */
-  private updateStreamMappings(): void {
+  // Updates mappings between transceivers and cameras
+  private updateStreamMappings(socket: WebSocket): void {
     const mappings: Record<string, CameraId> = {};
     for (const [cameraId, transceiver] of this.transceivers) {
       if (transceiver.mid && this.activeCameras.get(cameraId)) {
@@ -435,19 +407,19 @@ export class WebrtcService {
       }
     }
 
-    this.signalSocket.send(JSON.stringify({ kind: "streamMapping", mappings }));
+    socket.send(JSON.stringify({ kind: "streamMapping", mappings }));
   }
 
-  /** Synchronizes transceivers with active cameras. */
-  private syncTracks(activeCameras: CameraId[]): void {
+  // Synchronizes transceivers with active cameras
+  private syncTracks(activeCameras: CameraId[], pc?: RTCPeerConnection): void {
     for (let [id, _val] of this.activeCameras) {
       this.activeCameras.set(id, false);
     }
 
     for (const cameraId of activeCameras) {
       this.activeCameras.set(cameraId, true);
-      if (!this.transceivers.has(cameraId) && this.peerConnection) {
-        const transceiver = this.peerConnection?.addTransceiver("video", {
+      if (!this.transceivers.has(cameraId) && pc) {
+        const transceiver = pc?.addTransceiver("video", {
           direction: "recvonly",
         });
         this.transceivers.set(cameraId, transceiver!);
@@ -455,21 +427,23 @@ export class WebrtcService {
     }
   }
 
-  /** Inititates WebRTC connection */
-  private webrtcConnect() {
-    this.peerConnection = new RTCPeerConnection();
+  // Inititates WebRTC connection
+  private webrtcConnect(socket: WebSocket): RTCPeerConnection {
+    let peerConnection = new RTCPeerConnection();
 
-    this.dataChannel = this.peerConnection.createDataChannel("foo");
-    this.dataChannel.onclose = () => {};
-    this.dataChannel.onopen = () => {};
+    let dataChannel = peerConnection.createDataChannel("foo");
+    dataChannel.onclose = () => {};
+    dataChannel.onopen = () => {};
 
-    this.dataChannel.onmessage = (_) => {};
+    dataChannel.onmessage = (_) => {};
 
-    this.peerConnection.onconnectionstatechange = () => {
-      console.log(
-        `CONNECTION STATE CHANGE: ${this.peerConnection.connectionState}`,
-      );
-      switch (this.peerConnection?.connectionState) {
+    //
+    // RTCPeerConnection callbacks must only enqueue events, not use references
+    // which might become stale.
+    //
+    peerConnection.onconnectionstatechange = () => {
+      console.log(`CONNECTION STATE CHANGE: ${peerConnection.connectionState}`);
+      switch (peerConnection?.connectionState) {
         case "connected":
           this.enqueueEvent({ type: "WEBRTC_CONNECTED" });
           break;
@@ -483,29 +457,28 @@ export class WebrtcService {
       }
     };
 
-    this.peerConnection.oniceconnectionstatechange = (e) => {
+    peerConnection.oniceconnectionstatechange = (e) => {
       console.log(
-        `ICE CONNECTION STATE CHANGE: ${this.peerConnection.iceConnectionState}`,
+        `ICE CONNECTION STATE CHANGE: ${peerConnection.iceConnectionState}`,
       );
 
-      let state = this.peerConnection.iceConnectionState;
+      let state = peerConnection.iceConnectionState;
       if (state === "connected") {
       } else if (state === "disconnected" || state === "failed") {
       }
       //      this.updateState();
     };
 
-    this.peerConnection.onnegotiationneeded = async (_e) => {
-      console.log(`ICE negotiation requested`);
-      this.sendOffer();
+    peerConnection.onnegotiationneeded = async (_e) => {
+      this.enqueueEvent({ type: "NEGOTIATION_NEEDED" });
     };
 
-    this.peerConnection.onicecandidate = (event) => {
+    peerConnection.onicecandidate = (event) => {
       if (event.candidate !== null) {
       }
     };
 
-    this.peerConnection.ontrack = ({ transceiver, streams: [stream] }) => {
+    peerConnection.ontrack = ({ transceiver, streams: [stream] }) => {
       for (const [cameraId, tran] of this.transceivers) {
         if (tran.mid === transceiver.mid) {
           console.log(`FETCHING EMITTER FOR CAMERA ID: ${cameraId}`);
@@ -513,27 +486,29 @@ export class WebrtcService {
         }
       }
     };
+
+    return peerConnection;
   }
 
-  /** Send webrtc offer to server */
-  private async sendOffer() {
+  // Send webrtc offer to server
+  private async sendOffer(socket: WebSocket, pc: RTCPeerConnection) {
     try {
-      let offer = await this.peerConnection.createOffer();
+      let offer = await pc.createOffer();
 
-      await this.peerConnection.setLocalDescription(offer);
+      await pc.setLocalDescription(offer);
 
       let offerMsg = {
         kind: "negotiationRequest",
-        offer: this.peerConnection.localDescription.sdp,
+        offer: pc.localDescription.sdp,
       };
       let offer_string = JSON.stringify(offerMsg);
-      this.signalSocket.send(offer_string);
+      socket.send(offer_string);
     } catch (error) {
       console.log("Error sending offer! " + error);
+      this.enqueueEvent({ type: "NEGOTIATION_FAILED" });
     }
   }
 
-  /** Builds WebSocket url from base.href */
   private constructWebSocketUrl(): string {
     const loc = window.location;
     const basePath = document.querySelector("base")?.getAttribute("href") || "";
@@ -545,43 +520,43 @@ export class WebrtcService {
   private handleSocketMessage(event: MessageEvent): void {
     const message: ServerMessage = JSON.parse(event.data);
     if (message.kind === "negotiationAnswer") {
-      this.handleNegotiationAnswer(message.answer);
+      this.enqueueEvent({ type: "NEGOTIATION_ANSWER", answer: message.answer });
     }
   }
 
-  private async handleNegotiationAnswer(answer: string): Promise<void> {
-    try {
-      await this.peerConnection?.setRemoteDescription({
-        sdp: answer,
-        type: "answer",
-      });
-    } catch (err) {
+  private handleNegotiationAnswer(pc: RTCPeerConnection, answer: string) {
+    pc?.setRemoteDescription({
+      sdp: answer,
+      type: "answer",
+    }).catch((err) => {
       console.error("Failed to handle negotiation answer:", err);
       this.disconnect("message error");
-    }
+    });
   }
 
-  private async disconnect(reason: string) {
+  private disconnect(reason: string) {
     console.log("WebRTC disconnected ( " + reason + " )....!");
+    this.enqueueEvent({ type: "NEGOTIATION_FAILED" });
   }
 
   private cleanupTimeout(timeoutId: TimeoutId) {
     clearTimeout(timeoutId);
   }
 
-  private async cleanup() {
-    if (this.signalSocket) {
-      this.signalSocket.onopen = null;
-      this.signalSocket.onclose = null;
-      this.signalSocket.onerror = null;
-      this.signalSocket.onmessage = null;
-      this.signalSocket.close();
-      this.signalSocket = undefined;
+  private cleanup(signalSocket: WebSocket, pc: RTCPeerConnection) {
+    if (signalSocket) {
+      signalSocket.onopen = null;
+      signalSocket.onclose = null;
+      signalSocket.onerror = null;
+      signalSocket.onmessage = null;
+      signalSocket.close();
     }
-    if (this.peerConnection) {
-      this.peerConnection.close();
-      this.peerConnection = undefined;
-      this.dataChannel = undefined;
+    if (pc) {
+      pc.onconnectionstatechange = null;
+      pc.oniceconnectionstatechange = null;
+      pc.onnegotiationneeded = null;
+      pc.ontrack = null;
+      pc.close();
     }
     this.transceivers.clear();
   }
