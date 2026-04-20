@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.38.0
+2026-04-20
+
+### Features
+
+- Enable ServiceWorker and PWA (2354d97604665df2b9083159f85f24e4e1123361)
+
 ## 0.37.8
 2026-04-20
 
