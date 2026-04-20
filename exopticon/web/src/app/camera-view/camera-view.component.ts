@@ -66,6 +66,7 @@ export class CameraViewComponent implements OnInit {
   @ViewChild("videoElement") videoElement: ElementRef;
 
   public status: string;
+  public muted: boolean = true;
 
   private mediaStream?: MediaStream = undefined;
   private state: CameraViewStatus = { kind: "new" };
@@ -118,6 +119,7 @@ export class CameraViewComponent implements OnInit {
       let video = this.getVideoElement();
       video.srcObject = this.mediaStream;
       video.muted = true;
+      this.muted = true;
       video.autoplay = true;
       //video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
@@ -163,6 +165,12 @@ export class CameraViewComponent implements OnInit {
       //      let video = this.videoElement.nativeElement as HTMLVideoElement;
       //      video.pause();
     }
+  }
+
+  toggleMute() {
+    let muteValue = this.videoElement.nativeElement.muted;
+    this.videoElement.nativeElement.muted = !muteValue;
+    this.muted = !muteValue;
   }
 
   setStatus(_event) {

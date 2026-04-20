@@ -47,11 +47,12 @@ use crate::{
     },
     video_router::VideoRouter,
 };
-use exserial::models::CaptureMessage;
+use exserial::models::{CaptureMessage, PacketEncoding};
 
 #[derive(Clone)]
 pub struct VideoPacket {
     pub camera_id: Uuid,
+    pub encoding: PacketEncoding,
     pub data: Vec<u8>,
     pub timestamp: i64,
     pub duration: i64,
@@ -194,9 +195,16 @@ impl CaptureActor {
         }
         Ok(())
     }
-    async fn handle_packet(&self, data: Vec<u8>, timestamp: i64, duration: i64) {
+    async fn handle_packet(
+        &self,
+        encoding: PacketEncoding,
+        data: Vec<u8>,
+        timestamp: i64,
+        duration: i64,
+    ) {
         let packet = VideoPacket {
             camera_id: self.camera.id,
+            encoding,
             data,
             timestamp,
             duration,
@@ -230,25 +238,14 @@ impl CaptureActor {
                     self.lost_packet_counter.increment(packet_count.into());
                 }
             }
-            CaptureMessage::Frame {
-                jpeg: _,
-                offset: _,
-                unscaled_width: _,
-                unscaled_height: _,
-            }
-            | CaptureMessage::ScaledFrame {
-                jpeg: _,
-                offset: _,
-                unscaled_width: _,
-                unscaled_height: _,
-            } => {}
             CaptureMessage::Packet {
+                encoding,
                 data,
                 timestamp,
                 duration,
             } => {
-                // TODO handle packets...
-                self.handle_packet(data, timestamp, duration).await;
+                self.handle_packet(encoding, data, timestamp, duration)
+                    .await;
             }
             CaptureMessage::NewFile {
                 filename,

@@ -21,7 +21,11 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
   <video #videoElement (play)="setStatus($event)"></video>
 
   @if (selected) {
-    <app-camera-overlay [camera]="camera"></app-camera-overlay>
+    <app-camera-overlay
+      [camera]="camera"
+      [muted]="muted"
+      (muteEvent)="toggleMute()"
+    ></app-camera-overlay>
   }
   @if (status !== "active") {
     <app-camera-status-overlay

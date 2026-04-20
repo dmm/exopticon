@@ -19,6 +19,14 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <div>
   <div class="camera-name">{{ camera.name }}</div>
+  <div
+    (pointerdown)="toggleMute()"
+    (touchstart)="stopPropagation($event)"
+    (touchend)="stopPropagation($event)"
+    class="mute overlay-button"
+  >
+    {{ muted ? "UNMUTE" : "MUTE" }}
+  </div>
   @if (camera.ptzType !== "none") {
     <div class="ptz-overlay">
       <div

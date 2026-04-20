@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
 import { Camera } from "../camera";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
@@ -31,6 +31,10 @@ import { CameraService, PtzDirection } from "../camera.service";
 })
 export class CameraOverlayComponent implements OnInit {
   @Input() camera: Camera;
+  @Input() muted: boolean;
+
+  @Output()
+  muteEvent = new EventEmitter<boolean>();
 
   private directions = PtzDirection;
   private ptzActivated = false;
@@ -46,6 +50,10 @@ export class CameraOverlayComponent implements OnInit {
     event.stopImmediatePropagation();
     event.stopPropagation();
     this.cameraService.ptz(this.camera.id, direction);
+  }
+
+  toggleMute() {
+    this.muteEvent.emit(true);
   }
 
   stopPropagation(event: PointerEvent) {

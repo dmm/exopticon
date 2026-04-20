@@ -51,6 +51,16 @@ type State =
   | { kind: "connected"; socket: WebSocket; pc: RTCPeerConnection }
   | { kind: "reconnecting"; attempt: number; timeoutId: TimeoutId };
 
+interface TransceiverPair {
+  video: RTCRtpTransceiver;
+  audio: RTCRtpTransceiver;
+}
+
+interface MidPair {
+  video: string;
+  audio: string;
+}
+
 @Injectable({
   providedIn: "root",
 })
@@ -59,7 +69,7 @@ export class WebrtcService {
   private eventQueue: WebRtcEvent[] = [];
   private processing = false;
 
-  private transceivers: Map<CameraId, RTCRtpTransceiver> = new Map();
+  private transceivers: Map<CameraId, TransceiverPair> = new Map();
   private emitters: Map<CameraId, ReplaySubject<MediaStream>> = new Map();
   private activeCameras: Map<CameraId, boolean> = new Map();
 
@@ -400,10 +410,17 @@ export class WebrtcService {
 
   // Updates mappings between transceivers and cameras
   private updateStreamMappings(socket: WebSocket): void {
-    const mappings: Record<string, CameraId> = {};
-    for (const [cameraId, transceiver] of this.transceivers) {
-      if (transceiver.mid && this.activeCameras.get(cameraId)) {
-        mappings[transceiver.mid] = cameraId;
+    const mappings: Record<CameraId, MidPair> = {};
+    for (const [cameraId, tPair] of this.transceivers) {
+      if (
+        tPair.video.mid &&
+        tPair.audio.mid &&
+        this.activeCameras.get(cameraId)
+      ) {
+        mappings[cameraId] = {
+          video: tPair.video.mid,
+          audio: tPair.audio.mid,
+        };
       }
     }
 
@@ -419,10 +436,17 @@ export class WebrtcService {
     for (const cameraId of activeCameras) {
       this.activeCameras.set(cameraId, true);
       if (!this.transceivers.has(cameraId) && pc) {
-        const transceiver = pc?.addTransceiver("video", {
+        const videoTransceiver = pc?.addTransceiver("video", {
           direction: "recvonly",
         });
-        this.transceivers.set(cameraId, transceiver!);
+        const audioTransceiver = pc?.addTransceiver("audio", {
+          direction: "recvonly",
+        });
+
+        this.transceivers.set(cameraId, {
+          video: videoTransceiver,
+          audio: audioTransceiver,
+        });
       }
     }
   }
@@ -478,11 +502,27 @@ export class WebrtcService {
       }
     };
 
-    peerConnection.ontrack = ({ transceiver, streams: [stream] }) => {
-      for (const [cameraId, tran] of this.transceivers) {
-        if (tran.mid === transceiver.mid) {
+    peerConnection.ontrack = ({
+      transceiver: newTransceiver,
+      streams: [stream],
+    }) => {
+      for (const [cameraId, tPair] of this.transceivers) {
+        if (
+          tPair.video.mid === newTransceiver.mid ||
+          tPair.audio.mid === newTransceiver.mid
+        ) {
           console.log(`FETCHING EMITTER FOR CAMERA ID: ${cameraId}`);
-          this.emitters.get(cameraId).next(stream);
+          let tracks = new Array();
+          if (tPair.video.receiver.track) {
+            tracks.push(tPair.video.receiver.track);
+          }
+          if (tPair.audio.receiver.track) {
+            tracks.push(tPair.audio.receiver.track);
+          }
+
+          MediaStream;
+          const joinedStream = new MediaStream(tracks);
+          this.emitters.get(cameraId).next(joinedStream);
         }
       }
     };

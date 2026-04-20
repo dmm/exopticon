@@ -586,6 +586,7 @@ fn handle_video_sample(
 
     let mut nal_count = 0;
     let msg = CaptureMessage::Packet {
+        encoding: exserial::models::PacketEncoding::H264,
         data: data.to_owned(),
         timestamp: i64::try_from(pts_90khz).expect("i64 overflow"),
         duration: 100,
@@ -605,8 +606,40 @@ fn handle_video_sample(
 }
 
 fn handle_audio_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowError> {
-    let _sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
-    // yeah we got an audio sample!
+    let sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
+    let sample_caps = sample.caps().expect("failed to get audio sample  caps");
+    let sample_caps_struct = sample_caps
+        .structure(0)
+        .expect("failed to get audio sample caps structure");
+    let sample_type = sample_caps_struct.name();
+
+    // Only u-law PCM is supported right now
+    if sample_type != "audio/x-mulaw" {
+        debug!("Invalid sample encoding \"{}\"", &sample_type);
+        return Ok(gst::FlowSuccess::Ok);
+    }
+
+    let buffer = sample.buffer().expect("failed to get sample buffer");
+    let map = buffer.map_readable().expect("failed to get buffer map");
+    let data = map.as_slice();
+
+    if buffer.pts().is_none() {
+        error!("Buffer without pts despite pad probe — dropping");
+        return Ok(gst::FlowSuccess::Ok);
+    }
+
+    let pts_90khz = buffer
+        .pts()
+        .map(|pts| pts.nseconds() * 90_000 / 1_000_000_000)
+        .expect("failed to get buffer pts");
+
+    let msg = CaptureMessage::Packet {
+        encoding: exserial::models::PacketEncoding::PCMU,
+        data: data.to_owned(),
+        timestamp: i64::try_from(pts_90khz).expect("i64 overflow"),
+        duration: 100,
+    };
+    exserial::print_message(msg);
 
     Ok(gst::FlowSuccess::Ok)
 }

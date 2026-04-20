@@ -26,6 +26,7 @@ use std::{
 };
 
 use axum::extract::ws::{self, WebSocket};
+use exserial::models::PacketEncoding;
 use metrics::gauge;
 use str0m::{
     Candidate, Input, Rtc,
@@ -44,6 +45,13 @@ use crate::{capture_actor::VideoPacket, video_router::VideoRouter};
 
 pub type ClientId = Uuid;
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientMidPair {
+    video: String,
+    audio: String,
+}
+
 /// Messages from client
 #[derive(Deserialize)]
 #[serde(tag = "kind")]
@@ -55,7 +63,9 @@ pub enum ClientMessage {
     NegotiationRequest { offer: String },
     /// Maps camera id to Mid
     #[serde(rename_all = "camelCase")]
-    StreamMapping { mappings: HashMap<String, Uuid> },
+    StreamMapping {
+        mappings: HashMap<Uuid, ClientMidPair>,
+    },
 }
 
 /// Messages from server
@@ -65,6 +75,12 @@ pub enum ClientMessage {
 pub enum ServerMessage {
     #[serde(rename_all = "camelCase")]
     NegotiationAnswer { answer: String },
+}
+
+#[allow(dead_code)]
+pub struct MidPair {
+    video: Mid,
+    audio: Mid,
 }
 
 pub struct Client {
@@ -79,7 +95,7 @@ pub struct Client {
     candidate_ips: Vec<String>,
     candidate_socketaddrs: Vec<SocketAddr>,
     rtc: Rtc,
-    camera_mapping: HashMap<Uuid, Mid>,
+    camera_mapping: HashMap<Uuid, MidPair>,
 }
 
 impl Client {
@@ -97,6 +113,7 @@ impl Client {
             .set_reordering_size_video(500)
             .clear_codecs()
             .enable_h264(true)
+            .enable_pcmu(true)
             .build(Instant::now());
 
         Self {
@@ -206,20 +223,21 @@ impl Client {
             }
             ClientMessage::StreamMapping { mappings } => {
                 self.camera_mapping.clear();
-                for (mid_string, camera_id) in &mappings {
-                    let m: Mid = Mid::from(mid_string.as_str());
-                    self.camera_mapping.insert(*camera_id, m);
+                for (camera_id, mid_pair_string) in &mappings {
+                    let mid_pair = MidPair {
+                        video: Mid::from(mid_pair_string.video.as_str()),
+                        audio: Mid::from(mid_pair_string.audio.as_str()),
+                    };
+                    self.camera_mapping.insert(*camera_id, mid_pair);
                 }
 
-                error!("SENDING UPDATE SUBSCRIPTION!");
                 self.video_router
                     .update_subscriptions(
                         self.id,
-                        mappings.into_values().collect(),
+                        mappings.into_keys().collect(),
                         self.video_sender.clone(),
                     )
                     .await;
-                error!("DOOOOOONE UPDATE SUBSCRIPTION!");
             }
         }
         Ok(())
@@ -257,8 +275,16 @@ impl Client {
     }
 
     fn handle_video(&mut self, msg: VideoPacket) {
-        if let Some(mid) = self.camera_mapping.get(&msg.camera_id) {
-            let Some(writer) = self.rtc.writer(*mid) else {
+        if let Some(mid_pair) = self.camera_mapping.get(&msg.camera_id) {
+            let mid = if msg.encoding == PacketEncoding::H264 {
+                mid_pair.video
+            } else if msg.encoding == PacketEncoding::PCMU {
+                mid_pair.audio
+            } else {
+                return;
+            };
+
+            let Some(writer) = self.rtc.writer(mid) else {
                 return;
             };
             let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
