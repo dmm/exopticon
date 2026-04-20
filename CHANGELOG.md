@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.38.1
+2026-04-20
+
+### Fixes
+
+- Fix ServiceWorker index path (83186c489256bee4b09f0c00046a223bc90a75fc)
+
 ## 0.38.0
 2026-04-20
 
