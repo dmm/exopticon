@@ -1,4 +1,4 @@
-RELEASE_URL=https://gitlab.com/api/v4/projects/6717057/jobs/13983002817/artifacts/release
+RELEASE_URL=https://gitlab.com/api/v4/projects/6717057/jobs/13996241588/artifacts/release
 RELEASE_DESC="x86_64 Linux binary"
-RELEASE_SHA=3ea476c179584eea123a66c374df52accd940734
-RELEASE_VERSION=0.37.7
+RELEASE_SHA=706e5a9666ee11084b069b26d91227c92795cb67
+RELEASE_VERSION=0.37.8

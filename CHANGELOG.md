@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.37.8
+2026-04-20
+
+### Fixes
+
+- **webrtc.service:** Move connection objects into states (761c1441e9b28aa5122cb9ccc16be6ecada0cdc2)
+- Upgrade prettier (706e5a9666ee11084b069b26d91227c92795cb67)
+
 ## 0.37.7
 2026-04-18
 
