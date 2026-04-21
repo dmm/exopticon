@@ -332,6 +332,7 @@ export class WebrtcService {
 
       case "NEGOTIATION_ANSWER":
         this.handleNegotiationAnswer(this.state.pc, event.answer);
+        this.updateStreamMappings(this.state.socket);
         return this.state;
 
       default:
