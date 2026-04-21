@@ -112,6 +112,10 @@ export class WebrtcService {
   // private methods
   //
 
+  private getActiveCameras(): CameraId[] {
+    return [...this.activeCameras].filter(([_, v]) => v).map(([k]) => k);
+  }
+
   private enqueueEvent(event: WebRtcEvent): void {
     this.eventQueue.push(event);
     this.processEvents();
@@ -210,9 +214,7 @@ export class WebrtcService {
       case "WEBSOCKET_OPEN":
         this.cleanupTimeout(this.state.timeoutId);
         const pc = this.webrtcConnect(this.state.socket);
-        const active = [...this.activeCameras]
-          .filter(([_, v]) => v)
-          .map(([k]) => k);
+        const active = this.getActiveCameras();
         this.syncTracks(active, pc);
         return {
           kind: "connecting_webrtc",
@@ -258,9 +260,7 @@ export class WebrtcService {
 
       case "WEBRTC_CONNECTED":
         this.cleanupTimeout(this.state.timeoutId);
-        const active = [...this.activeCameras]
-          .filter(([_, v]) => v)
-          .map(([k]) => k);
+        const active = this.getActiveCameras();
         this.syncTracks(active, this.state.pc);
         this.updateStreamMappings(this.state.socket);
 
@@ -316,11 +316,6 @@ export class WebrtcService {
         // We got a WEBRTC_CONNECTED when we're already in the
         // connected state. This happens when we renegotiate another
         // stream, so update the stream mappings.
-        const map1 = new Map(
-          [...this.activeCameras].filter(([_k, v]) => v === true),
-        );
-        this.syncTracks(Array.from(map1.keys()), this.state.pc);
-
         this.updateStreamMappings(this.state.socket);
         return this.state;
 
@@ -408,7 +403,7 @@ export class WebrtcService {
     return duration > this.maxTimeout;
   }
 
-  // Updates mappings between transceivers and cameras
+  // Updates mappings between transceivers and *active* cameras
   private updateStreamMappings(socket: WebSocket): void {
     const mappings: Record<CameraId, MidPair> = {};
     for (const [cameraId, tPair] of this.transceivers) {
