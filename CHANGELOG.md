@@ -2,6 +2,21 @@
 
 <!--- next entry here -->
 
+## 0.39.0
+2026-04-29
+
+### Features
+
+- Add u-law pcm audio streaming (f83064ca50bbc3ee560e64fc5b8467d9d4368396)
+- Only stream audio when camera is unmuted (ca2b78a04c30491bc8fa09ff2baf3322978e1fe0)
+
+### Fixes
+
+- **camera-view:** hide overlay when camera isn't active (8406e5f15dad252833d5fcb963a3aa418f134e09)
+- Add getActiveCameras() method (af215bc0e0f8684be4fbef0712c2b81c5ab20482)
+- **webrtc.service:** Always update stream mappings after negotiation (2a4065cb0f3bd7409ebd839df88c1ea009b3453f)
+- Switch back to str0m 18.1 (9d576fdada265fc6929681b2204a63a77f414645)
+
 ## 0.38.1
 2026-04-20
 
