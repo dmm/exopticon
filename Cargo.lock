@@ -1933,7 +1933,8 @@ checksum = "187674a687eed5fe42285b40c6291f9a01517d415fad1c3cbc6a9f778af7fcd4"
 [[package]]
 name = "is"
 version = "0.8.0"
-source = "git+https://github.com/dmm/str0m.git?branch=rtx-ssrc-flag#4e4c13be919c978e3275a108d433cc8088ce9bbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40cf23944e1280f3b2959321a1ef776c14503af8e1e5efca32147a9136a5f8dc"
 dependencies = [
  "crc",
  "serde",
@@ -3350,8 +3351,9 @@ dependencies = [
 
 [[package]]
 name = "str0m"
-version = "0.18.0"
-source = "git+https://github.com/dmm/str0m.git?branch=rtx-ssrc-flag#4e4c13be919c978e3275a108d433cc8088ce9bbb"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "853853eafde0493f1928bf8a658ac05d5605ead911643f4cc88432420b8898b5"
 dependencies = [
  "arrayvec",
  "base64ct",
@@ -3371,7 +3373,8 @@ dependencies = [
 [[package]]
 name = "str0m-aws-lc-rs"
 version = "0.3.0"
-source = "git+https://github.com/dmm/str0m.git?branch=rtx-ssrc-flag#4e4c13be919c978e3275a108d433cc8088ce9bbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8417030c160709246a1457b03f322654cdbe5e30bc09f663407da291ed2b5106"
 dependencies = [
  "aws-lc-rs",
  "dimpl",
@@ -3382,7 +3385,8 @@ dependencies = [
 [[package]]
 name = "str0m-proto"
 version = "0.4.0"
-source = "git+https://github.com/dmm/str0m.git?branch=rtx-ssrc-flag#4e4c13be919c978e3275a108d433cc8088ce9bbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "222a6a5a946631a167c1b0282846bfa33b0f8098b8dd565237809735656ed63f"
 dependencies = [
  "base64ct",
  "dimpl",
