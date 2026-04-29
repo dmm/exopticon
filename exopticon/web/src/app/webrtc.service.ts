@@ -32,7 +32,7 @@ type WebRtcEvent =
       stream: MediaStream;
     }
   | { type: "TIMEOUT" }
-  | { type: "UPDATE_CAMERAS"; cameras: CameraId[] };
+  | { type: "UPDATE_CAMERAS"; cameras: Map<CameraId, ActivePair> };
 
 // States
 type State =
@@ -57,8 +57,13 @@ interface TransceiverPair {
 }
 
 interface MidPair {
-  video: string;
-  audio: string;
+  video?: string;
+  audio?: string;
+}
+
+export interface ActivePair {
+  video: boolean;
+  audio: boolean;
 }
 
 @Injectable({
@@ -71,7 +76,7 @@ export class WebrtcService {
 
   private transceivers: Map<CameraId, TransceiverPair> = new Map();
   private emitters: Map<CameraId, ReplaySubject<MediaStream>> = new Map();
-  private activeCameras: Map<CameraId, boolean> = new Map();
+  private activeCameras: Map<CameraId, ActivePair> = new Map();
 
   statusSubject: BehaviorSubject<State> = new BehaviorSubject(this.state);
 
@@ -94,8 +99,8 @@ export class WebrtcService {
     this.enqueueEvent({ type: "DISABLE" });
   }
 
-  updateActiveCameras(activeCameraIds: CameraId[]) {
-    this.enqueueEvent({ type: "UPDATE_CAMERAS", cameras: activeCameraIds });
+  updateActiveCameras(activeCameras: Map<CameraId, ActivePair>) {
+    this.enqueueEvent({ type: "UPDATE_CAMERAS", cameras: activeCameras });
   }
 
   subscribe(cameraId: CameraId): Subject<MediaStream> {
@@ -112,8 +117,10 @@ export class WebrtcService {
   // private methods
   //
 
-  private getActiveCameras(): CameraId[] {
-    return [...this.activeCameras].filter(([_, v]) => v).map(([k]) => k);
+  private getActiveCameras(): Map<CameraId, ActivePair> {
+    return new Map<CameraId, ActivePair>(
+      [...this.activeCameras].filter(([_, v]) => v.audio || v.video),
+    );
   }
 
   private enqueueEvent(event: WebRtcEvent): void {
@@ -408,14 +415,11 @@ export class WebrtcService {
   private updateStreamMappings(socket: WebSocket): void {
     const mappings: Record<CameraId, MidPair> = {};
     for (const [cameraId, tPair] of this.transceivers) {
-      if (
-        tPair.video.mid &&
-        tPair.audio.mid &&
-        this.activeCameras.get(cameraId)
-      ) {
+      let active = this.activeCameras.get(cameraId);
+      if ((tPair.audio || tPair.video) && (active.audio || active.video)) {
         mappings[cameraId] = {
-          video: tPair.video.mid,
-          audio: tPair.audio.mid,
+          video: active.video ? tPair.video.mid : null,
+          audio: active.audio ? tPair.audio.mid : null,
         };
       }
     }
@@ -424,14 +428,20 @@ export class WebrtcService {
   }
 
   // Synchronizes transceivers with active cameras
-  private syncTracks(activeCameras: CameraId[], pc?: RTCPeerConnection): void {
+  private syncTracks(
+    activeCameras: Map<CameraId, ActivePair>,
+    pc?: RTCPeerConnection,
+  ): void {
     for (let [id, _val] of this.activeCameras) {
-      this.activeCameras.set(id, false);
+      this.activeCameras.set(id, { video: false, audio: false });
     }
 
-    for (const cameraId of activeCameras) {
-      this.activeCameras.set(cameraId, true);
-      if (!this.transceivers.has(cameraId) && pc) {
+    for (const camera of activeCameras) {
+      console.log(
+        `SYNCING TRACK: ${camera[0]} video: ${camera[1].video} audio: ${camera[1].audio}`,
+      );
+      this.activeCameras.set(camera[0], camera[1]);
+      if (!this.transceivers.has(camera[0]) && pc) {
         const videoTransceiver = pc?.addTransceiver("video", {
           direction: "recvonly",
         });
@@ -439,7 +449,7 @@ export class WebrtcService {
           direction: "recvonly",
         });
 
-        this.transceivers.set(cameraId, {
+        this.transceivers.set(camera[0], {
           video: videoTransceiver,
           audio: audioTransceiver,
         });

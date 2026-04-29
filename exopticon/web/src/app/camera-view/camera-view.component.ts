@@ -32,6 +32,7 @@ import {
 import { Observable, Subscription } from "rxjs";
 import { Camera } from "../camera";
 import { WebrtcService } from "../webrtc.service";
+import { CameraPanelService } from "../camera-panel.service";
 
 export interface NewState {
   kind: "new";
@@ -75,6 +76,7 @@ export class CameraViewComponent implements OnInit {
   constructor(
     private changeRef: ChangeDetectorRef,
     private webrtcService: WebrtcService,
+    private cameraPanelService: CameraPanelService,
   ) {}
 
   ngOnInit() {
@@ -120,6 +122,7 @@ export class CameraViewComponent implements OnInit {
       video.srcObject = this.mediaStream;
       video.muted = true;
       this.muted = true;
+      this.cameraPanelService.setMute(this.camera.id, this.muted);
       video.autoplay = true;
       //video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
@@ -171,6 +174,7 @@ export class CameraViewComponent implements OnInit {
     let muteValue = this.videoElement.nativeElement.muted;
     this.videoElement.nativeElement.muted = !muteValue;
     this.muted = !muteValue;
+    this.cameraPanelService.setMute(this.camera.id, this.muted);
   }
 
   setStatus(_event) {

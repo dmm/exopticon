@@ -25,12 +25,12 @@ import { Camera, CameraId } from "./camera";
 import { ALL_GROUP_ID, CameraGroup, CameraGroupId } from "./camera-group";
 import { CameraGroupService } from "./camera-group.service";
 import { CameraService, PtzDirection } from "./camera.service";
-import { WebrtcService } from "./webrtc.service";
+import { ActivePair, WebrtcService } from "./webrtc.service";
 
 class PanelCamera {
   camera: Camera;
   inViewport: boolean;
-  enabled: boolean;
+  enabled: ActivePair;
 }
 
 enum SelectionMode {
@@ -84,6 +84,22 @@ export class CameraPanelService {
 
   //
   // End public binding properties
+  //
+
+  //
+  // Public binding handlers
+  //
+  setMute(id: CameraId, muted: boolean) {
+    let p = this.unsortedCameras.get(id);
+    if (p) {
+      p.enabled.audio = !muted;
+      this.unsortedCameras.set(id, p);
+    }
+    this.projectCameras();
+  }
+
+  //
+  // End public event handlers
   //
 
   // Unsorted cameras
@@ -164,7 +180,10 @@ export class CameraPanelService {
             let camera = new PanelCamera();
             camera.camera = c;
             camera.inViewport = false;
-            camera.enabled = true;
+            camera.enabled = {
+              video: true,
+              audio: false,
+            };
             this.unsortedCameras.set(camera.camera.id, camera);
           });
 
@@ -229,17 +248,20 @@ export class CameraPanelService {
     ).slice(0, cameraCount);
 
     // this isn't great...
-    let activeCameraIds: CameraId[] = new Array();
+    let activeCameras = new Map<CameraId, ActivePair>();
     this.cameraDesiredState = this.cameras.map((c) => {
       let p = this.unsortedCameras.get(c.id);
-      let active = p.inViewport && p.enabled && this.pageVisible;
+      let active =
+        p.inViewport &&
+        (p.enabled.video || p.enabled.audio) &&
+        this.pageVisible;
       if (active) {
-        activeCameraIds.push(c.id);
+        activeCameras.set(c.id, p.enabled);
       }
 
       return active;
     });
-    this.webrtcService.updateActiveCameras(activeCameraIds);
+    this.webrtcService.updateActiveCameras(activeCameras);
   }
 
   setRows(rowCount: number) {
@@ -279,6 +301,8 @@ export class CameraPanelService {
   }
 
   // Event Handlers
+  unmute(cameraId: CameraId) {}
+
   touchCamera(cameraId: CameraId) {
     if (this.selectedCameraId !== cameraId) {
       this.selectedCameraId = cameraId;
@@ -290,6 +314,7 @@ export class CameraPanelService {
       this.selectedCameraMode = SelectionMode.Touch;
     }
   }
+
   mouseOver(cameraId: CameraId) {
     if (
       this.selectedCameraId === cameraId &&

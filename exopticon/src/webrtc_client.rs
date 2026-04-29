@@ -48,8 +48,8 @@ pub type ClientId = Uuid;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientMidPair {
-    video: String,
-    audio: String,
+    video: Option<String>,
+    audio: Option<String>,
 }
 
 /// Messages from client
@@ -57,8 +57,6 @@ pub struct ClientMidPair {
 #[serde(tag = "kind")]
 #[serde(rename_all = "camelCase")]
 pub enum ClientMessage {
-    #[serde(rename_all = "camelCase")]
-    SubscriptionUpdate { _subscribed_camera_ids: Vec<Uuid> },
     #[serde(rename_all = "camelCase")]
     NegotiationRequest { offer: String },
     /// Maps camera id to Mid
@@ -79,8 +77,8 @@ pub enum ServerMessage {
 
 #[allow(dead_code)]
 pub struct MidPair {
-    video: Mid,
-    audio: Mid,
+    video: Option<Mid>,
+    audio: Option<Mid>,
 }
 
 pub struct Client {
@@ -183,13 +181,6 @@ impl Client {
         };
 
         match message {
-            ClientMessage::SubscriptionUpdate {
-                _subscribed_camera_ids: _,
-            } => {
-                // NOT USED
-                // TODO REMOVE ME
-                error!("ClientMessage::SubscriptionUpdate, we shouldn't get this...");
-            }
             ClientMessage::NegotiationRequest { offer } => {
                 let spd_offer =
                     SdpOffer::from_sdp_string(&offer).expect("Failed to deserialized sdp offer");
@@ -224,9 +215,18 @@ impl Client {
             ClientMessage::StreamMapping { mappings } => {
                 self.camera_mapping.clear();
                 for (camera_id, mid_pair_string) in &mappings {
+                    let video_mid = mid_pair_string
+                        .video
+                        .as_ref()
+                        .map(|video_mid| Mid::from(video_mid.as_str()));
+                    let audio_mid = mid_pair_string
+                        .audio
+                        .as_ref()
+                        .map(|audio_mid| Mid::from(audio_mid.as_str()));
+
                     let mid_pair = MidPair {
-                        video: Mid::from(mid_pair_string.video.as_str()),
-                        audio: Mid::from(mid_pair_string.audio.as_str()),
+                        video: video_mid,
+                        audio: audio_mid,
                     };
                     self.camera_mapping.insert(*camera_id, mid_pair);
                 }
@@ -275,28 +275,31 @@ impl Client {
     }
 
     fn handle_video(&mut self, msg: VideoPacket) {
-        if let Some(mid_pair) = self.camera_mapping.get(&msg.camera_id) {
-            let mid = if msg.encoding == PacketEncoding::H264 {
-                mid_pair.video
-            } else if msg.encoding == PacketEncoding::PCMU {
-                mid_pair.audio
-            } else {
-                return;
-            };
+        let Some(mid_pair) = self.camera_mapping.get(&msg.camera_id) else {
+            return;
+        };
 
-            let Some(writer) = self.rtc.writer(mid) else {
-                return;
-            };
-            let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
-            let timestamp: u64 = msg.timestamp.try_into().unwrap_or(0);
-            let rtp_time = MediaTime::new(timestamp, Frequency::NINETY_KHZ);
-            // debug!(
-            //     "Writing packet for camera id {} to mid {}, time {}",
-            //     msg.camera_id, mid, msg.timestamp
-            // );
-            if let Err(_e) = writer.write(pt, Instant::now(), rtp_time, msg.data) {
-                error!("Error writing video packet! ");
-            }
+        let maybe_mid = match msg.encoding {
+            PacketEncoding::H264 => mid_pair.video,
+            PacketEncoding::PCMU => mid_pair.audio,
+        };
+
+        let Some(mid) = maybe_mid else {
+            return;
+        };
+
+        let Some(writer) = self.rtc.writer(mid) else {
+            return;
+        };
+        let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
+        let timestamp: u64 = msg.timestamp.try_into().unwrap_or(0);
+        let rtp_time = MediaTime::new(timestamp, Frequency::NINETY_KHZ);
+        // debug!(
+        //     "Writing packet for camera id {} to mid {}, time {}",
+        //     msg.camera_id, mid, msg.timestamp
+        // );
+        if let Err(_e) = writer.write(pt, Instant::now(), rtp_time, msg.data) {
+            error!("Error writing video packet! ");
         }
     }
 
