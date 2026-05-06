@@ -24,12 +24,14 @@ import { Observable, of } from "rxjs";
 import { switchMap } from "rxjs/operators";
 import { Camera } from "../camera";
 import { CameraService } from "../camera.service";
+import { FormsModule } from "@angular/forms";
+import { AsyncPipe } from "@angular/common";
 
 @Component({
   selector: "app-camera-detail",
   templateUrl: "./camera-detail.component.html",
   styleUrls: ["./camera-detail.component.css"],
-  standalone: false,
+  imports: [FormsModule, AsyncPipe],
 })
 export class CameraDetailComponent implements OnInit {
   public camera$: Observable<Camera>;

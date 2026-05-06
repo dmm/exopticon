@@ -8,7 +8,7 @@ describe("CameraGroupDetailComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CameraGroupDetailComponent],
+      imports: [CameraGroupDetailComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CameraGroupDetailComponent);

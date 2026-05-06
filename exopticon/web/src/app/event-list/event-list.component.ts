@@ -25,6 +25,7 @@ import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
 import { Event, EventService } from "../event.service";
 import { User, UserService } from "../user.service";
+import { AsyncPipe } from "@angular/common";
 
 enum EventListState {
   Loading,
@@ -35,7 +36,7 @@ enum EventListState {
   selector: "app-event-list",
   templateUrl: "./event-list.component.html",
   styleUrls: ["./event-list.component.css"],
-  standalone: false,
+  imports: [AsyncPipe],
 })
 export class EventListComponent implements OnInit {
   public eventListState = EventListState;

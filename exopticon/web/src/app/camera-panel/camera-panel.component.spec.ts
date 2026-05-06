@@ -27,7 +27,7 @@ describe("CameraPanelComponent", () => {
 
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
-      declarations: [CameraPanelComponent],
+      imports: [CameraPanelComponent],
     }).compileComponents();
   }));
 

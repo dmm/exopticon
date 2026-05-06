@@ -19,16 +19,17 @@
  */
 
 import { Component, OnInit } from "@angular/core";
-import { Router } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { Observable } from "rxjs";
 import { CameraGroup } from "../camera-group";
 import { CameraGroupService } from "../camera-group.service";
+import { AsyncPipe } from "@angular/common";
 
 @Component({
   selector: "app-camera-group-list",
   templateUrl: "./camera-group-list.component.html",
   styleUrls: ["./camera-group-list.component.css"],
-  standalone: false,
+  imports: [RouterLink, AsyncPipe],
 })
 export class CameraGroupListComponent implements OnInit {
   cameraGroups$: Observable<CameraGroup[]>;

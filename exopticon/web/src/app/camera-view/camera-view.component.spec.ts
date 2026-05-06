@@ -27,7 +27,7 @@ describe("CameraViewComponent", () => {
 
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
-      declarations: [CameraViewComponent],
+      imports: [CameraViewComponent],
     }).compileComponents();
   }));
 

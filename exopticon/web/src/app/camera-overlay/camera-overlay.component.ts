@@ -27,7 +27,6 @@ import { CameraService, PtzDirection } from "../camera.service";
   selector: "app-camera-overlay",
   templateUrl: "./camera-overlay.component.html",
   styleUrls: ["./camera-overlay.component.css"],
-  standalone: false,
 })
 export class CameraOverlayComponent implements OnInit {
   @Input() camera: Camera;

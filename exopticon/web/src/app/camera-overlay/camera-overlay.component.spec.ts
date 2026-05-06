@@ -27,7 +27,7 @@ describe("CameraOverlayComponent", () => {
 
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
-      declarations: [CameraOverlayComponent],
+      imports: [CameraOverlayComponent],
     }).compileComponents();
   }));
 

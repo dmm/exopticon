@@ -30,13 +30,16 @@ import { Camera } from "../camera";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
 import { WebrtcService } from "../webrtc.service";
+import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
+import { CameraViewComponent } from "../camera-view/camera-view.component";
+import { AsyncPipe } from "@angular/common";
 
 @Component({
   selector: "app-camera-panel",
   templateUrl: "./camera-panel.component.html",
   styleUrls: ["./camera-panel.component.css"],
   providers: [CameraPanelService],
-  standalone: false,
+  imports: [IntersectionObserverModule, CameraViewComponent, AsyncPipe],
 })
 export class CameraPanelComponent implements OnInit {
   cameras: Camera[];

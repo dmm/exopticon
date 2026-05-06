@@ -1,5 +1,11 @@
 import { Component, OnInit } from "@angular/core";
-import { FormArray, FormControl, FormGroup } from "@angular/forms";
+import {
+  FormArray,
+  FormControl,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule,
+} from "@angular/forms";
 import { ActivatedRoute, ParamMap, Router } from "@angular/router";
 import { forkJoin, Observable, of, Subscription } from "rxjs";
 import { switchMap } from "rxjs/operators";
@@ -12,7 +18,7 @@ import { CameraService } from "../camera.service";
   selector: "app-camera-group-detail",
   templateUrl: "./camera-group-detail.component.html",
   styleUrls: ["./camera-group-detail.component.css"],
-  standalone: false,
+  imports: [FormsModule, ReactiveFormsModule],
 })
 export class CameraGroupDetailComponent implements OnInit {
   public stuff$: Observable<any>;

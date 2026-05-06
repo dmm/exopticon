@@ -33,6 +33,8 @@ import { Observable, Subscription } from "rxjs";
 import { Camera } from "../camera";
 import { WebrtcService } from "../webrtc.service";
 import { CameraPanelService } from "../camera-panel.service";
+import { CameraOverlayComponent } from "../camera-overlay/camera-overlay.component";
+import { CameraStatusOverlayComponent } from "../camera-status-overlay/camera-status-overlay.component";
 
 export interface NewState {
   kind: "new";
@@ -53,7 +55,7 @@ type CameraViewStatus = NewState | ConnectingState | PlayingState;
   selector: "app-camera-view",
   templateUrl: "./camera-view.component.html",
   styleUrls: ["./camera-view.component.css"],
-  standalone: false,
+  imports: [CameraOverlayComponent, CameraStatusOverlayComponent],
 })
 export class CameraViewComponent implements OnInit {
   @Input() camera: Camera;

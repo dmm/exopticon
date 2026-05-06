@@ -19,7 +19,12 @@
  */
 
 import { Component, OnInit } from "@angular/core";
-import { FormControl, FormGroup } from "@angular/forms";
+import {
+  FormControl,
+  FormGroup,
+  FormsModule,
+  ReactiveFormsModule,
+} from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { combineLatest } from "rxjs";
 import { map } from "rxjs/operators";
@@ -29,7 +34,7 @@ import { AuthService } from "../auth.service";
   selector: "app-login",
   templateUrl: "./login.component.html",
   styleUrls: ["./login.component.css"],
-  standalone: false,
+  imports: [FormsModule, ReactiveFormsModule],
 })
 export class LoginComponent implements OnInit {
   loginForm = new FormGroup({

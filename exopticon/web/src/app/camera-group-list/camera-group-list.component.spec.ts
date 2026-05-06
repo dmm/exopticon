@@ -8,7 +8,7 @@ describe("CameraGroupListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CameraGroupListComponent],
+      imports: [CameraGroupListComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CameraGroupListComponent);

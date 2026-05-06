@@ -23,12 +23,14 @@ import { Router } from "@angular/router";
 import { LocalDate } from "@js-joda/core";
 import { Observable } from "rxjs";
 import { Token, TokenService } from "../token.service";
+import { FormsModule } from "@angular/forms";
+import { AsyncPipe } from "@angular/common";
 
 @Component({
   selector: "app-token-list",
   templateUrl: "./token-list.component.html",
   styleUrls: ["./token-list.component.css"],
-  standalone: false,
+  imports: [FormsModule, AsyncPipe],
 })
 export class TokenListComponent implements OnInit {
   tokenName: string;

@@ -48,20 +48,7 @@ import { TokenListComponent } from "./token-list/token-list.component";
 import { TokenService } from "./token.service";
 
 @NgModule({
-  declarations: [
-    AppComponent,
-    CameraPanelComponent,
-    CameraViewComponent,
-    CameraOverlayComponent,
-    CameraStatusOverlayComponent,
-    LoginComponent,
-    CameraListComponent,
-    CameraDetailComponent,
-    EventListComponent,
-    TokenListComponent,
-    CameraGroupListComponent,
-    CameraGroupDetailComponent,
-  ],
+  declarations: [AppComponent],
   bootstrap: [AppComponent],
   imports: [
     BrowserModule,
@@ -73,6 +60,17 @@ import { TokenService } from "./token.service";
       enabled: !isDevMode(),
       registrationStrategy: "registerImmediately",
     }),
+    CameraPanelComponent,
+    CameraViewComponent,
+    CameraOverlayComponent,
+    CameraStatusOverlayComponent,
+    LoginComponent,
+    CameraListComponent,
+    CameraDetailComponent,
+    EventListComponent,
+    TokenListComponent,
+    CameraGroupListComponent,
+    CameraGroupDetailComponent,
   ],
   providers: [
     { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },

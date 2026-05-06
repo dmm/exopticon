@@ -27,7 +27,7 @@ describe("CameraDetailComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CameraDetailComponent],
+      imports: [CameraDetailComponent],
     }).compileComponents();
   });
 

@@ -22,12 +22,14 @@ import { Component, OnInit } from "@angular/core";
 import { Observable } from "rxjs";
 import { Camera } from "../camera";
 import { CameraService } from "../camera.service";
+import { RouterLink } from "@angular/router";
+import { AsyncPipe } from "@angular/common";
 
 @Component({
   selector: "app-camera-list",
   templateUrl: "./camera-list.component.html",
   styleUrls: ["./camera-list.component.css"],
-  standalone: false,
+  imports: [RouterLink, AsyncPipe],
 })
 export class CameraListComponent implements OnInit {
   cameras$: Observable<Camera[]>;

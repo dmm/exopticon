@@ -26,7 +26,7 @@ describe("CameraListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CameraListComponent],
+      imports: [CameraListComponent],
     }).compileComponents();
   });
 

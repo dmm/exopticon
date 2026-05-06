@@ -27,7 +27,7 @@ describe("TokenListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [TokenListComponent],
+      imports: [TokenListComponent],
     }).compileComponents();
   });
 
