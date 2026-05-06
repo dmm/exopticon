@@ -18,9 +18,15 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 import { Component } from "@angular/core";
-import { ActivatedRoute, Router } from "@angular/router";
+import {
+  ActivatedRoute,
+  Router,
+  RouterLink,
+  RouterOutlet,
+} from "@angular/router";
 import { Observable } from "rxjs";
 import { AuthService } from "./auth.service";
+import { AsyncPipe } from "@angular/common";
 
 export enum MenuState {
   None,
@@ -32,7 +38,7 @@ export enum MenuState {
   selector: "app-root",
   templateUrl: "./app.component.html",
   styleUrls: ["./app.component.css"],
-  standalone: false,
+  imports: [RouterLink, RouterOutlet, AsyncPipe],
 })
 export class AppComponent {
   public menuStates = MenuState;
