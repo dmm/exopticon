@@ -2,6 +2,18 @@
 
 <!--- next entry here -->
 
+## 0.40.0
+2026-05-06
+
+### Features
+
+- Add webrtc codecs component (e64b3f2f9534b9e51537a35c0f295cafd08d5e51)
+
+### Fixes
+
+- convert components to standalone (f9b3318dff5af11e246c87c4d7713bf2d92687ce)
+- Switch to `bootstrapApplication` and remove AppModule (222c16cace6fa8bc681c9e8799109f23df5b2d57)
+
 ## 0.39.0
 2026-04-29
 
