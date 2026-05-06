@@ -1,0 +1,51 @@
+<div class="codecs-container">
+  <h2>WebRTC Receive Codecs</h2>
+
+  <div *ngIf="!supported" class="error">
+    Your browser does not support RTCRtpReceiver.getCapabilities()
+  </div>
+
+  <div *ngIf="supported">
+    <section>
+      <h3>Audio Codecs ({{ audioCodecs.length }})</h3>
+      <table *ngIf="audioCodecs.length > 0">
+        <thead>
+          <tr>
+            <th>MIME Type</th>
+            <th>Clock Rate (Hz)</th>
+            <th>Channels</th>
+            <th>SDP Fmtp Line</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let codec of audioCodecs">
+            <td>{{ codec.mimeType }}</td>
+            <td>{{ codec.clockRate }}</td>
+            <td>{{ codec.channels ?? "—" }}</td>
+            <td class="fmtp">{{ codec.sdpFmtpLine ?? "—" }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h3>Video Codecs ({{ videoCodecs.length }})</h3>
+      <table *ngIf="videoCodecs.length > 0">
+        <thead>
+          <tr>
+            <th>MIME Type</th>
+            <th>Clock Rate (Hz)</th>
+            <th>SDP Fmtp Line</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let codec of videoCodecs">
+            <td>{{ codec.mimeType }}</td>
+            <td>{{ codec.clockRate }}</td>
+            <td class="fmtp">{{ codec.sdpFmtpLine ?? "—" }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>

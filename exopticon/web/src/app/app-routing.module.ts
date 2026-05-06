@@ -28,6 +28,7 @@ import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { EventListComponent } from "./event-list/event-list.component";
 import { LoginComponent } from "./login/login.component";
 import { TokenListComponent } from "./token-list/token-list.component";
+import { WebrtcCodecsComponent } from "./webrtc-codecs/webrtc-codecs.component";
 
 const routes: Routes = [
   { path: "login", component: LoginComponent },
@@ -37,6 +38,7 @@ const routes: Routes = [
   { path: "camera_groups", component: CameraGroupListComponent },
   { path: "camera_groups/new", component: CameraGroupDetailComponent },
   { path: "camera_groups/:id", component: CameraGroupDetailComponent },
+  { path: "webrtc_codecs", component: WebrtcCodecsComponent },
   { path: "events", component: EventListComponent },
   { path: "tokens", component: TokenListComponent },
   { path: "", redirectTo: "/camera_panel", pathMatch: "full" },

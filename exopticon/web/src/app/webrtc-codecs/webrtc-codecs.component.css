@@ -1,0 +1,53 @@
+.codecs-container {
+  font-family: Arial, sans-serif;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h2 {
+  border-bottom: 2px solid;
+  padding-bottom: 10px;
+}
+
+h3 {
+  margin-top: 24px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid;
+}
+
+th {
+}
+
+tr:nth-child(even) {
+}
+
+tr:hover {
+  background-color: #8888;
+}
+
+.fmtp {
+  font-family: monospace;
+  font-size: 0.85em;
+  max-width: 300px;
+  word-break: break-all;
+}
+
+.error {
+  color: #d32f2f;
+  background: #fdecea;
+  padding: 16px;
+  border-radius: 4px;
+  margin-top: 16px;
+}
