@@ -189,9 +189,9 @@ pub async fn ptz_relative_move(
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
         .route("/", axum::routing::get(fetch_all))
-        .route("/:name", axum::routing::get(fetch))
+        .route("/{name}", axum::routing::get(fetch))
         .route(
-            "/:name/ptz/:direction",
+            "/{name}/ptz/{direction}",
             axum::routing::post(ptz_relative_move),
         )
 }

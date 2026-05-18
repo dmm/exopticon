@@ -67,5 +67,5 @@ pub async fn fetch_all(
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
         .route("/", axum::routing::get(fetch_all))
-        .route("/:name", axum::routing::get(fetch))
+        .route("/{name}", axum::routing::get(fetch))
 }
