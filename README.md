@@ -63,7 +63,14 @@ docker exec -it exopticon_exopticon_1 /exopticon/exopticon --add-user
 
 1. Follow steps 1 & 2 & 3 from the Installation instructions
 
-2. Call docker compose to start the dev environment.
+2. Create a local config file and call docker compose to start the dev environment.
+
+```bash
+cp docker/exopticon.example.toml docker/exopticon.toml
+```
+
+Edit `docker/exopticon.toml` for your local cameras, storage path, and user
+password hashes. This file is ignored by git.
 
 ### Build dev environment
 ```bash

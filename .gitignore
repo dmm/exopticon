@@ -7,3 +7,4 @@
 
 /testdata
 /docker/.env.dev
+/docker/exopticon.toml

@@ -1,0 +1,67 @@
+# Example Exopticon declarative configuration.
+#
+# For local development:
+#
+#   cp docker/exopticon.example.toml docker/exopticon.toml
+#
+# Then edit docker/exopticon.toml with your real camera URLs, credentials,
+# storage path, and bcrypt user password hashes. docker/exopticon.toml is
+# intentionally ignored by git.
+#
+# Names are stable config identities and must be kebab-case. Display names are
+# optional and can contain spaces.
+
+[[storage-groups]]
+name = "default"
+display-name = "Default Storage"
+path = "/video"
+max-storage-space = 107374182400
+
+[[cameras]]
+name = "front-porch"
+display-name = "Front Porch"
+storage-group = "default"
+ip = "192.0.2.10"
+onvif-port = 80
+mac = "00-11-22-33-44-55"
+username = "camera-user"
+password = "replace-me"
+rtsp-url = "rtsp://camera-user:replace-me@192.0.2.10:554/live0"
+ptz-type = "none"
+ptz-profile-token = ""
+enabled = false
+ptz-step-size-x = 10
+ptz-step-size-y = 10
+
+[[cameras]]
+name = "garage"
+display-name = "Garage"
+storage-group = "default"
+ip = "192.0.2.11"
+onvif-port = 80
+mac = "00-11-22-33-44-66"
+username = "camera-user"
+password = "replace-me"
+rtsp-url = "rtsp://camera-user:replace-me@192.0.2.11:554/live0"
+ptz-type = "onvif_continuous"
+ptz-profile-token = "replace-me"
+enabled = false
+ptz-step-size-x = 10
+ptz-step-size-y = 10
+
+[[camera-groups]]
+name = "outside"
+display-name = "Outside"
+members = ["front-porch", "garage"]
+
+[[camera-groups]]
+name = "all"
+display-name = "All Cameras"
+members = ["front-porch", "garage"]
+
+[[users]]
+username = "admin"
+display-name = "Admin"
+# Replace this with a bcrypt hash for your real local password.
+# This example hash is syntactically valid and should not be used in production.
+password-hash = "$2b$12$abcdefghijklmnopqrstuu5sDoo7w6PDtgfC5WbJg6Yt4RxKsKQyK"
