@@ -20,5 +20,9 @@
 <div class="container">
   <div class="status-message">
     <span>{{ name }}: </span><span class="status">{{ status }}</span>
+    <div class="codec-row">
+      <span>Video: {{ videoCodec ?? "n/a" }}</span>
+      <span>Audio: {{ audioCodec ?? "n/a" }}</span>
+    </div>
   </div>
 </div>

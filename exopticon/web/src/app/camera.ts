@@ -45,7 +45,8 @@ export interface CameraStatus {
   active: boolean;
   lastStartedAt?: string;
   lastPacketAt?: string;
-  codec?: string;
+  videoCodec?: string;
+  audioCodec?: string;
   averageBitrate?: number;
   errorMessage?: string;
 }

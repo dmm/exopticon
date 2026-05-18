@@ -28,6 +28,8 @@ import { Component, Input, OnInit } from "@angular/core";
 export class CameraStatusOverlayComponent implements OnInit {
   @Input() status: string;
   @Input() name: string;
+  @Input() videoCodec?: string;
+  @Input() audioCodec?: string;
 
   constructor() {}
 

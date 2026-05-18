@@ -27,6 +27,10 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         <dd>{{ camera.metadata.name }}</dd>
         <dt>Status</dt>
         <dd>{{ camera.status.phase }}</dd>
+        <dt>Video Codec</dt>
+        <dd>{{ camera.status.videoCodec ?? "n/a" }}</dd>
+        <dt>Audio Codec</dt>
+        <dd>{{ camera.status.audioCodec ?? "n/a" }}</dd>
         <dt>Storage Group</dt>
         <dd>{{ camera.spec.storageGroupName }}</dd>
         <dt>IP</dt>

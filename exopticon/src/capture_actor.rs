@@ -23,6 +23,7 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
+    time::{Duration, Instant},
 };
 
 use bytes::BytesMut;
@@ -50,6 +51,8 @@ use crate::{
     video_router::VideoRouter,
 };
 use exserial::models::{CaptureMessage, PacketEncoding};
+
+const PACKET_STATUS_UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub struct VideoPacket {
@@ -90,6 +93,9 @@ pub struct CaptureActor {
     camera_status_registry: CameraStatusRegistry,
     /// counter to track lost packets
     lost_packet_counter: Counter,
+    video_codec: Option<String>,
+    audio_codec: Option<String>,
+    last_packet_status_update_at: Option<Instant>,
 }
 
 impl CaptureActor {
@@ -113,6 +119,9 @@ impl CaptureActor {
             video_router,
             camera_status_registry,
             lost_packet_counter: counter!("lost_packet_count", "camera_name" => camera_name),
+            video_codec: None,
+            audio_codec: None,
+            last_packet_status_update_at: None,
         }
     }
 
@@ -199,8 +208,52 @@ impl CaptureActor {
         }
         Ok(())
     }
+    async fn update_packet_status(&mut self, encoding: &PacketEncoding) {
+        let codec = encoding.codec_name();
+        let codec_changed = match encoding {
+            PacketEncoding::H264 => self.video_codec.as_deref() != Some(codec),
+            PacketEncoding::PCMU => self.audio_codec.as_deref() != Some(codec),
+        };
+
+        match encoding {
+            PacketEncoding::H264 => self.video_codec = Some(codec.to_string()),
+            PacketEncoding::PCMU => self.audio_codec = Some(codec.to_string()),
+        }
+
+        let now = Instant::now();
+        let should_update = codec_changed
+            || match self.last_packet_status_update_at {
+                Some(last_update) => last_update.elapsed() >= PACKET_STATUS_UPDATE_INTERVAL,
+                None => true,
+            };
+        if !should_update {
+            return;
+        }
+
+        let last_packet_at = Utc::now();
+        let mut statuses = self.camera_status_registry.write().await;
+        let (last_started_at, average_bitrate) = statuses
+            .get(&self.camera.name)
+            .map(|status| (status.last_started_at, status.average_bitrate))
+            .unwrap_or((None, None));
+        statuses.insert(
+            self.camera.name.clone(),
+            CameraStatus {
+                phase: "running".to_string(),
+                active: true,
+                last_started_at,
+                last_packet_at: Some(last_packet_at),
+                video_codec: self.video_codec.clone(),
+                audio_codec: self.audio_codec.clone(),
+                average_bitrate,
+                error_message: None,
+            },
+        );
+        self.last_packet_status_update_at = Some(now);
+    }
+
     async fn handle_packet(
-        &self,
+        &mut self,
         encoding: PacketEncoding,
         data: Vec<u8>,
         timestamp: i64,
@@ -213,24 +266,7 @@ impl CaptureActor {
             timestamp,
             duration,
         };
-        self.camera_status_registry.write().await.insert(
-            self.camera.name.clone(),
-            CameraStatus {
-                phase: "running".to_string(),
-                active: true,
-                last_started_at: None,
-                last_packet_at: Some(Utc::now()),
-                codec: Some(
-                    match packet.encoding {
-                        PacketEncoding::H264 => "h264",
-                        PacketEncoding::PCMU => "pcmu",
-                    }
-                    .to_string(),
-                ),
-                average_bitrate: None,
-                error_message: None,
-            },
-        );
+        self.update_packet_status(&packet.encoding).await;
         self.video_router.send_video(packet).await;
     }
 
@@ -370,7 +406,8 @@ impl CaptureActor {
                     active: false,
                     last_started_at: None,
                     last_packet_at: None,
-                    codec: None,
+                    video_codec: self.video_codec.clone(),
+                    audio_codec: self.audio_codec.clone(),
                     average_bitrate: None,
                     error_message: Some("capture actor exited after error".to_string()),
                 }
@@ -380,7 +417,8 @@ impl CaptureActor {
                     active: false,
                     last_started_at: None,
                     last_packet_at: None,
-                    codec: None,
+                    video_codec: self.video_codec.clone(),
+                    audio_codec: self.audio_codec.clone(),
                     average_bitrate: None,
                     error_message: None,
                 }

@@ -54,7 +54,8 @@ pub struct CameraStatus {
     pub active: bool,
     pub last_started_at: Option<chrono::DateTime<chrono::Utc>>,
     pub last_packet_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub codec: Option<String>,
+    pub video_codec: Option<String>,
+    pub audio_codec: Option<String>,
     pub average_bitrate: Option<i64>,
     pub error_message: Option<String>,
 }
@@ -66,7 +67,8 @@ impl CameraStatus {
             active: false,
             last_started_at: None,
             last_packet_at: None,
-            codec: None,
+            video_codec: None,
+            audio_codec: None,
             average_bitrate: None,
             error_message: None,
         }
@@ -78,7 +80,8 @@ impl CameraStatus {
             active: true,
             last_started_at: Some(chrono::Utc::now()),
             last_packet_at: None,
-            codec: None,
+            video_codec: None,
+            audio_codec: None,
             average_bitrate: None,
             error_message: None,
         }

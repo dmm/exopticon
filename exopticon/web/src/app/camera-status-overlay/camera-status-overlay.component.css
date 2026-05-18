@@ -38,6 +38,14 @@ div.status-message {
   border: 3px dashed green;
 }
 
+div.codec-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 16px;
+}
+
 span {
   background: black;
   padding: 5px 10px 5px 10px;

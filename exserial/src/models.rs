@@ -54,6 +54,15 @@ pub enum PacketEncoding {
     PCMU,
 }
 
+impl PacketEncoding {
+    pub fn codec_name(&self) -> &'static str {
+        match self {
+            Self::H264 => "h264",
+            Self::PCMU => "pcmu",
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 /// Message from captureworker
 pub enum CaptureMessage {

@@ -56,7 +56,8 @@ impl From<Camera> for crate::api::cameras::Camera {
                 active: false,
                 last_started_at: None,
                 last_packet_at: None,
-                codec: None,
+                video_codec: None,
+                audio_codec: None,
                 average_bitrate: None,
                 error_message: None,
             }
