@@ -208,7 +208,7 @@ impl Client {
                 .unwrap();
 
                 self.websocket
-                    .send(ws::Message::Text(answer_text))
+                    .send(ws::Message::Text(answer_text.into()))
                     .await
                     .unwrap();
             }

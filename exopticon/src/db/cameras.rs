@@ -18,7 +18,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::dsl::max;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use uuid::Uuid;
 
@@ -202,7 +201,7 @@ impl Service {
 
                 let max_order: i32 = camera_group_memberships::table
                     .filter(camera_group_memberships::camera_id.eq(ALL_GROUP_ID))
-                    .select(max(camera_group_memberships::display_order))
+                    .select(diesel::dsl::max(camera_group_memberships::display_order))
                     .first(conn)
                     .optional()?
                     .unwrap_or(None)

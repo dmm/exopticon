@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, dsl::sum};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use uuid::Uuid;
 
 use crate::{
@@ -183,7 +183,7 @@ impl super::Service {
             .first::<i64>(&mut conn)?;
 
         let storage_group_size = video_files
-            .select(sum(size))
+            .select(diesel::dsl::sum(size))
             .inner_join(video_units.inner_join(cameras))
             .filter(storage_group_id.eq(sid))
             .filter(size.ne(-1))
