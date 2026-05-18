@@ -31,7 +31,6 @@ use metrics::gauge;
 use str0m::{
     Candidate, Input, Rtc,
     change::SdpOffer,
-    format::PayloadParams,
     media::{Frequency, MediaTime, Mid},
     net::Protocol,
 };
@@ -62,7 +61,7 @@ pub enum ClientMessage {
     /// Maps camera id to Mid
     #[serde(rename_all = "camelCase")]
     StreamMapping {
-        mappings: HashMap<Uuid, ClientMidPair>,
+        mappings: HashMap<String, ClientMidPair>,
     },
 }
 
@@ -93,7 +92,7 @@ pub struct Client {
     candidate_ips: Vec<String>,
     candidate_socketaddrs: Vec<SocketAddr>,
     rtc: Rtc,
-    camera_mapping: HashMap<Uuid, MidPair>,
+    camera_mapping: HashMap<String, MidPair>,
 }
 
 impl Client {
@@ -214,7 +213,7 @@ impl Client {
             }
             ClientMessage::StreamMapping { mappings } => {
                 self.camera_mapping.clear();
-                for (camera_id, mid_pair_string) in &mappings {
+                for (camera_name, mid_pair_string) in &mappings {
                     let video_mid = mid_pair_string
                         .video
                         .as_ref()
@@ -228,7 +227,7 @@ impl Client {
                         video: video_mid,
                         audio: audio_mid,
                     };
-                    self.camera_mapping.insert(*camera_id, mid_pair);
+                    self.camera_mapping.insert(camera_name.clone(), mid_pair);
                 }
 
                 self.video_router
@@ -275,7 +274,7 @@ impl Client {
     }
 
     fn handle_video(&mut self, msg: VideoPacket) {
-        let Some(mid_pair) = self.camera_mapping.get(&msg.camera_id) else {
+        let Some(mid_pair) = self.camera_mapping.get(&msg.camera_name) else {
             return;
         };
 
@@ -291,7 +290,7 @@ impl Client {
         let Some(writer) = self.rtc.writer(mid) else {
             return;
         };
-        let pt = writer.payload_params().collect::<Vec<&PayloadParams>>()[0].pt();
+        let pt = writer.payload_params().next().unwrap().pt();
         let timestamp: u64 = msg.timestamp.try_into().unwrap_or(0);
         let rtp_time = MediaTime::new(timestamp, Frequency::NINETY_KHZ);
         // debug!(

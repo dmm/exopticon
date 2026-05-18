@@ -27,11 +27,11 @@ use futures::stream::FuturesUnordered;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::task::{JoinError, spawn_blocking};
-use uuid::Uuid;
 
-use crate::api::cameras::Camera;
+use crate::api::cameras::CameraStatus;
 use crate::capture_actor;
 use crate::video_router::VideoRouter;
+use crate::{CameraStatusRegistry, db::cameras::Camera};
 
 pub enum Command {
     RestartAll,
@@ -48,27 +48,33 @@ enum State {
 pub struct CaptureSupervisor {
     state: State,
     db: crate::db::Service,
-    stopped_camera_ids: Vec<Uuid>,
+    stopped_camera_names: Vec<String>,
     command_sender: mpsc::Sender<Command>,
     command_receiver: mpsc::Receiver<Command>,
-    capture_channels: HashMap<Uuid, mpsc::Sender<capture_actor::Command>>,
-    capture_handles: FuturesUnordered<JoinHandle<Uuid>>,
+    capture_channels: HashMap<String, mpsc::Sender<capture_actor::Command>>,
+    capture_handles: FuturesUnordered<JoinHandle<String>>,
     video_router: Arc<VideoRouter>,
+    camera_status_registry: CameraStatusRegistry,
 }
 
 impl CaptureSupervisor {
-    pub fn new(db: crate::db::Service, video_router: Arc<VideoRouter>) -> Self {
+    pub fn new(
+        db: crate::db::Service,
+        video_router: Arc<VideoRouter>,
+        camera_status_registry: CameraStatusRegistry,
+    ) -> Self {
         let (command_sender, command_receiver) = mpsc::channel(1);
 
         Self {
             state: State::Ready,
             db,
-            stopped_camera_ids: Vec::new(),
+            stopped_camera_names: Vec::new(),
             command_sender,
             command_receiver,
             capture_channels: HashMap::new(),
             capture_handles: FuturesUnordered::new(),
             video_router,
+            camera_status_registry,
         }
     }
 
@@ -90,9 +96,10 @@ impl CaptureSupervisor {
 
     async fn start_camera(&mut self, c: Camera) -> anyhow::Result<()> {
         let db = self.db.clone();
+        let storage_group_name = c.storage_group_name.clone();
         let storage_group =
-            spawn_blocking(move || db.fetch_storage_group(c.common.storage_group_id)).await??;
-        let id = c.id;
+            spawn_blocking(move || db.fetch_storage_group(&storage_group_name)).await??;
+        let name = c.name.clone();
         let (command_sender, command_receiver) = mpsc::channel(1);
         let actor = capture_actor::CaptureActor::new(
             self.db.clone(),
@@ -100,26 +107,37 @@ impl CaptureSupervisor {
             storage_group,
             command_receiver,
             self.video_router.clone(),
+            self.camera_status_registry.clone(),
         );
-        self.capture_channels.insert(id, command_sender);
+        self.camera_status_registry
+            .write()
+            .await
+            .insert(name.clone(), CameraStatus::starting());
+        self.capture_channels.insert(name, command_sender);
         let fut = tokio::spawn(actor.run());
         self.capture_handles.push(fut);
         Ok(())
     }
 
-    async fn start_cameras(&mut self, camera_id: Option<Uuid>) -> anyhow::Result<()> {
+    async fn start_cameras(&mut self, camera_name: Option<String>) -> anyhow::Result<()> {
         info!("Starting capture actors...");
         // fetch cameras
         let db = self.db.clone();
 
-        let mut cameras: Vec<Camera> = spawn_blocking(move || db.fetch_all_cameras())
-            .await??
-            .into_iter()
-            .filter(|c| c.common.enabled)
-            .collect();
+        let all_cameras: Vec<Camera> = spawn_blocking(move || db.fetch_all_camera_rows()).await??;
+        {
+            let mut statuses = self.camera_status_registry.write().await;
+            for camera in &all_cameras {
+                if !camera.enabled {
+                    statuses.insert(camera.name.clone(), CameraStatus::disabled());
+                }
+            }
+        }
 
-        if let Some(id) = camera_id {
-            cameras.retain(|c| c.id == id);
+        let mut cameras: Vec<Camera> = all_cameras.into_iter().filter(|c| c.enabled).collect();
+
+        if let Some(name) = camera_name {
+            cameras.retain(|c| c.name == name);
         }
 
         for c in cameras {
@@ -139,15 +157,15 @@ impl CaptureSupervisor {
         }
     }
 
-    fn handle_camera_event(&mut self, res: &Result<Uuid, JoinError>) {
+    fn handle_camera_event(&mut self, res: &Result<String, JoinError>) {
         match self.state {
             State::Running => {
-                if let Ok(id) = res {
+                if let Ok(name) = res {
                     error!(
-                        "Capture task died but we're supposed to be running. camera id {}",
-                        id
+                        "Capture task died but we're supposed to be running. camera name {}",
+                        name
                     );
-                    self.stopped_camera_ids.push(*id);
+                    self.stopped_camera_names.push(name.clone());
                 } else {
                     error!("Capture task died, restart all cameras..");
                     self.state = State::Restarting;
@@ -179,13 +197,13 @@ impl CaptureSupervisor {
                 // everything is fine
 
                 // check for stopped cameras
-                for id in self.stopped_camera_ids.clone() {
-                    if let Err(e) = self.start_cameras(Some(id)).await {
-                        error!("error restarting camera {}, {}. restarting all.", id, e);
+                for name in self.stopped_camera_names.clone() {
+                    if let Err(e) = self.start_cameras(Some(name.clone())).await {
+                        error!("error restarting camera {}, {}. restarting all.", name, e);
                         self.state = State::Restarting;
                     }
                 }
-                self.stopped_camera_ids.clear();
+                self.stopped_camera_names.clear();
             }
             State::Restarting => {
                 if let Err(e) = self.stop_cameras().await {

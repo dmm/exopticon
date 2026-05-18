@@ -21,6 +21,7 @@
 pub mod auth;
 pub mod camera_groups;
 pub mod cameras;
+pub mod config;
 pub mod storage_groups;
 pub mod video_units;
 

@@ -43,6 +43,7 @@
 #![allow(clippy::future_not_send)]
 #![allow(clippy::wildcard_imports)] // TODO: Fix DB handlers
 #![allow(clippy::uninlined_format_args)]
+#![allow(clippy::too_many_lines)]
 
 #[macro_use]
 extern crate diesel;
@@ -53,9 +54,6 @@ extern crate log;
 
 /// Api Application implementation
 mod api;
-
-/// implements business logic
-mod business;
 
 /// Implements database infrastructure
 mod db;
@@ -91,6 +89,7 @@ use capture_supervisor::Command;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenv::dotenv;
 use tokio::net::UdpSocket;
+use tokio::sync::RwLock;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
@@ -98,6 +97,7 @@ use tracing_subscriber::{EnvFilter, Layer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use video_router::VideoRouter;
 
+use std::collections::HashMap;
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -110,6 +110,8 @@ static DEFAULT_BUFFER_SIZE: usize = 2_097_152;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
 
+pub type CameraStatusRegistry = Arc<RwLock<HashMap<String, cameras::CameraStatus>>>;
+
 #[derive(Clone)]
 pub struct AppState {
     pub candidate_ips: Vec<String>,
@@ -118,6 +120,7 @@ pub struct AppState {
     pub db_service: crate::db::Service,
     pub capture_channel: mpsc::Sender<Command>,
     pub video_router: Arc<VideoRouter>,
+    pub camera_status_registry: CameraStatusRegistry,
 }
 
 fn parse_candidate_ips() -> Vec<String> {
@@ -187,6 +190,15 @@ async fn main() {
         .run_pending_migrations(MIGRATIONS)
         .expect("migrations failed");
 
+    let config_path = env::var(crate::config::CONFIG_PATH_ENV)
+        .unwrap_or_else(|_| crate::config::DEFAULT_CONFIG_PATH.to_string());
+    info!("Loading config from {config_path}");
+    let config =
+        crate::config::ValidatedConfig::load_from_path(&config_path).expect("config failed");
+    db_service
+        .apply_config(&config)
+        .expect("failed to apply config to database");
+
     let buffer_size: usize = env::var("EXOPTICON_WEBRTC_BUFFER_SIZE")
         .unwrap_or_default()
         .parse()
@@ -226,8 +238,12 @@ async fn main() {
 
     // Start capture supervisor
     let video_router = Arc::new(VideoRouter::new());
-    let capture_supervisor =
-        capture_supervisor::CaptureSupervisor::new(db_service.clone(), video_router.clone());
+    let camera_status_registry: CameraStatusRegistry = Arc::new(RwLock::new(HashMap::new()));
+    let capture_supervisor = capture_supervisor::CaptureSupervisor::new(
+        db_service.clone(),
+        video_router.clone(),
+        camera_status_registry.clone(),
+    );
     let capture_channel = capture_supervisor.get_command_channel();
 
     let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone());
@@ -239,6 +255,7 @@ async fn main() {
         db_service,
         capture_channel,
         video_router,
+        camera_status_registry,
     };
 
     // TODO: watch this future for exit...

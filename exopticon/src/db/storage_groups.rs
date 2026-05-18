@@ -19,9 +19,9 @@
  */
 
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
 
 use crate::{
+    api::{ResourceMetadata, storage_groups::StorageGroupSpec},
     db::{
         cameras::Camera,
         video_units::{VideoFile, VideoUnit},
@@ -29,69 +29,32 @@ use crate::{
     schema::storage_groups,
 };
 
-/// Full storage group model. Represents a full row returned from the
-/// database.
-#[derive(Identifiable, PartialEq, Eq, Debug, Queryable, Insertable)]
+#[derive(Identifiable, PartialEq, Eq, Debug, Queryable, Insertable, Clone)]
+#[diesel(primary_key(name))]
 #[diesel(table_name = storage_groups)]
 pub struct StorageGroup {
-    /// storage group id
-    pub id: Uuid,
-    /// storage group name
     pub name: String,
-    /// full path to video storage path, e.g. /mnt/video/8/
+    pub display_name: String,
     pub storage_path: String,
-    /// maximum allowed storage size in bytes
     pub max_storage_size: i64,
 }
 
 impl From<StorageGroup> for crate::api::storage_groups::StorageGroup {
     fn from(g: StorageGroup) -> Self {
         Self {
-            id: g.id,
-            name: g.name,
-            storage_path: g.storage_path,
-            max_storage_size: g.max_storage_size,
+            metadata: ResourceMetadata {
+                name: g.name,
+                display_name: g.display_name,
+            },
+            spec: StorageGroupSpec {
+                storage_path: g.storage_path,
+                max_storage_size: g.max_storage_size,
+            },
+            status: serde_json::json!({}),
         }
     }
 }
 
-/// Full storage group model. Represents a full row returned from the
-/// database.
-#[derive(PartialEq, Eq, Debug, Queryable, Insertable)]
-#[diesel(table_name = storage_groups)]
-pub struct CreateStorageGroup {
-    /// storage group name
-    pub name: String,
-    /// full path to video storage path, e.g. /mnt/video/8/
-    pub storage_path: String,
-    /// maximum allowed storage size in bytes
-    pub max_storage_size: i64,
-}
-
-/// Represents a storage group update request
-#[derive(AsChangeset, Debug)]
-#[diesel(table_name = storage_groups)]
-pub struct UpdateStorageGroup {
-    /// if provided, updated name for storage group
-    pub name: Option<String>,
-    /// if provided, updated storage path for storage group
-    pub storage_path: Option<String>,
-    /// if provided, updated storage size for storage group
-    pub max_storage_size: Option<i64>,
-}
-
-impl From<crate::api::storage_groups::UpdateStorageGroup> for UpdateStorageGroup {
-    fn from(g: crate::api::storage_groups::UpdateStorageGroup) -> Self {
-        Self {
-            name: g.name,
-            storage_path: g.storage_path,
-            max_storage_size: g.max_storage_size,
-        }
-    }
-}
-
-/// Represents the current state of storage group, with a snapshot of
-/// older video units
 pub struct StorageGroupOldFiles {
     pub storage_group_capacity: i64,
     pub storage_group_size: i64,
@@ -99,49 +62,15 @@ pub struct StorageGroupOldFiles {
 }
 
 impl super::Service {
-    pub fn create_storage_group(
-        &self,
-        group: crate::api::storage_groups::CreateStorageGroup,
-    ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
-        use crate::schema::storage_groups::dsl;
-        let mut conn = self.pool.get()?;
-
-        let new_storage_group: StorageGroup = diesel::insert_into(storage_groups::table)
-            .values((
-                dsl::name.eq(group.name),
-                dsl::storage_path.eq(group.storage_path),
-                dsl::max_storage_size.eq(group.max_storage_size),
-            ))
-            .get_result(&mut conn)?;
-
-        Ok(new_storage_group.into())
-    }
-
-    pub fn update_storage_group(
-        &self,
-        id: Uuid,
-        group: crate::api::storage_groups::UpdateStorageGroup,
-    ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
-        use crate::schema::storage_groups::dsl;
-        let mut conn = self.pool.get()?;
-
-        let updated_storage_group: StorageGroup =
-            diesel::update(dsl::storage_groups.filter(dsl::id.eq(id)))
-                .set::<UpdateStorageGroup>(group.into())
-                .get_result(&mut conn)?;
-
-        Ok(updated_storage_group.into())
-    }
-
     pub fn fetch_storage_group(
         &self,
-        id: Uuid,
+        storage_group_name: &str,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
         use crate::schema::storage_groups::dsl;
         let mut conn = self.pool.get()?;
 
         let group = dsl::storage_groups
-            .find(id)
+            .find(storage_group_name)
             .get_result::<StorageGroup>(&mut conn)?;
 
         Ok(group.into())
@@ -158,44 +87,34 @@ impl super::Service {
         Ok(groups.into_iter().map(std::convert::Into::into).collect())
     }
 
-    pub fn delete_storage_group(&self, sid: Uuid) -> Result<(), super::Error> {
-        use crate::schema::storage_groups::dsl::*;
-        let mut conn = self.pool.get()?;
-
-        diesel::delete(storage_groups.filter(id.eq(sid))).execute(&mut conn)?;
-        Ok(())
-    }
-
     pub fn fetch_storage_group_old_units(
         &self,
-        sid: Uuid,
+        storage_group_name: &str,
         count: i64,
     ) -> Result<StorageGroupOldFiles, super::Error> {
-        use crate::schema::cameras::dsl::*;
-        use crate::schema::video_files::dsl::*;
-        use crate::schema::video_units::dsl::*;
+        use crate::schema::{cameras, video_files, video_units};
 
         let mut conn = self.pool.get()?;
 
         let storage_group_capacity = storage_groups::dsl::storage_groups
             .select(storage_groups::max_storage_size)
-            .filter(storage_groups::columns::id.eq(sid))
+            .filter(storage_groups::columns::name.eq(storage_group_name))
             .first::<i64>(&mut conn)?;
 
-        let storage_group_size = video_files
-            .select(diesel::dsl::sum(size))
-            .inner_join(video_units.inner_join(cameras))
-            .filter(storage_group_id.eq(sid))
-            .filter(size.ne(-1))
+        let storage_group_size = video_files::table
+            .select(diesel::dsl::sum(video_files::size))
+            .inner_join(video_units::table.inner_join(cameras::table))
+            .filter(cameras::storage_group_name.eq(storage_group_name))
+            .filter(video_files::size.ne(-1))
             .first::<Option<i64>>(&mut conn)?
             .unwrap_or(0);
 
-        let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras
-            .inner_join(video_units.inner_join(video_files))
-            .filter(storage_group_id.eq(sid))
-            .filter(size.gt(-1))
-            .filter(begin_time.ne(end_time))
-            .order(begin_time.asc())
+        let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras::table
+            .inner_join(video_units::table.inner_join(video_files::table))
+            .filter(cameras::storage_group_name.eq(storage_group_name))
+            .filter(video_files::size.gt(-1))
+            .filter(video_units::begin_time.ne(video_units::end_time))
+            .order(video_units::begin_time.asc())
             .limit(count)
             .load(&mut conn)?;
 

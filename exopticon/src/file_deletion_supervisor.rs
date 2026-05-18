@@ -42,8 +42,12 @@ impl FileDeletionSupervisor {
             spawn_blocking(move || db.fetch_all_storage_groups()).await??;
         // start deletion actors
         for s in storage_groups {
-            debug!("Starting deletion actor for storage id {}", s.id);
-            let actor = file_deletion_actor::FileDeletionActor::new(s.id, self.db.clone());
+            debug!(
+                "Starting deletion actor for storage group {}",
+                s.metadata.name
+            );
+            let actor =
+                file_deletion_actor::FileDeletionActor::new(s.metadata.name, self.db.clone());
 
             let fut = tokio::spawn(actor.run());
             self.delete_handles.push(fut);

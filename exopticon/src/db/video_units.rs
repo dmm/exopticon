@@ -22,21 +22,19 @@ use chrono::{DateTime, Utc};
 use diesel::{BelongingToDsl, Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use uuid::Uuid;
 
-use crate::db::cameras::Camera;
 use crate::schema::{video_files, video_units};
 
 use super::Service;
 
 /// Full video unit model, represents entire database row
-#[derive(Identifiable, Insertable, Associations, Serialize, Queryable, Clone)]
+#[derive(Identifiable, Insertable, Serialize, Queryable, Clone)]
 #[serde(rename_all = "camelCase")]
-#[diesel(belongs_to(Camera))]
 #[diesel(table_name = video_units)]
 pub struct VideoUnit {
     /// id of video unit
     pub id: Uuid,
-    /// id of associated camera
-    pub camera_id: Uuid,
+    /// name of associated camera
+    pub camera_name: String,
     /// begin time in UTC
     pub begin_time: DateTime<Utc>,
     /// end time in UTC
@@ -47,7 +45,7 @@ impl From<VideoUnit> for crate::api::video_units::VideoUnit {
     fn from(v: VideoUnit) -> Self {
         Self {
             id: v.id,
-            camera_id: v.camera_id,
+            camera_name: v.camera_name,
             begin_time: v.begin_time,
             end_time: v.end_time,
         }
@@ -61,8 +59,8 @@ impl From<VideoUnit> for crate::api::video_units::VideoUnit {
 pub struct CreateVideoUnit {
     /// id of video unit
     pub id: Uuid,
-    /// id of associated camera
-    pub camera_id: Uuid,
+    /// name of associated camera
+    pub camera_name: String,
     /// begin time in UTC
     pub begin_time: DateTime<Utc>,
     /// end time in UTC
@@ -76,8 +74,8 @@ pub struct CreateVideoUnit {
 pub struct UpdateVideoUnit {
     /// id of video unit to update
     pub id: Uuid,
-    /// if present, new associated camera id
-    pub camera_id: Option<Uuid>,
+    /// if present, new associated camera name
+    pub camera_name: Option<String>,
     /// if present, new begin time, in UTC
     pub begin_time: Option<DateTime<Utc>>,
     /// if present, new end time, in UTC
@@ -156,7 +154,7 @@ impl Service {
             let video_unit = diesel::insert_into(video_units::dsl::video_units)
                 .values(VideoUnit {
                     id: Uuid::now_v7(),
-                    camera_id: video_unit.camera_id,
+                    camera_name: video_unit.camera_name.clone(),
                     begin_time: video_unit.begin_time,
                     end_time: video_unit.end_time,
                 })
@@ -196,7 +194,7 @@ impl Service {
             )
             .set(UpdateVideoUnit {
                 id: video_unit_id,
-                camera_id: None,
+                camera_name: None,
                 begin_time: None,
                 end_time: Some(end_time),
             })
@@ -223,7 +221,7 @@ impl Service {
     // Fetch between video unit
     pub fn fetch_video_units_between(
         &self,
-        camera_id: Uuid,
+        camera_name: &str,
         begin_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<Vec<VideoSegment>, super::Error> {
@@ -231,7 +229,7 @@ impl Service {
         let res = conn.transaction::<_, super::Error, _>(|conn| {
             use crate::schema::video_units::dsl;
             let vus: Vec<VideoUnit> = dsl::video_units
-                .filter(dsl::camera_id.eq(camera_id))
+                .filter(dsl::camera_name.eq(camera_name))
                 .filter(dsl::begin_time.le(end_time))
                 .filter(dsl::end_time.ge(begin_time))
                 .order(dsl::begin_time.asc())

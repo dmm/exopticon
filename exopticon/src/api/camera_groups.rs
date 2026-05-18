@@ -23,69 +23,33 @@ use axum::{
     extract::{Path, State},
     routing::get,
 };
+use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
-use uuid::Uuid;
 
 use crate::AppState;
 
-use super::UserError;
+use super::{ResourceMetadata, UserError};
 
-// Route Models
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraGroupSpec {
+    pub members: Vec<String>,
+}
 
-/// `CameraGroup` api resource
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CameraGroup {
-    pub id: Uuid,
-    pub name: String,
-    pub members: Vec<Uuid>,
-}
-
-/// Request to create new `CameraGroup`
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateCameraGroup {
-    pub name: String,
-    pub members: Vec<Uuid>,
-}
-
-// Routes
-
-pub async fn create(
-    State(state): State<AppState>,
-    Json(camera_group_request): Json<CreateCameraGroup>,
-) -> Result<Json<CameraGroup>, UserError> {
-    let db = state.db_service;
-    let req = camera_group_request;
-    let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
-    let camera_group = spawn_blocking(move || db.create_camera_group(&camera_group)).await??;
-    Ok(Json(camera_group))
-}
-
-pub async fn update(
-    State(state): State<AppState>,
-    Json(camera_group_request): Json<CameraGroup>,
-) -> Result<Json<CameraGroup>, UserError> {
-    let db = state.db_service;
-    let req = camera_group_request;
-    let camera_group = crate::business::camera_groups::CameraGroup::new(&req.name, req.members)?;
-    let camera_group =
-        spawn_blocking(move || db.update_camera_group(req.id, camera_group)).await??;
-    Ok(Json(camera_group))
-}
-
-pub async fn delete(id: Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
-    let db = state.db_service;
-    spawn_blocking(move || db.delete_camera_group(id.0)).await??;
-    Ok(())
+    pub metadata: ResourceMetadata,
+    pub spec: CameraGroupSpec,
+    pub status: serde_json::Value,
 }
 
 pub async fn fetch(
-    id: Path<Uuid>,
+    Path(name): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<CameraGroup>, UserError> {
     let db = state.db_service;
-    let camera_group = spawn_blocking(move || db.fetch_camera_group(id.0)).await??;
+    let camera_group = spawn_blocking(move || db.fetch_camera_group(&name)).await??;
     Ok(Json(camera_group))
 }
 
@@ -97,9 +61,6 @@ pub async fn fetch_all(State(state): State<AppState>) -> Result<Json<Vec<CameraG
 
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/", get(fetch_all).post(create))
-        .route("/:id", get(fetch).post(update).delete(delete))
+        .route("/", get(fetch_all))
+        .route("/:name", get(fetch))
 }
-
-#[cfg(test)]
-mod tests {}

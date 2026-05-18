@@ -40,18 +40,20 @@ use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
 use uuid::Uuid;
 
 use crate::{
+    CameraStatusRegistry,
     api::{
-        cameras::Camera,
+        cameras::CameraStatus,
         storage_groups::StorageGroup,
         video_units::{CreateVideoFile, CreateVideoUnit},
     },
+    db::cameras::Camera,
     video_router::VideoRouter,
 };
 use exserial::models::{CaptureMessage, PacketEncoding};
 
 #[derive(Clone)]
 pub struct VideoPacket {
-    pub camera_id: Uuid,
+    pub camera_name: String,
     pub encoding: PacketEncoding,
     pub data: Vec<u8>,
     pub timestamp: i64,
@@ -85,6 +87,7 @@ pub struct CaptureActor {
     video_router: Arc<VideoRouter>,
     /// Supervisor command channel
     command_receiver: mpsc::Receiver<Command>,
+    camera_status_registry: CameraStatusRegistry,
     /// counter to track lost packets
     lost_packet_counter: Counter,
 }
@@ -96,9 +99,9 @@ impl CaptureActor {
         storage_group: StorageGroup,
         command_receiver: mpsc::Receiver<Command>,
         video_router: Arc<VideoRouter>,
+        camera_status_registry: CameraStatusRegistry,
     ) -> Self {
-        let camera_name = camera.common.name.clone();
-        let camera_id = camera.id;
+        let camera_name = camera.name.clone();
         Self {
             state: State::Ready,
             db,
@@ -108,17 +111,18 @@ impl CaptureActor {
             video_segment_id: None,
             command_receiver,
             video_router,
-            lost_packet_counter: counter!("lost_packet_count", "camera_id" => camera_id.to_string(), "camera_name" => camera_name),
+            camera_status_registry,
+            lost_packet_counter: counter!("lost_packet_count", "camera_name" => camera_name),
         }
     }
 
     fn start_worker(&mut self) {
         debug!(
             "Starting worker process for camera: {}, id: {}, stream: {}",
-            self.camera.common.name, self.camera.id, self.camera.common.rtsp_url
+            self.camera.name, self.camera.name, self.camera.rtsp_url
         );
         let storage_path =
-            Path::new(&self.storage_group.storage_path).join(self.camera.id.to_string());
+            Path::new(&self.storage_group.spec.storage_path).join(self.camera.name.clone());
         if std::fs::create_dir(&storage_path).is_err() {
             // The error returned by create_dir has no information so
             // we can't really distinguish between failure
@@ -131,7 +135,7 @@ impl CaptureActor {
         let hwaccel_method =
             env::var("EXOPTICON_HWACCEL_METHOD").unwrap_or_else(|_| "none".to_string());
         let mut cmd = process::Command::new(executable_path);
-        cmd.arg(&self.camera.common.rtsp_url);
+        cmd.arg(&self.camera.rtsp_url);
         cmd.arg(&storage_path);
         cmd.arg(hwaccel_method);
         cmd.stdout(Stdio::piped());
@@ -158,7 +162,7 @@ impl CaptureActor {
         let date = begin_time.parse::<DateTime<Utc>>().expect("Parse failure!");
 
         let create_video_unit = CreateVideoUnit {
-            camera_id: self.camera.id,
+            camera_name: self.camera.name.clone(),
             begin_time: date,
             end_time: date,
             id: new_video_unit_id,
@@ -203,12 +207,30 @@ impl CaptureActor {
         duration: i64,
     ) {
         let packet = VideoPacket {
-            camera_id: self.camera.id,
+            camera_name: self.camera.name.clone(),
             encoding,
             data,
             timestamp,
             duration,
         };
+        self.camera_status_registry.write().await.insert(
+            self.camera.name.clone(),
+            CameraStatus {
+                phase: "running".to_string(),
+                active: true,
+                last_started_at: None,
+                last_packet_at: Some(Utc::now()),
+                codec: Some(
+                    match packet.encoding {
+                        PacketEncoding::H264 => "h264",
+                        PacketEncoding::PCMU => "pcmu",
+                    }
+                    .to_string(),
+                ),
+                average_bitrate: None,
+                error_message: None,
+            },
+        );
         self.video_router.send_video(packet).await;
     }
 
@@ -229,8 +251,8 @@ impl CaptureActor {
                 log!(
                     level,
                     "capture worker {} {} log: {}",
-                    self.camera.id,
-                    self.camera.common.name,
+                    self.camera.name,
+                    self.camera.name,
                     &message
                 );
 
@@ -287,13 +309,13 @@ impl CaptureActor {
                     _ = child.wait() => {
                         info!(
                             "Capture process for {} {} died. Restarting...",
-                            self.camera.id, self.camera.common.name,
+                            self.camera.name, self.camera.name,
                         );
                         return Ok(false);
                     }
                     Some(Command::Stop) = self.command_receiver.recv() => {
                         info!("Received stop command for {} {}.",
-                              self.camera.id, self.camera.common.name,
+                              self.camera.name, self.camera.name,
                         );
                         return Ok(false)
                     }
@@ -312,7 +334,8 @@ impl CaptureActor {
         Ok(true)
     }
 
-    pub async fn run(mut self) -> Uuid {
+    pub async fn run(mut self) -> String {
+        let mut had_error = false;
         loop {
             if self.state == State::Ready {
                 self.start_worker();
@@ -323,6 +346,7 @@ impl CaptureActor {
                 Ok(false) => break,
                 Err(e) => {
                     error!("Error {}", e);
+                    had_error = true;
                     break;
                 }
             }
@@ -338,6 +362,30 @@ impl CaptureActor {
                 error!("error waiting for child exit: {}", e);
             }
         }
-        self.camera.id
+        self.camera_status_registry.write().await.insert(
+            self.camera.name.clone(),
+            if had_error {
+                CameraStatus {
+                    phase: "error".to_string(),
+                    active: false,
+                    last_started_at: None,
+                    last_packet_at: None,
+                    codec: None,
+                    average_bitrate: None,
+                    error_message: Some("capture actor exited after error".to_string()),
+                }
+            } else {
+                CameraStatus {
+                    phase: "stopped".to_string(),
+                    active: false,
+                    last_started_at: None,
+                    last_packet_at: None,
+                    codec: None,
+                    average_bitrate: None,
+                    error_message: None,
+                }
+            },
+        );
+        self.camera.name
     }
 }

@@ -24,6 +24,7 @@ use std::{
 };
 
 use axum::{http::StatusCode, response::IntoResponse};
+use serde::{Deserialize, Serialize};
 use tokio::task::JoinError;
 
 use crate::capture_supervisor::Command;
@@ -36,6 +37,13 @@ pub mod static_files;
 pub mod storage_groups;
 pub mod video_units;
 pub mod webrtc;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceMetadata {
+    pub name: String,
+    pub display_name: String,
+}
 
 /// Error to be presented to api user
 #[derive(Debug)]
@@ -87,14 +95,6 @@ impl From<crate::db::Error> for UserError {
 impl From<JoinError> for UserError {
     fn from(err: JoinError) -> Self {
         Self::InternalError(format!("JoinError: {err}"))
-    }
-}
-
-impl From<crate::business::Error> for UserError {
-    fn from(err: crate::business::Error) -> Self {
-        match err {
-            crate::business::Error::Validation(message) => Self::Validation(message),
-        }
     }
 }
 

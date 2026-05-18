@@ -28,44 +28,33 @@ use crate::{
 
 use super::Service;
 
-/// Full user model struct, represents full value from database.
 #[derive(Queryable, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[diesel(primary_key(username))]
 #[diesel(table_name = users)]
 pub struct User {
-    /// user id
-    pub id: Uuid,
-    ///  username
     pub username: String,
-    /// hashed password
+    pub display_name: String,
     pub password: String,
 }
 
 impl From<User> for crate::api::auth::User {
     fn from(user: User) -> Self {
         Self {
-            id: user.id,
             username: user.username,
+            display_name: user.display_name,
         }
     }
 }
 
-/// User login session or token
-#[derive(Associations, Insertable, Serialize, Queryable, Clone)]
-#[diesel(belongs_to(User))]
+#[derive(Insertable, Serialize, Queryable, Clone)]
 #[diesel(table_name = user_sessions)]
 pub struct UserSession {
-    /// user session id
     pub id: Uuid,
-    /// user session name
     pub name: String,
-    /// id of user associated with session
-    pub user_id: Uuid,
-    /// session key value
+    pub user_name: String,
     pub session_key: String,
-    /// flag indicating where it is an api token or user session
     pub is_token: bool,
-    /// Expiration timestamp
     pub expiration: DateTime<Utc>,
 }
 
@@ -74,7 +63,7 @@ impl From<UserSession> for SlimAccessToken {
         Self {
             id: u.id,
             name: u.name,
-            user_id: u.user_id,
+            user_name: u.user_name,
             expiration: u.expiration,
         }
     }
@@ -98,19 +87,8 @@ impl Service {
         {
             return Ok(u.into());
         }
-        error!("Validation faild :(");
+        error!("Validation failed :(");
         Err(super::Error::NotFound)
-    }
-
-    pub fn fetch_user(&self, user_id: Uuid) -> Result<crate::api::auth::User, super::Error> {
-        use crate::schema::users::dsl;
-
-        let mut conn = self.pool.get()?;
-        let u = dsl::users
-            .filter(dsl::id.eq(user_id))
-            .first::<User>(&mut conn)?;
-
-        Ok(u.into())
     }
 
     pub fn create_user_session(
@@ -125,7 +103,7 @@ impl Service {
             .values((
                 dsl::id.eq(Uuid::now_v7()),
                 dsl::name.eq(&session.name),
-                dsl::user_id.eq(&session.user_id),
+                dsl::user_name.eq(&session.user_name),
                 dsl::session_key.eq(&session.session_key),
                 dsl::is_token.eq(&session.is_token),
                 dsl::expiration.eq(&session.expiration),
@@ -149,7 +127,6 @@ impl Service {
         use crate::schema::user_sessions::dsl::*;
         let mut conn = self.pool.get()?;
 
-        // remove expired sessions
         diesel::delete(user_sessions.filter(expiration.lt(Utc::now()))).execute(&mut conn)?;
         let session = user_sessions
             .filter(session_key.eq(&session_key_text))
@@ -157,18 +134,21 @@ impl Service {
             .first::<UserSession>(&mut conn)?;
 
         let user = crate::schema::users::dsl::users
-            .filter(crate::schema::users::dsl::id.eq(session.user_id))
+            .filter(crate::schema::users::dsl::username.eq(session.user_name))
             .first::<User>(&mut conn)?;
 
         Ok(user.into())
     }
 
-    pub fn fetch_users_tokens(&self, user_id2: Uuid) -> Result<Vec<SlimAccessToken>, super::Error> {
+    pub fn fetch_users_tokens(
+        &self,
+        user_name2: &str,
+    ) -> Result<Vec<SlimAccessToken>, super::Error> {
         use crate::schema::user_sessions::dsl::*;
         let mut conn = self.pool.get()?;
 
         let sessions = user_sessions
-            .filter(user_id.eq(user_id2))
+            .filter(user_name.eq(user_name2))
             .filter(is_token.eq(true))
             .load::<UserSession>(&mut conn)?;
         Ok(sessions.into_iter().map(std::convert::Into::into).collect())

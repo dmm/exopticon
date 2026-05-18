@@ -22,93 +22,35 @@ use axum::{
     Json, Router,
     extract::{Path, State},
 };
+use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
-use uuid::Uuid;
 
 use crate::AppState;
 
-use super::UserError;
+use super::{ResourceMetadata, UserError};
 
-/// Public `StorageGroup` model
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageGroupSpec {
+    pub storage_path: String,
+    pub max_storage_size: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageGroup {
-    /// storage group id
-    pub id: Uuid,
-    /// storage group name
-    pub name: String,
-    /// full path to video storage path, e.g. /mnt/video/8/
-    pub storage_path: String,
-    /// maximum allowed storage size in bytes
-    pub max_storage_size: i64,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateStorageGroup {
-    /// storage group name
-    pub name: String,
-    /// full path to video storage path, e.g. /mnt/video/8/
-    pub storage_path: String,
-    /// maximum allowed storage size in bytes
-    pub max_storage_size: i64,
-}
-
-/// Represents a request to update fields of a `StorageGroup`
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateStorageGroup {
-    /// storage group id
-    pub id: Uuid,
-    /// storage group name
-    pub name: Option<String>,
-    /// full path to video storage path, e.g. /mnt/video/8/
-    pub storage_path: Option<String>,
-    /// maximum allowed storage size in bytes
-    pub max_storage_size: Option<i64>,
-}
-
-// Routes
-
-pub async fn create(
-    State(state): State<AppState>,
-    Json(storage_group_request): Json<CreateStorageGroup>,
-) -> Result<Json<StorageGroup>, UserError> {
-    let db = state.db_service;
-    let storage_group =
-        spawn_blocking(move || db.create_storage_group(storage_group_request)).await??;
-
-    Ok(Json(storage_group))
-}
-
-pub async fn update(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    Json(update_request): Json<UpdateStorageGroup>,
-) -> Result<Json<StorageGroup>, UserError> {
-    let db = state.db_service;
-
-    let updated_group =
-        spawn_blocking(move || db.update_storage_group(id, update_request)).await??;
-
-    Ok(Json(updated_group))
-}
-
-pub async fn delete(Path(id): Path<Uuid>, State(state): State<AppState>) -> Result<(), UserError> {
-    let db = state.db_service;
-
-    spawn_blocking(move || db.delete_storage_group(id)).await??;
-
-    Ok(())
+    pub metadata: ResourceMetadata,
+    pub spec: StorageGroupSpec,
+    pub status: serde_json::Value,
 }
 
 pub async fn fetch(
-    Path(id): Path<Uuid>,
+    Path(name): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<StorageGroup>, UserError> {
     let db = state.db_service;
 
-    let storage_group = spawn_blocking(move || db.fetch_storage_group(id)).await??;
+    let storage_group = spawn_blocking(move || db.fetch_storage_group(&name)).await??;
 
     Ok(Json(storage_group))
 }
@@ -124,9 +66,6 @@ pub async fn fetch_all(
 
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/", axum::routing::get(fetch_all).post(create))
-        .route(
-            "/:id",
-            axum::routing::get(fetch).post(update).delete(delete),
-        )
+        .route("/", axum::routing::get(fetch_all))
+        .route("/:name", axum::routing::get(fetch))
 }

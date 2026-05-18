@@ -18,247 +18,105 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
+use diesel::{QueryDsl, RunQueryDsl};
 
-use crate::db::storage_groups::StorageGroup;
-use crate::schema::{camera_group_memberships, cameras};
+use crate::{
+    api::{
+        ResourceMetadata,
+        cameras::{CameraSpec, CameraStatus},
+    },
+    schema::cameras,
+};
 
-use super::Service;
-use super::camera_groups::ALL_GROUP_ID;
-
-/// Full camera model, represents database row
-#[derive(Identifiable, PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
-#[diesel(belongs_to(StorageGroup))]
+#[derive(Identifiable, PartialEq, Eq, Debug, Queryable, Insertable, Clone)]
+#[diesel(primary_key(name))]
 #[diesel(table_name = cameras)]
 pub struct Camera {
-    /// id of camera
-    pub id: Uuid,
-    /// id of associated storage group
-    pub storage_group_id: Uuid,
-    /// name of camera
     pub name: String,
-    /// ip address associated with camera, e.g. 192.168.0.53
+    pub display_name: String,
+    pub storage_group_name: String,
     pub ip: String,
-    /// port used for ONVIF protocol
     pub onvif_port: i32,
-    /// MAC address of camera, e.g. 9C-84-AE-0E-33-5A
     pub mac: String,
-    /// username for ONVIF and RTSP authentication
     pub username: String,
-    /// plaintext password for ONVIF and RTSP authentication
     pub password: String,
-    /// url for rtsp stream
     pub rtsp_url: String,
-    /// ptz type, either `onvif` or `onvif_continuous`
     pub ptz_type: String,
-    /// ONVIF profile token for ptz
     pub ptz_profile_token: String,
-    /// whether camera capture is enabled.
     pub enabled: bool,
-    /// ptz x step size, in hundredths
     pub ptz_x_step_size: i16,
-    /// ptz y step size, in hundredths
     pub ptz_y_step_size: i16,
 }
 
-#[derive(PartialEq, Eq, Associations, Debug, Queryable, Insertable)]
-#[diesel(belongs_to(StorageGroup))]
-#[diesel(table_name = cameras)]
-pub struct CreateCamera {
-    /// id of associated storage group
-    pub storage_group_id: Uuid,
-    /// name of camera
-    pub name: String,
-    /// ip address associated with camera, e.g. 192.168.0.53
-    pub ip: String,
-    /// port used for ONVIF protocol
-    pub onvif_port: i32,
-    /// MAC address of camera, e.g. 9C-84-AE-0E-33-5A
-    pub mac: String,
-    /// username for ONVIF and RTSP authentication
-    pub username: String,
-    /// plaintext password for ONVIF and RTSP authentication
-    pub password: String,
-    /// url for rtsp stream
-    pub rtsp_url: String,
-    /// ptz type, either `onvif` or `onvif_continuous`
-    pub ptz_type: String,
-    /// ONVIF profile token for ptz
-    pub ptz_profile_token: String,
-    /// whether camera capture is enabled.
-    pub enabled: bool,
-    /// ptz x step size, in hundredths
-    pub ptz_x_step_size: i16,
-    /// ptz y step size, in hundredths
-    pub ptz_y_step_size: i16,
-}
-
-impl From<crate::api::cameras::CreateCamera> for CreateCamera {
-    fn from(c: crate::api::cameras::CreateCamera) -> Self {
-        Self {
-            storage_group_id: c.storage_group_id,
-            name: c.name,
-            ip: c.ip,
-            onvif_port: c.onvif_port,
-            mac: c.mac,
-            username: c.username,
-            password: c.password,
-            rtsp_url: c.rtsp_url,
-            ptz_type: c.ptz_type,
-            ptz_profile_token: c.ptz_profile_token,
-            enabled: c.enabled,
-            ptz_x_step_size: c.ptz_x_step_size,
-            ptz_y_step_size: c.ptz_y_step_size,
-        }
-    }
-}
-
-#[derive(AsChangeset, Debug)]
-#[diesel(table_name = cameras)]
-pub struct UpdateCamera {
-    /// if present, new storage group id
-    pub storage_group_id: Option<Uuid>,
-    /// if present, new camera name
-    pub name: Option<String>,
-    /// if present, new ip address
-    pub ip: Option<String>,
-    /// if present, new onvif port
-    pub onvif_port: Option<i32>,
-    /// if present, new MAC address
-    pub mac: Option<String>,
-    /// if present, new username for ONVIF and RTSP streaming
-    pub username: Option<String>,
-    /// if present, new plaintext password of ONVIF and RTSP streaming
-    pub password: Option<String>,
-    /// if present, new `rtsp_url`
-    pub rtsp_url: Option<String>,
-    /// if present, new ptz type
-    pub ptz_type: Option<String>,
-    /// if present, new ONVIF ptz profile token
-    pub ptz_profile_token: Option<String>,
-    /// if present, updates enabled status
-    pub enabled: Option<bool>,
-    /// ptz x step size, in hundredths
-    pub ptz_x_step_size: Option<i16>,
-    /// ptz y step size, in hundredths
-    pub ptz_y_step_size: Option<i16>,
-}
-
-impl From<crate::api::cameras::UpdateCamera> for UpdateCamera {
-    fn from(u: crate::api::cameras::UpdateCamera) -> Self {
-        Self {
-            storage_group_id: u.storage_group_id,
-            name: u.name,
-            ip: u.ip,
-            onvif_port: u.onvif_port,
-            mac: u.mac,
-            username: u.username,
-            password: u.password,
-            rtsp_url: u.rtsp_url,
-            ptz_type: u.ptz_type,
-            ptz_profile_token: u.ptz_profile_token,
-            enabled: u.enabled,
-            ptz_x_step_size: u.ptz_x_step_size,
-            ptz_y_step_size: u.ptz_y_step_size,
-        }
-    }
-}
-
-impl Service {
-    pub fn create_camera(
-        &self,
-        create_camera: crate::api::cameras::CreateCamera,
-    ) -> Result<crate::api::cameras::Camera, super::Error> {
-        use diesel::OptionalExtension;
-
-        let mut conn = self.pool.get()?;
-
-        let new_camera: Camera = Camera {
-            id: Uuid::now_v7(),
-            storage_group_id: create_camera.storage_group_id,
-            name: create_camera.name,
-            ip: create_camera.ip,
-            onvif_port: create_camera.onvif_port,
-            mac: create_camera.mac,
-            username: create_camera.username,
-            password: create_camera.password,
-            rtsp_url: create_camera.rtsp_url,
-            ptz_type: create_camera.ptz_type,
-            ptz_profile_token: create_camera.ptz_profile_token,
-            enabled: create_camera.enabled,
-            ptz_x_step_size: create_camera.ptz_x_step_size,
-            ptz_y_step_size: create_camera.ptz_y_step_size,
+impl From<Camera> for crate::api::cameras::Camera {
+    fn from(c: Camera) -> Self {
+        let status = if c.enabled {
+            CameraStatus {
+                phase: "stopped".to_string(),
+                active: false,
+                last_started_at: None,
+                last_packet_at: None,
+                codec: None,
+                average_bitrate: None,
+                error_message: None,
+            }
+        } else {
+            CameraStatus::disabled()
         };
 
-        let new_camera = conn
-            .build_transaction()
-            .serializable()
-            .run::<_, super::Error, _>(|conn| {
-                let c: Camera = diesel::insert_into(crate::schema::cameras::dsl::cameras)
-                    .values(&Into::<Camera>::into(new_camera))
-                    .get_result(conn)?;
-
-                let max_order: i32 = camera_group_memberships::table
-                    .filter(camera_group_memberships::camera_id.eq(ALL_GROUP_ID))
-                    .select(diesel::dsl::max(camera_group_memberships::display_order))
-                    .first(conn)
-                    .optional()?
-                    .unwrap_or(None)
-                    .unwrap_or(0);
-
-                diesel::insert_into(camera_group_memberships::table)
-                    .values(&vec![(
-                        camera_group_memberships::dsl::id.eq(Uuid::now_v7()),
-                        camera_group_memberships::dsl::camera_group_id.eq(ALL_GROUP_ID),
-                        camera_group_memberships::dsl::camera_id.eq(c.id),
-                        camera_group_memberships::dsl::display_order.eq(max_order + 1),
-                    )])
-                    .execute(conn)?;
-                Ok(c)
-            })?;
-
-        Ok(new_camera.into())
+        Self {
+            metadata: ResourceMetadata {
+                name: c.name,
+                display_name: c.display_name,
+            },
+            spec: CameraSpec {
+                storage_group_name: c.storage_group_name,
+                ip: c.ip,
+                onvif_port: c.onvif_port,
+                mac: c.mac,
+                username: c.username,
+                rtsp_url: c.rtsp_url,
+                ptz_type: c.ptz_type,
+                ptz_profile_token: c.ptz_profile_token,
+                enabled: c.enabled,
+                ptz_x_step_size: c.ptz_x_step_size,
+                ptz_y_step_size: c.ptz_y_step_size,
+            },
+            status,
+        }
     }
+}
 
-    pub fn update_camera(
-        &self,
-        camera_id: Uuid,
-        camera: crate::api::cameras::UpdateCamera,
-    ) -> Result<crate::api::cameras::Camera, super::Error> {
-        use crate::schema::cameras::dsl::*;
-        let mut conn = self.pool.get()?;
-
-        let c: Camera = diesel::update(cameras.filter(id.eq(camera_id)))
-            .set(&Into::<UpdateCamera>::into(camera))
-            .get_result(&mut conn)?;
-
-        Ok(c.into())
-    }
-
-    pub fn delete_camera(&self, cid: Uuid) -> Result<(), super::Error> {
-        use crate::schema::cameras::dsl::*;
-        let mut conn = self.pool.get()?;
-
-        diesel::delete(cameras.filter(id.eq(cid))).execute(&mut conn)?;
-        Ok(())
-    }
-
-    pub fn fetch_camera(&self, id: Uuid) -> Result<crate::api::cameras::Camera, super::Error> {
+impl super::Service {
+    pub fn fetch_camera_row(&self, camera_name: &str) -> Result<Camera, super::Error> {
         let mut conn = self.pool.get()?;
 
         let c = crate::schema::cameras::dsl::cameras
-            .find(id)
+            .find(camera_name)
             .get_result::<Camera>(&mut conn)?;
 
-        Ok(c.into())
+        Ok(c)
+    }
+
+    pub fn fetch_camera(
+        &self,
+        camera_name: &str,
+    ) -> Result<crate::api::cameras::Camera, super::Error> {
+        Ok(self.fetch_camera_row(camera_name)?.into())
+    }
+
+    pub fn fetch_all_camera_rows(&self) -> Result<Vec<Camera>, super::Error> {
+        let mut conn = self.pool.get()?;
+
+        let cameras: Vec<Camera> = crate::schema::cameras::dsl::cameras.load(&mut conn)?;
+        Ok(cameras)
     }
 
     pub fn fetch_all_cameras(&self) -> Result<Vec<crate::api::cameras::Camera>, super::Error> {
-        let mut conn = self.pool.get()?;
-
-        let cameras: Vec<crate::db::cameras::Camera> =
-            crate::schema::cameras::dsl::cameras.load(&mut conn)?;
-        Ok(cameras.into_iter().map(std::convert::Into::into).collect())
+        Ok(self
+            .fetch_all_camera_rows()?
+            .into_iter()
+            .map(std::convert::Into::into)
+            .collect())
     }
 }

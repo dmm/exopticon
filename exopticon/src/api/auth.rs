@@ -51,10 +51,10 @@ pub struct Data {
 /// user operations.
 #[derive(Clone, Serialize)]
 pub struct User {
-    /// User id
-    pub id: Uuid,
     /// username
     pub username: String,
+    /// display name
+    pub display_name: String,
 }
 
 /// Request to create new user session
@@ -62,8 +62,8 @@ pub struct User {
 pub struct CreateUserSession {
     /// user session name
     pub name: String,
-    /// id of user associated with session
-    pub user_id: Uuid,
+    /// name of user associated with session
+    pub user_name: String,
     /// session key value
     pub session_key: String,
     /// flag indicating where it is an api token or user session
@@ -88,8 +88,8 @@ pub struct SlimAccessToken {
     pub id: Uuid,
     /// user session name
     pub name: String,
-    /// id of user associated with session
-    pub user_id: Uuid,
+    /// name of user associated with session
+    pub user_name: String,
     /// Expiration timestamp
     pub expiration: DateTime<Utc>,
 }
@@ -116,7 +116,7 @@ pub async fn login(
 
     let session = CreateUserSession {
         name: String::new(),
-        user_id: user.id,
+        user_name: user.username,
         session_key,
         is_token: false,
         expiration,
@@ -148,7 +148,7 @@ pub async fn create_personal_access_token(
 
     let new_session = CreateUserSession {
         name: create_token_request.name,
-        user_id: current_user.id,
+        user_name: current_user.username,
         session_key,
         is_token: true,
         expiration: create_token_request.expiration,
@@ -175,7 +175,7 @@ pub async fn fetch_personal_access_tokens(
 ) -> Result<Json<Vec<SlimAccessToken>>, UserError> {
     let db = state.db_service;
 
-    let tokens = spawn_blocking(move || db.fetch_users_tokens(user.id)).await??;
+    let tokens = spawn_blocking(move || db.fetch_users_tokens(&user.username)).await??;
 
     Ok(Json(tokens))
 }

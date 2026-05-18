@@ -21,15 +21,14 @@
 use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::{RwLock, mpsc};
-use uuid::Uuid;
 
 use crate::{capture_actor::VideoPacket, webrtc_client::ClientId};
 
 type VideoPacketVec = Vec<(ClientId, mpsc::Sender<VideoPacket>)>;
 
 pub struct VideoRouter {
-    // camera_id → list of (client_id, sender) pairs
-    subscriptions: Arc<RwLock<HashMap<Uuid, VideoPacketVec>>>,
+    // camera name → list of (client_id, sender) pairs
+    subscriptions: Arc<RwLock<HashMap<String, VideoPacketVec>>>,
 }
 
 impl VideoRouter {
@@ -42,7 +41,7 @@ impl VideoRouter {
     pub async fn update_subscriptions(
         &self,
         client_id: ClientId,
-        camera_ids: Vec<Uuid>,
+        camera_names: Vec<String>,
         sender: mpsc::Sender<VideoPacket>,
     ) {
         let mut subs = self.subscriptions.write().await;
@@ -53,8 +52,8 @@ impl VideoRouter {
         }
 
         // Add this client to subscribed cameras
-        for camera_id in camera_ids {
-            subs.entry(camera_id)
+        for camera_name in camera_names {
+            subs.entry(camera_name)
                 .or_insert_with(Vec::new)
                 .push((client_id, sender.clone()));
         }
@@ -70,7 +69,7 @@ impl VideoRouter {
     pub async fn send_video(&self, packet: VideoPacket) {
         let subs = self.subscriptions.read().await;
 
-        if let Some(clients) = subs.get(&packet.camera_id) {
+        if let Some(clients) = subs.get(&packet.camera_name) {
             for (_, tx) in clients {
                 // try_send to avoid blocking if client is slow
                 let _ = tx.try_send(packet.clone());

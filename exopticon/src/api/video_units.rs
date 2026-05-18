@@ -36,8 +36,8 @@ use crate::AppState;
 pub struct VideoUnit {
     /// id of video unit
     pub id: Uuid,
-    /// id of associated camera
-    pub camera_id: Uuid,
+    /// name of associated camera
+    pub camera_name: String,
     /// begin time in UTC
     pub begin_time: DateTime<Utc>,
     /// end time in UTC
@@ -48,8 +48,8 @@ pub struct VideoUnit {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateVideoUnit {
-    /// id of associated camera
-    pub camera_id: Uuid,
+    /// name of associated camera
+    pub camera_name: String,
     /// begin time in UTC
     pub begin_time: DateTime<Utc>,
     /// end time in UTC
@@ -91,13 +91,13 @@ pub struct Interval {
 
 pub async fn fetch_video_units_between(
     interval: Query<Interval>,
-    Path(camera_id): Path<Uuid>,
+    Path(camera_name): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<(VideoUnit, VideoFile)>>, super::UserError> {
     let db = state.db_service;
 
     let video_units = spawn_blocking(move || {
-        db.fetch_video_units_between(camera_id, interval.begin_time, interval.end_time)
+        db.fetch_video_units_between(&camera_name, interval.begin_time, interval.end_time)
     })
     .await??;
 
@@ -105,5 +105,5 @@ pub async fn fetch_video_units_between(
 }
 
 pub fn router() -> Router<AppState> {
-    Router::<AppState>::new().route("/:camera_id", get(fetch_video_units_between))
+    Router::<AppState>::new().route("/:camera_name", get(fetch_video_units_between))
 }

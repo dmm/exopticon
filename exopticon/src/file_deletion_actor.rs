@@ -21,19 +21,18 @@
 use std::time::Duration;
 
 use tokio::task::spawn_blocking;
-use uuid::Uuid;
 
 use crate::db::storage_groups::StorageGroupOldFiles;
 
 pub struct FileDeletionActor {
-    storage_group_id: Uuid,
+    storage_group_name: String,
     db: crate::db::Service,
 }
 
 impl FileDeletionActor {
-    pub const fn new(storage_group_id: Uuid, db: crate::db::Service) -> Self {
+    pub const fn new(storage_group_name: String, db: crate::db::Service) -> Self {
         Self {
-            storage_group_id,
+            storage_group_name,
             db,
         }
     }
@@ -46,7 +45,7 @@ impl FileDeletionActor {
         debug!(
             "FileDeletionActor {}: Handling {} files, max_size: {}MiB, current_size: {}MiB, \
              delete amount: {}MiB",
-            self.storage_group_id,
+            self.storage_group_name,
             files.video_units.len(),
             max_size_bytes / 1024 / 1024,
             files.storage_group_size / 1024 / 1024,
@@ -79,9 +78,10 @@ impl FileDeletionActor {
 
     async fn work(&self) -> anyhow::Result<()> {
         let db = self.db.clone();
-        let storage_group_id = self.storage_group_id;
-        let files = spawn_blocking(move || db.fetch_storage_group_old_units(storage_group_id, 100))
-            .await??;
+        let storage_group_name = self.storage_group_name.clone();
+        let files =
+            spawn_blocking(move || db.fetch_storage_group_old_units(&storage_group_name, 100))
+                .await??;
         self.handle_files(files).await?;
 
         Ok(())

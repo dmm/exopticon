@@ -187,55 +187,9 @@ impl ValidatedConfig {
 
 impl RawConfig {
     fn validate(self) -> Result<ValidatedConfig, Error> {
-        validate_unique_names(
-            "storage group",
-            self.storage_groups.iter().map(|group| group.name.as_str()),
-        )?;
-        validate_unique_names(
-            "camera",
-            self.cameras.iter().map(|camera| camera.name.as_str()),
-        )?;
-        validate_unique_names(
-            "camera group",
-            self.camera_groups.iter().map(|group| group.name.as_str()),
-        )?;
-        validate_unique_names("user", self.users.iter().map(|user| user.username.as_str()))?;
-
-        let storage_group_names: HashSet<&str> = self
-            .storage_groups
-            .iter()
-            .map(|group| group.name.as_str())
-            .collect();
-        let camera_names: HashSet<&str> = self
-            .cameras
-            .iter()
-            .map(|camera| camera.name.as_str())
-            .collect();
-
-        for camera in &self.cameras {
-            if !storage_group_names.contains(camera.storage_group_name.as_str()) {
-                return Err(Error::Validation(format!(
-                    "camera '{}' references missing storage group '{}'",
-                    camera.name, camera.storage_group_name
-                )));
-            }
-        }
-
-        for group in &self.camera_groups {
-            validate_unique_members(&group.name, &group.members)?;
-            for member in &group.members {
-                if !camera_names.contains(member.as_str()) {
-                    return Err(Error::Validation(format!(
-                        "camera group '{}' references missing camera '{}'",
-                        group.name, member
-                    )));
-                }
-            }
-        }
-
-        for user in &self.users {
-            validate_bcrypt_hash(&user.username, &user.password_hash)?;
-        }
+        self.validate_names()?;
+        self.validate_references()?;
+        self.validate_users()?;
 
         let storage_groups = self
             .storage_groups
@@ -299,6 +253,78 @@ impl RawConfig {
             users,
         })
     }
+
+    fn validate_names(&self) -> Result<(), Error> {
+        validate_unique_names(
+            "storage group",
+            self.storage_groups.iter().map(|group| group.name.as_str()),
+        )?;
+        validate_unique_names(
+            "camera",
+            self.cameras.iter().map(|camera| camera.name.as_str()),
+        )?;
+        validate_unique_names(
+            "camera group",
+            self.camera_groups.iter().map(|group| group.name.as_str()),
+        )?;
+        validate_unique_names("user", self.users.iter().map(|user| user.username.as_str()))
+    }
+
+    fn validate_references(&self) -> Result<(), Error> {
+        let storage_group_names: HashSet<&str> = self
+            .storage_groups
+            .iter()
+            .map(|group| group.name.as_str())
+            .collect();
+        let camera_names: HashSet<&str> = self
+            .cameras
+            .iter()
+            .map(|camera| camera.name.as_str())
+            .collect();
+
+        validate_camera_storage_group_references(&self.cameras, &storage_group_names)?;
+        validate_camera_group_references(&self.camera_groups, &camera_names)
+    }
+
+    fn validate_users(&self) -> Result<(), Error> {
+        for user in &self.users {
+            validate_bcrypt_hash(&user.username, &user.password_hash)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_camera_storage_group_references(
+    cameras: &[CameraConfig],
+    storage_group_names: &HashSet<&str>,
+) -> Result<(), Error> {
+    for camera in cameras {
+        if !storage_group_names.contains(camera.storage_group_name.as_str()) {
+            return Err(Error::Validation(format!(
+                "camera '{}' references missing storage group '{}'",
+                camera.name, camera.storage_group_name
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_camera_group_references(
+    camera_groups: &[CameraGroupConfig],
+    camera_names: &HashSet<&str>,
+) -> Result<(), Error> {
+    for group in camera_groups {
+        validate_unique_members(&group.name, &group.members)?;
+        for member in &group.members {
+            if !camera_names.contains(member.as_str()) {
+                return Err(Error::Validation(format!(
+                    "camera group '{}' references missing camera '{}'",
+                    group.name, member
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_unique_names<'a>(
