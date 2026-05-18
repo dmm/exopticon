@@ -19,7 +19,7 @@
  */
 
 import { Component, OnInit } from "@angular/core";
-import { Router, RouterLink } from "@angular/router";
+import { RouterLink } from "@angular/router";
 import { Observable } from "rxjs";
 import { CameraGroup } from "../camera-group";
 import { CameraGroupService } from "../camera-group.service";
@@ -33,16 +33,9 @@ import { AsyncPipe } from "@angular/common";
 })
 export class CameraGroupListComponent implements OnInit {
   cameraGroups$: Observable<CameraGroup[]>;
-  constructor(
-    private cameraGroupService: CameraGroupService,
-    public router: Router,
-  ) {}
+  constructor(private cameraGroupService: CameraGroupService) {}
 
   ngOnInit(): void {
     this.cameraGroups$ = this.cameraGroupService.getCameraGroups();
-  }
-
-  createNewGroup() {
-    this.router.navigate(["camera_groups", "new"]);
   }
 }

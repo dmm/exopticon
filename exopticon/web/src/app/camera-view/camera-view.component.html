@@ -30,7 +30,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
   @if (status !== "active") {
     <app-camera-status-overlay
       [status]="status"
-      [name]="camera.name"
+      [name]="camera.metadata.displayName"
     ></app-camera-status-overlay>
   }
 </div>

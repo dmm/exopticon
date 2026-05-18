@@ -20,18 +20,17 @@
 
 import { Component, OnInit } from "@angular/core";
 import { ActivatedRoute, ParamMap } from "@angular/router";
-import { Observable, of } from "rxjs";
+import { Observable } from "rxjs";
 import { switchMap } from "rxjs/operators";
 import { Camera } from "../camera";
 import { CameraService } from "../camera.service";
-import { FormsModule } from "@angular/forms";
 import { AsyncPipe } from "@angular/common";
 
 @Component({
   selector: "app-camera-detail",
   templateUrl: "./camera-detail.component.html",
   styleUrls: ["./camera-detail.component.css"],
-  imports: [FormsModule, AsyncPipe],
+  imports: [AsyncPipe],
 })
 export class CameraDetailComponent implements OnInit {
   public camera$: Observable<Camera>;
@@ -44,23 +43,8 @@ export class CameraDetailComponent implements OnInit {
   ngOnInit(): void {
     this.camera$ = this.route.paramMap.pipe(
       switchMap((params: ParamMap) => {
-        if (params.get("id") !== "") {
-          return this.cameraService.getCamera(params.get("id"));
-        } else {
-          let cam = new Camera();
-          cam.id = "";
-          cam.storageGroupId = 1;
-          return of(cam);
-        }
+        return this.cameraService.getCamera(params.get("name") ?? "");
       }),
     );
-  }
-
-  onSubmit(camera) {
-    camera.onvifPort = +camera.onvifPort;
-    camera.ptzXStepSize = +camera.ptzXStepSize;
-    camera.ptzYStepSize = +camera.ptzYStepSize;
-    this.camera$ = this.cameraService.setCamera(camera);
-    this.camera$.subscribe((_camera) => {});
   }
 }

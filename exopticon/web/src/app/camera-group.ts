@@ -18,20 +18,19 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { CameraId } from "./camera";
+import { CameraName, ResourceMetadata } from "./camera";
 
-export const ALL_GROUP_ID = "34e79812-df14-4773-a9f4-f766c799aa62";
+export const ALL_GROUP_NAME = "all";
 
-export type CameraGroupId = string;
+export type CameraGroupName = string;
+export type CameraGroupId = CameraGroupName;
 
-export class CameraGroup {
-  id?: CameraGroupId;
-  name: string;
-  members: CameraId[];
+export interface CameraGroupSpec {
+  members: CameraName[];
+}
 
-  constructor() {
-    this.id = null;
-    this.name = "";
-    this.members = new Array();
-  }
+export interface CameraGroup {
+  metadata: ResourceMetadata;
+  spec: CameraGroupSpec;
+  status: Record<string, unknown>;
 }

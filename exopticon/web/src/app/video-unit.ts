@@ -24,14 +24,14 @@ import { Observation } from "./observation";
 export class VideoUnit {
   constructor(public obj: any) {
     this.id = obj.id;
-    this.cameraId = obj.id;
+    this.cameraName = obj.cameraName;
     this.beginTime = ZonedDateTime.parse(obj.beginTime + "Z");
     this.endTime = ZonedDateTime.parse(obj.endTime + "Z");
     this.observations = obj.observations;
   }
 
   id: string;
-  cameraId: string;
+  cameraName: string;
   beginTime: ZonedDateTime;
   endTime: ZonedDateTime;
   observations: Observation[];

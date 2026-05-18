@@ -26,29 +26,6 @@ export class CameraGroupService {
     );
   }
 
-  setCameraGroup(cameraGroup: CameraGroup): Observable<CameraGroup> {
-    let obs: Observable<CameraGroup>;
-    if (cameraGroup.id === null) {
-      obs = this.http.post<CameraGroup>(this.cameraGroupUrl, {
-        name: cameraGroup.name,
-        members: cameraGroup.members,
-      });
-    } else {
-      obs = this.http.post<CameraGroup>(
-        this.cameraGroupUrl + "/" + cameraGroup.id,
-        cameraGroup,
-      );
-    }
-    return obs.pipe(
-      map((data) => data),
-      catchError(this.handleError),
-    );
-  }
-
-  deleteCameraGroup(cameraGroupId: CameraGroupId): Observable<any> {
-    return this.http.delete(this.cameraGroupUrl + "/" + cameraGroupId);
-  }
-
   private handleError(res: HttpErrorResponse | any) {
     console.error(res.error || res.body.error);
     return observableThrowError(res.error || "Server error");

@@ -48,7 +48,7 @@ export class CameraOverlayComponent implements OnInit {
   ptz(event: PointerEvent, direction: PtzDirection) {
     event.stopImmediatePropagation();
     event.stopPropagation();
-    this.cameraService.ptz(this.camera.id, direction);
+    this.cameraService.ptz(this.camera.metadata.name, direction);
   }
 
   toggleMute() {

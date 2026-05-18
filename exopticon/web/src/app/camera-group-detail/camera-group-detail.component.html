@@ -2,67 +2,29 @@
   <button type="button" class="back" (click)="returnToCameraGroups()">
     Back to Camera Groups
   </button>
-  @if (groupForm.controls.id.value !== null) {
-    <button
-      class="delete"
-      type="button"
-      (click)="deleteCameraGroup({ id: groupForm.controls.id.value })"
-    >
-      Delete
-    </button>
-  }
 </div>
-<form [formGroup]="groupForm">
-  <input type="hidden" formControlName="id" />
-  <div class="name">
-    <label for="name">Name: </label>
-    <input
-      id="name"
-      type="text"
-      size="10"
-      maxlength="15"
-      formControlName="name"
-      [readonly]="hideMembership"
-    />
-  </div>
-  <div class="members" formArrayName="members">
-    @for (member of members.controls; track member; let i = $index) {
-      <div class="member-list">
-        <div [formGroupName]="i">
-          <button
-            type="button"
-            class="up-button"
-            (click)="memberUp({ index: i })"
-          >
-            UP
-          </button>
-          <input type="hidden" formControlName="id" />
-          <input formControlName="name" class="name" readonly="true" />
-          <input
-            type="checkbox"
-            formControlName="include"
-            class="include"
-            [hidden]="hideMembership"
-          />
-          <button
-            type="button"
-            class="down-button"
-            (click)="memberDown({ index: i })"
-          >
-            DOWN
-          </button>
+
+@if (detail$ | async; as detail) {
+  <section>
+    <h2>{{ detail.group.metadata.displayName }}</h2>
+    <dl>
+      <dt>Name</dt>
+      <dd>{{ detail.group.metadata.name }}</dd>
+    </dl>
+
+    <h3>Members</h3>
+    <div class="members">
+      @for (camera of detail.memberCameras; track camera.metadata.name) {
+        <div class="member-list">
+          <span class="name">{{ camera.metadata.displayName }}</span>
+          <span>{{ camera.metadata.name }}</span>
         </div>
-      </div>
-    }
-  </div>
-  @if (groupForm.controls.id.value !== null) {
-    <button type="button" class="submit" (click)="onSubmit()">
-      Update Camera Group
-    </button>
-  }
-  @if (groupForm.controls.id.value === null) {
-    <button type="button" class="submit" (click)="onSubmit()">
-      Create Camera Group
-    </button>
-  }
-</form>
+      }
+      @if (detail.memberCameras.length === 0) {
+        <div class="member-list">
+          <span class="name">No members</span>
+        </div>
+      }
+    </div>
+  </section>
+}

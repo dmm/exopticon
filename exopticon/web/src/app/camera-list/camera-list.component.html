@@ -20,8 +20,8 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 <h2>CAMERAS</h2>
 <ul class="cameras">
   @for (camera of cameras$ | async; track camera) {
-    <li [routerLink]="['/cameras', camera.id]">
-      {{ camera.name }}
+    <li [routerLink]="['/cameras', camera.metadata.name]">
+      {{ camera.metadata.displayName }}
     </li>
   }
 </ul>

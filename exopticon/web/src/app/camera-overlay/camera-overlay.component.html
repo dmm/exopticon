@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <div>
-  <div class="camera-name">{{ camera.name }}</div>
+  <div class="camera-name">{{ camera.metadata.displayName }}</div>
   <div
     (pointerdown)="toggleMute()"
     (touchstart)="stopPropagation($event)"
@@ -27,7 +27,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
   >
     {{ muted ? "UNMUTE" : "MUTE" }}
   </div>
-  @if (camera.ptzType !== "none") {
+  @if (camera.spec.ptzType !== "none") {
     <div class="ptz-overlay">
       <div
         (pointerdown)="ptz($event, directions.left)"

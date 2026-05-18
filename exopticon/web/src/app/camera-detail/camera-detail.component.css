@@ -33,44 +33,48 @@ h3 {
   grid-column: 2;
 }
 
-form {
+dl {
   display: grid;
-  grid-template-columns: 1fr 150px 1em 300px 1fr;
-  grid-gap: 0.3em 0.6em;
-  grid-auto-flow: dense;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
   align-items: center;
-}
-
-input,
-button,
-select {
-  grid-column: 3 / 5;
-  width: auto;
   margin: 0;
 }
 
-label {
-  grid-column: 2 / 3;
-  width: auto;
-  padding: 0;
+dt,
+dd {
+  border-top: 1px solid #d0d0d0;
+  min-height: 2.25rem;
   margin: 0;
-  text-align: right;
+  padding: 0.55rem 0;
 }
 
-input[type="checkbox"] {
-  justify-self: start;
-  margin: 0;
+dt {
+  color: #555;
+  font-weight: 600;
+  padding-right: 1rem;
+}
+
+dd {
+  overflow-wrap: anywhere;
 }
 
 @media only screen and (max-width: 600px) {
-  form {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  :host {
+    grid-template-columns: 1rem 1fr 1rem;
   }
-  input,
-  button,
-  select,
-  label {
+
+  dl {
     grid-column: 1;
-    text-align: left;
+    grid-template-columns: 1fr;
+  }
+
+  dt {
+    min-height: 0;
+    padding-bottom: 0.15rem;
+  }
+
+  dd {
+    border-top: 0;
+    padding-top: 0;
   }
 }

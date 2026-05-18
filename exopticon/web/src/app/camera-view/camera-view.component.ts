@@ -124,7 +124,7 @@ export class CameraViewComponent implements OnInit {
       video.srcObject = this.mediaStream;
       video.muted = true;
       this.muted = true;
-      this.cameraPanelService.setMute(this.camera.id, this.muted);
+      this.cameraPanelService.setMute(this.camera.metadata.name, this.muted);
       video.autoplay = true;
       //video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
@@ -148,18 +148,20 @@ export class CameraViewComponent implements OnInit {
   }
 
   activate() {
-    this.subscription = this.webrtcService.subscribe(this.camera.id).subscribe(
-      (m) => {
-        if (m !== this.mediaStream) {
-          this.mediaStream = m;
-        }
-        this.setMediaSource();
-      },
-      (_err) => {
-        //        this.mediaStream = undefined;
-        //        this.setMediaSource();
-      },
-    );
+    this.subscription = this.webrtcService
+      .subscribe(this.camera.metadata.name)
+      .subscribe(
+        (m) => {
+          if (m !== this.mediaStream) {
+            this.mediaStream = m;
+          }
+          this.setMediaSource();
+        },
+        (_err) => {
+          //        this.mediaStream = undefined;
+          //        this.setMediaSource();
+        },
+      );
   }
 
   deactivate() {
@@ -176,7 +178,7 @@ export class CameraViewComponent implements OnInit {
     let muteValue = this.videoElement.nativeElement.muted;
     this.videoElement.nativeElement.muted = !muteValue;
     this.muted = !muteValue;
-    this.cameraPanelService.setMute(this.camera.id, this.muted);
+    this.cameraPanelService.setMute(this.camera.metadata.name, this.muted);
   }
 
   setStatus(_event) {

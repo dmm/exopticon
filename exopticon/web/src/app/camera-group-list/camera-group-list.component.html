@@ -18,13 +18,15 @@ You should have received a copy of the GNU General Public License
 along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <h2>Camera Groups</h2>
-<button type="button" (click)="createNewGroup()">Create New</button>
 <div class="camera-groups">
   @for (group of cameraGroups$ | async; track group) {
-    <div [routerLink]="['/camera_groups', group.id]">
-      <span>{{ group.name }}</span>
-      <button type="button" [routerLink]="['/camera_groups', group.id]">
-        EDIT
+    <div [routerLink]="['/camera_groups', group.metadata.name]">
+      <span>{{ group.metadata.displayName }}</span>
+      <button
+        type="button"
+        [routerLink]="['/camera_groups', group.metadata.name]"
+      >
+        VIEW
       </button>
     </div>
   }

@@ -23,6 +23,7 @@ import { Injectable } from "@angular/core";
 import { ZonedDateTime } from "@js-joda/core";
 import "@js-joda/timezone";
 import { Observable } from "rxjs";
+import { CameraName } from "./camera";
 import { Observation } from "./observation";
 
 @Injectable({
@@ -36,12 +37,12 @@ export class ObservationService {
   }
 
   getObservations(
-    cameraId: number,
+    cameraName: CameraName,
     beginTime: ZonedDateTime,
     endTime: ZonedDateTime,
   ): Observable<any> {
     return this.http.get(
-      `/v1/cameras/${cameraId}/observations?begin_time=${beginTime.toString()}` +
+      `/v1/cameras/${cameraName}/observations?begin_time=${beginTime.toString()}` +
         `&end_time=${endTime.toString()}`,
     );
   }

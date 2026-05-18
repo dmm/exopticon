@@ -22,7 +22,7 @@ import { Injectable } from "@angular/core";
 import { concat, defer, forkJoin, fromEvent, of } from "rxjs";
 import { map } from "rxjs/operators";
 import { Camera, CameraId } from "./camera";
-import { ALL_GROUP_ID, CameraGroup, CameraGroupId } from "./camera-group";
+import { ALL_GROUP_NAME, CameraGroup, CameraGroupId } from "./camera-group";
 import { CameraGroupService } from "./camera-group.service";
 import { CameraService, PtzDirection } from "./camera.service";
 import { ActivePair, WebrtcService } from "./webrtc.service";
@@ -74,7 +74,7 @@ export class CameraPanelService {
   // Active camera group id, 0 for all cameras aka no group
   activeCameraGroupId: CameraGroupId = null;
 
-  activeCameraGroupName: string = "ALL";
+  activeCameraGroupName: string = "All";
 
   desiredCameraGroupId: CameraGroupId = null;
 
@@ -175,7 +175,7 @@ export class CameraPanelService {
 
         this.unsortedCameras.clear();
         cameras
-          .filter((c) => c.enabled)
+          .filter((c) => c.spec.enabled)
           .forEach((c) => {
             let camera = new PanelCamera();
             camera.camera = c;
@@ -184,12 +184,12 @@ export class CameraPanelService {
               video: true,
               audio: false,
             };
-            this.unsortedCameras.set(camera.camera.id, camera);
+            this.unsortedCameras.set(camera.camera.metadata.name, camera);
           });
 
         this.cameraGroups.clear();
         cameraGroups.forEach((group) => {
-          this.cameraGroups.set(group.id, group);
+          this.cameraGroups.set(group.metadata.name, group);
         });
 
         this.projectCameras();
@@ -212,11 +212,11 @@ export class CameraPanelService {
   private realProjectCameras() {
     this.projectCameraTimeout = null;
     if (this.desiredCameraGroupId === null) {
-      this.desiredCameraGroupId = ALL_GROUP_ID;
+      this.desiredCameraGroupId = ALL_GROUP_NAME;
     }
 
     if (this.activeCameraGroupId === null) {
-      this.activeCameraGroupId = ALL_GROUP_ID;
+      this.activeCameraGroupId = ALL_GROUP_NAME;
     }
 
     this.setCameraGroup(this.desiredCameraGroupId);
@@ -225,10 +225,10 @@ export class CameraPanelService {
     if (cameraGroup === undefined) {
       return;
     }
-    cameraGroup.members.forEach((cameraId) => {
+    cameraGroup.spec.members.forEach((cameraId) => {
       const c = this.unsortedCameras.get(cameraId);
       if (c !== undefined) {
-        groupCameras.push(this.unsortedCameras.get(cameraId));
+        groupCameras.push(c);
       }
     });
 
@@ -250,13 +250,16 @@ export class CameraPanelService {
     // this isn't great...
     let activeCameras = new Map<CameraId, ActivePair>();
     this.cameraDesiredState = this.cameras.map((c) => {
-      let p = this.unsortedCameras.get(c.id);
+      let p = this.unsortedCameras.get(c.metadata.name);
+      if (p === undefined) {
+        return false;
+      }
       let active =
         p.inViewport &&
         (p.enabled.video || p.enabled.audio) &&
         this.pageVisible;
       if (active) {
-        activeCameras.set(c.id, p.enabled);
+        activeCameras.set(c.metadata.name, p.enabled);
       }
 
       return active;
@@ -283,7 +286,7 @@ export class CameraPanelService {
   ) {
     let panelCamera = this.unsortedCameras.get(cameraId);
 
-    if (panelCamera !== null) {
+    if (panelCamera !== undefined) {
       panelCamera.inViewport = intersectionEvents.some(
         (e) => e.intersectionRatio >= this.intersectionThreshold,
       );
@@ -294,9 +297,11 @@ export class CameraPanelService {
   }
 
   ptz(direction: PtzDirection) {
-    let camera = this.cameras.find((c) => c.id === this.selectedCameraId);
+    let camera = this.cameras.find(
+      (c) => c.metadata.name === this.selectedCameraId,
+    );
     if (camera) {
-      this.cameraService.ptz(camera.id, direction);
+      this.cameraService.ptz(camera.metadata.name, direction);
     }
   }
 
@@ -350,9 +355,9 @@ export class CameraPanelService {
 
     if (cameraGroupId !== null) {
       let cameraGroup = this.cameraGroups.get(cameraGroupId);
-      this.activeCameraGroupName = cameraGroup.name;
+      this.activeCameraGroupName = cameraGroup.metadata.displayName;
     } else {
-      this.activeCameraGroupName = "ALL";
+      this.activeCameraGroupName = "All";
     }
     return true;
   }

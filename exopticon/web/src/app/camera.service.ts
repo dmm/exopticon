@@ -22,7 +22,7 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable, throwError as observableThrowError } from "rxjs";
 import { catchError, map } from "rxjs/operators";
-import { AnalysisConfiguration, Camera, CameraId } from "./camera";
+import { Camera, CameraName } from "./camera";
 
 export enum PtzDirection {
   left,
@@ -46,25 +46,16 @@ export class CameraService {
     );
   }
 
-  getCamera(id: CameraId): Observable<Camera> {
-    return this.http.get<Camera[]>(this.cameraUrl).pipe(
-      map((data: Camera[]) => data.find((c) => c.id === id)),
-      catchError(this.handleError),
-    );
+  getCamera(name: CameraName): Observable<Camera> {
+    return this.http
+      .get<Camera>(`${this.cameraUrl}/${name}`)
+      .pipe(catchError(this.handleError));
   }
 
-  setCamera(camera: Camera): Observable<Camera> {
-    let url = this.cameraUrl + (camera.id === "" ? "" : "/" + camera.id);
-    return this.http.post<Camera>(url, camera).pipe(
-      map((data) => data),
-      catchError(this.handleError),
-    );
-  }
-
-  ptz(cameraId: CameraId, direction: PtzDirection) {
+  ptz(cameraName: CameraName, direction: PtzDirection) {
     let directionArg: string = PtzDirection[direction];
     this.http
-      .post(`${this.cameraUrl}/${cameraId}/ptz/${directionArg}`, null)
+      .post(`${this.cameraUrl}/${cameraName}/ptz/${directionArg}`, null)
       .pipe(
         map((data) => data),
         catchError(this.handleError),

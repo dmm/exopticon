@@ -47,13 +47,16 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="wrapper"
       (touchstart)="
-        cameraPanelService.touchCamera(camera.id); $event.stopPropagation()
+        cameraPanelService.touchCamera(camera.metadata.name);
+        $event.stopPropagation()
       "
       (mouseenter)="
-        cameraPanelService.mouseOver(camera.id); $event.stopPropagation()
+        cameraPanelService.mouseOver(camera.metadata.name);
+        $event.stopPropagation()
       "
       (mouseleave)="
-        cameraPanelService.mouseLeave(camera.id); $event.stopPropagation()
+        cameraPanelService.mouseLeave(camera.metadata.name);
+        $event.stopPropagation()
       "
       [style.width.%]="100 / cameraPanelService.columnCount"
       [style.height.vh]="100 / cameraPanelService.rowCount"
@@ -64,12 +67,14 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="content"
         (waIntersectionObservee)="
-          cameraPanelService.setCameraVisibility(camera.id, $event)
+          cameraPanelService.setCameraVisibility(camera.metadata.name, $event)
         "
       >
         <app-camera-view
           [camera]="camera"
-          [selected]="cameraPanelService.selectedCameraId === camera.id"
+          [selected]="
+            cameraPanelService.selectedCameraId === camera.metadata.name
+          "
           [enabled]="cameraPanelService.cameraDesiredState[i]"
           [videoService]="videoService"
           [resolution]="cameraPanelService.resolution"

@@ -56,6 +56,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
     <table>
       <thead>
         <th>Token name</th>
+        <th>User</th>
         <th>Expires</th>
         <th></th>
       </thead>
@@ -63,6 +64,9 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         <tr>
           <td>
             {{ token.name }}
+          </td>
+          <td>
+            {{ token.userName }}
           </td>
           <td>
             {{ token.expiration }}

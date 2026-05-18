@@ -23,18 +23,17 @@ import { Observable } from "rxjs";
 import { map, publishReplay, refCount } from "rxjs/operators";
 
 interface UserDto {
-  id: string;
   username: string;
-  timezone: string;
+  displayName: string;
 }
 
 export class User {
-  readonly id: string;
   readonly username: string;
+  readonly displayName: string;
 
   constructor(dto: UserDto) {
-    this.id = dto.id;
     this.username = dto.username;
+    this.displayName = dto.displayName;
   }
 }
 

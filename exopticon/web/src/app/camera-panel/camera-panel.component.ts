@@ -27,6 +27,7 @@ import {
 } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Camera } from "../camera";
+import { CameraGroupId } from "../camera-group";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
 import { WebrtcService } from "../webrtc.service";
@@ -47,7 +48,7 @@ export class CameraPanelComponent implements OnInit {
   enabledCamerasOffset: number = 0;
   fullscreen: boolean = false;
   error: any;
-  private cameraVisibility: Map<number, boolean>;
+  private cameraVisibility: Map<string, boolean>;
   webrtcStatus$ = this.webrtcService;
 
   constructor(
@@ -154,12 +155,12 @@ export class CameraPanelComponent implements OnInit {
     return params;
   }
 
-  updateCameraViewVisibility(cameraId: number, visible: boolean) {
+  updateCameraViewVisibility(cameraId: string, visible: boolean) {
     console.log(`Visibility change: ${cameraId} ${visible}`);
     this.cameraVisibility.set(cameraId, visible);
   }
 
-  setCameraGroup(newGroupId: number) {
+  setCameraGroup(newGroupId: CameraGroupId) {
     let route: ActivatedRoute;
     const newUrl = this.router.createUrlTree(
       [this.merge({ group: newGroupId }, this.route.snapshot.params)],

@@ -1,100 +1,88 @@
-div.top-buttons {
+:host {
   display: grid;
-  grid-template-columns: 140px 1fr 140px;
-  border-top: 1px solid;
-  padding-top: 25px;
+  grid-template-columns: 1fr minmax(20rem, 42rem) 1fr;
+}
+
+.top-buttons,
+section {
+  grid-column: 2;
+}
+
+.top-buttons {
+  border-top: 1px solid #d0d0d0;
   margin-top: 25px;
-}
-
-div.top-buttons button {
-  margin-right: 10px;
-  margin-left: 10px;
-}
-
-div.top-buttons button.back {
-  grid-column: 1 / 1;
-}
-
-div.top-buttons button.delete {
-  grid-column: 3 / 3;
-  color: red;
-}
-input {
-  font-size: 24px;
-}
-form {
-  font-size: 20pt;
-  display: grid;
-  grid-template-columns: 1fr 150px 150px 1fr;
-
-  /* top border styling */
-  border-top: 1px solid;
   padding-top: 25px;
-  margin-top: 25px;
-}
-form * {
-  min-width: 0;
 }
 
-form > button.back {
-  grid-row: 1;
-  grid-column: 1 / span 2;
-  margin-right: 10px;
-  margin-left: 10px;
+h2,
+h3 {
+  text-align: center;
 }
 
-form > button.delete {
-  grid-row: 1;
-  grid-column: 3 / span 2;
-  margin-right: 10px;
-  margin-left: 10px;
-  color: red;
-}
-
-form > div.name {
-  grid-column: 2 / span 2;
-  grid-row: 2;
-  margin-bottom: 20px;
-}
-
-form > div.members {
-  grid-row: 3;
-  grid-column: 2 / span 2;
-}
-
-form > div.members > div {
-  width: 100%;
-  padding-bottom: 25px;
-}
-
-form > button.submit {
-  grid-column: 2 / span 2;
-  grid-row: 4;
-}
-
-div.member-list > div {
+dl {
   display: grid;
-  grid-columns: 25px 1fr 1fr 25px;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
+  align-items: center;
+  margin: 0;
 }
 
-div.member-list > div > button.up-button {
-  grid-column: 1 / 1;
-  margin-right: 10px;
+dt,
+dd {
+  border-top: 1px solid #d0d0d0;
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0.55rem 0;
 }
 
-div.member-list > div > input.name {
-  grid-column: 2 / 2;
+dt {
+  color: #555;
+  font-weight: 600;
+  padding-right: 1rem;
 }
 
-div.member-list > div > input.include {
-  grid-column: 3 / 3;
+dd {
+  overflow-wrap: anywhere;
 }
 
-div.member-list > div > button.down-button {
-  grid-column: 4 / 4;
-  margin-left: 10px;
+.members {
+  border-top: 1px solid #d0d0d0;
 }
 
-md-checkbox[ng-readonly="true"] {
-  z-index: -1;
+.member-list {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
+  gap: 1rem;
+  border-bottom: 1px solid #d0d0d0;
+  min-height: 2.25rem;
+  padding: 0.55rem 0;
+}
+
+.member-list .name {
+  font-weight: 600;
+}
+
+.member-list span {
+  overflow-wrap: anywhere;
+}
+
+@media only screen and (max-width: 600px) {
+  :host {
+    grid-template-columns: 1rem 1fr 1rem;
+  }
+
+  dl,
+  .member-list {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  dt {
+    min-height: 0;
+    padding-bottom: 0.15rem;
+  }
+
+  dd {
+    border-top: 0;
+    padding-top: 0;
+  }
 }

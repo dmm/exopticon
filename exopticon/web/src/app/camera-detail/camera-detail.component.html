@@ -21,50 +21,29 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 <ng-container>
   @if (camera$ | async; as camera) {
     <div class="camera-wrapper">
-      <h3>"{{ camera.name }}"</h3>
-      <div class="submitMessage"></div>
-      <form #cameraForm="ngForm">
-        <label>Name:</label>
-        <input [(ngModel)]="camera.name" name="name" />
-        <label>ip:</label>
-        <input [(ngModel)]="camera.ip" name="ip" />
-        <label>onvif port:</label>
-        <input [(ngModel)]="camera.onvifPort" name="onvifPort" />
-        <label>mac:</label>
-        <input [(ngModel)]="camera.mac" name="mac" />
-        <label>username:</label>
-        <input [(ngModel)]="camera.username" name="username" />
-        <label>password:</label>
-        <input [(ngModel)]="camera.password" name="password" />
-        <label>rtsp url:</label>
-        <input [(ngModel)]="camera.rtspUrl" name="rtspUrl" />
-        <label for="ptzType">Ptz Type:</label>
-        <select
-          class="form-control"
-          id="ptzType"
-          required
-          [(ngModel)]="camera.ptzType"
-          name="ptzType"
-        >
-          <option value="none">None</option>
-          <option value="onvif">Onvif</option>
-          <option value="onvif_continuous">Onvif Continuous</option>
-        </select>
-        <label>Ptz Profile Token::</label>
-        <input [(ngModel)]="camera.ptzProfileToken" name="ptzProfileToken" />
-        <label>PTZ X Step Size</label>
-        <input [(ngModel)]="camera.ptzXStepSize" name="ptzXStepSize" />
-        <label>PTZ Y Step Size</label>
-        <input [(ngModel)]="camera.ptzYStepSize" name="ptzYStepSize" />
-        <label>enabled:</label>
-        <input
-          type="checkbox"
-          [checked]="camera.enabled"
-          (change)="camera.enabled = !camera.enabled"
-          name="ptzType"
-        />
-        <button type="submit" (click)="onSubmit(camera)">Edit Camera</button>
-      </form>
+      <h3>{{ camera.metadata.displayName }}</h3>
+      <dl>
+        <dt>Name</dt>
+        <dd>{{ camera.metadata.name }}</dd>
+        <dt>Status</dt>
+        <dd>{{ camera.status.phase }}</dd>
+        <dt>Storage Group</dt>
+        <dd>{{ camera.spec.storageGroupName }}</dd>
+        <dt>IP</dt>
+        <dd>{{ camera.spec.ip }}</dd>
+        <dt>ONVIF Port</dt>
+        <dd>{{ camera.spec.onvifPort }}</dd>
+        <dt>MAC</dt>
+        <dd>{{ camera.spec.mac }}</dd>
+        <dt>Username</dt>
+        <dd>{{ camera.spec.username }}</dd>
+        <dt>RTSP URL</dt>
+        <dd>{{ camera.spec.rtspUrl }}</dd>
+        <dt>PTZ Type</dt>
+        <dd>{{ camera.spec.ptzType }}</dd>
+        <dt>Enabled</dt>
+        <dd>{{ camera.spec.enabled }}</dd>
+      </dl>
     </div>
   }
 </ng-container>

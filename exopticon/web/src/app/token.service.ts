@@ -25,11 +25,15 @@ import { Observable, throwError as observableThrowError } from "rxjs";
 import { catchError, map } from "rxjs/operators";
 
 export class Token {
+  id: string;
   name: string;
+  userName: string;
   expiration: LocalDate;
 
   constructor(dto: TokenDto) {
+    this.id = dto.id;
     this.name = dto.name;
+    this.userName = dto.userName;
     this.expiration = Instant.parse(dto.expiration)
       .atZone(ZoneId.of("Z"))
       .toLocalDate();
@@ -42,7 +46,9 @@ export class CreateUserToken {
 }
 
 interface TokenDto {
+  id: string;
   name: string;
+  userName: string;
   expiration: string;
 }
 
@@ -72,7 +78,7 @@ export class TokenService {
     );
   }
 
-  deleteToken(id: number): Observable<string> {
+  deleteToken(id: string): Observable<string> {
     let url = `${this.tokenUrl}/${id}`;
     return this.http.delete<string>(url).pipe(
       map((data) => data),

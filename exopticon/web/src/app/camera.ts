@@ -18,27 +18,42 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { v4 as uuidv4 } from "uuid";
+export type CameraName = string;
+export type CameraId = CameraName;
 
-export type CameraId = string;
-
-export class Camera {
-  id: CameraId;
-  storageGroupId: number;
+export interface ResourceMetadata {
   name: string;
+  displayName: string;
+}
+
+export interface CameraSpec {
+  storageGroupName: string;
   ip: string;
   onvifPort: number;
   mac: string;
   username: string;
-  password: string;
   rtspUrl: string;
   ptzType: string;
   ptzProfileToken: string;
   ptzXStepSize: number;
   ptzYStepSize: number;
   enabled: boolean;
-  insertedAt: string;
-  updatedAt: string;
+}
+
+export interface CameraStatus {
+  phase: "disabled" | "starting" | "running" | "stopped" | "error";
+  active: boolean;
+  lastStartedAt?: string;
+  lastPacketAt?: string;
+  codec?: string;
+  averageBitrate?: number;
+  errorMessage?: string;
+}
+
+export interface Camera {
+  metadata: ResourceMetadata;
+  spec: CameraSpec;
+  status: CameraStatus;
 }
 
 export class AnalysisConfiguration {

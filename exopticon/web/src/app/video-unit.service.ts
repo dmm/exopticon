@@ -23,6 +23,7 @@ import { Injectable } from "@angular/core";
 import { ZonedDateTime } from "@js-joda/core";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
+import { CameraName } from "./camera";
 import { Observation } from "./observation";
 import { VideoUnit } from "./video-unit";
 
@@ -38,18 +39,18 @@ export class VideoUnitService {
 
   /// Fetch video units for the specified duration.
   getVideoUnits(
-    cameraId: number,
+    cameraName: CameraName,
     beginTime: ZonedDateTime,
     endTime: ZonedDateTime,
-  ): Observable<[VideoUnit, any[], Observation[]][]> {
+  ): Observable<[VideoUnit, any[]][]> {
     return this.http
       .get<
-        [any, any[], Observation[]][]
-      >(`/v1/cameras/${cameraId}/video?begin_time=${beginTime.toString()}` + `&end_time=${endTime.toString()}`)
+        [any, any[]][]
+      >(`/v1/video_units/${cameraName}?begin_time=${beginTime.toString()}` + `&end_time=${endTime.toString()}`)
       .pipe(
         map((groups) => {
-          return groups.map(([unit, files, obs]) => {
-            return [new VideoUnit(unit), files, obs];
+          return groups.map(([unit, files]) => {
+            return [new VideoUnit(unit), files];
           });
         }),
       );
