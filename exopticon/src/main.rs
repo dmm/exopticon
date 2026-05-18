@@ -60,6 +60,10 @@ mod business;
 /// Implements database infrastructure
 mod db;
 
+/// Declarative startup configuration
+#[allow(dead_code)]
+mod config;
+
 /// Error type
 mod errors;
 
