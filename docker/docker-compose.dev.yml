@@ -32,6 +32,7 @@ services:
     devices: []
 #      - /dev/apex_0:/dev/apex_0
     volumes:
+      - ./exopticon.toml:/etc/exopticon/exopticon.toml:ro,Z
       - ..:/exopticon:Z # map source directory for development
       - $EXOPTICON_VIDEO_PATH:/video:Z
       - cargo_home:/cargo
