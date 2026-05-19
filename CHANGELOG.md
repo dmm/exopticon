@@ -2,6 +2,24 @@
 
 <!--- next entry here -->
 
+## 0.41.0
+2026-05-19
+
+### Features
+
+- Add Config parsing (012b16fc84aad8ce3677f2638bbd163ad87edbc9)
+- Add migration and api changes for control/data plane split (7014b86a30b32917e58552ab994e77d8d2d99839)
+- Update frontend for config/data plane split (3318de5af77e8d167e0f9fd92ee2be3cdde840bd)
+- Add separate video/audio codecs (788b657d9de10209065ec8bcc4b1a7d65744bc1c)
+- Add config example (6f9e0667362cd14199011d625328aae0f0ff8a9f)
+
+### Fixes
+
+- Update metrics for latest rustc compat (66bdfe55e0056cbcaf56d2b5bccb89a644a263a9)
+- axum route captures (b3d8971b0787542cebe5ce145a30e01752160acd)
+- Add exopticon.toml volume (9428de3b1c127e72d263d9957d8c3112a36b578d)
+- appease clippy and remove last_packet_at status field (54a4dfa99e50dee7a7a7fc08b53a0d505920afae)
+
 ## 0.40.0
 2026-05-06
 
