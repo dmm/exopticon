@@ -222,33 +222,34 @@ impl CaptureActor {
 
         let now = Instant::now();
         let should_update = codec_changed
-            || match self.last_packet_status_update_at {
-                Some(last_update) => last_update.elapsed() >= PACKET_STATUS_UPDATE_INTERVAL,
-                None => true,
-            };
+            || self
+                .last_packet_status_update_at
+                .is_none_or(|last_update| last_update.elapsed() >= PACKET_STATUS_UPDATE_INTERVAL);
+
         if !should_update {
             return;
         }
 
-        let last_packet_at = Utc::now();
         let mut statuses = self.camera_status_registry.write().await;
         let (last_started_at, average_bitrate) = statuses
             .get(&self.camera.name)
-            .map(|status| (status.last_started_at, status.average_bitrate))
-            .unwrap_or((None, None));
+            .map_or((None, None), |status| {
+                (status.last_started_at, status.average_bitrate)
+            });
+
         statuses.insert(
             self.camera.name.clone(),
             CameraStatus {
                 phase: "running".to_string(),
                 active: true,
                 last_started_at,
-                last_packet_at: Some(last_packet_at),
                 video_codec: self.video_codec.clone(),
                 audio_codec: self.audio_codec.clone(),
                 average_bitrate,
                 error_message: None,
             },
         );
+        drop(statuses);
         self.last_packet_status_update_at = Some(now);
     }
 
@@ -405,7 +406,6 @@ impl CaptureActor {
                     phase: "error".to_string(),
                     active: false,
                     last_started_at: None,
-                    last_packet_at: None,
                     video_codec: self.video_codec.clone(),
                     audio_codec: self.audio_codec.clone(),
                     average_bitrate: None,
@@ -416,7 +416,6 @@ impl CaptureActor {
                     phase: "stopped".to_string(),
                     active: false,
                     last_started_at: None,
-                    last_packet_at: None,
                     video_codec: self.video_codec.clone(),
                     audio_codec: self.audio_codec.clone(),
                     average_bitrate: None,

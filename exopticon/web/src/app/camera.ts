@@ -44,7 +44,6 @@ export interface CameraStatus {
   phase: "disabled" | "starting" | "running" | "stopped" | "error";
   active: boolean;
   lastStartedAt?: string;
-  lastPacketAt?: string;
   videoCodec?: string;
   audioCodec?: string;
   averageBitrate?: number;
