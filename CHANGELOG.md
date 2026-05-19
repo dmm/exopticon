@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.41.1
+2026-05-19
+
+### Fixes
+
+- Change CameraPanelService to use signals (ccead2131a8c1855e05c252c30b5b2764be7fa05)
+
 ## 0.41.0
 2026-05-19
 
