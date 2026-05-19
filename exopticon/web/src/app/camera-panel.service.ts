@@ -18,8 +18,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { Injectable } from "@angular/core";
-import { concat, defer, forkJoin, fromEvent, of } from "rxjs";
+import { computed, effect, Injectable, OnDestroy, signal } from "@angular/core";
+import { concat, defer, forkJoin, fromEvent, of, Subscription } from "rxjs";
 import { map } from "rxjs/operators";
 import { Camera, CameraId } from "./camera";
 import { ALL_GROUP_NAME, CameraGroup, CameraGroupId } from "./camera-group";
@@ -27,10 +27,10 @@ import { CameraGroupService } from "./camera-group.service";
 import { CameraService, PtzDirection } from "./camera.service";
 import { ActivePair, WebrtcService } from "./webrtc.service";
 
-class PanelCamera {
-  camera: Camera;
-  inViewport: boolean;
-  enabled: ActivePair;
+interface PanelCamera {
+  readonly camera: Camera;
+  readonly inViewport: boolean;
+  readonly enabled: ActivePair;
 }
 
 enum SelectionMode {
@@ -38,75 +38,108 @@ enum SelectionMode {
   Mouse,
 }
 
+interface CameraPanelCameraProjection {
+  readonly camera: Camera;
+  readonly enabled: boolean;
+}
+
+interface CameraPanelProjection {
+  readonly tiles: readonly CameraPanelCameraProjection[];
+  readonly layout: CameraPanelLayoutViewModel;
+  readonly offset: number;
+  readonly activeCameraGroupName: string;
+  readonly prevCameraGroupId: CameraGroupId | null;
+  readonly nextCameraGroupId: CameraGroupId | null;
+  readonly activeCameras: ReadonlyMap<CameraId, ActivePair>;
+}
+
+export interface CameraPanelTileViewModel {
+  readonly camera: Camera;
+  readonly selected: boolean;
+  readonly enabled: boolean;
+}
+
+export interface CameraPanelLayoutViewModel {
+  readonly columnCount: number;
+  readonly rowCount: number;
+  readonly itemWidthPercent: number;
+  readonly itemHeightVh: number | null;
+  readonly usesIntrinsicWidthSpacer: boolean;
+}
+
+export interface CameraPanelViewModel {
+  readonly tiles: readonly CameraPanelTileViewModel[];
+  readonly layout: CameraPanelLayoutViewModel;
+  readonly offset: number;
+  readonly activeCameraGroupName: string;
+  readonly prevCameraGroupId: CameraGroupId | null;
+  readonly nextCameraGroupId: CameraGroupId | null;
+}
+
 @Injectable()
-export class CameraPanelService {
+export class CameraPanelService implements OnDestroy {
   // value between 0.0 and 1.0 inclusive representing how much of each
   // CameraView has to overlap the viewport to activate.
-  intersectionThreshold = 0.1;
+  readonly intersectionThreshold = 0.1;
 
-  //
-  // Public binding properties
-  // These public properties are exported for templates to bind against.
-  //
+  private readonly panelCameras = signal<ReadonlyMap<CameraId, PanelCamera>>(
+    new Map(),
+  );
+  private readonly cameraGroups = signal<
+    ReadonlyMap<CameraGroupId, CameraGroup>
+  >(new Map());
+  private readonly columnCount = signal(1);
+  private readonly rowCount = signal(-1);
+  private readonly offset = signal(0);
+  private readonly selectedCameraId = signal<CameraId | null>(null);
+  private selectedCameraMode = SelectionMode.Mouse;
+  private readonly keyboardControlCameraId = signal<CameraId | null>(null);
+  private readonly activeCameraGroupId = signal<CameraGroupId | null>(null);
+  private readonly desiredCameraGroupId = signal<CameraGroupId | null>(null);
+  private readonly pageVisible = signal(false);
 
-  // cameras
-  cameras: Camera[] = [];
-  cameraDesiredState: boolean[] = [];
+  private readonly cameraProjection = computed(() => this.projectCameraPanel());
 
-  // panel column count
-  columnCount: number = 1;
+  readonly vm = computed<CameraPanelViewModel>(() => {
+    const projection = this.cameraProjection();
+    const selectedCameraId = this.selectedCameraId();
 
-  // panel row count
-  rowCount: number = -1;
-
-  // camera offset
-  offset: number = 0;
-
-  // id of currently selected camera or -1
-  selectedCameraId: CameraId = null;
-
-  // Whether camera was selected by touch or mouse
-  selectedCameraMode = SelectionMode.Mouse;
-
-  //
-  keyboardControlCameraId: CameraId = null;
-
-  // Active camera group id, 0 for all cameras aka no group
-  activeCameraGroupId: CameraGroupId = null;
-
-  activeCameraGroupName: string = "All";
-
-  desiredCameraGroupId: CameraGroupId = null;
-
-  nextCameraGroupId: CameraGroupId = null;
-
-  prevCameraGroupId: CameraGroupId = null;
-
-  //
-  // End public binding properties
-  //
+    return {
+      tiles: projection.tiles.map((tile) => ({
+        camera: tile.camera,
+        enabled: tile.enabled,
+        selected: tile.camera.metadata.name === selectedCameraId,
+      })),
+      layout: projection.layout,
+      offset: projection.offset,
+      activeCameraGroupName: projection.activeCameraGroupName,
+      prevCameraGroupId: projection.prevCameraGroupId,
+      nextCameraGroupId: projection.nextCameraGroupId,
+    };
+  });
 
   //
   // Public binding handlers
   //
   setMute(id: CameraId, muted: boolean) {
-    let p = this.unsortedCameras.get(id);
-    if (p) {
-      p.enabled.audio = !muted;
-      this.unsortedCameras.set(id, p);
+    const panelCameras = new Map(this.panelCameras());
+    const panelCamera = panelCameras.get(id);
+
+    if (panelCamera) {
+      panelCameras.set(id, {
+        ...panelCamera,
+        enabled: {
+          ...panelCamera.enabled,
+          audio: !muted,
+        },
+      });
+      this.panelCameras.set(panelCameras);
     }
-    this.projectCameras();
   }
 
   //
   // End public event handlers
   //
-
-  // Unsorted cameras
-  private unsortedCameras: Map<CameraId, PanelCamera> = new Map();
-
-  // Camera groups
-  private cameraGroups: Map<CameraGroupId, CameraGroup> = new Map();
 
   // page visible observable
   private pageVisible$ = concat(
@@ -114,41 +147,58 @@ export class CameraPanelService {
     fromEvent(document, "visibilitychange").pipe(map(() => !document.hidden)),
   );
 
-  private pageVisible: boolean = false;
+  private pageVisibleSubscription: Subscription;
 
-  private setCameraTimeout = null;
-
-  private projectCameraTimeout = null;
+  private setCameraTimeout: ReturnType<typeof setTimeout> | null = null;
+  private activeCameraTimeout: ReturnType<typeof setTimeout> | null = null;
+  private activeCamerasToApply = new Map<CameraId, ActivePair>();
 
   constructor(
     private cameraService: CameraService,
     private cameraGroupService: CameraGroupService,
     private webrtcService: WebrtcService,
   ) {
-    this.pageVisible$.subscribe((visible) => {
-      this.pageVisible = visible;
-      if (this.pageVisible) {
+    effect(() => {
+      const activeCameras = new Map(this.cameraProjection().activeCameras);
+      this.scheduleActiveCameraUpdate(activeCameras);
+    });
+
+    this.pageVisibleSubscription = this.pageVisible$.subscribe((visible) => {
+      this.pageVisible.set(visible);
+      if (visible) {
         this.setCameras();
         this.webrtcService.enable();
       } else {
-        // This should disable cameras when page hidden.
-        this.projectCameras();
         this.webrtcService.disable();
       }
     });
   }
 
-  private rotateArray(arr: Array<any>, length: number): Array<any> {
+  ngOnDestroy() {
+    this.pageVisibleSubscription.unsubscribe();
+
+    if (this.setCameraTimeout !== null) {
+      clearTimeout(this.setCameraTimeout);
+      this.setCameraTimeout = null;
+    }
+
+    if (this.activeCameraTimeout !== null) {
+      clearTimeout(this.activeCameraTimeout);
+      this.activeCameraTimeout = null;
+    }
+  }
+
+  private rotateArray<T>(arr: T[], length: number): T[] {
     if (arr.length === 0) return [];
     arr = arr.slice();
 
     if (length > 0) {
       for (let i = 0; i < length; i++) {
-        arr.unshift(arr.pop());
+        arr.unshift(arr.pop()!);
       }
     } else {
       for (let i = 0; i < Math.abs(length); i++) {
-        arr.push(arr.shift());
+        arr.push(arr.shift()!);
       }
     }
 
@@ -158,6 +208,17 @@ export class CameraPanelService {
   private registerSetCameras() {
     if (this.setCameraTimeout == null) {
       this.setCameraTimeout = setTimeout(() => this.setCameras(), 2000);
+    }
+  }
+
+  private scheduleActiveCameraUpdate(activeCameras: Map<CameraId, ActivePair>) {
+    this.activeCamerasToApply = activeCameras;
+
+    if (this.activeCameraTimeout === null) {
+      this.activeCameraTimeout = setTimeout(() => {
+        this.activeCameraTimeout = null;
+        this.webrtcService.updateActiveCameras(this.activeCamerasToApply);
+      }, 200);
     }
   }
 
@@ -173,26 +234,35 @@ export class CameraPanelService {
         let cameras = res.cameras;
         let cameraGroups = res.cameraGroups;
 
-        this.unsortedCameras.clear();
+        const existingPanelCameras = this.panelCameras();
+        const panelCameras = new Map<CameraId, PanelCamera>();
         cameras
           .filter((c) => c.spec.enabled)
           .forEach((c) => {
-            let camera = new PanelCamera();
-            camera.camera = c;
-            camera.inViewport = false;
-            camera.enabled = {
-              video: true,
-              audio: false,
-            };
-            this.unsortedCameras.set(camera.camera.metadata.name, camera);
+            const existingPanelCamera = existingPanelCameras.get(
+              c.metadata.name,
+            );
+
+            panelCameras.set(c.metadata.name, {
+              camera: c,
+              inViewport: existingPanelCamera?.inViewport ?? false,
+              enabled: existingPanelCamera?.enabled ?? {
+                video: true,
+                audio: false,
+              },
+            });
           });
 
-        this.cameraGroups.clear();
+        const cameraGroupMap = new Map<CameraGroupId, CameraGroup>();
         cameraGroups.forEach((group) => {
-          this.cameraGroups.set(group.metadata.name, group);
+          cameraGroupMap.set(group.metadata.name, group);
         });
 
-        this.projectCameras();
+        this.panelCameras.set(panelCameras);
+        this.cameraGroups.set(cameraGroupMap);
+        this.activeCameraGroupId.set(
+          this.resolveCameraGroupId(this.desiredCameraGroupId()),
+        );
       })
       .catch((err) => {
         console.log(err);
@@ -200,108 +270,147 @@ export class CameraPanelService {
       });
   }
 
-  private projectCameras() {
-    if (this.projectCameraTimeout === null) {
-      this.projectCameraTimeout = setTimeout(
-        () => this.realProjectCameras(),
-        200,
-      );
-    }
-  }
+  private projectCameraPanel(): CameraPanelProjection {
+    const panelCameras = this.panelCameras();
+    const cameraGroups = this.cameraGroups();
+    const columnCount = this.columnCount();
+    const rowCount = this.rowCount();
+    const offset = this.offset();
+    const activeCameraGroupId = this.activeCameraGroupId();
+    const cameraGroup =
+      activeCameraGroupId === null
+        ? undefined
+        : cameraGroups.get(activeCameraGroupId);
+    const layout = this.buildLayout(columnCount, rowCount);
 
-  private realProjectCameras() {
-    this.projectCameraTimeout = null;
-    if (this.desiredCameraGroupId === null) {
-      this.desiredCameraGroupId = ALL_GROUP_NAME;
-    }
-
-    if (this.activeCameraGroupId === null) {
-      this.activeCameraGroupId = ALL_GROUP_NAME;
-    }
-
-    this.setCameraGroup(this.desiredCameraGroupId);
-    let groupCameras: PanelCamera[] = new Array();
-    let cameraGroup = this.cameraGroups.get(this.activeCameraGroupId);
     if (cameraGroup === undefined) {
-      return;
+      return {
+        tiles: [],
+        layout,
+        offset,
+        activeCameraGroupName: "All",
+        prevCameraGroupId: this.prevCameraGroup(
+          cameraGroups,
+          activeCameraGroupId,
+        ),
+        nextCameraGroupId: this.nextCameraGroup(
+          cameraGroups,
+          activeCameraGroupId,
+        ),
+        activeCameras: new Map(),
+      };
     }
+
+    let groupCameras: PanelCamera[] = [];
     cameraGroup.spec.members.forEach((cameraId) => {
-      const c = this.unsortedCameras.get(cameraId);
+      const c = panelCameras.get(cameraId);
       if (c !== undefined) {
         groupCameras.push(c);
       }
     });
 
-    this.nextCameraGroupId = this.nextCameraGroup();
-    this.prevCameraGroupId = this.prevCameraGroup();
-
     let cameraCount = 0;
-    if (this.rowCount < 1) {
-      cameraCount = this.unsortedCameras.size;
+    if (rowCount < 1) {
+      cameraCount = panelCameras.size;
     } else {
-      cameraCount = this.rowCount * this.columnCount;
+      cameraCount = rowCount * columnCount;
     }
 
-    this.cameras = this.rotateArray(
+    const cameras = this.rotateArray(
       groupCameras.map((c: PanelCamera) => c.camera),
-      this.offset,
+      offset,
     ).slice(0, cameraCount);
 
-    // this isn't great...
     let activeCameras = new Map<CameraId, ActivePair>();
-    this.cameraDesiredState = this.cameras.map((c) => {
-      let p = this.unsortedCameras.get(c.metadata.name);
+    const tiles = cameras.map((c) => {
+      let p = panelCameras.get(c.metadata.name);
       if (p === undefined) {
-        return false;
+        return {
+          camera: c,
+          enabled: false,
+        };
       }
       let active =
         p.inViewport &&
         (p.enabled.video || p.enabled.audio) &&
-        this.pageVisible;
+        this.pageVisible();
       if (active) {
-        activeCameras.set(c.metadata.name, p.enabled);
+        activeCameras.set(c.metadata.name, { ...p.enabled });
       }
 
-      return active;
+      return {
+        camera: c,
+        enabled: active,
+      };
     });
-    this.webrtcService.updateActiveCameras(activeCameras);
+
+    return {
+      tiles,
+      layout,
+      offset,
+      activeCameraGroupName: cameraGroup.metadata.displayName,
+      prevCameraGroupId: this.prevCameraGroup(
+        cameraGroups,
+        activeCameraGroupId,
+      ),
+      nextCameraGroupId: this.nextCameraGroup(
+        cameraGroups,
+        activeCameraGroupId,
+      ),
+      activeCameras,
+    };
+  }
+
+  private buildLayout(
+    columnCount: number,
+    rowCount: number,
+  ): CameraPanelLayoutViewModel {
+    return {
+      columnCount,
+      rowCount,
+      itemWidthPercent: 100 / columnCount,
+      itemHeightVh: rowCount > 0 ? 100 / rowCount : null,
+      usesIntrinsicWidthSpacer: rowCount === -1,
+    };
   }
 
   setRows(rowCount: number) {
-    this.rowCount = rowCount;
+    this.rowCount.set(rowCount);
   }
 
   setCols(colCount: number) {
-    this.columnCount = colCount;
+    this.columnCount.set(colCount);
   }
 
   setOffset(offset: number) {
-    this.offset = offset;
-    this.projectCameras();
+    this.offset.set(offset);
   }
 
   setCameraVisibility(
     cameraId: CameraId,
     intersectionEvents: IntersectionObserverEntry[],
   ) {
-    let panelCamera = this.unsortedCameras.get(cameraId);
+    const panelCameras = new Map(this.panelCameras());
+    let panelCamera = panelCameras.get(cameraId);
 
     if (panelCamera !== undefined) {
-      panelCamera.inViewport = intersectionEvents.some(
-        (e) => e.intersectionRatio >= this.intersectionThreshold,
-      );
+      panelCameras.set(cameraId, {
+        ...panelCamera,
+        inViewport: intersectionEvents.some(
+          (e) => e.intersectionRatio >= this.intersectionThreshold,
+        ),
+      });
+      this.panelCameras.set(panelCameras);
     }
-
-    this.projectCameraTimeout;
-    this.projectCameras();
   }
 
   ptz(direction: PtzDirection) {
-    let camera = this.cameras.find(
-      (c) => c.metadata.name === this.selectedCameraId,
+    const selectedCameraId = this.selectedCameraId();
+    let tile = this.cameraProjection().tiles.find(
+      (t) => t.camera.metadata.name === selectedCameraId,
     );
-    if (camera) {
-      this.cameraService.ptz(camera.metadata.name, direction);
+    if (tile) {
+      this.cameraService.ptz(tile.camera.metadata.name, direction);
     }
   }
 
@@ -309,63 +418,76 @@ export class CameraPanelService {
   unmute(cameraId: CameraId) {}
 
   touchCamera(cameraId: CameraId) {
-    if (this.selectedCameraId !== cameraId) {
-      this.selectedCameraId = cameraId;
-      this.keyboardControlCameraId = cameraId;
+    if (this.selectedCameraId() !== cameraId) {
+      this.selectedCameraId.set(cameraId);
+      this.keyboardControlCameraId.set(cameraId);
       this.selectedCameraMode = SelectionMode.Touch;
-    } else if (this.selectedCameraId === cameraId) {
-      this.selectedCameraId = null;
-      this.keyboardControlCameraId = null;
+    } else if (this.selectedCameraId() === cameraId) {
+      this.selectedCameraId.set(null);
+      this.keyboardControlCameraId.set(null);
       this.selectedCameraMode = SelectionMode.Touch;
     }
   }
 
   mouseOver(cameraId: CameraId) {
     if (
-      this.selectedCameraId === cameraId &&
+      this.selectedCameraId() === cameraId &&
       this.selectedCameraMode === SelectionMode.Mouse
     ) {
       // clear selected camera on second touch
-      this.selectedCameraId = null;
+      this.selectedCameraId.set(null);
     } else if (this.selectedCameraMode === SelectionMode.Mouse) {
-      this.selectedCameraId = cameraId;
-      this.keyboardControlCameraId = cameraId;
+      this.selectedCameraId.set(cameraId);
+      this.keyboardControlCameraId.set(cameraId);
       this.selectedCameraMode = SelectionMode.Mouse;
     }
   }
 
   mouseLeave() {
     if (this.selectedCameraMode === SelectionMode.Mouse) {
-      this.selectedCameraId = null;
-      this.keyboardControlCameraId = null;
+      this.selectedCameraId.set(null);
+      this.keyboardControlCameraId.set(null);
     }
   }
 
-  setDesiredCameraGroup(cameraGroupId: CameraGroupId) {
-    this.desiredCameraGroupId = cameraGroupId;
-    this.projectCameras();
+  setDesiredCameraGroup(cameraGroupId: CameraGroupId | null) {
+    this.desiredCameraGroupId.set(cameraGroupId);
+    this.activeCameraGroupId.set(this.resolveCameraGroupId(cameraGroupId));
   }
 
-  private setCameraGroup(cameraGroupId: CameraGroupId) {
-    // check validity of cameraGroupId
-    if (cameraGroupId !== null && !this.cameraGroups.has(cameraGroupId)) {
-      return false;
-    }
-    this.activeCameraGroupId = cameraGroupId;
+  private resolveCameraGroupId(
+    cameraGroupId: CameraGroupId | null,
+  ): CameraGroupId | null {
+    const cameraGroups = this.cameraGroups();
+    const desiredCameraGroupId = cameraGroupId ?? ALL_GROUP_NAME;
 
-    if (cameraGroupId !== null) {
-      let cameraGroup = this.cameraGroups.get(cameraGroupId);
-      this.activeCameraGroupName = cameraGroup.metadata.displayName;
-    } else {
-      this.activeCameraGroupName = "All";
+    if (cameraGroups.has(desiredCameraGroupId)) {
+      return desiredCameraGroupId;
     }
-    return true;
+
+    const activeCameraGroupId = this.activeCameraGroupId();
+    if (activeCameraGroupId !== null && cameraGroups.has(activeCameraGroupId)) {
+      return activeCameraGroupId;
+    }
+
+    if (cameraGroups.has(ALL_GROUP_NAME)) {
+      return ALL_GROUP_NAME;
+    }
+
+    return null;
   }
 
-  nextCameraGroup(): CameraGroupId {
-    let ids = Array.from(this.cameraGroups.keys());
+  private nextCameraGroup(
+    cameraGroups: ReadonlyMap<CameraGroupId, CameraGroup>,
+    activeCameraGroupId: CameraGroupId | null,
+  ): CameraGroupId | null {
+    let ids = Array.from(cameraGroups.keys());
+    if (ids.length === 0) {
+      return null;
+    }
     ids.sort();
-    let currentIndex = ids.indexOf(this.activeCameraGroupId);
+    let currentIndex =
+      activeCameraGroupId === null ? -1 : ids.indexOf(activeCameraGroupId);
     let nextIndex = currentIndex + 1;
     if (nextIndex >= ids.length) {
       // ALL group
@@ -375,11 +497,18 @@ export class CameraPanelService {
     }
   }
 
-  prevCameraGroup(): CameraGroupId {
-    let ids = Array.from(this.cameraGroups.keys());
+  private prevCameraGroup(
+    cameraGroups: ReadonlyMap<CameraGroupId, CameraGroup>,
+    activeCameraGroupId: CameraGroupId | null,
+  ): CameraGroupId | null {
+    let ids = Array.from(cameraGroups.keys());
+    if (ids.length === 0) {
+      return null;
+    }
     ids.sort();
     ids.reverse();
-    let currentIndex = ids.indexOf(this.activeCameraGroupId);
+    let currentIndex =
+      activeCameraGroupId === null ? -1 : ids.indexOf(activeCameraGroupId);
     let prevIndex = currentIndex + 1;
 
     if (prevIndex >= ids.length) {

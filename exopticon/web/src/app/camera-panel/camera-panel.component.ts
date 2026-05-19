@@ -99,15 +99,22 @@ export class CameraPanelComponent implements OnInit {
 
   @HostListener("window:keyup", ["$event"])
   KeyEvent(event: KeyboardEvent) {
-    let offset = this.cameraPanelService.offset;
+    const vm = this.cameraPanelService.vm();
+    const cameraCount = vm.tiles.length;
+    let offset = vm.offset;
+
     switch (event.keyCode) {
       case 78:
         // 'n'
-        offset = (offset + 1) % this.cameraPanelService.cameras.length;
+        if (cameraCount > 0) {
+          offset = (offset + 1) % cameraCount;
+        }
         break;
       case 80:
         // 'p'
-        offset = (offset - 1) % this.cameraPanelService.cameras.length;
+        if (cameraCount > 0) {
+          offset = (offset - 1) % cameraCount;
+        }
         break;
       case 65:
         // 'a'
@@ -127,7 +134,7 @@ export class CameraPanelComponent implements OnInit {
         break;
     }
 
-    if (offset !== this.cameraPanelService.offset) {
+    if (offset !== vm.offset) {
       this.router.navigate(
         ["./", this.merge({ offset: offset }, this.route.snapshot.params)],
         {
@@ -160,11 +167,10 @@ export class CameraPanelComponent implements OnInit {
     this.cameraVisibility.set(cameraId, visible);
   }
 
-  setCameraGroup(newGroupId: CameraGroupId) {
-    let route: ActivatedRoute;
+  setCameraGroup(newGroupId: CameraGroupId | null) {
     const newUrl = this.router.createUrlTree(
       [this.merge({ group: newGroupId }, this.route.snapshot.params)],
-      { relativeTo: route },
+      { relativeTo: this.route },
     );
     this.router.navigateByUrl(newUrl);
   }

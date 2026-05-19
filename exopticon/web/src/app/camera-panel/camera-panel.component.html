@@ -17,20 +17,22 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
+@let vm = cameraPanelService.vm();
+
 @if (!fullscreen) {
   <div class="group-selector">
     <button
       class="prev"
       type="button"
-      (click)="setCameraGroup(this.cameraPanelService.prevCameraGroupId)"
+      (click)="setCameraGroup(vm.prevCameraGroupId)"
     >
       PREV GROUP
     </button>
-    <div class="group-name">{{ cameraPanelService.activeCameraGroupName }}</div>
+    <div class="group-name">{{ vm.activeCameraGroupName }}</div>
     <button
       class="next"
       type="button"
-      (click)="setCameraGroup(this.cameraPanelService.nextCameraGroupId)"
+      (click)="setCameraGroup(vm.nextCameraGroupId)"
     >
       NEXT GROUP
     </button>
@@ -43,41 +45,40 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   }
 
-  @for (camera of cameraPanelService.cameras; track camera; let i = $index) {
+  @for (tile of vm.tiles; track tile.camera.metadata.name) {
     <div
       class="wrapper"
       (touchstart)="
-        cameraPanelService.touchCamera(camera.metadata.name);
+        cameraPanelService.touchCamera(tile.camera.metadata.name);
         $event.stopPropagation()
       "
       (mouseenter)="
-        cameraPanelService.mouseOver(camera.metadata.name);
+        cameraPanelService.mouseOver(tile.camera.metadata.name);
         $event.stopPropagation()
       "
       (mouseleave)="
-        cameraPanelService.mouseLeave(camera.metadata.name);
+        cameraPanelService.mouseLeave(tile.camera.metadata.name);
         $event.stopPropagation()
       "
-      [style.width.%]="100 / cameraPanelService.columnCount"
-      [style.height.vh]="100 / cameraPanelService.rowCount"
+      [style.width.%]="vm.layout.itemWidthPercent"
+      [style.height.vh]="vm.layout.itemHeightVh"
     >
-      @if (cameraPanelService.rowCount === -1) {
+      @if (vm.layout.usesIntrinsicWidthSpacer) {
         <div class="camera-width"></div>
       }
       <div
         class="content"
         (waIntersectionObservee)="
-          cameraPanelService.setCameraVisibility(camera.metadata.name, $event)
+          cameraPanelService.setCameraVisibility(
+            tile.camera.metadata.name,
+            $event
+          )
         "
       >
         <app-camera-view
-          [camera]="camera"
-          [selected]="
-            cameraPanelService.selectedCameraId === camera.metadata.name
-          "
-          [enabled]="cameraPanelService.cameraDesiredState[i]"
-          [videoService]="videoService"
-          [resolution]="cameraPanelService.resolution"
+          [camera]="tile.camera"
+          [selected]="tile.selected"
+          [enabled]="tile.enabled"
         >
         </app-camera-view>
       </div>
