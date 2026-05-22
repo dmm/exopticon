@@ -47,8 +47,7 @@ impl super::Service {
         &self,
         group_name: &str,
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
-        let mut conn = self.pool.get()?;
-        conn.transaction::<_, super::Error, _>(|conn| {
+        db_read!(self, "fetch_camera_group", |conn| {
             let c = camera_groups::dsl::camera_groups
                 .find(group_name)
                 .get_result::<CameraGroup>(conn)?;
@@ -76,8 +75,7 @@ impl super::Service {
     pub fn fetch_all_camera_groups(
         &self,
     ) -> Result<Vec<crate::api::camera_groups::CameraGroup>, super::Error> {
-        let mut conn = self.pool.get()?;
-        conn.transaction::<_, super::Error, _>(|conn| {
+        db_read!(self, "fetch_all_camera_groups", |conn| {
             let groups = camera_groups::dsl::camera_groups.load::<CameraGroup>(conn)?;
 
             let mut groups2 = Vec::new();

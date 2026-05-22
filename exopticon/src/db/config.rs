@@ -19,7 +19,7 @@
  */
 
 use diesel::upsert::excluded;
-use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 
 use crate::{
     config::{Camera, CameraGroup, StorageGroup, User, ValidatedConfig},
@@ -30,9 +30,7 @@ use super::Service;
 
 impl Service {
     pub fn apply_config(&self, config: &ValidatedConfig) -> Result<(), super::Error> {
-        let mut conn = self.pool.get()?;
-
-        conn.transaction::<_, super::Error, _>(|conn| {
+        db_write!(self, "apply_config", |conn| {
             for group in &config.storage_groups {
                 upsert_storage_group(conn, group)?;
             }

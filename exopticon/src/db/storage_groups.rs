@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 
 use crate::{
     api::{ResourceMetadata, storage_groups::StorageGroupSpec},
@@ -66,25 +66,25 @@ impl super::Service {
         &self,
         storage_group_name: &str,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
-        use crate::schema::storage_groups::dsl;
-        let mut conn = self.pool.get()?;
+        db_read!(self, "fetch_storage_group", |conn| {
+            use crate::schema::storage_groups::dsl;
+            let group = dsl::storage_groups
+                .find(storage_group_name)
+                .get_result::<StorageGroup>(conn)?;
 
-        let group = dsl::storage_groups
-            .find(storage_group_name)
-            .get_result::<StorageGroup>(&mut conn)?;
-
-        Ok(group.into())
+            Ok(group.into())
+        })
     }
 
     pub fn fetch_all_storage_groups(
         &self,
     ) -> Result<Vec<crate::api::storage_groups::StorageGroup>, super::Error> {
-        use crate::schema::storage_groups::dsl;
-        let mut conn = self.pool.get()?;
+        db_read!(self, "fetch_all_storage_groups", |conn| {
+            use crate::schema::storage_groups::dsl;
+            let groups = dsl::storage_groups.load::<StorageGroup>(conn)?;
 
-        let groups = dsl::storage_groups.load::<StorageGroup>(&mut conn)?;
-
-        Ok(groups.into_iter().map(std::convert::Into::into).collect())
+            Ok(groups.into_iter().map(std::convert::Into::into).collect())
+        })
     }
 
     pub fn fetch_storage_group_old_units(
@@ -92,41 +92,41 @@ impl super::Service {
         storage_group_name: &str,
         count: i64,
     ) -> Result<StorageGroupOldFiles, super::Error> {
-        use crate::schema::{cameras, video_files, video_units};
+        db_read!(self, "fetch_storage_group_old_units", |conn| {
+            use crate::schema::{cameras, video_files, video_units};
 
-        let mut conn = self.pool.get()?;
+            let storage_group_capacity = storage_groups::dsl::storage_groups
+                .select(storage_groups::max_storage_size)
+                .filter(storage_groups::columns::name.eq(storage_group_name))
+                .first::<i64>(conn)?;
 
-        let storage_group_capacity = storage_groups::dsl::storage_groups
-            .select(storage_groups::max_storage_size)
-            .filter(storage_groups::columns::name.eq(storage_group_name))
-            .first::<i64>(&mut conn)?;
+            let storage_group_size = video_files::table
+                .select(diesel::dsl::sum(video_files::size))
+                .inner_join(video_units::table.inner_join(cameras::table))
+                .filter(cameras::storage_group_name.eq(storage_group_name))
+                .filter(video_files::size.ne(-1))
+                .first::<Option<i64>>(conn)?
+                .unwrap_or(0);
 
-        let storage_group_size = video_files::table
-            .select(diesel::dsl::sum(video_files::size))
-            .inner_join(video_units::table.inner_join(cameras::table))
-            .filter(cameras::storage_group_name.eq(storage_group_name))
-            .filter(video_files::size.ne(-1))
-            .first::<Option<i64>>(&mut conn)?
-            .unwrap_or(0);
+            let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras::table
+                .inner_join(video_units::table.inner_join(video_files::table))
+                .filter(cameras::storage_group_name.eq(storage_group_name))
+                .filter(video_files::size.gt(-1))
+                .filter(video_units::begin_time_us.ne(video_units::end_time_us))
+                .order(video_units::begin_time_us.asc())
+                .limit(count)
+                .load(conn)?;
 
-        let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras::table
-            .inner_join(video_units::table.inner_join(video_files::table))
-            .filter(cameras::storage_group_name.eq(storage_group_name))
-            .filter(video_files::size.gt(-1))
-            .filter(video_units::begin_time_us.ne(video_units::end_time_us))
-            .order(video_units::begin_time_us.asc())
-            .limit(count)
-            .load(&mut conn)?;
+            let units = c
+                .into_iter()
+                .map(|(_c, (unit, file))| (file.size.into(), unit, file))
+                .collect();
 
-        let units = c
-            .into_iter()
-            .map(|(_c, (unit, file))| (file.size.into(), unit, file))
-            .collect();
-
-        Ok(StorageGroupOldFiles {
-            storage_group_capacity,
-            storage_group_size,
-            video_units: units,
+            Ok(StorageGroupOldFiles {
+                storage_group_capacity,
+                storage_group_size,
+                video_units: units,
+            })
         })
     }
 }

@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{QueryDsl, RunQueryDsl};
+use diesel::{Connection, QueryDsl, RunQueryDsl};
 
 use crate::{
     api::{
@@ -89,13 +89,13 @@ impl From<Camera> for crate::api::cameras::Camera {
 
 impl super::Service {
     pub fn fetch_camera_row(&self, camera_name: &str) -> Result<Camera, super::Error> {
-        let mut conn = self.pool.get()?;
+        db_read!(self, "fetch_camera_row", |conn| {
+            let c = crate::schema::cameras::dsl::cameras
+                .find(camera_name)
+                .get_result::<Camera>(conn)?;
 
-        let c = crate::schema::cameras::dsl::cameras
-            .find(camera_name)
-            .get_result::<Camera>(&mut conn)?;
-
-        Ok(c)
+            Ok(c)
+        })
     }
 
     pub fn fetch_camera(
@@ -106,10 +106,10 @@ impl super::Service {
     }
 
     pub fn fetch_all_camera_rows(&self) -> Result<Vec<Camera>, super::Error> {
-        let mut conn = self.pool.get()?;
-
-        let cameras: Vec<Camera> = crate::schema::cameras::dsl::cameras.load(&mut conn)?;
-        Ok(cameras)
+        db_read!(self, "fetch_all_camera_rows", |conn| {
+            let cameras: Vec<Camera> = crate::schema::cameras::dsl::cameras.load(conn)?;
+            Ok(cameras)
+        })
     }
 
     pub fn fetch_all_cameras(&self) -> Result<Vec<crate::api::cameras::Camera>, super::Error> {

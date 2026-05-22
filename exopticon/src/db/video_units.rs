@@ -116,31 +116,32 @@ impl Service {
         video_unit: &crate::api::video_units::CreateVideoUnit,
         video_file: crate::api::video_units::CreateVideoFile,
     ) -> Result<VideoSegment, super::Error> {
-        let mut conn = self.pool.get()?;
-        let res: (VideoUnit, VideoFile) = conn.transaction::<_, super::Error, _>(|conn| {
-            let video_unit = diesel::insert_into(video_units::dsl::video_units)
-                .values(NewVideoUnit {
-                    camera_name: video_unit.camera_name.clone(),
-                    begin_time_us: datetime_to_micros(video_unit.begin_time),
-                    end_time_us: datetime_to_micros(video_unit.end_time),
-                })
-                .get_result::<VideoUnit>(conn)?;
+        db_write!(self, "create_video_segment", |conn| {
+            let res: (VideoUnit, VideoFile) = conn.transaction::<_, super::Error, _>(|conn| {
+                let video_unit = diesel::insert_into(video_units::dsl::video_units)
+                    .values(NewVideoUnit {
+                        camera_name: video_unit.camera_name.clone(),
+                        begin_time_us: datetime_to_micros(video_unit.begin_time),
+                        end_time_us: datetime_to_micros(video_unit.end_time),
+                    })
+                    .get_result::<VideoUnit>(conn)?;
 
-            let video_file = diesel::insert_into(video_files::dsl::video_files)
-                .values(NewVideoFile {
-                    filename: video_file.filename,
-                    size: video_file.size,
-                    video_unit_id: video_unit.id,
-                })
-                .get_result(conn)?;
-            Ok((video_unit, video_file))
-        })?;
+                let video_file = diesel::insert_into(video_files::dsl::video_files)
+                    .values(NewVideoFile {
+                        filename: video_file.filename,
+                        size: video_file.size,
+                        video_unit_id: video_unit.id,
+                    })
+                    .get_result(conn)?;
+                Ok((video_unit, video_file))
+            })?;
 
-        let res2: (
-            crate::api::video_units::VideoUnit,
-            crate::api::video_units::VideoFile,
-        ) = (res.0.try_into()?, res.1.into());
-        Ok(res2)
+            let res2: (
+                crate::api::video_units::VideoUnit,
+                crate::api::video_units::VideoFile,
+            ) = (res.0.try_into()?, res.1.into());
+            Ok(res2)
+        })
     }
 
     // update video unit/video file
@@ -151,8 +152,7 @@ impl Service {
         end_time: DateTime<Utc>,
         file_size: i32,
     ) -> Result<VideoSegment, super::Error> {
-        let mut conn = self.pool.get()?;
-        let res = conn.transaction::<_, super::Error, _>(|conn| {
+        let res = db_read!(self, "close_video_segment", |conn| {
             let video_unit = diesel::update(
                 video_units::dsl::video_units
                     .filter(crate::schema::video_units::columns::id.eq(video_unit_id)),
@@ -180,8 +180,7 @@ impl Service {
         begin_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<Vec<VideoSegment>, super::Error> {
-        let mut conn = self.pool.get()?;
-        let res = conn.transaction::<_, super::Error, _>(|conn| {
+        let res = db_read!(self, "fetch_video_units_between", |conn| {
             use crate::schema::video_units::dsl;
             let segments: Vec<(VideoUnit, VideoFile)> = dsl::video_units
                 .inner_join(video_files::table)
@@ -201,46 +200,46 @@ impl Service {
     }
 
     // Delete Video Units
-    pub fn delete_video_unit(&self, delete_id: i64) -> anyhow::Result<()> {
-        use crate::schema;
-        use crate::schema::video_files::dsl::*;
-        use crate::schema::video_units::dsl::*;
+    pub fn delete_video_unit(&self, delete_id: i64) -> Result<(), super::Error> {
+        db_write!(self, "delete_video_unit", |conn| {
+            use crate::schema;
+            use crate::schema::video_files::dsl::*;
+            use crate::schema::video_units::dsl::*;
 
-        let mut conn = self.pool.get()?;
+            // Delete VideoFiles associated with VideoUnit
 
-        // Delete VideoFiles associated with VideoUnit
+            // fetch video files to be deleted
+            let files: Vec<String> = video_files
+                .inner_join(video_units)
+                .filter(schema::video_files::columns::video_unit_id.eq(&delete_id))
+                .select(filename)
+                .load(conn)?;
 
-        // fetch video files to be deleted
-        let files: Vec<String> = video_files
-            .inner_join(video_units)
-            .filter(schema::video_files::columns::video_unit_id.eq(&delete_id))
-            .select(filename)
-            .load(&mut conn)?;
-
-        for f in files {
-            debug!("Deleting file: {}", f);
-            match std::fs::remove_file(&f) {
-                Ok(()) => {}
-                Err(err) => {
-                    if err.kind() == std::io::ErrorKind::NotFound {
-                        // this is arguably a non-error error
-                        error!("Failed to delete file because it is missing: {}", f);
-                    } else {
-                        error!("Failed to delete file for other reasons... {}", err);
+            for f in files {
+                debug!("Deleting file: {}", f);
+                match std::fs::remove_file(&f) {
+                    Ok(()) => {}
+                    Err(err) => {
+                        if err.kind() == std::io::ErrorKind::NotFound {
+                            // this is arguably a non-error error
+                            error!("Failed to delete file because it is missing: {}", f);
+                        } else {
+                            error!("Failed to delete file for other reasons... {}", err);
+                        }
                     }
                 }
             }
-        }
 
-        // delete video files owned by VideoUnit
-        diesel::delete(
-            video_files.filter(schema::video_files::columns::video_unit_id.eq(delete_id)),
-        )
-        .execute(&mut conn)?;
+            // delete video files owned by VideoUnit
+            diesel::delete(
+                video_files.filter(schema::video_files::columns::video_unit_id.eq(delete_id)),
+            )
+            .execute(conn)?;
 
-        diesel::delete(video_units.filter(schema::video_units::columns::id.eq(delete_id)))
-            .execute(&mut conn)?;
+            diesel::delete(video_units.filter(schema::video_units::columns::id.eq(delete_id)))
+                .execute(conn)?;
 
-        Ok(())
+            Ok(())
+        })
     }
 }
