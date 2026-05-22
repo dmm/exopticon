@@ -18,8 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
+use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 
 use crate::{
     api::{ResourceMetadata, camera_groups::CameraGroupSpec},
@@ -37,7 +36,7 @@ struct CameraGroup {
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Queryable, Insertable)]
 #[diesel(table_name = camera_group_memberships)]
 struct CameraGroupMembership {
-    pub id: Uuid,
+    pub id: i64,
     pub camera_group_name: String,
     pub camera_name: String,
     display_order: i32,
@@ -49,21 +48,46 @@ impl super::Service {
         group_name: &str,
     ) -> Result<crate::api::camera_groups::CameraGroup, super::Error> {
         let mut conn = self.pool.get()?;
-        conn.build_transaction()
-            .serializable()
-            .run::<_, super::Error, _>(|conn| {
-                let c = camera_groups::dsl::camera_groups
-                    .find(group_name)
-                    .get_result::<CameraGroup>(conn)?;
+        conn.transaction::<_, super::Error, _>(|conn| {
+            let c = camera_groups::dsl::camera_groups
+                .find(group_name)
+                .get_result::<CameraGroup>(conn)?;
 
-                let mut members = camera_group_memberships::dsl::camera_group_memberships
+            let mut members = camera_group_memberships::dsl::camera_group_memberships
+                .filter(camera_group_memberships::camera_group_name.eq(&c.name))
+                .order(camera_group_memberships::display_order.asc())
+                .load::<CameraGroupMembership>(conn)?;
+
+            members.sort_by_key(|m| m.display_order);
+
+            Ok(crate::api::camera_groups::CameraGroup {
+                metadata: ResourceMetadata {
+                    name: c.name,
+                    display_name: c.display_name,
+                },
+                spec: CameraGroupSpec {
+                    members: members.into_iter().map(|m| m.camera_name).collect(),
+                },
+                status: serde_json::json!({}),
+            })
+        })
+    }
+
+    pub fn fetch_all_camera_groups(
+        &self,
+    ) -> Result<Vec<crate::api::camera_groups::CameraGroup>, super::Error> {
+        let mut conn = self.pool.get()?;
+        conn.transaction::<_, super::Error, _>(|conn| {
+            let groups = camera_groups::dsl::camera_groups.load::<CameraGroup>(conn)?;
+
+            let mut groups2 = Vec::new();
+            for c in groups {
+                let members = camera_group_memberships::dsl::camera_group_memberships
                     .filter(camera_group_memberships::camera_group_name.eq(&c.name))
                     .order(camera_group_memberships::display_order.asc())
                     .load::<CameraGroupMembership>(conn)?;
 
-                members.sort_by_key(|m| m.display_order);
-
-                Ok(crate::api::camera_groups::CameraGroup {
+                groups2.push(crate::api::camera_groups::CameraGroup {
                     metadata: ResourceMetadata {
                         name: c.name,
                         display_name: c.display_name,
@@ -72,39 +96,10 @@ impl super::Service {
                         members: members.into_iter().map(|m| m.camera_name).collect(),
                     },
                     status: serde_json::json!({}),
-                })
-            })
-    }
+                });
+            }
 
-    pub fn fetch_all_camera_groups(
-        &self,
-    ) -> Result<Vec<crate::api::camera_groups::CameraGroup>, super::Error> {
-        let mut conn = self.pool.get()?;
-        conn.build_transaction()
-            .serializable()
-            .run::<_, super::Error, _>(|conn| {
-                let groups = camera_groups::dsl::camera_groups.load::<CameraGroup>(conn)?;
-
-                let mut groups2 = Vec::new();
-                for c in groups {
-                    let members = camera_group_memberships::dsl::camera_group_memberships
-                        .filter(camera_group_memberships::camera_group_name.eq(&c.name))
-                        .order(camera_group_memberships::display_order.asc())
-                        .load::<CameraGroupMembership>(conn)?;
-
-                    groups2.push(crate::api::camera_groups::CameraGroup {
-                        metadata: ResourceMetadata {
-                            name: c.name,
-                            display_name: c.display_name,
-                        },
-                        spec: CameraGroupSpec {
-                            members: members.into_iter().map(|m| m.camera_name).collect(),
-                        },
-                        status: serde_json::json!({}),
-                    });
-                }
-
-                Ok(groups2)
-            })
+            Ok(groups2)
+        })
     }
 }

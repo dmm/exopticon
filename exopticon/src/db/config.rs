@@ -19,8 +19,7 @@
  */
 
 use diesel::upsert::excluded;
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
+use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 
 use crate::{
     config::{Camera, CameraGroup, StorageGroup, User, ValidatedConfig},
@@ -33,32 +32,30 @@ impl Service {
     pub fn apply_config(&self, config: &ValidatedConfig) -> Result<(), super::Error> {
         let mut conn = self.pool.get()?;
 
-        conn.build_transaction()
-            .serializable()
-            .run::<_, super::Error, _>(|conn| {
-                for group in &config.storage_groups {
-                    upsert_storage_group(conn, group)?;
-                }
+        conn.transaction::<_, super::Error, _>(|conn| {
+            for group in &config.storage_groups {
+                upsert_storage_group(conn, group)?;
+            }
 
-                for camera in &config.cameras {
-                    upsert_camera(conn, camera)?;
-                }
+            for camera in &config.cameras {
+                upsert_camera(conn, camera)?;
+            }
 
-                for group in &config.camera_groups {
-                    upsert_camera_group(conn, group)?;
-                }
+            for group in &config.camera_groups {
+                upsert_camera_group(conn, group)?;
+            }
 
-                for user in &config.users {
-                    upsert_user(conn, user)?;
-                }
+            for user in &config.users {
+                upsert_user(conn, user)?;
+            }
 
-                Ok(())
-            })
+            Ok(())
+        })
     }
 }
 
 fn upsert_storage_group(
-    conn: &mut diesel::PgConnection,
+    conn: &mut SqliteConnection,
     group: &StorageGroup,
 ) -> Result<(), diesel::result::Error> {
     diesel::insert_into(storage_groups::table)
@@ -80,7 +77,7 @@ fn upsert_storage_group(
 }
 
 fn upsert_camera(
-    conn: &mut diesel::PgConnection,
+    conn: &mut SqliteConnection,
     camera: &Camera,
 ) -> Result<(), diesel::result::Error> {
     diesel::insert_into(cameras::table)
@@ -122,7 +119,7 @@ fn upsert_camera(
 }
 
 fn upsert_camera_group(
-    conn: &mut diesel::PgConnection,
+    conn: &mut SqliteConnection,
     group: &CameraGroup,
 ) -> Result<(), diesel::result::Error> {
     diesel::insert_into(camera_groups::table)
@@ -144,7 +141,6 @@ fn upsert_camera_group(
     for (pos, camera_name) in group.members.iter().enumerate() {
         diesel::insert_into(camera_group_memberships::table)
             .values((
-                camera_group_memberships::id.eq(Uuid::now_v7()),
                 camera_group_memberships::camera_group_name.eq(&group.name),
                 camera_group_memberships::camera_name.eq(camera_name),
                 camera_group_memberships::display_order
@@ -155,7 +151,7 @@ fn upsert_camera_group(
     Ok(())
 }
 
-fn upsert_user(conn: &mut diesel::PgConnection, user: &User) -> Result<(), diesel::result::Error> {
+fn upsert_user(conn: &mut SqliteConnection, user: &User) -> Result<(), diesel::result::Error> {
     diesel::insert_into(users::table)
         .values((
             users::username.eq(&user.username),

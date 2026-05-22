@@ -25,7 +25,6 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use tokio::task::spawn_blocking;
-use uuid::Uuid;
 
 use crate::AppState;
 
@@ -35,7 +34,7 @@ use crate::AppState;
 #[serde(rename_all = "camelCase")]
 pub struct VideoUnit {
     /// id of video unit
-    pub id: Uuid,
+    pub id: i64,
     /// name of associated camera
     pub camera_name: String,
     /// begin time in UTC
@@ -54,8 +53,6 @@ pub struct CreateVideoUnit {
     pub begin_time: DateTime<Utc>,
     /// end time in UTC
     pub end_time: DateTime<Utc>,
-    /// id of video unit
-    pub id: Uuid,
 }
 
 /// Full video file model, represents full database row
@@ -63,13 +60,13 @@ pub struct CreateVideoUnit {
 #[serde(rename_all = "camelCase")]
 pub struct VideoFile {
     /// id of video file
-    pub id: Uuid,
+    pub id: i64,
     /// filename of video file
     pub filename: String,
     /// size in bytes of video file
     pub size: i32,
     /// id of associated video unit
-    pub video_unit_id: Uuid,
+    pub video_unit_id: i64,
 }
 
 /// Represents request to create new video file
@@ -79,8 +76,6 @@ pub struct CreateVideoFile {
     pub filename: String,
     /// size in bytes of new video file
     pub size: i32,
-    /// id of video unit to own this video file
-    pub video_unit_id: Uuid,
 }
 
 #[derive(Deserialize)]

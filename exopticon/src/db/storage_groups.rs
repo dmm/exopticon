@@ -113,8 +113,8 @@ impl super::Service {
             .inner_join(video_units::table.inner_join(video_files::table))
             .filter(cameras::storage_group_name.eq(storage_group_name))
             .filter(video_files::size.gt(-1))
-            .filter(video_units::begin_time.ne(video_units::end_time))
-            .order(video_units::begin_time.asc())
+            .filter(video_units::begin_time_us.ne(video_units::end_time_us))
+            .order(video_units::begin_time_us.asc())
             .limit(count)
             .load(&mut conn)?;
 

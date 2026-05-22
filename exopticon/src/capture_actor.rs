@@ -38,7 +38,6 @@ use tokio::{
     task::spawn_blocking,
 };
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
-use uuid::Uuid;
 
 use crate::{
     CameraStatusRegistry,
@@ -84,7 +83,7 @@ pub struct CaptureActor {
         ChildStdin,
         FramedRead<ChildStdout, LengthDelimitedCodec>,
     )>,
-    video_segment_id: Option<(Uuid, Uuid)>,
+    video_segment_id: Option<(i64, i64)>,
 
     /// Video Packet Router
     video_router: Arc<VideoRouter>,
@@ -167,20 +166,14 @@ impl CaptureActor {
         filename: String,
         begin_time: String,
     ) -> anyhow::Result<()> {
-        let new_video_unit_id = Uuid::new_v4();
         let date = begin_time.parse::<DateTime<Utc>>().expect("Parse failure!");
 
         let create_video_unit = CreateVideoUnit {
             camera_name: self.camera.name.clone(),
             begin_time: date,
             end_time: date,
-            id: new_video_unit_id,
         };
-        let create_video_file = CreateVideoFile {
-            filename,
-            size: 0,
-            video_unit_id: new_video_unit_id,
-        };
+        let create_video_file = CreateVideoFile { filename, size: 0 };
         let db = self.db.clone();
         let (video_unit, video_file) =
             spawn_blocking(move || db.create_video_segment(&create_video_unit, create_video_file))

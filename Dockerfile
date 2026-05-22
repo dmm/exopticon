@@ -90,7 +90,7 @@ RUN dnf install -y \
     gstreamer1-plugins-base-devel \
     gstreamer1-plugins-good \
     gstreamer1-plugins-ugly-free \
-    libpq-devel \
+    sqlite-devel \
     nodejs \
     nodejs-npm \
     python3-pip \
@@ -158,7 +158,7 @@ RUN dnf install -y \
     gstreamer1-plugins-base \
     gstreamer1-plugins-good \
     gstreamer1-plugins-ugly-free \
-    libpq \
+    sqlite-libs \
     # for Rust openssl crate:
     openssl \
     && dnf clean all \

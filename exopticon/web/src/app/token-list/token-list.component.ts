@@ -50,7 +50,7 @@ export class TokenListComponent implements OnInit {
     this.newToken = null;
   }
 
-  onDelete(tokenId: string) {
+  onDelete(tokenId: number) {
     this.tokenService
       .deleteToken(tokenId)
       .toPromise()

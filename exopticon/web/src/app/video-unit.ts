@@ -30,7 +30,7 @@ export class VideoUnit {
     this.observations = obj.observations;
   }
 
-  id: string;
+  id: number;
   cameraName: string;
   beginTime: ZonedDateTime;
   endTime: ZonedDateTime;

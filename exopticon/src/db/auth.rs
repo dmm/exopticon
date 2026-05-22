@@ -17,16 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use uuid::Uuid;
 
-use crate::{
-    api::auth::SlimAccessToken,
-    schema::{user_sessions, users},
-};
+use crate::{api::auth::SlimAccessToken, schema::users};
 
-use super::Service;
+use super::{Service, datetime_to_micros, micros_to_datetime};
 
 #[derive(Queryable, Identifiable, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,25 +43,27 @@ impl From<User> for crate::api::auth::User {
     }
 }
 
-#[derive(Insertable, Serialize, Queryable, Clone)]
+#[derive(Serialize, Queryable, Clone)]
 #[diesel(table_name = user_sessions)]
 pub struct UserSession {
-    pub id: Uuid,
+    pub id: i64,
     pub name: String,
     pub user_name: String,
     pub session_key: String,
     pub is_token: bool,
-    pub expiration: DateTime<Utc>,
+    pub expiration_us: i64,
 }
 
-impl From<UserSession> for SlimAccessToken {
-    fn from(u: UserSession) -> Self {
-        Self {
+impl TryFrom<UserSession> for SlimAccessToken {
+    type Error = super::Error;
+
+    fn try_from(u: UserSession) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: u.id,
             name: u.name,
             user_name: u.user_name,
-            expiration: u.expiration,
-        }
+            expiration: micros_to_datetime("user_sessions.expiration_us", u.expiration_us)?,
+        })
     }
 }
 
@@ -101,18 +99,17 @@ impl Service {
 
         diesel::insert_into(dsl::user_sessions)
             .values((
-                dsl::id.eq(Uuid::now_v7()),
                 dsl::name.eq(&session.name),
                 dsl::user_name.eq(&session.user_name),
                 dsl::session_key.eq(&session.session_key),
                 dsl::is_token.eq(&session.is_token),
-                dsl::expiration.eq(&session.expiration),
+                dsl::expiration_us.eq(datetime_to_micros(session.expiration)),
             ))
             .execute(&mut conn)?;
         Ok(session.session_key.clone())
     }
 
-    pub fn delete_user_session(&self, session_id: Uuid) -> Result<(), super::Error> {
+    pub fn delete_user_session(&self, session_id: i64) -> Result<(), super::Error> {
         use crate::schema::user_sessions::dsl::*;
         let mut conn = self.pool.get()?;
 
@@ -127,10 +124,11 @@ impl Service {
         use crate::schema::user_sessions::dsl::*;
         let mut conn = self.pool.get()?;
 
-        diesel::delete(user_sessions.filter(expiration.lt(Utc::now()))).execute(&mut conn)?;
+        diesel::delete(user_sessions.filter(expiration_us.lt(datetime_to_micros(Utc::now()))))
+            .execute(&mut conn)?;
         let session = user_sessions
             .filter(session_key.eq(&session_key_text))
-            .filter(expiration.gt(Utc::now()))
+            .filter(expiration_us.gt(datetime_to_micros(Utc::now())))
             .first::<UserSession>(&mut conn)?;
 
         let user = crate::schema::users::dsl::users
@@ -151,6 +149,9 @@ impl Service {
             .filter(user_name.eq(user_name2))
             .filter(is_token.eq(true))
             .load::<UserSession>(&mut conn)?;
-        Ok(sessions.into_iter().map(std::convert::Into::into).collect())
+        sessions
+            .into_iter()
+            .map(std::convert::TryInto::try_into)
+            .collect()
     }
 }

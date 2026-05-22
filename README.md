@@ -38,19 +38,20 @@ git checkout v0.11.0
 ```
 
 3. Configure docker compose by setting the variables in exopticon/docker/.env .
+   Set `EXOPTICON_DB_PATH` to a host directory for the SQLite database.
 
 4. Call docker compose
 
 ### Non-cuda
 ```bash
 cd exopticon/docker/
-bash -ac 'source ../release_info && docker-compose -f docker-compose.db.yml -f docker-compose.yml up -d'
+bash -ac 'source ../release_info && docker-compose -f docker-compose.yml up -d'
 ```
 
 ### cuda
 ```bash
 cd exopticon/docker/
-bash -ac 'source ../release-info && docker-compose -f docker-compose.db.yml -f docker-compose.yml -f docker-compose.cuda.yml -d'
+bash -ac 'source ../release_info && docker-compose -f docker-compose.yml -f docker-compose.cuda.yml up -d'
 ```
 
 5. Create initial user
@@ -75,7 +76,7 @@ password hashes. This file is ignored by git.
 ### Build dev environment
 ```bash
 cd exopticon/docker
-docker-compose -f docker-compose.db.yml -f docker-compose.dev.yml up
+docker-compose -f docker-compose.dev.yml up
 ```
 
 That will build the dev docker image and start the dev environment container.

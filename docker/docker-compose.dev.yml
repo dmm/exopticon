@@ -11,8 +11,7 @@ services:
       target: exopticon-development
     userns_mode: "keep-id:uid=1000,gid=1000"
     environment:
-      DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@db
-      TEST_DATABASE_URL: postgres://postgres:${EXOPTICON_POSTGRES_PASSWORD}@testdb
+      DATABASE_URL: /data/exopticon.sqlite
       ROOT_URL: "https://${DOMAIN}"
       DOMAIN: ${DOMAIN}
       EXOPTICON_NAME: ${EXOPTICON_NAME}
@@ -34,18 +33,11 @@ services:
     volumes:
       - ./exopticon.toml:/etc/exopticon/exopticon.toml:ro,Z
       - ..:/exopticon:Z # map source directory for development
-      - $EXOPTICON_VIDEO_PATH:/video:Z
+      - ${EXOPTICON_DB_PATH:-./data}:/data:Z
+      - ${EXOPTICON_VIDEO_PATH}:/video:Z
       - cargo_home:/cargo
       - target:/target
-  testdb:
-    image: docker.io/pgautoupgrade/pgautoupgrade:17-bookworm
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: ${EXOPTICON_POSTGRES_PASSWORD}
-    volumes:
-      - test_db:/var/lib/postgresql/data
 
 volumes:
-  test_db:
   cargo_home:
   target:

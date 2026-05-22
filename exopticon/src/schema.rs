@@ -2,10 +2,10 @@
 
 diesel::table! {
     camera_group_memberships (id) {
-        id -> Uuid,
+        id -> BigInt,
         camera_group_name -> Text,
         camera_name -> Text,
-        display_order -> Int4,
+        display_order -> Integer,
     }
 }
 
@@ -22,7 +22,7 @@ diesel::table! {
         display_name -> Text,
         storage_group_name -> Text,
         ip -> Text,
-        onvif_port -> Int4,
+        onvif_port -> Integer,
         mac -> Text,
         username -> Text,
         password -> Text,
@@ -30,8 +30,8 @@ diesel::table! {
         ptz_type -> Text,
         ptz_profile_token -> Text,
         enabled -> Bool,
-        ptz_x_step_size -> Int2,
-        ptz_y_step_size -> Int2,
+        ptz_x_step_size -> SmallInt,
+        ptz_y_step_size -> SmallInt,
     }
 }
 
@@ -46,12 +46,12 @@ diesel::table! {
 
 diesel::table! {
     user_sessions (id) {
-        id -> Uuid,
+        id -> BigInt,
         name -> Text,
         user_name -> Text,
         session_key -> Text,
         is_token -> Bool,
-        expiration -> Timestamptz,
+        expiration_us -> BigInt,
     }
 }
 
@@ -65,19 +65,19 @@ diesel::table! {
 
 diesel::table! {
     video_files (id) {
-        id -> Uuid,
+        id -> BigInt,
         filename -> Text,
-        size -> Int4,
-        video_unit_id -> Uuid,
+        size -> Integer,
+        video_unit_id -> BigInt,
     }
 }
 
 diesel::table! {
     video_units (id) {
-        id -> Uuid,
+        id -> BigInt,
         camera_name -> Text,
-        begin_time -> Timestamptz,
-        end_time -> Timestamptz,
+        begin_time_us -> BigInt,
+        end_time_us -> BigInt,
     }
 }
 

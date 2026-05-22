@@ -25,18 +25,46 @@ pub mod config;
 pub mod storage_groups;
 pub mod video_units;
 
-use diesel::PgConnection;
+use chrono::{DateTime, Utc};
+use diesel::SqliteConnection;
+use diesel::connection::SimpleConnection;
 use diesel::r2d2::ConnectionManager;
 use thiserror::Error;
 
+pub type DbConnection = SqliteConnection;
+pub type DbPool = r2d2::Pool<ConnectionManager<DbConnection>>;
+
 #[derive(Clone)]
 pub struct Service {
-    pub pool: r2d2::Pool<ConnectionManager<diesel::PgConnection>>,
+    pub pool: DbPool,
 }
 
-fn build_pool(database_url: &str) -> r2d2::Pool<ConnectionManager<diesel::PgConnection>> {
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
+#[derive(Debug)]
+struct SqliteConnectionCustomizer;
+
+impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error>
+    for SqliteConnectionCustomizer
+{
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        for statement in [
+            "PRAGMA busy_timeout = 2000;",
+            "PRAGMA journal_mode = WAL;",
+            "PRAGMA synchronous = NORMAL;",
+            "PRAGMA wal_autocheckpoint = 1000;",
+            "PRAGMA wal_checkpoint(TRUNCATE);",
+            "PRAGMA foreign_keys = ON;",
+        ] {
+            conn.batch_execute(statement)
+                .map_err(diesel::r2d2::Error::QueryError)?;
+        }
+        Ok(())
+    }
+}
+
+fn build_pool(database_url: &str) -> DbPool {
+    let manager = ConnectionManager::<DbConnection>::new(database_url);
     r2d2::Pool::builder()
+        .connection_customizer(Box::new(SqliteConnectionCustomizer))
         .build(manager)
         .expect("Failed to create pool.")
 }
@@ -69,6 +97,21 @@ pub enum OtherError {
         description: String,
         cause: diesel::result::Error,
     },
+    #[error("invalid timestamp stored in database: {field}={value}")]
+    InvalidTimestamp { field: &'static str, value: i64 },
+}
+
+const fn datetime_to_micros(timestamp: DateTime<Utc>) -> i64 {
+    timestamp.timestamp_micros()
+}
+
+fn micros_to_datetime(field: &'static str, timestamp_us: i64) -> Result<DateTime<Utc>, Error> {
+    DateTime::from_timestamp_micros(timestamp_us).ok_or(Error::Other(
+        OtherError::InvalidTimestamp {
+            field,
+            value: timestamp_us,
+        },
+    ))
 }
 
 impl From<r2d2::Error> for Error {
@@ -94,4 +137,286 @@ impl From<diesel::result::Error> for Error {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::thread;
+
+    use chrono::{DateTime, Duration, Utc};
+    use diesel_migrations::MigrationHarness;
+    use tempfile::TempDir;
+
+    use super::Service;
+    use crate::{
+        api::{
+            auth::CreateUserSession,
+            video_units::{CreateVideoFile, CreateVideoUnit},
+        },
+        config::{Camera, CameraGroup, StorageGroup, User, ValidatedConfig},
+    };
+
+    fn migrated_service() -> (TempDir, Service) {
+        let temp_dir = TempDir::new().expect("temp dir created");
+        let database_path = temp_dir.path().join("exopticon.sqlite");
+        let database_url = database_path.display().to_string();
+        let service = Service::new(&database_url);
+
+        let mut conn = service.pool.get().expect("migration connection");
+        conn.run_pending_migrations(crate::MIGRATIONS)
+            .expect("migrations run");
+        drop(conn);
+
+        (temp_dir, service)
+    }
+
+    fn sample_config(password: &str, members: Vec<&str>) -> ValidatedConfig {
+        let password_hash = bcrypt::hash(password, 4).expect("password hash created");
+
+        ValidatedConfig {
+            storage_groups: vec![StorageGroup {
+                name: "primary".to_string(),
+                display_name: "Primary".to_string(),
+                storage_path: "/video".to_string(),
+                max_storage_size: 1024,
+            }],
+            cameras: vec![
+                Camera {
+                    name: "front".to_string(),
+                    display_name: "Front".to_string(),
+                    storage_group_name: "primary".to_string(),
+                    ip: "192.0.2.10".to_string(),
+                    onvif_port: 80,
+                    mac: "00:00:00:00:00:01".to_string(),
+                    username: "camera-user".to_string(),
+                    password: "camera-password".to_string(),
+                    rtsp_url: "rtsp://front.example/stream".to_string(),
+                    ptz_type: "none".to_string(),
+                    ptz_profile_token: String::new(),
+                    enabled: true,
+                    ptz_x_step_size: 1,
+                    ptz_y_step_size: 1,
+                },
+                Camera {
+                    name: "back".to_string(),
+                    display_name: "Back".to_string(),
+                    storage_group_name: "primary".to_string(),
+                    ip: "192.0.2.11".to_string(),
+                    onvif_port: 80,
+                    mac: "00:00:00:00:00:02".to_string(),
+                    username: "camera-user".to_string(),
+                    password: "camera-password".to_string(),
+                    rtsp_url: "rtsp://back.example/stream".to_string(),
+                    ptz_type: "none".to_string(),
+                    ptz_profile_token: String::new(),
+                    enabled: true,
+                    ptz_x_step_size: 1,
+                    ptz_y_step_size: 1,
+                },
+            ],
+            camera_groups: vec![CameraGroup {
+                name: "all".to_string(),
+                display_name: "All".to_string(),
+                members: members
+                    .into_iter()
+                    .map(std::string::ToString::to_string)
+                    .collect(),
+            }],
+            users: vec![User {
+                username: "alice".to_string(),
+                display_name: "Alice".to_string(),
+                password_hash,
+            }],
+        }
+    }
+
+    fn test_time(timestamp: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(timestamp)
+            .expect("valid timestamp")
+            .with_timezone(&Utc)
+    }
+
+    #[test]
+    fn applies_config_and_replaces_camera_group_memberships() {
+        let (_temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front", "back"]))
+            .expect("initial config applied");
+
+        let group = service
+            .fetch_camera_group("all")
+            .expect("camera group fetched");
+        assert_eq!(group.spec.members, vec!["front", "back"]);
+
+        service
+            .apply_config(&sample_config("secret", vec!["back"]))
+            .expect("updated config applied");
+
+        let group = service
+            .fetch_camera_group("all")
+            .expect("camera group fetched");
+        assert_eq!(group.spec.members, vec!["back"]);
+
+        let storage_group = service
+            .fetch_storage_group("primary")
+            .expect("storage group fetched");
+        assert_eq!(storage_group.metadata.display_name, "Primary");
+    }
+
+    #[test]
+    fn creates_closes_fetches_and_deletes_video_segment() {
+        let (temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+
+        let filename = temp_dir.path().join("segment.mkv");
+        std::fs::write(&filename, b"video").expect("video file written");
+        let begin_time = test_time("2026-05-21T00:00:00Z");
+        let end_time = test_time("2026-05-21T00:00:05Z");
+
+        let (video_unit, video_file) = service
+            .create_video_segment(
+                &CreateVideoUnit {
+                    camera_name: "front".to_string(),
+                    begin_time,
+                    end_time: begin_time,
+                },
+                CreateVideoFile {
+                    filename: filename.display().to_string(),
+                    size: 0,
+                },
+            )
+            .expect("video segment created");
+
+        assert!(video_unit.id > 0);
+        assert!(video_file.id > 0);
+        assert_eq!(video_file.video_unit_id, video_unit.id);
+
+        let (_video_unit, video_file) = service
+            .close_video_segment(video_unit.id, video_file.id, end_time, 4)
+            .expect("video segment closed");
+        assert_eq!(video_file.size, 4);
+
+        let segments = service
+            .fetch_video_units_between("front", begin_time, end_time)
+            .expect("video segments fetched");
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].0.id, video_unit.id);
+        assert_eq!(segments[0].0.begin_time, begin_time);
+        assert_eq!(segments[0].0.end_time, end_time);
+
+        let old_units = service
+            .fetch_storage_group_old_units("primary", 10)
+            .expect("old units fetched");
+        assert_eq!(old_units.video_units.len(), 1);
+
+        service
+            .delete_video_unit(video_unit.id)
+            .expect("video unit deleted");
+        assert!(!filename.exists());
+
+        let old_units = service
+            .fetch_storage_group_old_units("primary", 10)
+            .expect("old units fetched");
+        assert!(old_units.video_units.is_empty());
+    }
+
+    #[test]
+    fn handles_sessions_tokens_and_expired_cleanup() {
+        let (_temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+
+        let user = service.login("alice", "secret").expect("login succeeds");
+        assert_eq!(user.username, "alice");
+
+        let expiration = Utc::now() + Duration::days(1);
+        let token_key = service
+            .create_user_session(&CreateUserSession {
+                name: "ci-token".to_string(),
+                user_name: "alice".to_string(),
+                session_key: "token-key".to_string(),
+                is_token: true,
+                expiration,
+            })
+            .expect("token created");
+        assert_eq!(token_key, "token-key");
+
+        let user = service
+            .validate_user_session("token-key")
+            .expect("session validates");
+        assert_eq!(user.username, "alice");
+
+        let tokens = service.fetch_users_tokens("alice").expect("tokens fetched");
+        assert_eq!(tokens.len(), 1);
+        assert!(tokens[0].id > 0);
+        assert_eq!(
+            tokens[0].expiration.timestamp_micros(),
+            expiration.timestamp_micros()
+        );
+
+        service
+            .delete_user_session(tokens[0].id)
+            .expect("token deleted");
+        let tokens = service.fetch_users_tokens("alice").expect("tokens fetched");
+        assert!(tokens.is_empty());
+
+        service
+            .create_user_session(&CreateUserSession {
+                name: String::new(),
+                user_name: "alice".to_string(),
+                session_key: "expired-key".to_string(),
+                is_token: false,
+                expiration: Utc::now() - Duration::days(1),
+            })
+            .expect("expired session created");
+        assert!(matches!(
+            service.validate_user_session("expired-key"),
+            Err(super::Error::NotFound)
+        ));
+    }
+
+    #[test]
+    fn creates_and_closes_video_segments_concurrently() {
+        let (_temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+
+        let begin_time = test_time("2026-05-21T01:00:00Z");
+        let end_time = test_time("2026-05-21T01:00:30Z");
+        let mut handles = Vec::new();
+
+        for worker in 0..4 {
+            let service = service.clone();
+            handles.push(thread::spawn(move || {
+                for segment in 0..5 {
+                    let (video_unit, video_file) = service
+                        .create_video_segment(
+                            &CreateVideoUnit {
+                                camera_name: "front".to_string(),
+                                begin_time,
+                                end_time: begin_time,
+                            },
+                            CreateVideoFile {
+                                filename: format!("/tmp/segment-{worker}-{segment}.mkv"),
+                                size: 0,
+                            },
+                        )
+                        .expect("video segment created");
+                    service
+                        .close_video_segment(video_unit.id, video_file.id, end_time, 1)
+                        .expect("video segment closed");
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join().expect("worker joined");
+        }
+
+        let segments = service
+            .fetch_video_units_between("front", begin_time, end_time)
+            .expect("video segments fetched");
+        assert_eq!(segments.len(), 20);
+    }
+}

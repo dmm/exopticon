@@ -20,7 +20,7 @@
 
 export interface Observation {
   id: number;
-  videoUnitId: string;
+  videoUnitId: number;
   frameOffset: number;
   tag: string;
   details: string;

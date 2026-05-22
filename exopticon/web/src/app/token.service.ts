@@ -25,7 +25,7 @@ import { Observable, throwError as observableThrowError } from "rxjs";
 import { catchError, map } from "rxjs/operators";
 
 export class Token {
-  id: string;
+  id: number;
   name: string;
   userName: string;
   expiration: LocalDate;
@@ -46,7 +46,7 @@ export class CreateUserToken {
 }
 
 interface TokenDto {
-  id: string;
+  id: number;
   name: string;
   userName: string;
   expiration: string;
@@ -78,7 +78,7 @@ export class TokenService {
     );
   }
 
-  deleteToken(id: string): Observable<string> {
+  deleteToken(id: number): Observable<string> {
     let url = `${this.tokenUrl}/${id}`;
     return this.http.delete<string>(url).pipe(
       map((data) => data),

@@ -30,7 +30,6 @@ use base64::prelude::{BASE64_STANDARD, Engine as _};
 use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 use tokio::task::spawn_blocking;
-use uuid::Uuid;
 
 use crate::AppState;
 
@@ -85,7 +84,7 @@ pub struct CreatePersonalAccessToken {
 #[derive(Debug, Serialize)]
 pub struct SlimAccessToken {
     /// user session id
-    pub id: Uuid,
+    pub id: i64,
     /// user session name
     pub name: String,
     /// name of user associated with session
@@ -103,7 +102,6 @@ pub async fn login(
     let db2 = state.db_service;
 
     let user = spawn_blocking(move || db.login(&auth_data.username, &auth_data.password)).await??;
-    error!("Auth success!");
     // We found a valid user with that password. Create a login session.
     let session_key = BASE64_STANDARD.encode(rand::thread_rng().r#gen::<[u8; 32]>());
     let valid_time = Duration::days(7);
@@ -160,7 +158,7 @@ pub async fn create_personal_access_token(
 }
 
 pub async fn delete_personal_access_token(
-    Path(id): Path<Uuid>,
+    Path(id): Path<i64>,
     State(state): State<AppState>,
 ) -> Result<(), UserError> {
     let db = state.db_service;

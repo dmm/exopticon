@@ -154,7 +154,6 @@ async fn udp_listener(
     }
 }
 
-#[allow(clippy::too_many_lines)]
 #[tokio::main]
 async fn main() {
     let filter = EnvFilter::from_default_env();
@@ -184,9 +183,8 @@ async fn main() {
 
     // Run migrations
     info!("Running migrations...");
-    let _migration_res = &pool
-        .get()
-        .expect("migration connection failed")
+    let mut migration_conn = pool.get().expect("migration connection failed");
+    let _migration_res = migration_conn
         .run_pending_migrations(MIGRATIONS)
         .expect("migrations failed");
 
