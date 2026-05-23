@@ -2,6 +2,17 @@
 
 <!--- next entry here -->
 
+## 0.42.0
+2026-05-23
+
+### Features
+
+- Add db metrics (8e445086d0651fc69c49f626597ffe52c5686491)
+
+### Fixes
+
+- Switch to sqlite and integer ids (fc2b0df7bedf5c2433371c58f80763eee82fdde6)
+
 ## 0.41.1
 2026-05-19
 
