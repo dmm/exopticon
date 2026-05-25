@@ -23,6 +23,7 @@
 #![deny(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 #![deny(clippy::expect_used)]
 #![allow(clippy::arithmetic_side_effects)]
+#![allow(clippy::float_arithmetic)]
 #![allow(clippy::missing_inline_in_public_items)]
 #![allow(clippy::multiple_crate_versions)]
 #![allow(clippy::implicit_return)]

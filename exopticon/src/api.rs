@@ -103,3 +103,9 @@ impl From<tokio::sync::mpsc::error::SendError<Command>> for UserError {
         Self::InternalError(format!("tokio SendError: {err}"))
     }
 }
+
+impl From<onvif::error::Error> for UserError {
+    fn from(_value: onvif::error::Error) -> Self {
+        Self::InternalError("onvif error".to_string())
+    }
+}

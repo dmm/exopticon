@@ -136,12 +136,12 @@ pub async fn ptz_relative_move(
 
     let db = state.db_service.clone();
     let camera = spawn_blocking(move || db.fetch_camera_row(&name)).await??;
-    let onvif_cam = onvif::camera::Camera {
-        host: camera.ip,
-        port: camera.onvif_port,
-        username: camera.username,
-        password: camera.password,
-    };
+    let onvif_cam = onvif::camera::Camera::new(
+        camera.ip,
+        camera.onvif_port as u16,
+        camera.username,
+        camera.password,
+    )?;
 
     let x_step = f32::from(camera.ptz_x_step_size);
     let y_step = f32::from(camera.ptz_y_step_size);

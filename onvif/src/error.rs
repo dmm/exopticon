@@ -31,6 +31,15 @@ pub enum Error {
     #[error("Operation required authentication and this failed")]
     Unauthorized,
 
+    #[error("Request timed out")]
+    Timeout,
+
+    #[error("Remote device returned HTTP status {0}")]
+    HttpStatus(u16),
+
+    #[error("Remote device returned SOAP fault: {0}")]
+    SoapFault(String),
+
     #[error("The remote device returned an invalid response")]
     InvalidResponse,
 
@@ -44,6 +53,12 @@ pub enum Error {
 
 impl From<hyper::Error> for Error {
     fn from(_err: hyper::Error) -> Self {
+        Self::ConnectionFailed
+    }
+}
+
+impl From<hyper_util::client::legacy::Error> for Error {
+    fn from(_err: hyper_util::client::legacy::Error) -> Self {
         Self::ConnectionFailed
     }
 }
