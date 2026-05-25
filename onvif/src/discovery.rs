@@ -26,6 +26,42 @@ use tokio::net::UdpSocket;
 use tokio::time::timeout;
 use uuid::Uuid;
 
+use crate::error::Error;
+use crate::soap::{NS_NETWORK, NS_SOAP12, NS_WSA_DISCOVERY, NS_WSD, NS_XSD, NS_XSI, XmlWriter};
+
+fn build_probe_request(message_id: Uuid) -> Result<String, Error> {
+    let mut xml = XmlWriter::new();
+
+    xml.start_attr(
+        "Envelope",
+        &[("xmlns", NS_SOAP12), ("xmlns:dn", NS_NETWORK)],
+    )?;
+    xml.start_attr("Header", &[("xmlns:wsa", NS_WSA_DISCOVERY)])?;
+    xml.text_element("wsa:MessageID", message_id)?;
+    xml.text_element("wsa:To", "urn:schemas-xmlsoap-org:ws:2005:04:discovery")?;
+    xml.text_element(
+        "wsa:Action",
+        "http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe",
+    )?;
+    xml.end("Header")?;
+    xml.start("Body")?;
+    xml.start_attr(
+        "Probe",
+        &[
+            ("xmlns", NS_WSD),
+            ("xmlns:xsd", NS_XSD),
+            ("xmlns:xsi", NS_XSI),
+        ],
+    )?;
+    xml.text_element("Types", "dn:NetworkVideoTransmitter")?;
+    xml.empty("Scopes")?;
+    xml.end("Probe")?;
+    xml.end("Body")?;
+    xml.end("Envelope")?;
+
+    xml.finish_string()
+}
+
 /// Struct representing onvif discover probe
 pub struct ProbeServer {
     /// multicast socket used for discovery
@@ -66,26 +102,7 @@ impl ProbeServer {
     }
     /// Sends a probe request and returns detected cameras
     pub async fn probe(&mut self) -> Result<usize, io::Error> {
-        let request_body = format!(
-            r#"
-            <Envelope xmlns="http://www.w3.org/2003/05/soap-envelope"
-                      xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
-              <Header>
-                <wsa:MessageID xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">{}</wsa:MessageID>
-                <wsa:To xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">urn:schemas-xmlsoap-org:ws:2005:04:discovery</wsa:To>
-                <wsa:Action xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action>
-              </Header>
-              <Body>
-                <Probe xmlns="http://schemas.xmlsoap.org/ws/2005/04/discovery"
-                       xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                  <Types>dn:NetworkVideoTransmitter</Types>
-                  <Scopes />
-                </Probe>
-              </Body>
-            </Envelope>"#,
-            Uuid::new_v4()
-        );
+        let request_body = build_probe_request(Uuid::new_v4()).map_err(io::Error::other)?;
 
         let remote_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(239, 255, 255, 250)), 3702);
 
@@ -129,4 +146,42 @@ pub async fn probe(timeout: Duration) -> Result<usize, io::Error> {
     };
 
     p.probe().await
+}
+
+#[cfg(test)]
+mod tests {
+    use sxd_document::parser;
+    use sxd_xpath::evaluate_xpath;
+    use uuid::Uuid;
+
+    use super::build_probe_request;
+
+    fn xpath_string(xml: &str, xpath: &str) -> String {
+        let doc = parser::parse(xml).unwrap();
+        evaluate_xpath(&doc.as_document(), xpath).unwrap().string()
+    }
+
+    fn xpath_bool(xml: &str, xpath: &str) -> bool {
+        let doc = parser::parse(xml).unwrap();
+        evaluate_xpath(&doc.as_document(), xpath).unwrap().boolean()
+    }
+
+    #[test]
+    fn discovery_probe_xml_contains_ws_discovery_shape() {
+        let message_id = Uuid::nil();
+        let xml = build_probe_request(message_id).unwrap();
+
+        assert!(xpath_bool(&xml, "boolean(//*[local-name()='Envelope'])"));
+        assert!(xpath_bool(&xml, "boolean(//*[local-name()='Header'])"));
+        assert!(xpath_bool(&xml, "boolean(//*[local-name()='Probe'])"));
+        assert!(xpath_bool(&xml, "boolean(//*[local-name()='Scopes'])"));
+        assert_eq!(
+            xpath_string(&xml, "string(//*[local-name()='MessageID'])"),
+            message_id.to_string()
+        );
+        assert_eq!(
+            xpath_string(&xml, "string(//*[local-name()='Types'])"),
+            "dn:NetworkVideoTransmitter"
+        );
+    }
 }

@@ -42,6 +42,9 @@ pub mod discovery;
 /// module describing onvif errors
 pub mod error;
 
+/// module implementing SOAP request generation
+mod soap;
+
 /// utility module, mostly soap tools
 mod util;
 

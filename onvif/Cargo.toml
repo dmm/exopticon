@@ -16,6 +16,7 @@ bytes = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 log = "0.4"
 hyper = { version = "0.14.30", features = ["client", "http1", "tcp", "stream"]}
+quick-xml = "0.40.1"
 futures = "0.3.30"
 futures-util = "0.3.30"
 tokio = { version = "^1.40.0", features = ["full"] }
