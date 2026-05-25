@@ -84,7 +84,7 @@ fn upsert_camera(
             cameras::display_name.eq(&camera.display_name),
             cameras::storage_group_name.eq(&camera.storage_group_name),
             cameras::ip.eq(&camera.ip),
-            cameras::onvif_port.eq(camera.onvif_port),
+            cameras::onvif_port.eq(i32::from(camera.onvif_port)),
             cameras::mac.eq(&camera.mac),
             cameras::username.eq(&camera.username),
             cameras::password.eq(&camera.password),

@@ -36,7 +36,7 @@ use super::{ResourceMetadata, UserError};
 pub struct CameraSpec {
     pub storage_group_name: String,
     pub ip: String,
-    pub onvif_port: i32,
+    pub onvif_port: u16,
     pub mac: String,
     pub username: String,
     pub rtsp_url: String,
@@ -138,7 +138,7 @@ pub async fn ptz_relative_move(
     let camera = spawn_blocking(move || db.fetch_camera_row(&name)).await??;
     let onvif_cam = onvif::camera::Camera::new(
         camera.ip,
-        camera.onvif_port as u16,
+        camera.onvif_port.try_into().expect("invalid port number"),
         camera.username,
         camera.password,
     )?;

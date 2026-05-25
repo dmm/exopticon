@@ -80,7 +80,7 @@ pub struct Camera {
     pub display_name: String,
     pub storage_group_name: String,
     pub ip: String,
-    pub onvif_port: i32,
+    pub onvif_port: u16,
     pub mac: String,
     pub username: String,
     pub password: String,
@@ -125,7 +125,7 @@ struct CameraConfig {
     #[serde(rename = "storage-group", alias = "storage-group-name")]
     storage_group_name: String,
     ip: String,
-    onvif_port: i32,
+    onvif_port: u16,
     mac: String,
     username: String,
     password: String,

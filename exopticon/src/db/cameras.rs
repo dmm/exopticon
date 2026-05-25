@@ -72,7 +72,10 @@ impl From<Camera> for crate::api::cameras::Camera {
             spec: CameraSpec {
                 storage_group_name: c.storage_group_name,
                 ip: c.ip,
-                onvif_port: c.onvif_port,
+                onvif_port: c
+                    .onvif_port
+                    .try_into()
+                    .expect("failed to convert onvif_port"),
                 mac: c.mac,
                 username: c.username,
                 rtsp_url: c.rtsp_url,
