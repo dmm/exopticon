@@ -2,6 +2,18 @@
 
 <!--- next entry here -->
 
+## 0.43.0
+2026-05-25
+
+### Features
+
+- Refactor onvif to use quick-xml api (300218b24fd6d2270e33402ae1a416d23dedf5ff)
+
+### Fixes
+
+- **onvif:** Add robust response parsing and tighter api (a30b278709ca438465196dc917abbd6d1dacb386)
+- refactor to use u16 for onvif_port (3362245f560ed9b5e6140d5295963658e3061252)
+
 ## 0.42.0
 2026-05-23
 
