@@ -461,6 +461,61 @@ mod tests {
     }
 
     #[test]
+    fn reserves_opens_closes_and_cleans_unopened_video_segments() {
+        let (temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+
+        let reserved_at = test_time("2026-05-21T02:00:00Z");
+        let begin_time = test_time("2026-05-21T02:00:05Z");
+        let end_time = test_time("2026-05-21T02:00:35Z");
+        let filename = temp_dir.path().join("reserved.mkv");
+
+        let (video_unit, video_file) = service
+            .reserve_video_segment("front", filename.display().to_string(), reserved_at)
+            .expect("video segment reserved");
+        assert_eq!(video_unit.begin_time, reserved_at);
+        assert_eq!(video_unit.end_time, reserved_at);
+        assert_eq!(video_file.size, 0);
+
+        let opened_unit = service
+            .open_video_segment(video_unit.id, video_file.id, begin_time)
+            .expect("video segment opened");
+        assert_eq!(opened_unit.begin_time, begin_time);
+        assert_eq!(opened_unit.end_time, begin_time);
+
+        std::fs::write(&filename, b"video").expect("video file written");
+        let (_closed_unit, closed_file) = service
+            .close_video_segment(video_unit.id, video_file.id, end_time, 5)
+            .expect("video segment closed");
+        assert_eq!(closed_file.size, 5);
+
+        let unopened_filename = temp_dir.path().join("unopened.mkv");
+        std::fs::write(&unopened_filename, b"unused").expect("unused file written");
+        service
+            .reserve_video_segment(
+                "front",
+                unopened_filename.display().to_string(),
+                reserved_at,
+            )
+            .expect("unopened video segment reserved");
+
+        let deleted_count = service
+            .delete_unopened_video_segments("front")
+            .expect("unopened video segments deleted");
+        assert_eq!(deleted_count, 1);
+        assert!(!unopened_filename.exists());
+
+        let segments = service
+            .fetch_video_units_between("front", begin_time, end_time)
+            .expect("video segments fetched");
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].0.id, video_unit.id);
+        assert_eq!(segments[0].1.size, 5);
+    }
+
+    #[test]
     fn handles_sessions_tokens_and_expired_cleanup() {
         let (_temp_dir, service) = migrated_service();
         service

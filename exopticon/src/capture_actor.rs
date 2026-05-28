@@ -33,23 +33,21 @@ use metrics::{Counter, counter};
 use regex::Regex;
 use tokio::{
     fs,
+    io::AsyncWriteExt,
     process::{self, Child, ChildStdin, ChildStdout},
     sync::mpsc,
     task::spawn_blocking,
 };
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
+use uuid::Uuid;
 
 use crate::{
     CameraStatusRegistry,
-    api::{
-        cameras::CameraStatus,
-        storage_groups::StorageGroup,
-        video_units::{CreateVideoFile, CreateVideoUnit},
-    },
+    api::{cameras::CameraStatus, storage_groups::StorageGroup},
     db::cameras::Camera,
     video_router::VideoRouter,
 };
-use exserial::models::{CaptureMessage, PacketEncoding};
+use exserial::models::{CaptureCommand, CaptureMessage, PacketEncoding};
 
 const PACKET_STATUS_UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -73,6 +71,20 @@ enum State {
     Recording,
 }
 
+fn uuid_to_filename(parent_path: &Path, uuid: Uuid) -> PathBuf {
+    let uuid_ts = uuid.get_timestamp().expect("failed to get uuid timestamp");
+    let (secs, nsecs) = uuid_ts.to_unix();
+
+    let secs = i64::try_from(secs).expect("overflow converting secs timestamp");
+
+    let ts =
+        chrono::DateTime::from_timestamp(secs, nsecs).expect("failed to build chrono datetime");
+
+    let path = format!("{}/{}.mkv", ts.format("%Y/%m/%d/%H"), uuid);
+
+    parent_path.join(&path)
+}
+
 pub struct CaptureActor {
     state: State,
     db: crate::db::Service,
@@ -83,7 +95,6 @@ pub struct CaptureActor {
         ChildStdin,
         FramedRead<ChildStdout, LengthDelimitedCodec>,
     )>,
-    video_segment_id: Option<(i64, i64)>,
 
     /// Video Packet Router
     video_router: Arc<VideoRouter>,
@@ -113,7 +124,6 @@ impl CaptureActor {
             camera,
             storage_group,
             child: None,
-            video_segment_id: None,
             command_receiver,
             video_router,
             camera_status_registry,
@@ -161,37 +171,82 @@ impl CaptureActor {
         self.state = State::Started;
     }
 
-    async fn handle_new_file(
+    fn worker_storage_path(&self) -> PathBuf {
+        Path::new(&self.storage_group.spec.storage_path).join(self.camera.name.clone())
+    }
+
+    async fn reserve_file(&self) -> anyhow::Result<(i64, i64, String)> {
+        let path = uuid_to_filename(&self.worker_storage_path(), Uuid::now_v7());
+        let parent = path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("reserved filename has no parent directory"))?;
+        fs::create_dir_all(parent).await?;
+
+        let filename = path.to_string_lossy().to_string();
+        let db_filename = filename.clone();
+        let db = self.db.clone();
+        let camera_name = self.camera.name.clone();
+        let reserved_at = Utc::now();
+        let (video_unit, video_file) = spawn_blocking(move || {
+            db.reserve_video_segment(&camera_name, db_filename, reserved_at)
+        })
+        .await??;
+
+        Ok((video_unit.id, video_file.id, filename))
+    }
+
+    async fn send_worker_command(&mut self, command: CaptureCommand) -> anyhow::Result<()> {
+        let Some((_, stdin, _)) = &mut self.child else {
+            anyhow::bail!("capture worker stdin is not available");
+        };
+
+        let frame = exserial::serialize_frame(&command)?;
+        stdin.write_all(&frame).await?;
+        stdin.flush().await?;
+        Ok(())
+    }
+
+    async fn handle_reserve_file(&mut self) -> anyhow::Result<()> {
+        let command = match self.reserve_file().await {
+            Ok((video_unit_id, video_file_id, filename)) => CaptureCommand::FileReserved {
+                video_unit_id,
+                video_file_id,
+                filename,
+            },
+            Err(err) => CaptureCommand::FileReservationFailed {
+                message: err.to_string(),
+            },
+        };
+
+        self.send_worker_command(command).await
+    }
+
+    async fn handle_file_opened(
         &mut self,
+        video_unit_id: i64,
+        video_file_id: i64,
         filename: String,
         begin_time: String,
     ) -> anyhow::Result<()> {
-        let date = begin_time.parse::<DateTime<Utc>>().expect("Parse failure!");
+        let begin_time = begin_time.parse::<DateTime<Utc>>().expect("Parse failure!");
+        debug!("Reserved file opened: {filename}");
 
-        let create_video_unit = CreateVideoUnit {
-            camera_name: self.camera.name.clone(),
-            begin_time: date,
-            end_time: date,
-        };
-        let create_video_file = CreateVideoFile { filename, size: 0 };
         let db = self.db.clone();
-        let (video_unit, video_file) =
-            spawn_blocking(move || db.create_video_segment(&create_video_unit, create_video_file))
-                .await??;
+        spawn_blocking(move || db.open_video_segment(video_unit_id, video_file_id, begin_time))
+            .await??;
 
-        self.video_segment_id = Some((video_unit.id, video_file.id));
         self.state = State::Recording;
         Ok(())
     }
 
     async fn handle_close_file(
         &self,
+        video_unit_id: i64,
+        video_file_id: i64,
         filename: &str,
         end_time: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        if let (Some((video_unit_id, video_file_id)), Ok(metadata)) =
-            (self.video_segment_id, fs::metadata(filename).await)
-        {
+        if let Ok(metadata) = fs::metadata(filename).await {
             let db = self.db.clone();
             let file_size: i32 = metadata.len().try_into().unwrap_or(-1);
             spawn_blocking(move || {
@@ -201,6 +256,23 @@ impl CaptureActor {
         }
         Ok(())
     }
+
+    async fn cleanup_unopened_video_segments(&self) -> anyhow::Result<()> {
+        let db = self.db.clone();
+        let camera_name = self.camera.name.clone();
+        let deleted_count =
+            spawn_blocking(move || db.delete_unopened_video_segments(&camera_name)).await??;
+
+        if deleted_count > 0 {
+            debug!(
+                "Deleted {} unopened video segments for {}",
+                deleted_count, self.camera.name
+            );
+        }
+
+        Ok(())
+    }
+
     async fn update_packet_status(&mut self, encoding: &PacketEncoding) {
         let codec = encoding.codec_name();
         let codec_changed = match encoding {
@@ -299,14 +371,28 @@ impl CaptureActor {
                 self.handle_packet(encoding, data, timestamp, duration)
                     .await;
             }
-            CaptureMessage::NewFile {
+            CaptureMessage::ReserveFile => {
+                self.handle_reserve_file().await?;
+            }
+            CaptureMessage::FileOpened {
+                video_unit_id,
+                video_file_id,
                 filename,
                 begin_time,
-            } => self.handle_new_file(filename, begin_time).await?,
+            } => {
+                self.handle_file_opened(video_unit_id, video_file_id, filename, begin_time)
+                    .await?;
+            }
 
-            CaptureMessage::EndFile { filename, end_time } => {
+            CaptureMessage::EndFile {
+                video_unit_id,
+                video_file_id,
+                filename,
+                end_time,
+            } => {
                 let end_time = end_time.parse::<DateTime<Utc>>().expect("Parse failure!");
-                self.handle_close_file(&filename, end_time).await?;
+                self.handle_close_file(video_unit_id, video_file_id, &filename, end_time)
+                    .await?;
             }
             CaptureMessage::Metric {
                 label: _,
@@ -336,6 +422,7 @@ impl CaptureActor {
             Some((child, _, framed_stream)) => {
                 tokio::select! {
                     biased;
+                    Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
                     _ = child.wait() => {
                         info!(
                             "Capture process for {} {} died. Restarting...",
@@ -349,7 +436,6 @@ impl CaptureActor {
                         );
                         return Ok(false)
                     }
-                    Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
                     else => return Ok(false)
                 }
             }
@@ -368,6 +454,9 @@ impl CaptureActor {
         let mut had_error = false;
         loop {
             if self.state == State::Ready {
+                if let Err(e) = self.cleanup_unopened_video_segments().await {
+                    error!("error cleaning unopened video segments: {}", e);
+                }
                 self.start_worker();
             }
             let res = self.select_next().await;
@@ -391,6 +480,9 @@ impl CaptureActor {
             if let Err(e) = child.wait().await {
                 error!("error waiting for child exit: {}", e);
             }
+        }
+        if let Err(e) = self.cleanup_unopened_video_segments().await {
+            error!("error cleaning unopened video segments after stop: {}", e);
         }
         self.camera_status_registry.write().await.insert(
             self.camera.name.clone(),

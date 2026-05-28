@@ -44,16 +44,23 @@
 #![allow(clippy::too_many_lines)]
 
 use std::{
-    fs::create_dir_all,
+    io,
     path::PathBuf,
-    sync::{Arc, Mutex, Weak},
+    sync::{
+        Arc, Mutex, Weak,
+        mpsc::{Receiver, RecvTimeoutError, SyncSender, sync_channel},
+    },
+    thread,
     time::{Duration, Instant},
 };
 
 use chrono::{SecondsFormat, Utc};
-use exserial::{exlog::ExLog, models::CaptureMessage};
+use exserial::{
+    exlog::ExLog,
+    models::{CaptureCommand, CaptureMessage},
+};
 use gstreamer::{
-    self as gst, Bin, Element, Pad, PadProbeReturn, PadProbeType,
+    self as gst, Bin, Element, Pad, PadProbeId, PadProbeReturn, PadProbeType,
     glib::{
         self,
         object::{Cast, ObjectExt},
@@ -65,16 +72,178 @@ use gstreamer::{
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use log::{debug, error, info};
-use uuid::Uuid;
 
 static LOGGER: ExLog = ExLog;
 static TIMEOUT: Duration = Duration::from_secs(10);
+static STARTUP_PREROLL_TIMEOUT: Duration = Duration::from_secs(1);
+
+#[derive(Clone, Debug)]
+struct FileReservation {
+    video_unit_id: i64,
+    video_file_id: i64,
+    filename: String,
+}
+
+#[derive(Clone, Debug)]
+struct OpenFileSegment {
+    video_unit_id: i64,
+    video_file_id: i64,
+    filename: String,
+}
+
+#[derive(Debug)]
+struct BlockedPrerollPad {
+    pad: Pad,
+    probe_id: PadProbeId,
+}
+
+#[derive(Debug, Default)]
+struct StartupPreroll {
+    complete: bool,
+    timeout_scheduled: bool,
+    blocked_pads: Vec<BlockedPrerollPad>,
+}
+
+#[derive(Debug)]
+struct PrerollBlockResult {
+    blocked: bool,
+    start_timeout: bool,
+}
+
+impl StartupPreroll {
+    fn block_pad(&mut self, pad: &Pad, stream_name: &'static str) -> PrerollBlockResult {
+        if self.complete {
+            return PrerollBlockResult {
+                blocked: false,
+                start_timeout: false,
+            };
+        }
+
+        let start_timeout = !self.timeout_scheduled;
+        self.timeout_scheduled = true;
+
+        let probe_id = pad
+            .add_probe(PadProbeType::BLOCK_DOWNSTREAM, move |_, _| {
+                debug!("Holding {stream_name} mux branch during startup preroll");
+                PadProbeReturn::Ok
+            })
+            .expect("failed to add startup preroll probe");
+
+        self.blocked_pads.push(BlockedPrerollPad {
+            pad: pad.clone(),
+            probe_id,
+        });
+
+        PrerollBlockResult {
+            blocked: true,
+            start_timeout,
+        }
+    }
+
+    fn finish(&mut self, reason: &str) {
+        if self.complete {
+            return;
+        }
+
+        self.complete = true;
+        let blocked_count = self.blocked_pads.len();
+
+        for blocked in self.blocked_pads.drain(..) {
+            blocked.pad.remove_probe(blocked.probe_id);
+        }
+
+        info!("Startup preroll complete via {reason}; released {blocked_count} mux branch(es)");
+    }
+}
+
+#[derive(Debug)]
+struct ReservationClient {
+    receiver: Mutex<Receiver<Result<FileReservation, String>>>,
+    timeout: Duration,
+}
+
+impl ReservationClient {
+    fn start(timeout: Duration) -> Arc<Self> {
+        let (sender, receiver) = sync_channel(1);
+        let client = Arc::new(Self {
+            receiver: Mutex::new(receiver),
+            timeout,
+        });
+
+        thread::Builder::new()
+            .name("capture-command-reader".to_string())
+            .spawn(move || Self::read_commands(&sender))
+            .expect("failed to spawn capture command reader");
+
+        client
+    }
+
+    fn request_next() {
+        exserial::print_message(CaptureMessage::ReserveFile);
+    }
+
+    fn wait_for_reservation(&self) -> Result<FileReservation, String> {
+        let receiver = self
+            .receiver
+            .lock()
+            .expect("reservation receiver lock poisoned");
+        match receiver.recv_timeout(self.timeout) {
+            Ok(result) => result,
+            Err(RecvTimeoutError::Timeout) => Err(format!(
+                "timed out waiting {} seconds for file reservation",
+                self.timeout.as_secs()
+            )),
+            Err(RecvTimeoutError::Disconnected) => Err(
+                "capture actor command stream closed before file reservation arrived".to_string(),
+            ),
+        }
+    }
+
+    fn read_commands(sender: &SyncSender<Result<FileReservation, String>>) {
+        let stdin = io::stdin();
+        let mut stdin = stdin.lock();
+
+        loop {
+            match exserial::read_framed::<_, CaptureCommand>(&mut stdin) {
+                Ok(command) => {
+                    let reservation = match command {
+                        CaptureCommand::FileReserved {
+                            video_unit_id,
+                            video_file_id,
+                            filename,
+                        } => Ok(FileReservation {
+                            video_unit_id,
+                            video_file_id,
+                            filename,
+                        }),
+                        CaptureCommand::FileReservationFailed { message } => Err(message),
+                    };
+
+                    if sender.send(reservation).is_err() {
+                        break;
+                    }
+                }
+                Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
+                    let _ = sender.try_send(Err("capture actor command stream closed".to_string()));
+                    break;
+                }
+                Err(err) => {
+                    let _ = sender
+                        .try_send(Err(format!("failed to read capture actor command: {err}")));
+                    break;
+                }
+            }
+        }
+    }
+}
 
 /// `CaptureWorker` state
 #[derive(Debug)]
 struct CustomData {
-    /// top level path to write video for this stream
-    storage_path: PathBuf,
+    /// DB-backed file reservations
+    reservations: Arc<ReservationClient>,
+    /// prefetched reservation for the first output file
+    next_file: Option<FileReservation>,
     /// splitmuxsink and associated video sink pad, used by gstreamer
     /// callbacks
     mkv_sink_pad: (Element, Pad),
@@ -82,15 +251,17 @@ struct CustomData {
     video_appsink: Option<AppSink>,
     /// set if audio stream is provided
     audio_appsink: Option<AppSink>,
-    /// current filename
-    current_filename: Option<String>,
+    /// blocks mux branches until `rtspsrc` has exposed all startup pads
+    startup_preroll: StartupPreroll,
+    /// currently open file
+    current_file: Option<OpenFileSegment>,
     /// `last_frame_time` is set to detect a hung process not
     /// producing frames
     last_frame_time: Instant,
 }
 
 impl CustomData {
-    pub fn new(storage_path: PathBuf) -> Self {
+    pub fn new(reservations: Arc<ReservationClient>, next_file: FileReservation) -> Self {
         let mkv_sink = gst::ElementFactory::make("splitmuxsink")
             .name("sink")
             .property("async-finalize", true)
@@ -108,28 +279,16 @@ impl CustomData {
             .expect("Failed to get video sink pad from convert");
 
         Self {
-            storage_path,
+            reservations,
+            next_file: Some(next_file),
             mkv_sink_pad: (mkv_sink, video_sink_pad),
             video_appsink: None,
             audio_appsink: None,
-            current_filename: None,
+            startup_preroll: StartupPreroll::default(),
+            current_file: None,
             last_frame_time: Instant::now(),
         }
     }
-}
-
-fn uuid_to_filename(parent_path: &std::path::Path, uuid: Uuid) -> std::path::PathBuf {
-    let uuid_ts = uuid.get_timestamp().expect("failed to get uuid timestamp");
-    let (secs, nsecs) = uuid_ts.to_unix();
-
-    let secs = i64::try_from(secs).expect("overflow converting secs timestamp");
-
-    let ts =
-        chrono::DateTime::from_timestamp(secs, nsecs).expect("failed to build chrono datetime");
-
-    let path = format!("{}/{}.mkv", ts.format("%Y/%m/%d/%H"), uuid);
-
-    parent_path.join(&path)
 }
 
 fn caps_are_compatible(old: &gst::CapsRef, new: &gst::CapsRef) -> bool {
@@ -650,30 +809,92 @@ fn handle_file_location_request(data_weak: &Weak<Mutex<CustomData>>) -> gstreame
     let Some(data) = data_weak.upgrade() else {
         panic!("Failed to upgrade the weak reference");
     };
-    let mut d = data.lock().unwrap();
+    let (reservations, current_file, next_file) = {
+        let mut d = data.lock().unwrap();
+        (
+            Arc::clone(&d.reservations),
+            d.current_file.take(),
+            d.next_file.take(),
+        )
+    };
 
-    if let Some(current_filename) = &d.current_filename {
+    if let Some(current_file) = current_file {
         let msg = CaptureMessage::EndFile {
-            filename: current_filename.clone(),
+            video_unit_id: current_file.video_unit_id,
+            video_file_id: current_file.video_file_id,
+            filename: current_file.filename,
             end_time: timestamp.clone(),
         };
         exserial::print_message(msg);
     }
 
-    let id = Uuid::now_v7();
-    let path = uuid_to_filename(&d.storage_path, id);
-    let parent = path.parent().expect("failed to get new file parent");
-    create_dir_all(parent).expect("failed to create parent directory");
-    debug!("New file: {}", path.display());
+    let reservation = next_file.unwrap_or_else(|| {
+        reservations.wait_for_reservation().unwrap_or_else(|err| {
+            error!("Failed to get file reservation: {err}");
+            panic!("failed to get file reservation: {err}");
+        })
+    });
+    let filename = reservation.filename.clone();
+    debug!("New reserved file: {filename}");
 
-    let msg = CaptureMessage::NewFile {
-        filename: path.to_string_lossy().to_string(),
+    let msg = CaptureMessage::FileOpened {
+        video_unit_id: reservation.video_unit_id,
+        video_file_id: reservation.video_file_id,
+        filename: filename.clone(),
         begin_time: timestamp,
     };
     exserial::print_message(msg);
-    d.current_filename = Some(path.to_string_lossy().to_string());
-    drop(d);
-    path.into()
+
+    {
+        let mut d = data.lock().unwrap();
+        d.current_file = Some(OpenFileSegment {
+            video_unit_id: reservation.video_unit_id,
+            video_file_id: reservation.video_file_id,
+            filename: filename.clone(),
+        });
+    }
+
+    ReservationClient::request_next();
+    PathBuf::from(filename).into()
+}
+
+fn schedule_startup_preroll_timeout(data_weak: Weak<Mutex<CustomData>>) {
+    thread::Builder::new()
+        .name("startup-preroll-timeout".to_string())
+        .spawn(move || {
+            thread::sleep(STARTUP_PREROLL_TIMEOUT);
+
+            let Some(data) = data_weak.upgrade() else {
+                return;
+            };
+
+            data.lock().unwrap().startup_preroll.finish("timeout");
+        })
+        .expect("failed to spawn startup preroll timeout");
+}
+
+fn drain_unmuxed_branch(pipeline: &gst::Pipeline, src_pad: &Pad, sink_name: &str) {
+    let fakesink = gst::ElementFactory::make("fakesink")
+        .name(sink_name)
+        .property("sync", false)
+        .build()
+        .expect("failed to build fakesink");
+
+    pipeline
+        .add_many([&fakesink])
+        .expect("failed to add fakesink");
+
+    let fakesink_pad = fakesink
+        .static_pad("sink")
+        .expect("failed to get fakesink sink pad");
+
+    src_pad
+        .link(&fakesink_pad)
+        .expect("failed to link late mux branch to fakesink");
+
+    fakesink
+        .sync_state_with_parent()
+        .expect("failed to sync fakesink state");
 }
 
 fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, src_pad: &Pad) {
@@ -739,6 +960,10 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
         let bin_mkv_src_pad = bin
             .static_pad("mkv_src")
             .expect("failed to get bin src pad");
+        let preroll_block = d.startup_preroll.block_pad(&bin_mkv_src_pad, "video");
+        if preroll_block.start_timeout {
+            schedule_startup_preroll_timeout(data_weak.clone());
+        }
 
         src_pad
             .link(&bin_sink_pad)
@@ -798,6 +1023,10 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
         let bin_mkv_src_pad = bin
             .static_pad("mkv_src")
             .expect("failed to get bin src pad");
+        let preroll_block = d.startup_preroll.block_pad(&bin_mkv_src_pad, "audio");
+        if preroll_block.start_timeout {
+            schedule_startup_preroll_timeout(data_weak);
+        }
 
         src_pad
             .link(&bin_sink_pad)
@@ -830,16 +1059,23 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
             .expect("failed to sync video appsink state");
         d.audio_appsink = Some(appsink);
 
-        let audio_sink_pad = d
-            .mkv_sink_pad
-            .0
-            .request_pad_simple("audio_%u")
-            .expect("Failed to get video sink pad from convert");
+        let audio_sink_pad = preroll_block.blocked.then(|| {
+            d.mkv_sink_pad
+                .0
+                .request_pad_simple("audio_%u")
+                .expect("Failed to get audio sink pad from splitmuxsink")
+        });
         drop(d);
-        // link the bin pipeline to the mkv splitmuxsink
-        bin_mkv_src_pad
-            .link(&audio_sink_pad)
-            .expect("linking bin to audio sink failed");
+
+        if let Some(audio_sink_pad) = audio_sink_pad {
+            // link the bin pipeline to the mkv splitmuxsink
+            bin_mkv_src_pad
+                .link(&audio_sink_pad)
+                .expect("linking bin to audio sink failed");
+        } else {
+            info!("Audio arrived after startup preroll; draining it outside of the MKV muxer");
+            drain_unmuxed_branch(&pipeline, &bin_mkv_src_pad, "late_audio_fakesink");
+        }
 
         info!("Link succeeded (type {new_pad_type}).");
 
@@ -864,11 +1100,16 @@ fn main() {
     }
 
     let url = std::env::args().nth(1).expect("Failed to get url");
-    let storage_path: std::path::PathBuf = std::env::args()
+    let _storage_path: PathBuf = std::env::args()
         .nth(2)
         .expect("Failed to get storage path")
         .into();
-    let data = CustomData::new(storage_path);
+    let reservations = ReservationClient::start(TIMEOUT);
+    ReservationClient::request_next();
+    let initial_reservation = reservations
+        .wait_for_reservation()
+        .expect("failed to reserve initial file");
+    let data = CustomData::new(reservations, initial_reservation);
 
     let source = gst::ElementFactory::make("rtspsrc")
         .name("source")

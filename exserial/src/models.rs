@@ -80,13 +80,49 @@ pub enum CaptureMessage {
         /// duration in microseconds
         duration: i64,
     },
-    /// New file indication
-    NewFile {
+    /// Request a reserved file location before creating a file
+    ReserveFile,
+    /// Reserved file opened indication
+    FileOpened {
+        /// id of associated video unit
+        video_unit_id: i64,
+        /// id of associated video file
+        video_file_id: i64,
+        /// filename opened by the worker
         filename: String,
+        /// segment begin time
         begin_time: String,
     },
     /// File closed indication
-    EndFile { filename: String, end_time: String },
+    EndFile {
+        /// id of associated video unit
+        video_unit_id: i64,
+        /// id of associated video file
+        video_file_id: i64,
+        /// filename closed by the worker
+        filename: String,
+        /// segment end time
+        end_time: String,
+    },
     /// metric report
     Metric { label: String, values: Vec<f64> },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+/// Command from capture actor to capture worker
+pub enum CaptureCommand {
+    /// Reserved file location response
+    FileReserved {
+        /// id of associated video unit
+        video_unit_id: i64,
+        /// id of associated video file
+        video_file_id: i64,
+        /// filename reserved for the worker
+        filename: String,
+    },
+    /// File reservation failed
+    FileReservationFailed {
+        /// failure message
+        message: String,
+    },
 }

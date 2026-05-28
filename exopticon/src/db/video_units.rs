@@ -110,6 +110,23 @@ type VideoSegment = (
 );
 
 impl Service {
+    // reserve a VideoSegment before the capture worker creates the file
+    pub fn reserve_video_segment(
+        &self,
+        camera_name: &str,
+        filename: String,
+        reserved_at: DateTime<Utc>,
+    ) -> Result<VideoSegment, super::Error> {
+        let create_video_unit = crate::api::video_units::CreateVideoUnit {
+            camera_name: camera_name.to_string(),
+            begin_time: reserved_at,
+            end_time: reserved_at,
+        };
+        let create_video_file = crate::api::video_units::CreateVideoFile { filename, size: 0 };
+
+        self.create_video_segment(&create_video_unit, create_video_file)
+    }
+
     // create VideoSegment
     pub fn create_video_segment(
         &self,
@@ -144,6 +161,38 @@ impl Service {
         })
     }
 
+    pub fn open_video_segment(
+        &self,
+        video_unit_id: i64,
+        video_file_id: i64,
+        begin_time: DateTime<Utc>,
+    ) -> Result<crate::api::video_units::VideoUnit, super::Error> {
+        let video_unit = db_write!(self, "open_video_segment", |conn| {
+            let _video_file = diesel::update(
+                video_files::dsl::video_files
+                    .filter(video_files::dsl::id.eq(video_file_id))
+                    .filter(video_files::dsl::video_unit_id.eq(video_unit_id)),
+            )
+            .set(video_files::dsl::size.eq(-1))
+            .get_result::<VideoFile>(conn)?;
+
+            let begin_time_us = datetime_to_micros(begin_time);
+            let video_unit = diesel::update(
+                video_units::dsl::video_units
+                    .filter(crate::schema::video_units::columns::id.eq(video_unit_id)),
+            )
+            .set((
+                crate::schema::video_units::columns::begin_time_us.eq(begin_time_us),
+                crate::schema::video_units::columns::end_time_us.eq(begin_time_us),
+            ))
+            .get_result::<VideoUnit>(conn)?;
+
+            Ok(video_unit)
+        })?;
+
+        video_unit.try_into()
+    }
+
     // update video unit/video file
     pub fn close_video_segment(
         &self,
@@ -152,7 +201,7 @@ impl Service {
         end_time: DateTime<Utc>,
         file_size: i32,
     ) -> Result<VideoSegment, super::Error> {
-        let res = db_read!(self, "close_video_segment", |conn| {
+        let res = db_write!(self, "close_video_segment", |conn| {
             let video_unit = diesel::update(
                 video_units::dsl::video_units
                     .filter(crate::schema::video_units::columns::id.eq(video_unit_id)),
@@ -171,6 +220,57 @@ impl Service {
         })?;
 
         Ok((res.0.try_into()?, res.1.into()))
+    }
+
+    pub fn delete_unopened_video_segments(&self, camera_name: &str) -> Result<usize, super::Error> {
+        let mut deleted_count = 0;
+
+        let unopened_units: Vec<(VideoUnit, VideoFile)> =
+            db_read!(self, "read_unopened_video_segments", |conn| {
+                let unopened_units: Vec<(VideoUnit, VideoFile)> = video_units::table
+                    .inner_join(video_files::table)
+                    .filter(video_units::camera_name.eq(camera_name))
+                    .filter(video_units::begin_time_us.eq(video_units::end_time_us))
+                    .filter(video_files::size.eq(0))
+                    .load(conn)?;
+
+                Ok(unopened_units)
+            })?;
+
+        for (_video_unit, video_file) in &unopened_units {
+            debug!("Deleting unopened video segment: {}", video_file.filename);
+            match std::fs::remove_file(&video_file.filename) {
+                Ok(()) => {}
+                Err(err) => {
+                    if err.kind() != std::io::ErrorKind::NotFound {
+                        error!(
+                            "Failed to delete unopened video segment file {}: {}",
+                            video_file.filename, err
+                        );
+                    }
+                }
+            }
+            deleted_count += 1;
+        }
+        db_write!(self, "delete_unopened_video_segments", |conn| {
+            for (video_unit, video_file) in unopened_units {
+                use crate::schema;
+                diesel::delete(
+                    schema::video_files::dsl::video_files
+                        .filter(schema::video_files::columns::id.eq(video_file.id)),
+                )
+                .execute(conn)?;
+
+                diesel::delete(
+                    schema::video_units::dsl::video_units
+                        .filter(schema::video_units::columns::id.eq(video_unit.id)),
+                )
+                .execute(conn)?;
+            }
+            Ok(())
+        })?;
+
+        Ok(deleted_count)
     }
 
     // Fetch between video unit
