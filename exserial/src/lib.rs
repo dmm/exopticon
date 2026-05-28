@@ -44,6 +44,8 @@ pub fn print_message(message: CaptureMessage) {
     handle
         .write_all(serialized.as_slice())
         .expect("unable to write frame!");
+
+    handle.flush().expect("to flush stdout");
 }
 
 #[cfg(test)]
