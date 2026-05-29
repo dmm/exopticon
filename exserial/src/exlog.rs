@@ -15,7 +15,6 @@ impl log::Log for ExLog {
                 level: record.metadata().level(),
                 message: format!("{}", record.args()),
             });
-            eprintln!("{} {}", record.metadata().level(), record.args());
         }
     }
 
