@@ -2,6 +2,15 @@
 
 <!--- next entry here -->
 
+## 0.43.1
+2026-05-29
+
+### Fixes
+
+- **exserial:** Flush stdout after sending message (56aa041fabe605bd93c1acf7607ce54ce0191b20)
+- **capture-worker:** fix video file creation race (85fe329a87e4217c0a929d9b3da974a5bdae0ba8)
+- **exserial:** Remove printing logs to stderr in exserial (8d8fca74addde300f4ee91bd42d202b24592c9ce)
+
 ## 0.43.0
 2026-05-25
 
