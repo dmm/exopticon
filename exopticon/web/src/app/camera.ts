@@ -57,8 +57,8 @@ export interface Camera {
 }
 
 export class AnalysisConfiguration {
-  camera_id: number;
-  analysisConfig: AnalysisType;
+  camera_id!: number;
+  analysisConfig!: AnalysisType;
 }
 
 export enum AnalysisType {

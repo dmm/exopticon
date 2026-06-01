@@ -39,10 +39,10 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 }
 <div class="panel" waIntersectionObserver waIntersectionThreshold="0.1">
-  @if ((webrtcService.status$ | async).kind != "connected") {
-    <div class="webrtc-status">
-      CONNECTING: {{ (webrtcService.status$ | async).kind }}
-    </div>
+  @if (webrtcService.status$ | async; as webrtcStatus) {
+    @if (webrtcStatus.kind != "connected") {
+      <div class="webrtc-status">CONNECTING: {{ webrtcStatus.kind }}</div>
+    }
   }
 
   @for (tile of vm.tiles; track tile.camera.metadata.name) {
@@ -56,10 +56,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         cameraPanelService.mouseOver(tile.camera.metadata.name);
         $event.stopPropagation()
       "
-      (mouseleave)="
-        cameraPanelService.mouseLeave(tile.camera.metadata.name);
-        $event.stopPropagation()
-      "
+      (mouseleave)="cameraPanelService.mouseLeave(); $event.stopPropagation()"
       [style.width.%]="vm.layout.itemWidthPercent"
       [style.height.vh]="vm.layout.itemHeightVh"
     >

@@ -6,6 +6,7 @@
     "esModuleInterop": true,
     "sourceMap": true,
     "declaration": false,
+    "strict": true,
     "module": "es2020",
     "moduleResolution": "bundler",
     "experimentalDecorators": true,
@@ -15,5 +16,10 @@
       "node_modules/@types"
     ],
     "useDefineForClassFields": false
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true
   }
 }

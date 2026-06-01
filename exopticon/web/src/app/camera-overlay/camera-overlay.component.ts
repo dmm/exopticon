@@ -29,13 +29,13 @@ import { CameraService, PtzDirection } from "../camera.service";
   styleUrls: ["./camera-overlay.component.css"],
 })
 export class CameraOverlayComponent implements OnInit {
-  @Input() camera: Camera;
-  @Input() muted: boolean;
+  @Input() camera!: Camera;
+  @Input() muted!: boolean;
 
   @Output()
   muteEvent = new EventEmitter<boolean>();
 
-  private directions = PtzDirection;
+  directions = PtzDirection;
   private ptzActivated = false;
 
   constructor(
@@ -55,7 +55,7 @@ export class CameraOverlayComponent implements OnInit {
     this.muteEvent.emit(true);
   }
 
-  stopPropagation(event: PointerEvent) {
+  stopPropagation(event: Event) {
     event.stopImmediatePropagation();
   }
 }

@@ -41,11 +41,11 @@ enum EventListState {
 export class EventListComponent implements OnInit {
   public eventListState = EventListState;
   public selectedEvent: number = -1;
-  public state: EventListState;
+  public state: EventListState = EventListState.Loading;
   public now = ZonedDateTime.now();
 
-  events$: Observable<Event[]>;
-  user$: Observable<User>;
+  events$!: Observable<Event[]>;
+  user$!: Observable<User>;
   offset: number = 0;
 
   constructor(
@@ -129,7 +129,7 @@ export class EventListComponent implements OnInit {
   }
 
   groupEventList(events: Event[]): Array<Event[]> {
-    let groups = [];
+    let groups: Event[][] = [];
     let activeGroup = new Array<Event>();
 
     events.forEach((e) => {
@@ -140,7 +140,7 @@ export class EventListComponent implements OnInit {
           activeGroup.push(e);
         } else {
           groups.push(activeGroup);
-          activeGroup = new Array<Event>();
+          activeGroup = [e];
         }
       }
     });
@@ -152,9 +152,9 @@ export class EventListComponent implements OnInit {
   }
 
   groupEvents(events: Event[]): Array<Event> {
-    let mainGroups = [];
+    let mainGroups: Event[] = [];
     let cameraGroups = events.reduce((r, a) => {
-      let arr = r.has(a.cameraId) ? r.get(a.cameraId) : [];
+      let arr = r.get(a.cameraId) ?? [];
       arr.push(a);
       r.set(a.cameraId, arr);
       return r;
@@ -164,17 +164,14 @@ export class EventListComponent implements OnInit {
       let overlapping = this.groupEventList(value);
       let longestEvents = overlapping.map((ev) => {
         return ev.reduce((acc, val) => {
-          if (acc == null) {
-            acc = val;
-          }
           return val.interval.toDuration().toMillis() >
             acc.interval.toDuration().toMillis()
             ? val
             : acc;
-        }, null);
+        });
       });
       mainGroups = mainGroups.concat(longestEvents);
     });
-    return mainGroups.sort((a, b) => a.beginTime.isBefore(b.beginTime));
+    return mainGroups.sort((a, b) => b.beginTime.compareTo(a.beginTime));
   }
 }

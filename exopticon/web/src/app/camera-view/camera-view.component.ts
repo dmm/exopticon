@@ -58,22 +58,22 @@ type CameraViewStatus = NewState | ConnectingState | PlayingState;
   imports: [CameraOverlayComponent, CameraStatusOverlayComponent],
 })
 export class CameraViewComponent implements OnInit {
-  @Input() camera: Camera;
-  @Input() selected: boolean;
-  @Input() enabled: boolean;
+  @Input() camera!: Camera;
+  @Input() selected = false;
+  @Input() enabled = false;
 
   @Output() isVisible = new EventEmitter<boolean>();
 
-  @ViewChild("wrapperDiv") wrapperDiv: ElementRef;
+  @ViewChild("wrapperDiv") wrapperDiv!: ElementRef<HTMLDivElement>;
 
-  @ViewChild("videoElement") videoElement: ElementRef;
+  @ViewChild("videoElement") videoElement!: ElementRef<HTMLVideoElement>;
 
-  public status: string;
+  public status = "loading";
   public muted: boolean = true;
 
   private mediaStream?: MediaStream = undefined;
   private state: CameraViewStatus = { kind: "new" };
-  private subscription: Subscription = null;
+  private subscription: Subscription | null = null;
 
   constructor(
     private changeRef: ChangeDetectorRef,
@@ -114,8 +114,7 @@ export class CameraViewComponent implements OnInit {
   }
 
   getVideoElement(): HTMLVideoElement {
-    let video = this.videoElement.nativeElement as HTMLVideoElement;
-    return video;
+    return this.videoElement.nativeElement;
   }
 
   setMediaSource() {
@@ -181,7 +180,7 @@ export class CameraViewComponent implements OnInit {
     this.cameraPanelService.setMute(this.camera.metadata.name, this.muted);
   }
 
-  setStatus(_event) {
+  setStatus(_event: Event) {
     this.status = "active";
   }
 

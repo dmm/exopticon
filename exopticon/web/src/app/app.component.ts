@@ -45,7 +45,7 @@ export class AppComponent {
   title = "exopticon";
   fullscreen = false;
   menuState = MenuState.None;
-  isLoggedIn$: Observable<boolean>;
+  isLoggedIn$!: Observable<boolean>;
 
   constructor(
     private route: ActivatedRoute,
@@ -68,7 +68,7 @@ export class AppComponent {
     this.router.navigateByUrl("/camera_panel");
   }
 
-  handleClick(menu) {
+  handleClick(menu: "main") {
     if (menu === "main" && this.menuState == MenuState.None) {
       this.menuState = MenuState.Main;
     } else if (menu === "main" && this.menuState == MenuState.Main) {

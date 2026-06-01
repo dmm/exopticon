@@ -33,11 +33,11 @@ import { AsyncPipe } from "@angular/common";
   imports: [FormsModule, AsyncPipe],
 })
 export class TokenListComponent implements OnInit {
-  tokenName: string;
-  tokenExpiration: string;
-  error: string;
-  tokens$: Observable<Token[]>;
-  newToken: string;
+  tokenName = "";
+  tokenExpiration = "";
+  error: string | null = null;
+  tokens$!: Observable<Token[]>;
+  newToken: string | null = null;
   minDate: LocalDate = LocalDate.now().plusDays(1);
 
   constructor(
@@ -47,7 +47,6 @@ export class TokenListComponent implements OnInit {
 
   ngOnInit(): void {
     this.tokens$ = this.tokenService.getTokens();
-    this.newToken = null;
   }
 
   onDelete(tokenId: number) {
@@ -79,6 +78,8 @@ export class TokenListComponent implements OnInit {
   }
 
   copyToken(): void {
-    navigator.clipboard.writeText(this.newToken);
+    if (this.newToken !== null) {
+      navigator.clipboard.writeText(this.newToken);
+    }
   }
 }

@@ -20,7 +20,7 @@ interface CameraGroupDetail {
   imports: [AsyncPipe],
 })
 export class CameraGroupDetailComponent implements OnInit {
-  public detail$: Observable<CameraGroupDetail>;
+  public detail$!: Observable<CameraGroupDetail>;
 
   constructor(
     public route: ActivatedRoute,

@@ -38,8 +38,8 @@ import { AuthService } from "../auth.service";
 })
 export class LoginComponent implements OnInit {
   loginForm = new FormGroup({
-    username: new FormControl<string>(""),
-    password: new FormControl<string>(""),
+    username: new FormControl<string>("", { nonNullable: true }),
+    password: new FormControl<string>("", { nonNullable: true }),
   });
 
   constructor(
@@ -54,7 +54,7 @@ export class LoginComponent implements OnInit {
     let redirectPath = this.route.queryParamMap.pipe(
       map((params) => {
         if (params.has("redirect_path")) {
-          return params.get("redirect_path");
+          return params.get("redirect_path") ?? "/";
         } else {
           return "/";
         }

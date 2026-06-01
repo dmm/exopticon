@@ -21,10 +21,12 @@ export class WebrtcCodecsComponent implements OnInit {
   supported = false;
 
   ngOnInit(): void {
-    if (
-      typeof RTCRtpReceiver !== "undefined" &&
-      RTCRtpReceiver.getCapabilities
-    ) {
+    const receiver =
+      typeof RTCRtpReceiver === "undefined"
+        ? undefined
+        : (RTCRtpReceiver as Partial<typeof RTCRtpReceiver>);
+
+    if (typeof receiver?.getCapabilities === "function") {
       this.supported = true;
       this.loadCodecs();
     }

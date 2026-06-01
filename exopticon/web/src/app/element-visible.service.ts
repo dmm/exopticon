@@ -20,7 +20,7 @@
 
 import { ElementRef, Inject, Injectable, DOCUMENT } from "@angular/core";
 import { combineLatest, concat, defer, fromEvent, Observable, of } from "rxjs";
-import { distinctUntilChanged, flatMap, map } from "rxjs/operators";
+import { distinctUntilChanged, mergeMap, map } from "rxjs/operators";
 
 @Injectable({
   providedIn: "root",
@@ -28,7 +28,7 @@ import { distinctUntilChanged, flatMap, map } from "rxjs/operators";
 export class ElementVisibleService {
   private pageVisible$: Observable<boolean>;
 
-  constructor(@Inject(DOCUMENT) document: any) {
+  constructor(@Inject(DOCUMENT) document: Document) {
     this.pageVisible$ = concat(
       defer(() => of(!document.hidden)),
       fromEvent(document, "visibilitychange").pipe(
@@ -37,28 +37,32 @@ export class ElementVisibleService {
     );
   }
 
-  elementVisible(element: ElementRef): Observable<boolean> {
-    const elementVisible$ = Observable.create((observer) => {
-      const intersectionObserver = new IntersectionObserver((entries) => {
-        observer.next(entries);
-      });
+  elementVisible(element: ElementRef<Element>): Observable<boolean> {
+    const elementVisible$ = new Observable<IntersectionObserverEntry[]>(
+      (observer) => {
+        const intersectionObserver = new IntersectionObserver((entries) => {
+          observer.next(entries);
+        });
 
-      intersectionObserver.observe(element.nativeElement);
+        intersectionObserver.observe(element.nativeElement);
 
-      return () => {
-        intersectionObserver.disconnect();
-      };
-    }).pipe(
-      flatMap((entries: IntersectionObserverEntry[]) => entries),
+        return () => {
+          intersectionObserver.disconnect();
+        };
+      },
+    ).pipe(
+      mergeMap((entries: IntersectionObserverEntry[]) => entries),
       map((entry: IntersectionObserverEntry) => entry.isIntersecting),
       distinctUntilChanged(),
     );
 
-    const elementInViewport$ = combineLatest(
+    const elementInViewport$ = combineLatest([
       this.pageVisible$,
       elementVisible$,
-      (pageVisible, elementVisible: boolean) => pageVisible && elementVisible,
-    ).pipe(distinctUntilChanged());
+    ]).pipe(
+      map(([pageVisible, elementVisible]) => pageVisible && elementVisible),
+      distinctUntilChanged(),
+    );
 
     return elementInViewport$;
   }

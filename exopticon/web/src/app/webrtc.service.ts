@@ -57,8 +57,8 @@ interface TransceiverPair {
 }
 
 interface MidPair {
-  video?: string;
-  audio?: string;
+  video: string | null;
+  audio: string | null;
 }
 
 export interface ActivePair {
@@ -104,13 +104,12 @@ export class WebrtcService {
   }
 
   subscribe(cameraId: CameraId): Subject<MediaStream> {
-    if (this.emitters.has(cameraId)) {
-      return this.emitters.get(cameraId);
-    } else {
-      let ff = new ReplaySubject<MediaStream>(1);
-      this.emitters.set(cameraId, ff);
-      return ff;
+    let emitter = this.emitters.get(cameraId);
+    if (emitter === undefined) {
+      emitter = new ReplaySubject<MediaStream>(1);
+      this.emitters.set(cameraId, emitter);
     }
+    return emitter;
   }
 
   //
@@ -181,7 +180,7 @@ export class WebrtcService {
   private handleDisabledState(event: WebRtcEvent): State {
     if (this.state.kind !== "disabled") {
       console.error(`invalid state handler called: ${this.state.kind}`);
-      return;
+      return this.state;
     }
 
     switch (event.type) {
@@ -204,7 +203,7 @@ export class WebrtcService {
   private handleConnectingSignalState(event: WebRtcEvent): State {
     if (this.state.kind !== "connecting_signal") {
       console.error(`invalid state handler called: ${this.state.kind}`);
-      return;
+      return this.state;
     }
 
     switch (event.type) {
@@ -250,7 +249,7 @@ export class WebrtcService {
   private handleConnectingWebrtcState(event: WebRtcEvent): State {
     if (this.state.kind !== "connecting_webrtc") {
       console.error(`invalid state handler called: ${this.state.kind}`);
-      return;
+      return this.state;
     }
 
     switch (event.type) {
@@ -305,7 +304,7 @@ export class WebrtcService {
   private handleConnectedState(event: WebRtcEvent): State {
     if (this.state.kind !== "connected") {
       console.error(`invalid state handler called: ${this.state.kind}`);
-      return;
+      return this.state;
     }
 
     switch (event.type) {
@@ -350,7 +349,7 @@ export class WebrtcService {
   private handleReconnectingState(event: WebRtcEvent): State {
     if (this.state.kind !== "reconnecting") {
       console.error(`invalid state handler called: ${this.state.kind}`);
-      return;
+      return this.state;
     }
 
     switch (event.type) {
@@ -415,8 +414,8 @@ export class WebrtcService {
   private updateStreamMappings(socket: WebSocket): void {
     const mappings: Record<CameraId, MidPair> = {};
     for (const [cameraId, tPair] of this.transceivers) {
-      let active = this.activeCameras.get(cameraId);
-      if ((tPair.audio || tPair.video) && (active.audio || active.video)) {
+      const active = this.activeCameras.get(cameraId);
+      if (active !== undefined && (active.audio || active.video)) {
         mappings[cameraId] = {
           video: active.video ? tPair.video.mid : null,
           audio: active.audio ? tPair.audio.mid : null,
@@ -442,10 +441,10 @@ export class WebrtcService {
       );
       this.activeCameras.set(camera[0], camera[1]);
       if (!this.transceivers.has(camera[0]) && pc) {
-        const videoTransceiver = pc?.addTransceiver("video", {
+        const videoTransceiver = pc.addTransceiver("video", {
           direction: "recvonly",
         });
-        const audioTransceiver = pc?.addTransceiver("audio", {
+        const audioTransceiver = pc.addTransceiver("audio", {
           direction: "recvonly",
         });
 
@@ -518,7 +517,7 @@ export class WebrtcService {
           tPair.audio.mid === newTransceiver.mid
         ) {
           console.log(`FETCHING EMITTER FOR CAMERA ID: ${cameraId}`);
-          let tracks = new Array();
+          let tracks: MediaStreamTrack[] = [];
           if (tPair.video.receiver.track) {
             tracks.push(tPair.video.receiver.track);
           }
@@ -528,7 +527,7 @@ export class WebrtcService {
 
           MediaStream;
           const joinedStream = new MediaStream(tracks);
-          this.emitters.get(cameraId).next(joinedStream);
+          this.subscribe(cameraId).next(joinedStream);
         }
       }
     };
@@ -542,10 +541,14 @@ export class WebrtcService {
       let offer = await pc.createOffer();
 
       await pc.setLocalDescription(offer);
+      const localDescription = pc.localDescription;
+      if (localDescription === null) {
+        throw new Error("Peer connection did not create a local description");
+      }
 
       let offerMsg = {
         kind: "negotiationRequest",
-        offer: pc.localDescription.sdp,
+        offer: localDescription.sdp,
       };
       let offer_string = JSON.stringify(offerMsg);
       socket.send(offer_string);
@@ -589,7 +592,10 @@ export class WebrtcService {
     clearTimeout(timeoutId);
   }
 
-  private cleanup(signalSocket: WebSocket, pc: RTCPeerConnection) {
+  private cleanup(
+    signalSocket: WebSocket | null,
+    pc: RTCPeerConnection | null,
+  ) {
     if (signalSocket) {
       signalSocket.onopen = null;
       signalSocket.onclose = null;

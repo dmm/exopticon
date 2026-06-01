@@ -43,12 +43,12 @@ import { AsyncPipe } from "@angular/common";
   imports: [IntersectionObserverModule, CameraViewComponent, AsyncPipe],
 })
 export class CameraPanelComponent implements OnInit {
-  cameras: Camera[];
-  enabledCameras: Camera[];
+  cameras: Camera[] = [];
+  enabledCameras: Camera[] = [];
   enabledCamerasOffset: number = 0;
   fullscreen: boolean = false;
-  error: any;
-  private cameraVisibility: Map<string, boolean>;
+  error: unknown;
+  private cameraVisibility = new Map<string, boolean>();
   webrtcStatus$ = this.webrtcService;
 
   constructor(
@@ -68,14 +68,16 @@ export class CameraPanelComponent implements OnInit {
   ngOnInit() {
     this.route.paramMap.subscribe((params) => {
       if (params.has("cols")) {
-        this.cameraPanelService.setCols(parseInt(params.get("cols"), 10));
+        this.cameraPanelService.setCols(parseInt(params.get("cols") ?? "", 10));
       }
       if (params.has("rows")) {
-        this.cameraPanelService.setRows(parseInt(params.get("rows"), 10));
+        this.cameraPanelService.setRows(parseInt(params.get("rows") ?? "", 10));
       }
 
       if (params.has("offset")) {
-        this.cameraPanelService.setOffset(parseInt(params.get("offset"), 10));
+        this.cameraPanelService.setOffset(
+          parseInt(params.get("offset") ?? "", 10),
+        );
       }
 
       if (params.has("group")) {

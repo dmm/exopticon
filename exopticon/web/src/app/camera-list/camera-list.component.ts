@@ -32,7 +32,7 @@ import { AsyncPipe } from "@angular/common";
   imports: [RouterLink, AsyncPipe],
 })
 export class CameraListComponent implements OnInit {
-  cameras$: Observable<Camera[]>;
+  cameras$!: Observable<Camera[]>;
 
   constructor(private cameraService: CameraService) {}
 

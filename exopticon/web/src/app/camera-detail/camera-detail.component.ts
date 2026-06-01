@@ -33,7 +33,7 @@ import { AsyncPipe } from "@angular/common";
   imports: [AsyncPipe],
 })
 export class CameraDetailComponent implements OnInit {
-  public camera$: Observable<Camera>;
+  public camera$!: Observable<Camera>;
 
   constructor(
     public route: ActivatedRoute,

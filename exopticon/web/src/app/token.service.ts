@@ -41,8 +41,8 @@ export class Token {
 }
 
 export class CreateUserToken {
-  name: string;
-  expiration: string;
+  name!: string;
+  expiration!: string;
 }
 
 interface TokenDto {

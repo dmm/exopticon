@@ -17,7 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
-@if (!fullscreen && isLoggedIn$ | async) {
+@if (!fullscreen && (isLoggedIn$ | async)) {
   <div class="top-menu">
     <div class="logo">
       <img src="assets/assets/logo.png" alt="EXOPTICON" (click)="redirect()" />

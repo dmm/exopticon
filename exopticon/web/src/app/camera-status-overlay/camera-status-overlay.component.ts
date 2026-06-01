@@ -26,8 +26,8 @@ import { Component, Input, OnInit } from "@angular/core";
   styleUrls: ["./camera-status-overlay.component.css"],
 })
 export class CameraStatusOverlayComponent implements OnInit {
-  @Input() status: string;
-  @Input() name: string;
+  @Input() status!: string;
+  @Input() name!: string;
   @Input() videoCodec?: string;
   @Input() audioCodec?: string;
 
