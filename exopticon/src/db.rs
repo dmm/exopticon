@@ -461,6 +461,48 @@ mod tests {
     }
 
     #[test]
+    fn delete_video_unit_removes_empty_parent_directories_within_storage_root() {
+        let (temp_dir, service) = migrated_service();
+        let storage_root = temp_dir.path().join("video");
+        let mut config = sample_config("secret", vec!["front"]);
+        config.storage_groups[0].storage_path = storage_root.display().to_string();
+        service.apply_config(&config).expect("config applied");
+
+        let segment_dir = storage_root.join("front/2026/05/21/00");
+        std::fs::create_dir_all(&segment_dir).expect("segment directory created");
+        let filename = segment_dir.join("segment.mkv");
+        std::fs::write(&filename, b"video").expect("video file written");
+        let begin_time = test_time("2026-05-21T00:00:00Z");
+        let end_time = test_time("2026-05-21T00:00:05Z");
+
+        let (video_unit, video_file) = service
+            .create_video_segment(
+                &CreateVideoUnit {
+                    camera_name: "front".to_string(),
+                    begin_time,
+                    end_time: begin_time,
+                },
+                CreateVideoFile {
+                    filename: filename.display().to_string(),
+                    size: 0,
+                },
+            )
+            .expect("video segment created");
+
+        service
+            .close_video_segment(video_unit.id, video_file.id, end_time, 4)
+            .expect("video segment closed");
+        service
+            .delete_video_unit(video_unit.id)
+            .expect("video unit deleted");
+
+        assert!(!filename.exists());
+        assert!(!segment_dir.exists());
+        assert!(!storage_root.join("front").exists());
+        assert!(storage_root.exists());
+    }
+
+    #[test]
     fn reserves_opens_closes_and_cleans_unopened_video_segments() {
         let (temp_dir, service) = migrated_service();
         service

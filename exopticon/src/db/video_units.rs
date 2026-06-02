@@ -19,7 +19,8 @@
  */
 
 use chrono::{DateTime, Utc};
-use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
+use diesel::{Connection, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
+use std::path::Path;
 
 use crate::schema::{video_files, video_units};
 
@@ -108,6 +109,35 @@ type VideoSegment = (
     crate::api::video_units::VideoUnit,
     crate::api::video_units::VideoFile,
 );
+
+fn remove_empty_parent_dirs(file_path: &Path, storage_root: &Path) {
+    let Some(mut dir) = file_path.parent() else {
+        return;
+    };
+
+    while dir != storage_root && dir.starts_with(storage_root) {
+        match std::fs::remove_dir(dir) {
+            Ok(()) => {
+                debug!("Removed empty directory: {}", dir.display());
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) if err.kind() == std::io::ErrorKind::DirectoryNotEmpty => break,
+            Err(err) => {
+                error!(
+                    "Failed to remove empty directory {}: {}",
+                    dir.display(),
+                    err
+                );
+                break;
+            }
+        }
+
+        let Some(parent) = dir.parent() else {
+            break;
+        };
+        dir = parent;
+    }
+}
 
 impl Service {
     // reserve a VideoSegment before the capture worker creates the file
@@ -303,22 +333,32 @@ impl Service {
     pub fn delete_video_unit(&self, delete_id: i64) -> Result<(), super::Error> {
         db_write!(self, "delete_video_unit", |conn| {
             use crate::schema;
-            use crate::schema::video_files::dsl::*;
-            use crate::schema::video_units::dsl::*;
+            use crate::schema::{cameras, storage_groups, video_files, video_units};
 
             // Delete VideoFiles associated with VideoUnit
 
+            let storage_root = video_units::table
+                .inner_join(cameras::table.inner_join(storage_groups::table))
+                .filter(video_units::columns::id.eq(delete_id))
+                .select(storage_groups::columns::storage_path)
+                .first::<String>(conn)
+                .optional()?;
+
             // fetch video files to be deleted
-            let files: Vec<String> = video_files
-                .inner_join(video_units)
+            let files: Vec<String> = video_files::table
+                .inner_join(video_units::table)
                 .filter(schema::video_files::columns::video_unit_id.eq(&delete_id))
-                .select(filename)
+                .select(video_files::columns::filename)
                 .load(conn)?;
 
             for f in files {
                 debug!("Deleting file: {}", f);
                 match std::fs::remove_file(&f) {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        if let Some(storage_root) = storage_root.as_deref() {
+                            remove_empty_parent_dirs(Path::new(&f), Path::new(storage_root));
+                        }
+                    }
                     Err(err) => {
                         if err.kind() == std::io::ErrorKind::NotFound {
                             // this is arguably a non-error error
@@ -332,12 +372,15 @@ impl Service {
 
             // delete video files owned by VideoUnit
             diesel::delete(
-                video_files.filter(schema::video_files::columns::video_unit_id.eq(delete_id)),
+                video_files::table
+                    .filter(schema::video_files::columns::video_unit_id.eq(delete_id)),
             )
             .execute(conn)?;
 
-            diesel::delete(video_units.filter(schema::video_units::columns::id.eq(delete_id)))
-                .execute(conn)?;
+            diesel::delete(
+                video_units::table.filter(schema::video_units::columns::id.eq(delete_id)),
+            )
+            .execute(conn)?;
 
             Ok(())
         })
