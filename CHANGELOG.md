@@ -2,6 +2,17 @@
 
 <!--- next entry here -->
 
+## 0.44.0
+2026-06-02
+
+### Features
+
+- Remove empty video directories (c7560408ccda849d62c5c00991dffb116dd5d947)
+
+### Fixes
+
+- Enable typescript strict mode (eae5e54886a3d21d5d28b2a6a869c733b61d85bd)
+
 ## 0.43.1
 2026-05-29
 
