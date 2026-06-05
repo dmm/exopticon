@@ -40,6 +40,8 @@ interface CameraPanelFocusHistoryState {
   cameraPanelFocusPreviousFsPresent?: boolean;
   cameraPanelFocusPreviousFs?: "true" | "false";
   cameraPanelFocusAutoFs?: boolean;
+  cameraPanelFocusPreviousScrollX?: number;
+  cameraPanelFocusPreviousScrollY?: number;
 }
 
 @Component({
@@ -230,14 +232,18 @@ export class CameraPanelComponent implements OnInit {
       queryParams["fs"] = focusHistoryState.cameraPanelFocusPreviousFs;
     }
 
-    this.router.navigate(
-      ["./", this.merge({ focus: null }, this.route.snapshot.params)],
-      {
-        relativeTo: this.route,
-        queryParams,
-        replaceUrl: true,
-      },
-    );
+    this.router
+      .navigate(
+        ["./", this.merge({ focus: null }, this.route.snapshot.params)],
+        {
+          relativeTo: this.route,
+          queryParams,
+          replaceUrl: true,
+        },
+      )
+      .then(() => {
+        this.restoreFocusScrollPosition(focusHistoryState);
+      });
   }
 
   normalizeFocusedUrlIfNeeded(): void {
@@ -298,7 +304,28 @@ export class CameraPanelComponent implements OnInit {
       cameraPanelFocusPreviousFsPresent: previousFsPresent,
       cameraPanelFocusPreviousFs: previousFs,
       cameraPanelFocusAutoFs: !previousFsPresent,
+      cameraPanelFocusPreviousScrollX: window.scrollX,
+      cameraPanelFocusPreviousScrollY: window.scrollY,
     };
+  }
+
+  private restoreFocusScrollPosition(
+    focusHistoryState: CameraPanelFocusHistoryState | undefined,
+  ): void {
+    if (
+      focusHistoryState?.cameraPanelFocusPreviousScrollX === undefined ||
+      focusHistoryState.cameraPanelFocusPreviousScrollY === undefined
+    ) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        left: focusHistoryState.cameraPanelFocusPreviousScrollX,
+        top: focusHistoryState.cameraPanelFocusPreviousScrollY,
+        behavior: "auto",
+      });
+    });
   }
 
   private focusHistoryStateForNavigation():

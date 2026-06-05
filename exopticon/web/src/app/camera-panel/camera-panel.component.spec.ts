@@ -18,7 +18,13 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
+import {
+  ComponentFixture,
+  TestBed,
+  fakeAsync,
+  flushMicrotasks,
+  waitForAsync,
+} from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, Router } from "@angular/router";
 import { of } from "rxjs";
 import { CameraPanelService } from "../camera-panel.service";
@@ -133,6 +139,8 @@ describe("CameraPanelComponent", () => {
           cameraPanelFocusPreviousFsPresent: false,
           cameraPanelFocusPreviousFs: "false",
           cameraPanelFocusAutoFs: true,
+          cameraPanelFocusPreviousScrollX: 0,
+          cameraPanelFocusPreviousScrollY: 0,
         },
       },
     );
@@ -164,6 +172,40 @@ describe("CameraPanelComponent", () => {
       },
     );
   });
+
+  it("restores the previous scroll position after returning from focus", fakeAsync(() => {
+    route = setRouteSnapshot(
+      route,
+      { group: "front", focus: "front_door" },
+      { fs: "true" },
+    );
+    history.replaceState(
+      {
+        cameraPanelFocusPreviousFsPresent: false,
+        cameraPanelFocusAutoFs: true,
+        cameraPanelFocusPreviousScrollX: 12,
+        cameraPanelFocusPreviousScrollY: 345,
+      },
+      "",
+      location.href,
+    );
+    const scrollTo = spyOn(window, "scrollTo").and.stub();
+    spyOn(window, "requestAnimationFrame").and.callFake(
+      (callback: FrameRequestCallback) => {
+        callback(0);
+        return 0;
+      },
+    );
+
+    component.returnFromFocus();
+    flushMicrotasks();
+
+    expect(scrollTo).toHaveBeenCalledOnceWith({
+      left: 12,
+      top: 345,
+      behavior: "auto",
+    });
+  }));
 
   it("normalizes a direct focused URL without fs", () => {
     route = setRouteSnapshot(route, { focus: "front_door" }, {});
