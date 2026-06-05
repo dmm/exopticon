@@ -24,7 +24,10 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
     <app-camera-overlay
       [camera]="camera"
       [muted]="muted"
+      [focused]="focused"
       (muteEvent)="toggleMute()"
+      (focusEvent)="focusEvent.emit($event)"
+      (returnEvent)="returnEvent.emit()"
     ></app-camera-overlay>
   }
   @if (status !== "active") {

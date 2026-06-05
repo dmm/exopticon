@@ -19,7 +19,7 @@
  */
 
 import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
-import { Camera } from "../camera";
+import { Camera, CameraId } from "../camera";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
 
@@ -31,9 +31,12 @@ import { CameraService, PtzDirection } from "../camera.service";
 export class CameraOverlayComponent implements OnInit {
   @Input() camera!: Camera;
   @Input() muted!: boolean;
+  @Input() focused = false;
 
   @Output()
   muteEvent = new EventEmitter<boolean>();
+  @Output() focusEvent = new EventEmitter<CameraId>();
+  @Output() returnEvent = new EventEmitter<void>();
 
   directions = PtzDirection;
   private ptzActivated = false;
@@ -51,11 +54,23 @@ export class CameraOverlayComponent implements OnInit {
     this.cameraService.ptz(this.camera.metadata.name, direction);
   }
 
-  toggleMute() {
+  toggleMute(event: Event) {
+    this.stopPropagation(event);
     this.muteEvent.emit(true);
+  }
+
+  focusCamera(event: Event) {
+    this.stopPropagation(event);
+    this.focusEvent.emit(this.camera.metadata.name);
+  }
+
+  returnFromFocus(event: Event) {
+    this.stopPropagation(event);
+    this.returnEvent.emit();
   }
 
   stopPropagation(event: Event) {
     event.stopImmediatePropagation();
+    event.stopPropagation();
   }
 }

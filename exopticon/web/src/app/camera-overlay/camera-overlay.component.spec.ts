@@ -19,6 +19,9 @@
  */
 
 import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
+import { Camera } from "../camera";
+import { CameraPanelService } from "../camera-panel.service";
+import { CameraService } from "../camera.service";
 import { CameraOverlayComponent } from "./camera-overlay.component";
 
 describe("CameraOverlayComponent", () => {
@@ -28,16 +31,72 @@ describe("CameraOverlayComponent", () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       imports: [CameraOverlayComponent],
+      providers: [
+        { provide: CameraService, useValue: {} },
+        { provide: CameraPanelService, useValue: {} },
+      ],
     }).compileComponents();
   }));
 
   beforeEach(() => {
     fixture = TestBed.createComponent(CameraOverlayComponent);
     component = fixture.componentInstance;
+    component.camera = buildCamera("front_door");
+    component.muted = true;
     fixture.detectChanges();
   });
 
   it("should create", () => {
     expect(component).toBeTruthy();
   });
+
+  it("emits focus for the camera in normal mode", () => {
+    const focusEvents: string[] = [];
+    component.focusEvent.subscribe((cameraId) => focusEvents.push(cameraId));
+
+    component.focusCamera(buildEvent());
+
+    expect(focusEvents).toEqual(["front_door"]);
+  });
+
+  it("emits return in focus mode", () => {
+    let returned = false;
+    component.returnEvent.subscribe(() => {
+      returned = true;
+    });
+
+    component.returnFromFocus(buildEvent());
+
+    expect(returned).toBeTrue();
+  });
 });
+
+function buildEvent(): Event {
+  return {
+    stopImmediatePropagation: jasmine.createSpy("stopImmediatePropagation"),
+    stopPropagation: jasmine.createSpy("stopPropagation"),
+  } as unknown as Event;
+}
+
+function buildCamera(name: string): Camera {
+  return {
+    metadata: { name, displayName: "Front Door" },
+    spec: {
+      storageGroupName: "default",
+      ip: "127.0.0.1",
+      onvifPort: 80,
+      mac: "",
+      username: "",
+      rtspUrl: "",
+      ptzType: "none",
+      ptzProfileToken: "",
+      ptzXStepSize: 0,
+      ptzYStepSize: 0,
+      enabled: true,
+    },
+    status: {
+      phase: "running",
+      active: true,
+    },
+  };
+}

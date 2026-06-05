@@ -88,3 +88,12 @@
   background-color: rgba(0, 0, 0, 0.5);
   border-radius: 5px;
 }
+
+.focus {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  padding: 3px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 5px;
+}

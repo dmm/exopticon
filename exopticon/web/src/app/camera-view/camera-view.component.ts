@@ -24,13 +24,14 @@ import {
   ElementRef,
   EventEmitter,
   Input,
+  OnDestroy,
   OnInit,
   Output,
   SimpleChanges,
   ViewChild,
 } from "@angular/core";
-import { Observable, Subscription } from "rxjs";
-import { Camera } from "../camera";
+import { Subscription } from "rxjs";
+import { Camera, CameraId } from "../camera";
 import { WebrtcService } from "../webrtc.service";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraOverlayComponent } from "../camera-overlay/camera-overlay.component";
@@ -57,23 +58,27 @@ type CameraViewStatus = NewState | ConnectingState | PlayingState;
   styleUrls: ["./camera-view.component.css"],
   imports: [CameraOverlayComponent, CameraStatusOverlayComponent],
 })
-export class CameraViewComponent implements OnInit {
+export class CameraViewComponent implements OnInit, OnDestroy {
   @Input() camera!: Camera;
   @Input() selected = false;
   @Input() enabled = false;
+  @Input() focused = false;
+  @Input() muted = true;
 
   @Output() isVisible = new EventEmitter<boolean>();
+  @Output() focusEvent = new EventEmitter<CameraId>();
+  @Output() returnEvent = new EventEmitter<void>();
 
   @ViewChild("wrapperDiv") wrapperDiv!: ElementRef<HTMLDivElement>;
 
   @ViewChild("videoElement") videoElement!: ElementRef<HTMLVideoElement>;
 
   public status = "loading";
-  public muted: boolean = true;
 
   private mediaStream?: MediaStream = undefined;
   private state: CameraViewStatus = { kind: "new" };
   private subscription: Subscription | null = null;
+  private viewInitialized = false;
 
   constructor(
     private changeRef: ChangeDetectorRef,
@@ -88,6 +93,7 @@ export class CameraViewComponent implements OnInit {
   }
 
   ngAfterViewInit() {
+    this.viewInitialized = true;
     if (this.state.kind === "new") {
       this.onVideoStatusChange("loading...");
       this.activate();
@@ -108,9 +114,18 @@ export class CameraViewComponent implements OnInit {
       }
     }
 
+    if (changes.hasOwnProperty("muted")) {
+      this.applyMutedState();
+    }
+
     if (changes.hasOwnProperty("resolution")) {
       // handle changing resolution
     }
+  }
+
+  ngOnDestroy() {
+    this.deactivate();
+    this.clearMediaSource();
   }
 
   getVideoElement(): HTMLVideoElement {
@@ -118,12 +133,14 @@ export class CameraViewComponent implements OnInit {
   }
 
   setMediaSource() {
+    if (!this.viewInitialized) {
+      return;
+    }
+
     if (this.mediaStream) {
       let video = this.getVideoElement();
       video.srcObject = this.mediaStream;
-      video.muted = true;
-      this.muted = true;
-      this.cameraPanelService.setMute(this.camera.metadata.name, this.muted);
+      this.applyMutedState();
       video.autoplay = true;
       //video.onloadeddata = this.genStatusHandler("active");
       video.onpause = this.genStatusHandler("loading");
@@ -140,13 +157,15 @@ export class CameraViewComponent implements OnInit {
         }
       };
     } else {
-      //      let video = this.videoElement.nativeElement as HTMLVideoElement;
-      //      video.pause();
-      //      video.srcObject = null;
+      this.clearMediaSource();
     }
   }
 
   activate() {
+    if (this.subscription !== null) {
+      return;
+    }
+
     this.subscription = this.webrtcService
       .subscribe(this.camera.metadata.name)
       .subscribe(
@@ -166,18 +185,32 @@ export class CameraViewComponent implements OnInit {
   deactivate() {
     if (this.subscription !== null) {
       this.subscription.unsubscribe();
+      this.subscription = null;
     }
     if (this.videoElement !== undefined) {
-      //      let video = this.videoElement.nativeElement as HTMLVideoElement;
-      //      video.pause();
+      this.getVideoElement().pause();
     }
   }
 
   toggleMute() {
-    let muteValue = this.videoElement.nativeElement.muted;
-    this.videoElement.nativeElement.muted = !muteValue;
-    this.muted = !muteValue;
+    this.muted = !this.muted;
+    this.applyMutedState();
     this.cameraPanelService.setMute(this.camera.metadata.name, this.muted);
+  }
+
+  private applyMutedState() {
+    if (this.videoElement !== undefined) {
+      this.videoElement.nativeElement.muted = this.muted;
+    }
+  }
+
+  private clearMediaSource() {
+    if (this.videoElement !== undefined) {
+      const video = this.getVideoElement();
+      video.pause();
+      video.srcObject = null;
+    }
+    this.mediaStream = undefined;
   }
 
   setStatus(_event: Event) {

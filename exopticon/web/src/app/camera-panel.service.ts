@@ -41,6 +41,7 @@ enum SelectionMode {
 interface CameraPanelCameraProjection {
   readonly camera: Camera;
   readonly enabled: boolean;
+  readonly muted: boolean;
 }
 
 interface CameraPanelProjection {
@@ -51,12 +52,15 @@ interface CameraPanelProjection {
   readonly prevCameraGroupId: CameraGroupId | null;
   readonly nextCameraGroupId: CameraGroupId | null;
   readonly activeCameras: ReadonlyMap<CameraId, ActivePair>;
+  readonly focusedCameraId: CameraId | null;
+  readonly focusState: FocusState;
 }
 
 export interface CameraPanelTileViewModel {
   readonly camera: Camera;
   readonly selected: boolean;
   readonly enabled: boolean;
+  readonly muted: boolean;
 }
 
 export interface CameraPanelLayoutViewModel {
@@ -67,6 +71,12 @@ export interface CameraPanelLayoutViewModel {
   readonly usesIntrinsicWidthSpacer: boolean;
 }
 
+export type FocusState =
+  | { kind: "none" }
+  | { kind: "pending"; cameraId: CameraId }
+  | { kind: "active"; cameraId: CameraId }
+  | { kind: "invalid"; cameraId: CameraId };
+
 export interface CameraPanelViewModel {
   readonly tiles: readonly CameraPanelTileViewModel[];
   readonly layout: CameraPanelLayoutViewModel;
@@ -74,6 +84,8 @@ export interface CameraPanelViewModel {
   readonly activeCameraGroupName: string;
   readonly prevCameraGroupId: CameraGroupId | null;
   readonly nextCameraGroupId: CameraGroupId | null;
+  readonly focusedCameraId: CameraId | null;
+  readonly focusState: FocusState;
 }
 
 @Injectable()
@@ -96,6 +108,8 @@ export class CameraPanelService implements OnDestroy {
   private readonly keyboardControlCameraId = signal<CameraId | null>(null);
   private readonly activeCameraGroupId = signal<CameraGroupId | null>(null);
   private readonly desiredCameraGroupId = signal<CameraGroupId | null>(null);
+  private readonly focusedCameraId = signal<CameraId | null>(null);
+  private readonly camerasLoaded = signal(false);
   private readonly pageVisible = signal(false);
 
   private readonly cameraProjection = computed(() => this.projectCameraPanel());
@@ -108,6 +122,7 @@ export class CameraPanelService implements OnDestroy {
       tiles: projection.tiles.map((tile) => ({
         camera: tile.camera,
         enabled: tile.enabled,
+        muted: tile.muted,
         selected: tile.camera.metadata.name === selectedCameraId,
       })),
       layout: projection.layout,
@@ -115,6 +130,8 @@ export class CameraPanelService implements OnDestroy {
       activeCameraGroupName: projection.activeCameraGroupName,
       prevCameraGroupId: projection.prevCameraGroupId,
       nextCameraGroupId: projection.nextCameraGroupId,
+      focusedCameraId: projection.focusedCameraId,
+      focusState: projection.focusState,
     };
   });
 
@@ -135,6 +152,24 @@ export class CameraPanelService implements OnDestroy {
       });
       this.panelCameras.set(panelCameras);
     }
+  }
+
+  setFocusedCamera(cameraId: CameraId | null): void {
+    const previousCameraId = this.focusedCameraId();
+    this.focusedCameraId.set(cameraId);
+
+    if (cameraId !== null) {
+      this.keyboardControlCameraId.set(cameraId);
+    } else if (
+      previousCameraId !== null &&
+      this.keyboardControlCameraId() === previousCameraId
+    ) {
+      this.keyboardControlCameraId.set(this.selectedCameraId());
+    }
+  }
+
+  focusedCameraIdValue(): CameraId | null {
+    return this.focusedCameraId();
   }
 
   //
@@ -260,6 +295,7 @@ export class CameraPanelService implements OnDestroy {
 
         this.panelCameras.set(panelCameras);
         this.cameraGroups.set(cameraGroupMap);
+        this.camerasLoaded.set(true);
         this.activeCameraGroupId.set(
           this.resolveCameraGroupId(this.desiredCameraGroupId()),
         );
@@ -277,11 +313,17 @@ export class CameraPanelService implements OnDestroy {
     const rowCount = this.rowCount();
     const offset = this.offset();
     const activeCameraGroupId = this.activeCameraGroupId();
+    const focusedCameraId = this.focusedCameraId();
     const cameraGroup =
       activeCameraGroupId === null
         ? undefined
         : cameraGroups.get(activeCameraGroupId);
     const layout = this.buildLayout(columnCount, rowCount);
+    const focusState = this.resolveFocusState(
+      focusedCameraId,
+      panelCameras,
+      cameraGroup,
+    );
 
     if (cameraGroup === undefined) {
       return {
@@ -298,6 +340,8 @@ export class CameraPanelService implements OnDestroy {
           activeCameraGroupId,
         ),
         activeCameras: new Map(),
+        focusedCameraId,
+        focusState,
       };
     }
 
@@ -308,6 +352,41 @@ export class CameraPanelService implements OnDestroy {
         groupCameras.push(c);
       }
     });
+
+    if (focusState.kind === "active") {
+      const focusedCamera = panelCameras.get(focusState.cameraId)!;
+      const active =
+        (focusedCamera.enabled.video || focusedCamera.enabled.audio) &&
+        this.pageVisible();
+      const activeCameras = new Map<CameraId, ActivePair>();
+      if (active) {
+        activeCameras.set(focusState.cameraId, { ...focusedCamera.enabled });
+      }
+
+      return {
+        tiles: [
+          {
+            camera: focusedCamera.camera,
+            enabled: active,
+            muted: !focusedCamera.enabled.audio,
+          },
+        ],
+        layout: this.buildFocusLayout(),
+        offset,
+        activeCameraGroupName: cameraGroup.metadata.displayName,
+        prevCameraGroupId: this.prevCameraGroup(
+          cameraGroups,
+          activeCameraGroupId,
+        ),
+        nextCameraGroupId: this.nextCameraGroup(
+          cameraGroups,
+          activeCameraGroupId,
+        ),
+        activeCameras,
+        focusedCameraId,
+        focusState,
+      };
+    }
 
     let cameraCount = 0;
     if (rowCount < 1) {
@@ -328,6 +407,7 @@ export class CameraPanelService implements OnDestroy {
         return {
           camera: c,
           enabled: false,
+          muted: true,
         };
       }
       let active =
@@ -341,6 +421,7 @@ export class CameraPanelService implements OnDestroy {
       return {
         camera: c,
         enabled: active,
+        muted: !p.enabled.audio,
       };
     });
 
@@ -358,7 +439,32 @@ export class CameraPanelService implements OnDestroy {
         activeCameraGroupId,
       ),
       activeCameras,
+      focusedCameraId,
+      focusState,
     };
+  }
+
+  private resolveFocusState(
+    focusedCameraId: CameraId | null,
+    panelCameras: ReadonlyMap<CameraId, PanelCamera>,
+    cameraGroup: CameraGroup | undefined,
+  ): FocusState {
+    if (focusedCameraId === null) {
+      return { kind: "none" };
+    }
+
+    if (!this.camerasLoaded() || cameraGroup === undefined) {
+      return { kind: "pending", cameraId: focusedCameraId };
+    }
+
+    if (
+      panelCameras.has(focusedCameraId) &&
+      cameraGroup.spec.members.includes(focusedCameraId)
+    ) {
+      return { kind: "active", cameraId: focusedCameraId };
+    }
+
+    return { kind: "invalid", cameraId: focusedCameraId };
   }
 
   private buildLayout(
@@ -371,6 +477,16 @@ export class CameraPanelService implements OnDestroy {
       itemWidthPercent: 100 / columnCount,
       itemHeightVh: rowCount > 0 ? 100 / rowCount : null,
       usesIntrinsicWidthSpacer: rowCount === -1,
+    };
+  }
+
+  private buildFocusLayout(): CameraPanelLayoutViewModel {
+    return {
+      columnCount: 1,
+      rowCount: 1,
+      itemWidthPercent: 100,
+      itemHeightVh: 100,
+      usesIntrinsicWidthSpacer: false,
     };
   }
 
@@ -405,12 +521,19 @@ export class CameraPanelService implements OnDestroy {
   }
 
   ptz(direction: PtzDirection) {
-    const selectedCameraId = this.selectedCameraId();
-    let tile = this.cameraProjection().tiles.find(
-      (t) => t.camera.metadata.name === selectedCameraId,
-    );
-    if (tile) {
-      this.cameraService.ptz(tile.camera.metadata.name, direction);
+    const targetCameraIds = [
+      this.keyboardControlCameraId(),
+      this.selectedCameraId(),
+    ];
+
+    for (const cameraId of targetCameraIds) {
+      let tile = this.cameraProjection().tiles.find(
+        (t) => t.camera.metadata.name === cameraId,
+      );
+      if (tile) {
+        this.cameraService.ptz(tile.camera.metadata.name, direction);
+        return;
+      }
     }
   }
 

@@ -21,19 +21,26 @@
 import {
   ChangeDetectorRef,
   Component,
+  effect,
   HostListener,
   NgZone,
   OnInit,
 } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
-import { Camera } from "../camera";
+import { AsyncPipe } from "@angular/common";
+import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
+import { Camera, CameraId } from "../camera";
 import { CameraGroupId } from "../camera-group";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraService, PtzDirection } from "../camera.service";
-import { WebrtcService } from "../webrtc.service";
-import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
 import { CameraViewComponent } from "../camera-view/camera-view.component";
-import { AsyncPipe } from "@angular/common";
+import { WebrtcService } from "../webrtc.service";
+
+interface CameraPanelFocusHistoryState {
+  cameraPanelFocusPreviousFsPresent?: boolean;
+  cameraPanelFocusPreviousFs?: "true" | "false";
+  cameraPanelFocusAutoFs?: boolean;
+}
 
 @Component({
   selector: "app-camera-panel",
@@ -49,6 +56,7 @@ export class CameraPanelComponent implements OnInit {
   fullscreen: boolean = false;
   error: unknown;
   private cameraVisibility = new Map<string, boolean>();
+  private normalizingFocusedUrl = false;
   webrtcStatus$ = this.webrtcService;
 
   constructor(
@@ -59,7 +67,17 @@ export class CameraPanelComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private ngZone: NgZone,
-  ) {}
+  ) {
+    effect(() => {
+      const focusState = this.cameraPanelService.vm().focusState;
+      if (
+        focusState.kind === "invalid" &&
+        this.route.snapshot.paramMap.get("focus") === focusState.cameraId
+      ) {
+        this.ngZone.run(() => this.clearInvalidFocus());
+      }
+    });
+  }
 
   getCameras(): void {
     this.cameraService.getCameras().subscribe((cameras) => {});
@@ -85,6 +103,9 @@ export class CameraPanelComponent implements OnInit {
       } else {
         this.cameraPanelService.setDesiredCameraGroup(null);
       }
+
+      this.cameraPanelService.setFocusedCamera(params.get("focus"));
+      this.normalizeFocusedUrlIfNeeded();
     });
 
     this.route.queryParamMap.subscribe((params) => {
@@ -93,6 +114,8 @@ export class CameraPanelComponent implements OnInit {
       } else {
         this.fullscreen = false;
       }
+
+      this.normalizeFocusedUrlIfNeeded();
     });
 
     //    this.videoService.connect();
@@ -104,17 +127,24 @@ export class CameraPanelComponent implements OnInit {
     const vm = this.cameraPanelService.vm();
     const cameraCount = vm.tiles.length;
     let offset = vm.offset;
+    const focused = vm.focusedCameraId !== null;
 
     switch (event.keyCode) {
+      case 27:
+        // Escape
+        if (focused) {
+          this.returnFromFocus();
+        }
+        break;
       case 78:
         // 'n'
-        if (cameraCount > 0) {
+        if (!focused && cameraCount > 0) {
           offset = (offset + 1) % cameraCount;
         }
         break;
       case 80:
         // 'p'
-        if (cameraCount > 0) {
+        if (!focused && cameraCount > 0) {
           offset = (offset - 1) % cameraCount;
         }
         break;
@@ -140,8 +170,9 @@ export class CameraPanelComponent implements OnInit {
       this.router.navigate(
         ["./", this.merge({ offset: offset }, this.route.snapshot.params)],
         {
-          queryParamsHandling: "preserve",
           relativeTo: this.route,
+          queryParams: this.route.snapshot.queryParams,
+          state: this.focusHistoryStateForNavigation(),
         },
       );
     }
@@ -169,11 +200,125 @@ export class CameraPanelComponent implements OnInit {
     this.cameraVisibility.set(cameraId, visible);
   }
 
-  setCameraGroup(newGroupId: CameraGroupId | null) {
-    const newUrl = this.router.createUrlTree(
-      [this.merge({ group: newGroupId }, this.route.snapshot.params)],
-      { relativeTo: this.route },
+  focusCamera(cameraId: CameraId): void {
+    const queryParams = {
+      ...this.route.snapshot.queryParams,
+      fs: "true",
+    };
+
+    this.router.navigate(
+      ["./", this.merge({ focus: cameraId }, this.route.snapshot.params)],
+      {
+        relativeTo: this.route,
+        queryParams,
+        replaceUrl: false,
+        state: this.buildFocusHistoryState(),
+      },
     );
-    this.router.navigateByUrl(newUrl);
+  }
+
+  returnFromFocus(): void {
+    const queryParams = { ...this.route.snapshot.queryParams };
+    const focusHistoryState = this.readFocusHistoryState();
+
+    if (focusHistoryState?.cameraPanelFocusPreviousFsPresent === false) {
+      delete queryParams["fs"];
+    } else if (
+      focusHistoryState?.cameraPanelFocusPreviousFsPresent === true &&
+      focusHistoryState.cameraPanelFocusPreviousFs !== undefined
+    ) {
+      queryParams["fs"] = focusHistoryState.cameraPanelFocusPreviousFs;
+    }
+
+    this.router.navigate(
+      ["./", this.merge({ focus: null }, this.route.snapshot.params)],
+      {
+        relativeTo: this.route,
+        queryParams,
+        replaceUrl: true,
+      },
+    );
+  }
+
+  normalizeFocusedUrlIfNeeded(): void {
+    if (
+      !this.normalizingFocusedUrl &&
+      this.route.snapshot.paramMap.has("focus") &&
+      !this.route.snapshot.queryParamMap.has("fs")
+    ) {
+      this.normalizingFocusedUrl = true;
+      this.router
+        .navigate(["./", this.route.snapshot.params], {
+          relativeTo: this.route,
+          queryParams: {
+            ...this.route.snapshot.queryParams,
+            fs: "true",
+          },
+          replaceUrl: true,
+          state: {
+            cameraPanelFocusPreviousFsPresent: false,
+            cameraPanelFocusAutoFs: true,
+          } satisfies CameraPanelFocusHistoryState,
+        })
+        .finally(() => {
+          this.normalizingFocusedUrl = false;
+        });
+    }
+  }
+
+  clearInvalidFocus(): void {
+    this.router.navigate(
+      ["./", this.merge({ focus: null }, this.route.snapshot.params)],
+      {
+        relativeTo: this.route,
+        queryParams: this.route.snapshot.queryParams,
+        replaceUrl: true,
+        state: this.focusHistoryStateForNavigation(),
+      },
+    );
+  }
+
+  setCameraGroup(newGroupId: CameraGroupId | null) {
+    this.router.navigate(
+      ["./", this.merge({ group: newGroupId }, this.route.snapshot.params)],
+      {
+        relativeTo: this.route,
+        queryParams: this.route.snapshot.queryParams,
+        state: this.focusHistoryStateForNavigation(),
+      },
+    );
+  }
+
+  private buildFocusHistoryState(): CameraPanelFocusHistoryState {
+    const queryParamMap = this.route.snapshot.queryParamMap;
+    const previousFsPresent = queryParamMap.has("fs");
+    const previousFs = queryParamMap.get("fs") === "true" ? "true" : "false";
+
+    return {
+      cameraPanelFocusPreviousFsPresent: previousFsPresent,
+      cameraPanelFocusPreviousFs: previousFs,
+      cameraPanelFocusAutoFs: !previousFsPresent,
+    };
+  }
+
+  private focusHistoryStateForNavigation():
+    | CameraPanelFocusHistoryState
+    | undefined {
+    return this.cameraPanelService.focusedCameraIdValue() === null
+      ? undefined
+      : this.readFocusHistoryState();
+  }
+
+  private readFocusHistoryState(): CameraPanelFocusHistoryState | undefined {
+    const state = history.state as CameraPanelFocusHistoryState | undefined;
+    if (
+      state?.cameraPanelFocusPreviousFsPresent === undefined &&
+      state?.cameraPanelFocusPreviousFs === undefined &&
+      state?.cameraPanelFocusAutoFs === undefined
+    ) {
+      return undefined;
+    }
+
+    return state;
   }
 }

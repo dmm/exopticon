@@ -20,13 +20,32 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 <div>
   <div class="camera-name">{{ camera.metadata.displayName }}</div>
   <div
-    (pointerdown)="toggleMute()"
+    (pointerdown)="toggleMute($event)"
     (touchstart)="stopPropagation($event)"
     (touchend)="stopPropagation($event)"
     class="mute overlay-button"
   >
     {{ muted ? "UNMUTE" : "MUTE" }}
   </div>
+  @if (focused) {
+    <div
+      (click)="returnFromFocus($event)"
+      (touchstart)="stopPropagation($event)"
+      (touchend)="stopPropagation($event)"
+      class="focus overlay-button"
+    >
+      RETURN
+    </div>
+  } @else {
+    <div
+      (pointerdown)="focusCamera($event)"
+      (touchstart)="stopPropagation($event)"
+      (touchend)="stopPropagation($event)"
+      class="focus overlay-button"
+    >
+      FOCUS
+    </div>
+  }
   @if (camera.spec.ptzType !== "none") {
     <div class="ptz-overlay">
       <div

@@ -57,6 +57,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         $event.stopPropagation()
       "
       (mouseleave)="cameraPanelService.mouseLeave(); $event.stopPropagation()"
+      [class.focused]="vm.focusState.kind === 'active'"
       [style.width.%]="vm.layout.itemWidthPercent"
       [style.height.vh]="vm.layout.itemHeightVh"
     >
@@ -76,6 +77,10 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
           [camera]="tile.camera"
           [selected]="tile.selected"
           [enabled]="tile.enabled"
+          [muted]="tile.muted"
+          [focused]="vm.focusState.kind === 'active'"
+          (focusEvent)="focusCamera($event)"
+          (returnEvent)="returnFromFocus()"
         >
         </app-camera-view>
       </div>

@@ -64,6 +64,10 @@ div.panel > div.wrapper {
   position: relative;
 }
 
+div.panel > div.wrapper.focused {
+  min-height: 100vh;
+}
+
 div.panel > div.wrapper.background {
   display: none;
 }
