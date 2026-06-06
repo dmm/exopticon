@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.45.0
+2026-06-06
+
+### Features
+
+- Add focus button to camera overlay (cdcfc278f6121fb927c59f8e1b2f4e49c4885cae)
+- restore scroll position on return from focus (69e3ec7ae7bd5c68d9f46ab95e64e16c00a570a6)
+
 ## 0.44.0
 2026-06-02
 
