@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.45.1
+2026-06-08
+
+### Fixes
+
+- Set mkv file start time to zero to fix playback (47acad0a3813648211443dceec0472de6e68e0a5)
+
 ## 0.45.0
 2026-06-06
 
