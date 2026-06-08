@@ -262,11 +262,17 @@ struct CustomData {
 
 impl CustomData {
     pub fn new(reservations: Arc<ReservationClient>, next_file: FileReservation) -> Self {
+        let muxer_properties = gst::Structure::builder("properties")
+            .field("offset-to-zero", true)
+            .field("writing-app", "EXOPTICON")
+            .build();
+
         let mkv_sink = gst::ElementFactory::make("splitmuxsink")
             .name("sink")
             .property("async-finalize", true)
             .property("max-size-bytes", 15_000_000u64)
             .property_from_str("muxer-factory", "matroskamux")
+            .property("muxer-properties", muxer_properties)
             .build()
             .expect("Could not create sink element.");
 
