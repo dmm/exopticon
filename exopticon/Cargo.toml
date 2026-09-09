@@ -15,7 +15,7 @@ default-run = "exopticon"
 console = ["console-subscriber"]
 
 [dependencies]
-onvif = { path = "../onvif" }
+oxvif = "0.16.0"
 exserial = { path = "../exserial" }
 axum = { version = "0.8", features = ["ws"]}
 axum-extra = { version = "0.12", features = ["cookie", "typed-header"]}

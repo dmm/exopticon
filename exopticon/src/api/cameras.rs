@@ -18,12 +18,13 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::time::Duration;
+use std::net::Ipv6Addr;
 
 use axum::{
     Json, Router,
     extract::{Path, State},
 };
+use oxvif::OnvifClient;
 use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
@@ -132,20 +133,28 @@ pub async fn ptz_relative_move(
     Path((name, direction)): Path<(String, String)>,
     State(state): State<AppState>,
 ) -> Result<(), UserError> {
-    let zoom = 0.0;
-
     let db = state.db_service.clone();
     let camera = spawn_blocking(move || db.fetch_camera_row(&name)).await??;
-    let onvif_cam = onvif::camera::Camera::new(
-        camera.ip,
-        camera.onvif_port.try_into().expect("invalid port number"),
-        camera.username,
-        camera.password,
-    )?;
+    move_camera(&camera, &direction).await
+}
 
+fn onvif_device_url(host: &str, port: u16) -> String {
+    let host = if host.parse::<Ipv6Addr>().is_ok() {
+        format!("[{host}]")
+    } else {
+        host.to_string()
+    };
+    format!("http://{host}:{port}/onvif/device_service")
+}
+
+async fn move_camera(
+    camera: &crate::db::cameras::Camera,
+    direction: &str,
+) -> Result<(), UserError> {
+    let zoom = 0.0;
     let x_step = f32::from(camera.ptz_x_step_size);
     let y_step = f32::from(camera.ptz_y_step_size);
-    let (x, y) = match direction.as_str() {
+    let (x, y) = match direction {
         "left" => (x_step / -100.0f32, 0.0),
         "right" => (x_step / 100f32, 0.0),
         "up" => (0.0, y_step / 100f32),
@@ -157,26 +166,15 @@ pub async fn ptz_relative_move(
         }
     };
 
-    if camera.ptz_type == "onvif_continuous" {
-        if onvif_cam
-            .continuous_move(&camera.ptz_profile_token, x, y, zoom, 500.0)
-            .await
-            .is_err()
-        {
-            return Err(UserError::InternalError(
-                "begin continuous move failed".to_string(),
-            ));
-        }
+    let endpoint = onvif_device_url(
+        &camera.ip,
+        camera.onvif_port.try_into().expect("invalid port number"),
+    );
+    let onvif_cam =
+        OnvifClient::new(&endpoint).with_credentials(&camera.username, &camera.password);
 
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        if onvif_cam.stop(&camera.ptz_profile_token).await.is_err() {
-            return Err(UserError::InternalError(
-                "stop continuous move failed".to_string(),
-            ));
-        }
-    } else if onvif_cam
-        .relative_move(&camera.ptz_profile_token, x, y, zoom)
+    if onvif_cam
+        .ptz_relative_move(&endpoint, &camera.ptz_profile_token, x, y, zoom)
         .await
         .is_err()
     {
@@ -195,3 +193,6 @@ pub fn router() -> Router<AppState> {
             axum::routing::post(ptz_relative_move),
         )
 }
+
+#[cfg(test)]
+mod tests;

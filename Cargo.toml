@@ -1,7 +1,7 @@
 
 
 [workspace]
-members = [ "exserial", "onvif", "exopticon", "workers" ]
+members = [ "exserial", "exopticon", "workers" ]
 resolver = "2"
 
 [profile.dev.package."*"]
