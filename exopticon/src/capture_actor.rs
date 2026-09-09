@@ -355,7 +355,7 @@ impl CaptureActor {
                     "capture worker {} {} log: {}",
                     self.camera.name,
                     self.camera.name,
-                    &message
+                    message
                 );
 
                 if let Some(packet_count) = Self::check_log_for_lost_packets(&message) {

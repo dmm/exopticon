@@ -68,7 +68,7 @@ impl FileDeletionActor {
             if let Err(e) = spawn_blocking(move || db.delete_video_unit(vu_id)).await? {
                 error!(
                     "error deleting VideoUnit {}, filename {}: {}",
-                    &video_unit_id, &filename, e
+                    video_unit_id, filename, e
                 );
             }
         }

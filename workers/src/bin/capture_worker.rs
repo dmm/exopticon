@@ -780,7 +780,7 @@ fn handle_audio_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowE
 
     // Only u-law PCM is supported right now
     if sample_type != "audio/x-mulaw" {
-        debug!("Invalid sample encoding \"{}\"", &sample_type);
+        debug!("Invalid sample encoding \"{sample_type}\"");
         return Ok(gst::FlowSuccess::Ok);
     }
 
@@ -944,10 +944,7 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
         _ => (None, None),
     };
 
-    info!(
-        "New pad type {}, {} {}",
-        &new_pad_type, &media, &encoding_name
-    );
+    info!("New pad type {new_pad_type}, {media} {encoding_name}");
 
     if let ("video", Some(depay_name), Some(parser_name), &None) =
         (media, depayloader_name, parser_name, &d.video_appsink)

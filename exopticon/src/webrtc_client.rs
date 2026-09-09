@@ -174,7 +174,7 @@ impl Client {
         let message: ClientMessage = match serde_json::from_str(&txt_msg) {
             Ok(m) => m,
             Err(err) => {
-                info!("error parsing client message {}: {}", &txt_msg, err);
+                info!("error parsing client message {}: {}", txt_msg, err);
                 return Err(());
             }
         };
