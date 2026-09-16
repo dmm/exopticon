@@ -80,6 +80,12 @@ pub struct MidPair {
     audio: Option<Mid>,
 }
 
+fn camera_for_video_mid(mapping: &HashMap<String, MidPair>, mid: Mid) -> Option<&str> {
+    mapping
+        .iter()
+        .find_map(|(camera_name, pair)| (pair.video == Some(mid)).then_some(camera_name.as_str()))
+}
+
 pub struct Client {
     id: ClientId,
     websocket: WebSocket,
@@ -334,6 +340,15 @@ impl Client {
                     }
                 }
                 str0m::Output::Event(e) => match e {
+                    str0m::Event::KeyframeRequest(request) => {
+                        if let Some(camera_name) =
+                            camera_for_video_mid(&self.camera_mapping, request.mid)
+                        {
+                            self.video_router
+                                .request_keyframe(self.id, camera_name)
+                                .await;
+                        }
+                    }
                     str0m::Event::PeerStats(s) => {
                         debug!(
                             "Peer stats loss {:?}, bwe {:?}",
@@ -443,5 +458,40 @@ impl Client {
         self.video_router.unsubscribe(self.id).await;
 
         gauge.decrement(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{HashMap, Mid, MidPair, camera_for_video_mid};
+
+    #[test]
+    fn keyframes_route_only_to_the_matching_video_camera() {
+        let mapping = HashMap::from([
+            (
+                "front".to_string(),
+                MidPair {
+                    video: Some(Mid::from("v0")),
+                    audio: Some(Mid::from("a0")),
+                },
+            ),
+            (
+                "back".to_string(),
+                MidPair {
+                    video: Some(Mid::from("v1")),
+                    audio: None,
+                },
+            ),
+        ]);
+        assert_eq!(
+            camera_for_video_mid(&mapping, Mid::from("v0")),
+            Some("front")
+        );
+        assert_eq!(
+            camera_for_video_mid(&mapping, Mid::from("v1")),
+            Some("back")
+        );
+        assert_eq!(camera_for_video_mid(&mapping, Mid::from("a0")), None);
+        assert_eq!(camera_for_video_mid(&mapping, Mid::from("missing")), None);
     }
 }

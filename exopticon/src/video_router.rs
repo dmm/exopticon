@@ -20,6 +20,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use crate::keyframe_requests::KeyframeRequestGate;
 use tokio::sync::{RwLock, mpsc};
 
 use crate::{capture_actor::VideoPacket, webrtc_client::ClientId};
@@ -29,12 +30,41 @@ type VideoPacketVec = Vec<(ClientId, mpsc::Sender<VideoPacket>)>;
 pub struct VideoRouter {
     // camera name → list of (client_id, sender) pairs
     subscriptions: Arc<RwLock<HashMap<String, VideoPacketVec>>>,
+    keyframe_requests: RwLock<HashMap<String, Arc<KeyframeRequestGate>>>,
 }
 
 impl VideoRouter {
     pub fn new() -> Self {
         Self {
             subscriptions: Arc::new(RwLock::new(HashMap::new())),
+            keyframe_requests: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub async fn register_keyframe_requests(
+        &self,
+        camera_name: String,
+        requests: Arc<KeyframeRequestGate>,
+    ) {
+        self.keyframe_requests
+            .write()
+            .await
+            .insert(camera_name, requests);
+    }
+
+    pub async fn unregister_keyframe_requests(&self, camera_name: &str) {
+        self.keyframe_requests.write().await.remove(camera_name);
+    }
+
+    pub async fn request_keyframe(&self, client_id: ClientId, camera_name: &str) {
+        let subscribed = self
+            .subscriptions
+            .read()
+            .await
+            .get(camera_name)
+            .is_some_and(|clients| clients.iter().any(|(id, _)| *id == client_id));
+        if subscribed && let Some(requests) = self.keyframe_requests.read().await.get(camera_name) {
+            requests.request();
         }
     }
 
@@ -81,5 +111,59 @@ impl VideoRouter {
 impl Default for VideoRouter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::FutureExt;
+    use uuid::Uuid;
+
+    #[tokio::test(start_paused = true)]
+    async fn viewers_share_camera_notifications_and_lifecycle_is_respected() {
+        let router = VideoRouter::new();
+        let first = Arc::new(KeyframeRequestGate::new());
+        let second = Arc::new(KeyframeRequestGate::new());
+        router
+            .register_keyframe_requests("front".to_string(), Arc::clone(&first))
+            .await;
+        router
+            .register_keyframe_requests("back".to_string(), Arc::clone(&second))
+            .await;
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        let (tx, _rx) = mpsc::channel(1);
+        router
+            .update_subscriptions(a, vec!["front".to_string(), "back".to_string()], tx.clone())
+            .await;
+        router
+            .update_subscriptions(b, vec!["front".to_string()], tx)
+            .await;
+        for client in [a, b, a, b] {
+            router.request_keyframe(client, "front").await;
+        }
+        assert!(first.wait().now_or_never().is_some());
+        assert!(first.wait().now_or_never().is_none());
+        assert!(second.wait().now_or_never().is_none());
+        router.request_keyframe(b, "back").await;
+        assert!(second.wait().now_or_never().is_none());
+        router.request_keyframe(a, "back").await;
+        assert!(second.wait().now_or_never().is_some());
+        first.finish();
+        tokio::time::advance(std::time::Duration::from_secs(1)).await;
+        router.unsubscribe(a).await;
+        router.request_keyframe(a, "front").await;
+        assert!(first.wait().now_or_never().is_none());
+        router.unregister_keyframe_requests("front").await;
+        router.request_keyframe(b, "front").await;
+        assert!(first.wait().now_or_never().is_none());
+        let replacement = Arc::new(KeyframeRequestGate::new());
+        router
+            .register_keyframe_requests("front".to_string(), Arc::clone(&replacement))
+            .await;
+        router.request_keyframe(b, "front").await;
+        assert!(replacement.wait().now_or_never().is_some());
+        assert!(first.wait().now_or_never().is_none());
     }
 }

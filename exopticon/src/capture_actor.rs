@@ -36,7 +36,7 @@ use tokio::{
     io::AsyncWriteExt,
     process::{self, Child, ChildStdin, ChildStdout},
     sync::mpsc,
-    task::spawn_blocking,
+    task::{JoinSet, spawn_blocking},
 };
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
 use uuid::Uuid;
@@ -451,6 +451,15 @@ impl CaptureActor {
     }
 
     pub async fn run(mut self) -> String {
+        // JoinSet aborts the ONVIF task if this actor is dropped or panics.
+        let mut keyframe_tasks = JoinSet::new();
+        if !self.camera.ptz_profile_token.trim().is_empty() {
+            let requests = Arc::new(crate::keyframe_requests::KeyframeRequestGate::new());
+            self.video_router
+                .register_keyframe_requests(self.camera.name.clone(), Arc::clone(&requests))
+                .await;
+            keyframe_tasks.spawn(crate::keyframe_requests::run(self.camera.clone(), requests));
+        }
         let mut had_error = false;
         loop {
             if self.state == State::Ready {
@@ -470,6 +479,11 @@ impl CaptureActor {
                 }
             }
         }
+
+        self.video_router
+            .unregister_keyframe_requests(&self.camera.name)
+            .await;
+        keyframe_tasks.shutdown().await;
 
         if let Some((mut child, stdin, _)) = self.child.take() {
             drop(stdin);

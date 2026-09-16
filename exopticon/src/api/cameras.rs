@@ -18,8 +18,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::net::Ipv6Addr;
-
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -29,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
 use crate::AppState;
+use crate::keyframe_requests::device_url as onvif_device_url;
 
 use super::{ResourceMetadata, UserError};
 
@@ -136,15 +135,6 @@ pub async fn ptz_relative_move(
     let db = state.db_service.clone();
     let camera = spawn_blocking(move || db.fetch_camera_row(&name)).await??;
     move_camera(&camera, &direction).await
-}
-
-fn onvif_device_url(host: &str, port: u16) -> String {
-    let host = if host.parse::<Ipv6Addr>().is_ok() {
-        format!("[{host}]")
-    } else {
-        host.to_string()
-    };
-    format!("http://{host}:{port}/onvif/device_service")
 }
 
 async fn move_camera(

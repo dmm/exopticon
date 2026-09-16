@@ -2469,8 +2469,7 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "oxvif"
 version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ac1f0d680a48f33161ccffbd76a628dab36957c59ec9ec0d1a2e0115c5bdb19"
+source = "git+https://github.com/dmm/oxvif.git?branch=media-sync#3ea7a34503e77a92afcebe0fca6550a93bd03c27"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2764,9 +2763,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.41.0"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
+checksum = "41b1177fdf999d2321d3fb46ff47159d9c1fb9ad66a4879f8c50a0b504615e9b"
 dependencies = [
  "memchr",
 ]
