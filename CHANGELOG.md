@@ -2,6 +2,23 @@
 
 <!--- next entry here -->
 
+## 0.46.0
+2026-09-17
+
+### Features
+
+- Forward key frame requests from clients to cameras (ad5c444f1cfe51ed03548af35fdfdc829e593bf1)
+
+### Fixes
+
+- appease clippy by remove redundant borrows (0c7d985af47eeac79ebe51defbde59d2d529e8e9)
+- Update readme with new build workflow (9c1bfc099c47cca2a942b76666db22feedde49b2)
+- Replace onvif crate with oxvif (c03fa568e34eac6b6fff758d2423c8c12ea1e071)
+- Rename ptz-profile-token to onvif-profile-token (717eba544a72c3d8ea8915a7a72a7f70cdd99ddc)
+- **ci:** Login to docker hub on each build stage (6833d90a88246cc5dcd9e104d56a1cdc0b6eab89)
+- Remove dvc (8cd5651cf5eefaeb8b2d0f6c8ca0572807ee852a)
+- Update prettier and use pinned version for check-format (a6c983df3f7d27bf4d5471a3abd14df458da1e3b)
+
 ## 0.45.1
 2026-06-08
 
