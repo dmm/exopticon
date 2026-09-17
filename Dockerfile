@@ -1,4 +1,4 @@
-FROM docker.io/almalinux:10 AS base
+FROM harbor.home.mattli.us/proxy_cache/library/almalinux:10 AS base
 
 # Install EPEL
 RUN  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm

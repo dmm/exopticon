@@ -1,4 +1,4 @@
-image: rust:1.47.0-buster
+image: harbor.home.mattli.us/proxy_cache/library/rust:1.47.0-buster
 
 # Set any required environment variables here
 variables:
@@ -32,9 +32,10 @@ version:
 
 pre-release:
   stage: build
-  image: docker:29-dind
+  image: harbor.home.mattli.us/proxy_cache/library/docker:29-dind
   services:
-    - docker:29-dind
+    - name: harbor.home.mattli.us/proxy_cache/library/docker:29-dind
+      alias: docker
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
@@ -46,9 +47,10 @@ pre-release:
 
 build-image:
   stage: image
-  image: docker:29-dind
+  image: harbor.home.mattli.us/proxy_cache/library/docker:29-dind
   services:
-    - docker:29-dind
+    - name: harbor.home.mattli.us/proxy_cache/library/docker:29-dind
+      alias: docker
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
