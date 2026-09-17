@@ -329,8 +329,7 @@ export class CameraPanelComponent implements OnInit {
   }
 
   private focusHistoryStateForNavigation():
-    | CameraPanelFocusHistoryState
-    | undefined {
+    CameraPanelFocusHistoryState | undefined {
     return this.cameraPanelService.focusedCameraIdValue() === null
       ? undefined
       : this.readFocusHistoryState();

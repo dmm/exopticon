@@ -44,9 +44,10 @@ export class VideoUnitService {
     endTime: ZonedDateTime,
   ): Observable<[VideoUnit, any[]][]> {
     return this.http
-      .get<
-        [any, any[]][]
-      >(`/v1/video_units/${cameraName}?begin_time=${beginTime.toString()}` + `&end_time=${endTime.toString()}`)
+      .get<[any, any[]][]>(
+        `/v1/video_units/${cameraName}?begin_time=${beginTime.toString()}` +
+          `&end_time=${endTime.toString()}`,
+      )
       .pipe(
         map((groups) => {
           return groups.map(([unit, files]) => {

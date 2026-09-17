@@ -53,9 +53,8 @@ format:
 	cd exopticon/web; npm run format
 
 .PHONY: check-format
-check-format:
+check-format: check-web
 	cargo fmt --check
-	cd exopticon/web; npm run check-format
 
 .PHONY: target/debug/exopticon
 target/debug/exopticon: build-web
