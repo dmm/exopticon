@@ -8,7 +8,9 @@ variables:
   DOCKER_BUILDKIT: 1
   DOCKER_CLI_EXPERIMENTAL: enabled
   DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
   FF_NETWORK_PER_BUILD: "true"
+
 
 stages:
   - version
@@ -24,60 +26,64 @@ version:
     - release next-version --bump-patch > .next-version
   artifacts:
     paths:
-    - .next-version
+      - .next-version
   except:
-  - tags
+    - tags
 
 pre-release:
   stage: build
   image: docker:29-dind
   services:
     - docker:29-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
-  - docker build .
+    - docker build .
   only:
-  - branches
+    - branches
   except:
-  - master
+    - master
 
 build-image:
   stage: image
   image: docker:29-dind
   services:
     - docker:29-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
-  - rm -f build_info
-  - echo "RELEASE_URL=https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/release" > build_info
-  - echo "RELEASE_DESC=\"$(uname -mo) binary\"" >> build_info
-  - echo "RELEASE_SHA=$CI_COMMIT_SHA" >> build_info
-  - echo "RELEASE_VERSION=$(cat .next-version)" >> build_info
-  - . build_info
-  - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
-  # Build cuda image
-  - docker build -t $CI_REGISTRY_IMAGE:v$RELEASE_VERSION .
-  - docker build -t $CI_REGISTRY_IMAGE:latest .
-  - docker push $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
-  - docker push $CI_REGISTRY_IMAGE:latest
+    - rm -f build_info
+    - echo "RELEASE_URL=https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/release" > build_info
+    - echo "RELEASE_DESC=\"$(uname -mo) binary\"" >> build_info
+    - echo "RELEASE_SHA=$CI_COMMIT_SHA" >> build_info
+    - echo "RELEASE_VERSION=$(cat .next-version)" >> build_info
+    - . build_info
+
+    # Build cuda image
+    - docker build -t $CI_REGISTRY_IMAGE:v$RELEASE_VERSION .
+    - docker build -t $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:v$RELEASE_VERSION
+    - docker push $CI_REGISTRY_IMAGE:latest
   artifacts:
-     paths:
-     - build_info
+    paths:
+      - build_info
   only:
-  - master
+    - master
 
 release:
   stage: release
   image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
   script:
-  - rm -f release_info
-  - mv build_info release_info
-  - . release_info
+    - rm -f release_info
+    - mv build_info release_info
+    - . release_info
 
-  - release -v
-  - release --bump-patch changelog
-  - release --bump-patch commit-and-tag CHANGELOG.md release_info
-  - release --bump-patch --ci-commit-tag v$RELEASE_VERSION add-download-link -n release -u $RELEASE_URL -d "$RELEASE_DESC"
+    - release -v
+    - release --bump-patch changelog
+    - release --bump-patch commit-and-tag CHANGELOG.md release_info
+    - release --bump-patch --ci-commit-tag v$RELEASE_VERSION add-download-link -n release -u $RELEASE_URL -d "$RELEASE_DESC"
   artifacts:
     paths:
       - release_info
   only:
-  - master
+    - master
