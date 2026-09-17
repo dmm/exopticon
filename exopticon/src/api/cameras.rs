@@ -41,7 +41,7 @@ pub struct CameraSpec {
     pub username: String,
     pub rtsp_url: String,
     pub ptz_type: String,
-    pub ptz_profile_token: String,
+    pub onvif_profile_token: Option<String>,
     pub enabled: bool,
     pub ptz_x_step_size: i16,
     pub ptz_y_step_size: i16,
@@ -163,8 +163,12 @@ async fn move_camera(
     let onvif_cam =
         OnvifClient::new(&endpoint).with_credentials(&camera.username, &camera.password);
 
+    let profile_token = camera.onvif_profile_token.as_deref().ok_or_else(|| {
+        UserError::Validation("ONVIF profile token is not configured".to_string())
+    })?;
+
     if onvif_cam
-        .ptz_relative_move(&endpoint, &camera.ptz_profile_token, x, y, zoom)
+        .ptz_relative_move(&endpoint, profile_token, x, y, zoom)
         .await
         .is_err()
     {

@@ -86,7 +86,7 @@ pub struct Camera {
     pub password: String,
     pub rtsp_url: String,
     pub ptz_type: String,
-    pub ptz_profile_token: String,
+    pub onvif_profile_token: Option<String>,
     pub enabled: bool,
     pub ptz_x_step_size: i16,
     pub ptz_y_step_size: i16,
@@ -131,7 +131,7 @@ struct CameraConfig {
     password: String,
     rtsp_url: String,
     ptz_type: String,
-    ptz_profile_token: String,
+    onvif_profile_token: Option<String>,
     #[serde(default)]
     enabled: bool,
     #[serde(rename = "ptz-step-size-x", alias = "ptz-x-step-size")]
@@ -216,7 +216,7 @@ impl RawConfig {
                 password: camera.password,
                 rtsp_url: camera.rtsp_url,
                 ptz_type: camera.ptz_type,
-                ptz_profile_token: camera.ptz_profile_token,
+                onvif_profile_token: camera.onvif_profile_token,
                 enabled: camera.enabled,
                 ptz_x_step_size: camera.ptz_x_step_size,
                 ptz_y_step_size: camera.ptz_y_step_size,
@@ -426,7 +426,7 @@ username = "admin"
 password = ""
 rtsp-url = "rtsp://admin:@192.168.1.108:5544/live0.264"
 ptz-type = "none"
-ptz-profile-token = ""
+onvif-profile-token = "main-profile"
 enabled = true
 ptz-step-size-x = 10
 ptz-step-size-y = 10
@@ -441,7 +441,6 @@ username = "admin"
 password = ""
 rtsp-url = "rtsp://admin:@192.168.1.109:5544/live0.264"
 ptz-type = "none"
-ptz-profile-token = ""
 enabled = true
 ptz-step-size-x = 10
 ptz-step-size-y = 10
@@ -463,6 +462,11 @@ password-hash = "{VALID_HASH}"
 
         assert_eq!(config.storage_groups[0].display_name, "default");
         assert_eq!(config.cameras[0].display_name, "Garage North");
+        assert_eq!(
+            config.cameras[0].onvif_profile_token.as_deref(),
+            Some("main-profile")
+        );
+        assert_eq!(config.cameras[1].onvif_profile_token, None);
         assert_eq!(config.users[0].display_name, "admin-user");
         assert_eq!(
             config

@@ -56,6 +56,12 @@ pub struct KeyframeRequestGate {
     state: Mutex<RequestState>,
 }
 
+impl Default for KeyframeRequestGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KeyframeRequestGate {
     pub fn new() -> Self {
         Self {
@@ -96,9 +102,9 @@ impl KeyframeRequestGate {
 }
 
 pub async fn run(camera: Camera, requests: Arc<KeyframeRequestGate>) {
-    if camera.ptz_profile_token.trim().is_empty() {
+    let Some(profile_token) = camera.onvif_profile_token.as_deref() else {
         return;
-    }
+    };
     let Ok(port) = u16::try_from(camera.onvif_port) else {
         warn!(
             "Cannot request keyframes for {}: invalid ONVIF port",
@@ -128,7 +134,7 @@ pub async fn run(camera: Camera, requests: Arc<KeyframeRequestGate>) {
             session
                 .as_ref()
                 .expect("media client discovered")
-                .media_set_synchronization_point(&camera.ptz_profile_token)
+                .media_set_synchronization_point(profile_token)
                 .await
         }
         .await;

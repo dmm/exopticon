@@ -76,7 +76,7 @@ impl TestCamera {
                 password: "camera-password".to_string(),
                 rtsp_url: "rtsp://capture.example/live".to_string(),
                 ptz_type: "onvif_relative".to_string(),
-                ptz_profile_token: "profile<&token".to_string(),
+                onvif_profile_token: Some("profile<&token".to_string()),
                 enabled: true,
                 ptz_x_step_size: 25,
                 ptz_y_step_size: 40,
@@ -124,7 +124,7 @@ async fn relative_moves_preserve_directions_profile_and_credentials() {
         let movement = request.body.path(&["Body", "RelativeMove"]).unwrap();
         assert_eq!(
             movement.child("ProfileToken").unwrap().text(),
-            fixture.camera.ptz_profile_token
+            fixture.camera.onvif_profile_token.as_deref().unwrap()
         );
         let pan_tilt = movement.path(&["Translation", "PanTilt"]).unwrap();
         assert_eq!(pan_tilt.attr("x"), Some(x));

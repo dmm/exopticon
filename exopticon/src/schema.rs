@@ -28,7 +28,7 @@ diesel::table! {
         password -> Text,
         rtsp_url -> Text,
         ptz_type -> Text,
-        ptz_profile_token -> Text,
+        onvif_profile_token -> Nullable<Text>,
         enabled -> Bool,
         ptz_x_step_size -> SmallInt,
         ptz_y_step_size -> SmallInt,

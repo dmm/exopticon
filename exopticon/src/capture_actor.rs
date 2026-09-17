@@ -453,7 +453,7 @@ impl CaptureActor {
     pub async fn run(mut self) -> String {
         // JoinSet aborts the ONVIF task if this actor is dropped or panics.
         let mut keyframe_tasks = JoinSet::new();
-        if !self.camera.ptz_profile_token.trim().is_empty() {
+        if self.camera.onvif_profile_token.is_some() {
             let requests = Arc::new(crate::keyframe_requests::KeyframeRequestGate::new());
             self.video_router
                 .register_keyframe_requests(self.camera.name.clone(), Arc::clone(&requests))

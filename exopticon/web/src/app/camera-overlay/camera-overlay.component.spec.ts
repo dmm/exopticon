@@ -89,7 +89,7 @@ function buildCamera(name: string): Camera {
       username: "",
       rtspUrl: "",
       ptzType: "none",
-      ptzProfileToken: "",
+      onvifProfileToken: null,
       ptzXStepSize: 0,
       ptzYStepSize: 0,
       enabled: true,

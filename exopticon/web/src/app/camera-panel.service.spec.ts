@@ -234,7 +234,7 @@ function buildCamera(
       username: "",
       rtspUrl: "",
       ptzType: "relative",
-      ptzProfileToken: "",
+      onvifProfileToken: null,
       ptzXStepSize: 0,
       ptzYStepSize: 0,
       enabled,

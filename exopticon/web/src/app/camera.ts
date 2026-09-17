@@ -34,7 +34,7 @@ export interface CameraSpec {
   username: string;
   rtspUrl: string;
   ptzType: string;
-  ptzProfileToken: string;
+  onvifProfileToken: string | null;
   ptzXStepSize: number;
   ptzYStepSize: number;
   enabled: boolean;
