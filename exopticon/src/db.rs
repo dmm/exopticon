@@ -282,6 +282,7 @@ mod tests {
     use std::thread;
 
     use chrono::{DateTime, Duration, Utc};
+    use diesel::{Connection, ExpressionMethods, RunQueryDsl};
     use diesel_migrations::MigrationHarness;
     use tempfile::TempDir;
 
@@ -374,6 +375,27 @@ mod tests {
             .with_timezone(&Utc)
     }
 
+    fn insert_video_units(
+        service: &Service,
+        camera_name: &str,
+        intervals: impl IntoIterator<Item = (DateTime<Utc>, DateTime<Utc>)>,
+    ) {
+        let mut conn = service.pool.get().expect("insert connection");
+        conn.transaction::<_, diesel::result::Error, _>(|conn| {
+            for (begin_time, end_time) in intervals {
+                diesel::insert_into(crate::schema::video_units::table)
+                    .values((
+                        crate::schema::video_units::camera_name.eq(camera_name),
+                        crate::schema::video_units::begin_time_us.eq(begin_time.timestamp_micros()),
+                        crate::schema::video_units::end_time_us.eq(end_time.timestamp_micros()),
+                    ))
+                    .execute(conn)?;
+            }
+            Ok(())
+        })
+        .expect("video units inserted");
+    }
+
     #[test]
     fn applies_config_and_replaces_camera_group_memberships() {
         let (_temp_dir, service) = migrated_service();
@@ -458,6 +480,166 @@ mod tests {
             .fetch_storage_group_old_units("primary", 10)
             .expect("old units fetched");
         assert!(old_units.video_units.is_empty());
+    }
+
+    #[test]
+    fn recording_ranges_merge_clip_and_isolate_cameras() {
+        let (_temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front", "back"]))
+            .expect("config applied");
+
+        let requested_begin = test_time("2026-09-22T10:00:10Z");
+        let requested_end = test_time("2026-09-22T10:00:50Z");
+        assert!(
+            service
+                .fetch_recording_ranges("front", requested_begin, requested_end)
+                .expect("empty availability fetched")
+                .is_empty()
+        );
+
+        insert_video_units(
+            &service,
+            "front",
+            [
+                // Exact left boundary exclusion.
+                (
+                    test_time("2026-09-22T10:00:00Z"),
+                    test_time("2026-09-22T10:00:10Z"),
+                ),
+                // Left clipping, touching, nesting, and overlap.
+                (
+                    test_time("2026-09-22T10:00:05Z"),
+                    test_time("2026-09-22T10:00:15Z"),
+                ),
+                (
+                    test_time("2026-09-22T10:00:15Z"),
+                    test_time("2026-09-22T10:00:20Z"),
+                ),
+                (
+                    test_time("2026-09-22T10:00:16Z"),
+                    test_time("2026-09-22T10:00:18Z"),
+                ),
+                (
+                    test_time("2026-09-22T10:00:19Z"),
+                    test_time("2026-09-22T10:00:25Z"),
+                ),
+                // A positive gap followed by touching intervals.
+                (
+                    test_time("2026-09-22T10:00:30Z"),
+                    test_time("2026-09-22T10:00:35Z"),
+                ),
+                (
+                    test_time("2026-09-22T10:00:35Z"),
+                    test_time("2026-09-22T10:00:45Z"),
+                ),
+                // A second positive gap and right clipping.
+                (
+                    test_time("2026-09-22T10:00:48Z"),
+                    test_time("2026-09-22T10:01:00Z"),
+                ),
+                // Exact right boundary exclusion.
+                (
+                    test_time("2026-09-22T10:00:50Z"),
+                    test_time("2026-09-22T10:00:55Z"),
+                ),
+                // Reserved/open and invalid metadata rows.
+                (
+                    test_time("2026-09-22T10:00:26Z"),
+                    test_time("2026-09-22T10:00:26Z"),
+                ),
+                (
+                    test_time("2026-09-22T10:00:47Z"),
+                    test_time("2026-09-22T10:00:46Z"),
+                ),
+            ],
+        );
+        insert_video_units(
+            &service,
+            "back",
+            [(
+                test_time("2026-09-22T10:00:25Z"),
+                test_time("2026-09-22T10:00:40Z"),
+            )],
+        );
+
+        let ranges = service
+            .fetch_recording_ranges("front", requested_begin, requested_end)
+            .expect("availability fetched");
+        assert_eq!(
+            ranges,
+            vec![
+                super::video_units::RecordingRange {
+                    begin_time: requested_begin,
+                    end_time: test_time("2026-09-22T10:00:25Z"),
+                },
+                super::video_units::RecordingRange {
+                    begin_time: test_time("2026-09-22T10:00:30Z"),
+                    end_time: test_time("2026-09-22T10:00:45Z"),
+                },
+                super::video_units::RecordingRange {
+                    begin_time: test_time("2026-09-22T10:00:48Z"),
+                    end_time: requested_end,
+                },
+            ]
+        );
+
+        let back_ranges = service
+            .fetch_recording_ranges("back", requested_begin, requested_end)
+            .expect("other camera availability fetched");
+        assert_eq!(back_ranges.len(), 1);
+        assert_eq!(
+            back_ranges[0],
+            super::video_units::RecordingRange {
+                begin_time: test_time("2026-09-22T10:00:25Z"),
+                end_time: test_time("2026-09-22T10:00:40Z"),
+            }
+        );
+    }
+
+    #[test]
+    fn recording_ranges_are_not_limited_to_999_units() {
+        let (_temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+
+        let begin_time = test_time("2026-09-22T00:00:00Z");
+        insert_video_units(
+            &service,
+            "front",
+            (0_i64..1_001).map(|index| {
+                let range_begin = begin_time + Duration::seconds(index * 2);
+                (range_begin, range_begin + Duration::seconds(1))
+            }),
+        );
+
+        let ranges = service
+            .fetch_recording_ranges("front", begin_time, begin_time + Duration::seconds(2_002))
+            .expect("availability fetched");
+        assert_eq!(ranges.len(), 1_001);
+        assert_eq!(ranges[0].begin_time, begin_time);
+        assert_eq!(
+            ranges[1_000].end_time,
+            begin_time + Duration::seconds(2_001)
+        );
+    }
+
+    #[test]
+    fn recording_ranges_reject_an_unknown_camera() {
+        let (_temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+
+        assert!(matches!(
+            service.fetch_recording_ranges(
+                "missing",
+                test_time("2026-09-22T10:00:00Z"),
+                test_time("2026-09-22T10:15:00Z"),
+            ),
+            Err(super::Error::NotFound)
+        ));
     }
 
     #[test]

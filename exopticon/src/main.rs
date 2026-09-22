@@ -80,7 +80,7 @@ mod video_router;
 mod webrtc_client;
 
 use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
-use crate::api::{auth, camera_groups, cameras, storage_groups, video_units};
+use crate::api::{auth, camera_groups, cameras, recordings, storage_groups, video_units};
 use crate::file_deletion_supervisor::FileDeletionSupervisor;
 
 use axum::routing::{get, post};
@@ -272,6 +272,7 @@ async fn main() {
         .nest("/v1/storage_groups", storage_groups::router())
         .nest("/v1/camera_groups", camera_groups::router())
         .nest("/v1/cameras", cameras::router())
+        .nest("/v1/recordings", recordings::router())
         .nest("/v1/video_units", video_units::router())
         .nest("/v1/webrtc", crate::api::webrtc::router())
         .route_layer(middleware::from_fn_with_state(

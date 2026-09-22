@@ -19,10 +19,11 @@
  */
 
 use chrono::{DateTime, Utc};
+use diesel::connection::DefaultLoadingMode;
 use diesel::{Connection, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use std::path::Path;
 
-use crate::schema::{video_files, video_units};
+use crate::schema::{cameras, video_files, video_units};
 
 use super::{Service, datetime_to_micros, micros_to_datetime};
 
@@ -109,6 +110,14 @@ type VideoSegment = (
     crate::api::video_units::VideoUnit,
     crate::api::video_units::VideoFile,
 );
+
+/// A continuous range for which closed video recordings exists. Maybe
+/// represent multiple VideoUnits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordingRange {
+    pub begin_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+}
 
 fn remove_empty_parent_dirs(file_path: &Path, storage_root: &Path) {
     let Some(mut dir) = file_path.parent() else {
@@ -326,6 +335,70 @@ impl Service {
 
         res.into_iter()
             .map(|v| Ok((v.0.try_into()?, v.1.into())))
+            .collect()
+    }
+
+    /// Fetch closed recordings ranges with the half-open window
+    /// specified.
+    pub fn fetch_recording_ranges(
+        &self,
+        camera_name: &str,
+        requested_begin: DateTime<Utc>,
+        requested_end: DateTime<Utc>,
+    ) -> Result<Vec<RecordingRange>, super::Error> {
+        let requested_begin_us = datetime_to_micros(requested_begin);
+        let requested_end_us = datetime_to_micros(requested_end);
+
+        let merged_micros = db_read!(self, "fetch_recording_ranges", |conn| {
+            let camera_exists = cameras::table
+                .filter(cameras::name.eq(camera_name))
+                .select(cameras::name)
+                .first::<String>(conn)
+                .optional()?
+                .is_some();
+
+            if !camera_exists {
+                return Err(super::Error::NotFound);
+            }
+
+            let rows = video_units::table
+                .filter(video_units::camera_name.eq(camera_name))
+                .filter(video_units::begin_time_us.lt(requested_end_us))
+                .filter(video_units::end_time_us.gt(requested_begin_us))
+                .filter(video_units::end_time_us.gt(video_units::begin_time_us))
+                .order(video_units::begin_time_us.asc())
+                .select((video_units::begin_time_us, video_units::end_time_us))
+                .load_iter::<(i64, i64), DefaultLoadingMode>(conn)?;
+
+            let mut merged_micros: Vec<(i64, i64)> = Vec::new();
+            for row in rows {
+                let (begin_time_us, end_time_us) = row?;
+                let clipped_begin = begin_time_us.max(requested_begin_us);
+                let clipped_end = end_time_us.min(requested_end_us);
+                if clipped_begin >= clipped_end {
+                    continue;
+                }
+
+                if let Some((_, current_end)) = merged_micros.last_mut()
+                    && clipped_begin <= *current_end
+                {
+                    *current_end = (*current_end).max(clipped_end);
+                } else {
+                    merged_micros.push((clipped_begin, clipped_end));
+                }
+            }
+
+            Ok(merged_micros)
+        })?;
+
+        merged_micros
+            .into_iter()
+            .map(|(begin_time_us, end_time_us)| {
+                Ok(RecordingRange {
+                    begin_time: micros_to_datetime("video_units.begin_time_us", begin_time_us)?,
+                    end_time: micros_to_datetime("video_units.end_time_us", end_time_us)?,
+                })
+            })
             .collect()
     }
 

@@ -33,6 +33,7 @@ pub mod auth;
 pub mod basic_auth_middleware;
 pub mod camera_groups;
 pub mod cameras;
+pub mod recordings;
 pub mod static_files;
 pub mod storage_groups;
 pub mod video_units;
