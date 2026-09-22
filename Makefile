@@ -40,7 +40,7 @@ $(WEB_OBJ_FILES): $(WEB_SRC_FILES)
 
 .PHONY: check-web
 check-web:
-	cd exopticon/web; npm install
+	cd exopticon/web && npx --yes --prefer-offline prettier@3.9.7 --check src
 	cd exopticon/web; npm run check-format
 
 .PHONY: clippy
