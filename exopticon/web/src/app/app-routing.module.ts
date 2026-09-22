@@ -30,7 +30,10 @@ import { LoginComponent } from "./login/login.component";
 import { TokenListComponent } from "./token-list/token-list.component";
 import { WebrtcCodecsComponent } from "./webrtc-codecs/webrtc-codecs.component";
 
+import { PlaybackComponent } from "./playback/playback.component";
+
 const routes: Routes = [
+  { path: "playback/:camera_name", component: PlaybackComponent },
   { path: "login", component: LoginComponent },
   { path: "camera_panel", component: CameraPanelComponent },
   { path: "cameras", component: CameraListComponent },

@@ -50,6 +50,7 @@
   text-align: center;
   user-select: none;
   padding: 0.376rem 0.76rem;
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 .ptz-overlay {
@@ -85,7 +86,6 @@
   position: absolute;
   top: 5px;
   padding: 3px;
-  background-color: rgba(0, 0, 0, 0.5);
   border-radius: 5px;
 }
 
@@ -94,6 +94,12 @@
   top: 5px;
   right: 5px;
   padding: 3px;
-  background-color: rgba(0, 0, 0, 0.5);
   border-radius: 5px;
+}
+
+.playback {
+  position: absolute;
+  bottom: 40px;
+  left: 5px;
+  font: inherit;
 }

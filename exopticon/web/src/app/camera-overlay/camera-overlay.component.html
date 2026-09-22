@@ -27,6 +27,17 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
   >
     {{ muted ? "UNMUTE" : "MUTE" }}
   </div>
+  <button
+    type="button"
+    class="playback overlay-button"
+    [routerLink]="['/playback', camera.metadata.name]"
+    (click)="$event.stopPropagation()"
+    (pointerdown)="stopPropagation($event)"
+    (touchstart)="stopPropagation($event)"
+    (touchend)="stopPropagation($event)"
+  >
+    PLAYBACK
+  </button>
   @if (focused) {
     <div
       (click)="returnFromFocus($event)"

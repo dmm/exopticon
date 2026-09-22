@@ -1,0 +1,110 @@
+:host {
+  display: block;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+}
+.window-controls,
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+button {
+  font-size: 1rem;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible,
+.timeline:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+.preview {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid #080;
+  background: #071007;
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+.preview strong {
+  font-size: 1.4rem;
+}
+.preview time {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.window-controls {
+  justify-content: space-between;
+}
+.window-label,
+.help,
+#timeline-help {
+  font-size: 0.9rem;
+  color: #a9c4a9;
+  line-height: 1.5;
+}
+.timeline {
+  position: relative;
+  height: 56px;
+  background: #1b241b;
+  border: 1px solid #527252;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+.recording {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  background: #098509;
+  min-width: 1px;
+  pointer-events: none;
+}
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #fff;
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+.playhead::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #fff;
+}
+.ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.availability-status {
+  min-height: 1rem;
+}
+@media (max-width: 480px) {
+  .window-controls {
+    gap: 0.3rem;
+  }
+  button {
+    padding: 0.5rem 0.6rem;
+  }
+  .preview {
+    min-height: 160px;
+  }
+}

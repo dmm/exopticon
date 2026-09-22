@@ -1,0 +1,82 @@
+<h2>Playback — {{ cameraName }}</h2>
+<p><button type="button" routerLink="/camera_panel">Back to cameras</button></p>
+@if (cameraName) {
+  <div class="preview">
+    <strong>Mock playback</strong>
+    <p>Recorded video is not connected yet.</p>
+    <time>{{ position | date: "MMM d, y HH:mm:ss.SSS" }}</time>
+    <p>
+      {{ playing ? "Playing" : "Paused" }} ·
+      {{ available ? "Recording available" : "No recording at this time" }}
+    </p>
+  </div>
+  <div class="window-controls">
+    <button (click)="shiftWindow(-1)" aria-label="Show 30 minutes earlier">
+      ← 30 min
+    </button>
+    <button (click)="latest()">Latest hour</button>
+    <button (click)="shiftWindow(1)" aria-label="Show 30 minutes later">
+      30 min →
+    </button>
+  </div>
+  <p class="window-label">
+    {{ windowStart | date: "MMM d, y HH:mm" }} –
+    {{ windowEnd | date: "MMM d, y HH:mm" }} (local time)
+  </p>
+  <div
+    class="timeline"
+    role="slider"
+    tabindex="0"
+    aria-label="Playback time"
+    aria-describedby="timeline-help"
+    [attr.aria-valuemin]="windowStart"
+    [attr.aria-valuemax]="windowEnd - 1"
+    [attr.aria-valuenow]="position"
+    [attr.aria-valuetext]="position | date: 'MMM d, y HH:mm:ss.SSS'"
+    [attr.aria-busy]="loading"
+    (pointerdown)="seekPointer($event)"
+    (keydown)="seekKey($event)"
+  >
+    @for (range of ranges; track range.begin) {
+      <span
+        class="recording"
+        [style.left.%]="percent(range.begin)"
+        [style.width.%]="percent(range.end) - percent(range.begin)"
+      ></span>
+    }
+    <span class="playhead" [style.left.%]="percent(position)"></span>
+  </div>
+  <div class="ticks" aria-hidden="true">
+    @for (tick of ticks; track tick) {
+      <span>{{ windowStart + tick * 60000 | date: "HH:mm" }}</span>
+    }
+  </div>
+  <p id="timeline-help">
+    Green marks available video. Click or touch to seek; use arrow keys for
+    one-second seeks.
+  </p>
+  <div class="availability-status" aria-live="polite">
+    @if (loading) {
+      <p>Loading recording ranges…</p>
+    } @else if (error) {
+      <p>
+        Could not load recording ranges.
+        <button (click)="loadRanges()">Retry</button>
+      </p>
+    } @else if (!ranges.length) {
+      <p>No recordings in this hour. Try an earlier window.</p>
+    }
+  </div>
+  <div class="transport">
+    <button (click)="togglePlay()" [disabled]="!playing && !canAdvance">
+      {{ playing ? "Pause" : "Play" }}
+    </button>
+    <button (click)="stepForward()" [disabled]="playing || !canAdvance">
+      Next frame →
+    </button>
+  </div>
+  <p class="help">
+    Frame stepping is simulated at 30 fps. Playback skips gaps and stops at the
+    last available recording in this window.
+  </p>
+}
