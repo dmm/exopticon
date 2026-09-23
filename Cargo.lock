@@ -4729,6 +4729,8 @@ dependencies = [
  "gstreamer-app",
  "gstreamer-video",
  "log",
+ "serde",
+ "serde_json",
  "uuid",
 ]
 

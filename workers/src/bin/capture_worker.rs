@@ -44,6 +44,7 @@
 #![allow(clippy::too_many_lines)]
 
 use std::{
+    collections::HashMap,
     io,
     path::PathBuf,
     sync::{
@@ -54,7 +55,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use chrono::{SecondsFormat, Utc};
+use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
 use exserial::{
     exlog::ExLog,
     models::{CaptureCommand, CaptureMessage},
@@ -67,15 +68,99 @@ use gstreamer::{
     },
     prelude::{
         ClockExt, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, GstValueExt, PadExt,
-        PadExtManual,
+        PadExtManual, TagSetterExtManual,
     },
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use log::{debug, error, info};
+use serde::Serialize;
+use uuid::Uuid;
 
 static LOGGER: ExLog = ExLog;
 static TIMEOUT: Duration = Duration::from_secs(10);
 static STARTUP_PREROLL_TIMEOUT: Duration = Duration::from_secs(1);
+static MATROSKA_TIMECODE_SCALE: gst::ClockTime = gst::ClockTime::from_mseconds(1);
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClockAnchorMetadata {
+    pipeline_running_time_ns: u64,
+    utc_time: String,
+}
+
+/// mkv container session data with session clock - utc wall time
+/// anchor and session id
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CaptureTimelineMetadata {
+    capture_session_id: Uuid,
+    // MKV timestamps are session running times (at the configured timecode
+    // precision): UTC = anchor UTC + MKV timestamp - anchor running time.
+    clock_anchor: ClockAnchorMetadata,
+}
+
+#[derive(Clone, Debug)]
+struct CaptureClock {
+    session_id: Uuid,
+    anchor_running_time: gst::ClockTime,
+    anchor_utc: DateTime<Utc>,
+    last_reference_running_time: Option<gst::ClockTime>,
+}
+
+impl CaptureClock {
+    fn anchored_to(element: &Element) -> Option<Self> {
+        // Bracket the GStreamer clock read with UTC reads and use their midpoint.
+        // This keeps the two clocks paired without treating a media buffer's PTS
+        // as either running time or wall-clock time.
+        let utc_before = Utc::now();
+        let anchor_running_time = element.current_running_time()?;
+        let utc_after = Utc::now();
+        let half_sample_interval = utc_after
+            .signed_duration_since(utc_before)
+            .num_nanoseconds()
+            .map_or(TimeDelta::zero(), |ns| TimeDelta::nanoseconds(ns / 2));
+
+        Some(Self {
+            session_id: Uuid::new_v4(),
+            anchor_running_time,
+            anchor_utc: utc_before + half_sample_interval,
+            last_reference_running_time: None,
+        })
+    }
+
+    fn metadata_for_reference(
+        &mut self,
+        element: &Element,
+        reference_running_time: gst::ClockTime,
+    ) -> Option<(Uuid, ClockAnchorMetadata)> {
+        if self
+            .last_reference_running_time
+            .is_some_and(|last_origin| reference_running_time < last_origin)
+        {
+            info!(
+                "Pipeline running time moved backwards from {:?} to {reference_running_time}; starting a new capture session",
+                self.last_reference_running_time
+            );
+            *self = Self::anchored_to(element)?;
+        }
+
+        self.last_reference_running_time = Some(reference_running_time);
+        Some((
+            self.session_id,
+            ClockAnchorMetadata {
+                pipeline_running_time_ns: self.anchor_running_time.nseconds(),
+                utc_time: self.anchor_utc.to_rfc3339_opts(SecondsFormat::Nanos, true),
+            },
+        ))
+    }
+
+    fn utc_at_running_time(&self, running_time: gst::ClockTime) -> Option<DateTime<Utc>> {
+        let delta_ns = i128::from(running_time.nseconds())
+            .checked_sub(i128::from(self.anchor_running_time.nseconds()))?;
+        self.anchor_utc
+            .checked_add_signed(TimeDelta::nanoseconds(i64::try_from(delta_ns).ok()?))
+    }
+}
 
 #[derive(Clone, Debug)]
 struct FileReservation {
@@ -85,10 +170,12 @@ struct FileReservation {
 }
 
 #[derive(Clone, Debug)]
-struct OpenFileSegment {
+struct FragmentCapture {
     video_unit_id: i64,
     video_file_id: i64,
     filename: String,
+    begin_running_time: gst::ClockTime,
+    capture_clock: CaptureClock,
 }
 
 #[derive(Debug)]
@@ -246,15 +333,19 @@ struct CustomData {
     next_file: Option<FileReservation>,
     /// splitmuxsink and associated video sink pad, used by gstreamer
     /// callbacks
-    mkv_sink_pad: (Element, Pad),
+    mkv_sink_pad: (Element, Option<Pad>),
     /// set once video pad is connected
     video_appsink: Option<AppSink>,
     /// set if audio stream is provided
     audio_appsink: Option<AppSink>,
     /// blocks mux branches until `rtspsrc` has exposed all startup pads
     startup_preroll: StartupPreroll,
-    /// currently open file
-    current_file: Option<OpenFileSegment>,
+    /// muxer created for the fragment whose location is requested next
+    pending_muxer: Option<Element>,
+    /// files currently being written or finalized, keyed by splitmux fragment ID
+    fragments: HashMap<u32, FragmentCapture>,
+    /// identity and UTC mapping for the current `GStreamer` running-time domain
+    capture_clock: Option<CaptureClock>,
     /// `last_frame_time` is set to detect a hung process not
     /// producing frames
     last_frame_time: Instant,
@@ -263,7 +354,13 @@ struct CustomData {
 impl CustomData {
     pub fn new(reservations: Arc<ReservationClient>, next_file: FileReservation) -> Self {
         let muxer_properties = gst::Structure::builder("properties")
-            .field("offset-to-zero", true)
+            // Keep every fragment in the capture session's running-time domain.
+            .field("offset-to-zero", false)
+            .field(
+                "timecodescale",
+                i64::try_from(MATROSKA_TIMECODE_SCALE.nseconds())
+                    .expect("Matroska timecode scale exceeds i64"),
+            )
             .field("writing-app", "EXOPTICON")
             .build();
 
@@ -276,22 +373,16 @@ impl CustomData {
             .build()
             .expect("Could not create sink element.");
 
-        // We request the video pad here because if we wait until we
-        // get the on_pad_connect signal from `rtspsrc` then we might
-        // get the audio first if you try to sink video after audio
-        // `splitmuxsink` complains it already set the headers.
-        let video_sink_pad = mkv_sink
-            .request_pad_simple("video")
-            .expect("Failed to get video sink pad from convert");
-
         Self {
             reservations,
             next_file: Some(next_file),
-            mkv_sink_pad: (mkv_sink, video_sink_pad),
+            mkv_sink_pad: (mkv_sink, None),
             video_appsink: None,
             audio_appsink: None,
             startup_preroll: StartupPreroll::default(),
-            current_file: None,
+            pending_muxer: None,
+            fragments: HashMap::new(),
+            capture_clock: None,
             last_frame_time: Instant::now(),
         }
     }
@@ -809,30 +900,71 @@ fn handle_audio_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowE
     Ok(gst::FlowSuccess::Ok)
 }
 
-fn handle_file_location_request(data_weak: &Weak<Mutex<CustomData>>) -> gstreamer::glib::Value {
-    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+fn sample_running_time(sample: &gst::Sample) -> Option<gst::ClockTime> {
+    let pts = sample.buffer()?.pts()?;
+    let segment = sample.segment()?.downcast_ref::<gst::ClockTime>()?;
+    segment.to_running_time(pts)
+}
 
+fn write_capture_timeline_tag(muxer: Element, metadata: &CaptureTimelineMetadata) {
+    let metadata_json = serde_json::to_string(metadata)
+        .expect("capture timeline metadata contains only serializable values");
+    let tag_setter = muxer
+        .dynamic_cast::<gst::TagSetter>()
+        .expect("matroskamux does not implement GstTagSetter");
+    tag_setter.add_tag::<gst::tags::Comment>(&metadata_json.as_str(), gst::TagMergeMode::Replace);
+    debug!("MKV capture timeline metadata: {metadata_json}");
+}
+
+fn handle_muxer_added(data_weak: &Weak<Mutex<CustomData>>, muxer: &Element) {
+    let data = data_weak
+        .upgrade()
+        .expect("capture data dropped before muxer-added");
+    data.lock().unwrap().pending_muxer = Some(muxer.clone());
+}
+
+fn handle_file_location_request(
+    splitmuxsink: &Element,
+    fragment_id: u32,
+    first_sample: &gst::Sample,
+    data_weak: &Weak<Mutex<CustomData>>,
+) -> gstreamer::glib::Value {
+    let reference_running_time = sample_running_time(first_sample)
+        .expect("first fragment sample does not have a PTS in a TIME segment");
     let Some(data) = data_weak.upgrade() else {
         panic!("Failed to upgrade the weak reference");
     };
-    let (reservations, current_file, next_file) = {
+    let (reservations, next_file, capture_clock) = {
         let mut d = data.lock().unwrap();
+        let mut capture_clock = d
+            .capture_clock
+            .take()
+            .or_else(|| CaptureClock::anchored_to(splitmuxsink))
+            .expect("splitmuxsink does not have a running-time clock");
+        let (capture_session_id, clock_anchor) = capture_clock
+            .metadata_for_reference(splitmuxsink, reference_running_time)
+            .expect("splitmuxsink does not have a running-time clock");
+        d.capture_clock = Some(capture_clock);
+        let pending_muxer = d
+            .pending_muxer
+            .take()
+            .expect("format-location-full arrived before muxer-added");
+        write_capture_timeline_tag(
+            pending_muxer,
+            &CaptureTimelineMetadata {
+                capture_session_id,
+                clock_anchor,
+            },
+        );
+
         (
             Arc::clone(&d.reservations),
-            d.current_file.take(),
             d.next_file.take(),
+            d.capture_clock
+                .clone()
+                .expect("capture clock was just stored"),
         )
     };
-
-    if let Some(current_file) = current_file {
-        let msg = CaptureMessage::EndFile {
-            video_unit_id: current_file.video_unit_id,
-            video_file_id: current_file.video_file_id,
-            filename: current_file.filename,
-            end_time: timestamp.clone(),
-        };
-        exserial::print_message(msg);
-    }
 
     let reservation = next_file.unwrap_or_else(|| {
         reservations.wait_for_reservation().unwrap_or_else(|err| {
@@ -843,25 +975,85 @@ fn handle_file_location_request(data_weak: &Weak<Mutex<CustomData>>) -> gstreame
     let filename = reservation.filename.clone();
     debug!("New reserved file: {filename}");
 
-    let msg = CaptureMessage::FileOpened {
-        video_unit_id: reservation.video_unit_id,
-        video_file_id: reservation.video_file_id,
-        filename: filename.clone(),
-        begin_time: timestamp,
-    };
-    exserial::print_message(msg);
-
     {
         let mut d = data.lock().unwrap();
-        d.current_file = Some(OpenFileSegment {
-            video_unit_id: reservation.video_unit_id,
-            video_file_id: reservation.video_file_id,
-            filename: filename.clone(),
-        });
+        d.fragments.insert(
+            fragment_id,
+            FragmentCapture {
+                video_unit_id: reservation.video_unit_id,
+                video_file_id: reservation.video_file_id,
+                filename: filename.clone(),
+                begin_running_time: reference_running_time,
+                capture_clock,
+            },
+        );
     }
 
     ReservationClient::request_next();
     PathBuf::from(filename).into()
+}
+
+fn handle_fragment_opened(structure: &gst::StructureRef, data_weak: &Weak<Mutex<CustomData>>) {
+    let fragment_id = structure
+        .get::<u32>("fragment-id")
+        .expect("fragment-opened message has no fragment ID");
+    let data = data_weak
+        .upgrade()
+        .expect("capture data dropped before fragment-opened");
+    let d = data.lock().unwrap();
+    let fragment = d
+        .fragments
+        .get(&fragment_id)
+        .expect("fragment-opened arrived before format-location-full");
+    // File bookkeeping uses the reference stream's fragment boundary. Sample
+    // playback uses the session timestamps stored directly in the MKV.
+    let begin_time = fragment
+        .capture_clock
+        .utc_at_running_time(fragment.begin_running_time)
+        .expect("fragment start is too far from its UTC anchor")
+        .to_rfc3339_opts(SecondsFormat::Nanos, true);
+    let message = CaptureMessage::FileOpened {
+        video_unit_id: fragment.video_unit_id,
+        video_file_id: fragment.video_file_id,
+        filename: fragment.filename.clone(),
+        begin_time,
+    };
+    drop(d);
+    exserial::print_message(message);
+}
+
+fn handle_fragment_closed(structure: &gst::StructureRef, data_weak: &Weak<Mutex<CustomData>>) {
+    let fragment_id = structure
+        .get::<u32>("fragment-id")
+        .expect("fragment-closed message has no fragment ID");
+    let duration = structure
+        .get::<gst::ClockTime>("fragment-duration")
+        .expect("fragment-closed message has no duration");
+    let data = data_weak
+        .upgrade()
+        .expect("capture data dropped before fragment-closed");
+    let fragment = data
+        .lock()
+        .unwrap()
+        .fragments
+        .remove(&fragment_id)
+        .expect("fragment-closed arrived for an unknown fragment");
+    let end_running_time = fragment
+        .begin_running_time
+        .checked_add(duration)
+        .expect("fragment running-time end overflowed");
+    let end_time = fragment
+        .capture_clock
+        .utc_at_running_time(end_running_time)
+        .expect("fragment end is too far from its UTC anchor")
+        .to_rfc3339_opts(SecondsFormat::Nanos, true);
+
+    exserial::print_message(CaptureMessage::EndFile {
+        video_unit_id: fragment.video_unit_id,
+        video_file_id: fragment.video_file_id,
+        filename: fragment.filename,
+        end_time,
+    });
 }
 
 fn schedule_startup_preroll_timeout(data_weak: Weak<Mutex<CustomData>>) {
@@ -1003,7 +1195,12 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
 
         // link the bin pipeline to the mkv splitmuxsink
         bin_mkv_src_pad
-            .link(&d.mkv_sink_pad.1)
+            .link(
+                d.mkv_sink_pad
+                    .1
+                    .as_ref()
+                    .expect("splitmuxsink video pad was not requested"),
+            )
             .expect("linking bin to video sink failed");
 
         info!("Link succeeded (type {new_pad_type}).");
@@ -1062,13 +1259,17 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
             .expect("failed to sync video appsink state");
         d.audio_appsink = Some(appsink);
 
-        let audio_sink_pad = preroll_block.blocked.then(|| {
-            d.mkv_sink_pad
-                .0
+        let request_audio_pad = preroll_block.blocked;
+        let mkv_sink = d.mkv_sink_pad.0.clone();
+        drop(d);
+
+        // Requesting a pad synchronously emits muxer-added, whose handler also
+        // accesses CustomData, so the CustomData lock must not be held here.
+        let audio_sink_pad = request_audio_pad.then(|| {
+            mkv_sink
                 .request_pad_simple("audio_%u")
                 .expect("Failed to get audio sink pad from splitmuxsink")
         });
-        drop(d);
 
         if let Some(audio_sink_pad) = audio_sink_pad {
             // link the bin pipeline to the mkv splitmuxsink
@@ -1129,17 +1330,47 @@ fn main() {
     let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(data));
     let data_weak = Arc::downgrade(&data);
 
-    data.lock()
-        .unwrap()
-        .mkv_sink_pad
-        .0
-        .connect("format-location-full", false, {
-            let data_weak = data_weak.clone();
+    let mkv_sink = data.lock().unwrap().mkv_sink_pad.0.clone();
+    mkv_sink.connect("muxer-added", false, {
+        let data_weak = data_weak.clone();
 
-            move |_el| -> Option<gstreamer::glib::Value> {
-                Some(handle_file_location_request(&data_weak.clone()))
-            }
-        });
+        move |values| {
+            let muxer = values[1]
+                .get::<Element>()
+                .expect("muxer-added did not provide a GstElement");
+            handle_muxer_added(&data_weak, &muxer);
+            None
+        }
+    });
+
+    mkv_sink.connect("format-location-full", false, {
+        let data_weak = data_weak.clone();
+
+        move |values| -> Option<gstreamer::glib::Value> {
+            let splitmuxsink = values[0]
+                .get::<Element>()
+                .expect("format-location-full did not provide splitmuxsink");
+            let fragment_id = values[1]
+                .get::<u32>()
+                .expect("format-location-full did not provide a fragment ID");
+            let first_sample = values[2]
+                .get::<gst::Sample>()
+                .expect("format-location-full did not provide the first sample");
+            Some(handle_file_location_request(
+                &splitmuxsink,
+                fragment_id,
+                &first_sample,
+                &data_weak,
+            ))
+        }
+    });
+
+    // Request the primary video pad only after muxer-added is connected. The
+    // request creates the initial muxer and emits muxer-added synchronously.
+    let video_sink_pad = mkv_sink
+        .request_pad_simple("video")
+        .expect("Failed to get video sink pad from splitmuxsink");
+    data.lock().unwrap().mkv_sink_pad.1 = Some(video_sink_pad);
 
     // Connect the pad-added signal
     source.connect_pad_added({
@@ -1180,6 +1411,21 @@ fn main() {
                     }
                 }
                 MessageView::Eos(..) => break,
+
+                MessageView::Element(element) => {
+                    let Some(structure) = element.structure() else {
+                        continue;
+                    };
+                    match structure.name().as_str() {
+                        "splitmuxsink-fragment-opened" => {
+                            handle_fragment_opened(structure, &data_weak);
+                        }
+                        "splitmuxsink-fragment-closed" => {
+                            handle_fragment_closed(structure, &data_weak);
+                        }
+                        _ => {}
+                    }
+                }
 
                 MessageView::Progress(_progress) => {}
                 _ => {}
