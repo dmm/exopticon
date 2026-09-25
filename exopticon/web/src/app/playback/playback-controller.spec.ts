@@ -319,6 +319,59 @@ describe("PlaybackController continuous playback", () => {
     expect(recordings.download).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps seeking through overlapping files with no eligible frame", async () => {
+    const middleDescriptor = {
+      ...nextDescriptor,
+      beginTime: "2026-09-23T10:00:09Z",
+      endTime: "2026-09-23T10:00:10Z",
+    };
+    const finalDescriptor = {
+      ...nextDescriptor,
+      fileId: 9,
+      beginTime: "2026-09-23T10:00:09.500Z",
+      endTime: "2026-09-23T10:00:12Z",
+    };
+    const first = reader();
+    first.firstAtOrAfter.and.resolveTo(null);
+    const middle = reader();
+    middle.firstAtOrAfter.and.resolveTo(null);
+    const final = reader();
+    final.firstAtOrAfter.and.resolveTo(frame(base + 9700));
+    readers.push(first, middle, final);
+    recordings.getNext.and.returnValues(
+      of({ recording: middleDescriptor }),
+      of({ recording: finalDescriptor }),
+      of({ recording: null }),
+    );
+    await controller.seek(base + 9500);
+    expect(controller.state.phase).toBe("paused");
+    expect(controller.state.requestedTime).toBe(base + 9500);
+    expect(controller.state.displayedTime).toBe(base + 9700);
+    expect(first.dispose).toHaveBeenCalledTimes(1);
+    expect(middle.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles as unavailable when all overlapping successors are exhausted", async () => {
+    const middleDescriptor = {
+      ...nextDescriptor,
+      beginTime: "2026-09-23T10:00:09Z",
+    };
+    const first = reader();
+    first.firstAtOrAfter.and.resolveTo(null);
+    const middle = reader();
+    middle.firstAtOrAfter.and.resolveTo(null);
+    readers.push(first, middle);
+    recordings.getNext.and.returnValues(
+      of({ recording: middleDescriptor }),
+      of({ recording: null }),
+      of({ recording: null }),
+    );
+    await controller.seek(base + 9500);
+    expect(controller.state.phase).toBe("unavailable");
+    expect(controller.state.requestedTime).toBe(base + 9500);
+    expect(controller.state.displayedTime).toBeNull();
+  });
+
   it("refreshes a prefetched null successor before reporting the end", async () => {
     const oldReader = reader();
     oldReader.firstAtOrAfter.and.resolveTo(frame(base + 9000));

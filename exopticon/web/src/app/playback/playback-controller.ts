@@ -165,11 +165,17 @@ export class PlaybackController {
         this.show(frame, "paused", utcMilliseconds);
       } else {
         this.fileExhausted = true;
-        await this.produce();
+        while (
+          this.current(generation) &&
+          this.isPhase("seeking") &&
+          !this.queue.length
+        ) {
+          await this.produce();
+        }
         if (!this.current(generation)) return;
-        if (this.queue.length) {
+        if (this.isPhase("seeking") && this.queue.length) {
           this.show(this.queue.shift()!, "paused", utcMilliseconds);
-        } else if (this.state.phase === "ended") {
+        } else if (this.isPhase("ended")) {
           this.setPhase("unavailable");
         }
       }
