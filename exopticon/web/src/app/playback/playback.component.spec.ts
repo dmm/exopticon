@@ -1,7 +1,6 @@
-import { fakeAsync, tick } from "@angular/core/testing";
-import { of, Subject } from "rxjs";
 import { ChangeDetectorRef } from "@angular/core";
 import { ActivatedRoute, convertToParamMap, ParamMap } from "@angular/router";
+import { of, Subject } from "rxjs";
 import { RecordingRange, RecordingService } from "../recording.service";
 import { PlaybackComponent } from "./playback.component";
 
@@ -21,15 +20,10 @@ describe("PlaybackComponent", () => {
     component.cameraName = "front";
     component.windowStart = 0;
     component.windowEnd = component.windowDuration;
-    component.position = 1000;
-    component.ranges = [
-      { begin: 1000, end: 2000 },
-      { begin: 3000, end: 4000 },
-    ];
   });
   afterEach(() => component.ngOnDestroy());
 
-  it("loads the camera from the URL and reloads on route changes", () => {
+  it("loads the camera from the URL and releases route work", () => {
     component.ngOnInit();
     params.next(convertToParamMap({ camera_name: "front" }));
     expect(recordings.getRanges).toHaveBeenCalledWith(
@@ -48,44 +42,28 @@ describe("PlaybackComponent", () => {
     expect(params.observers.length).toBe(0);
   });
 
-  it("steps forward only while paused and skips gaps", () => {
-    component.stepForward();
-    expect(component.position).toBeCloseTo(1000 + 1000 / 30);
-    component.position = 1999;
-    component.stepForward();
-    expect(component.position).toBe(3000);
-    component.playing = true;
-    component.stepForward();
-    expect(component.position).toBe(3000);
-    component.pause();
-    component.position = 3999;
-    expect(component.canAdvance).toBe(false);
+  it("keeps the displayed timestamp while navigating timeline windows", () => {
+    component.controller.state = {
+      phase: "paused",
+      requestedTime: 1200,
+      displayedTime: 1300,
+      error: null,
+    };
+    component.shiftWindow(-1);
+    expect(component.controller.state.displayedTime).toBe(1300);
+    expect(component.controller.state.requestedTime).toBe(1200);
+    expect(component.windowEnd - component.windowStart).toBe(
+      component.windowDuration,
+    );
   });
 
-  it("plays across gaps and stops at the last recording", fakeAsync(() => {
-    // Control the monotonic clock independently of the test runner's fake timers.
-    let now = 0;
-    spyOn(performance, "now").and.callFake(() => now);
-    component.position = 1990;
-    component.togglePlay();
-    now = 100;
-    tick(100);
-    expect(component.position).toBe(3000);
-    now = 1200;
-    tick(100);
-    expect(component.playing).toBe(false);
-  }));
-
-  it("cancels stale requests when the window shifts", () => {
+  it("cancels stale range requests when the window shifts", () => {
     const old = new Subject<{ ranges: RecordingRange[] }>();
     const current = new Subject<{ ranges: RecordingRange[] }>();
     recordings.getRanges.and.returnValues(old, current);
     component.loadRanges();
     component.shiftWindow(-1);
     expect(old.observers.length).toBe(0);
-    expect(component.windowEnd - component.windowStart).toBe(
-      component.windowDuration,
-    );
     expect(recordings.getRanges).toHaveBeenCalledWith(
       "front",
       -1800000,
@@ -103,21 +81,10 @@ describe("PlaybackComponent", () => {
     expect(component.loading).toBe(false);
   });
 
-  it("clears old availability and exposes request failures for retry", () => {
-    const request = new Subject<{ ranges: RecordingRange[] }>();
-    recordings.getRanges.and.returnValue(request);
-    component.loadRanges();
-    expect(component.ranges).toEqual([]);
-    expect(component.canAdvance).toBe(false);
-    request.error(new Error("offline"));
-    expect(component.error).toBe(true);
-    expect(component.loading).toBe(false);
-    recordings.getRanges.and.returnValue(of({ ranges: [] }));
-    component.loadRanges();
-    expect(component.error).toBe(false);
-  });
-
-  it("seeks with touch coordinates and clamps keyboard seeks to the window", () => {
+  it("maps pointer and keyboard seeks to requested UTC positions", () => {
+    const seek = spyOn(component.controller, "seek").and.returnValue(
+      Promise.resolve(),
+    );
     component.seekPointer({
       button: 0,
       clientX: 150,
@@ -125,11 +92,16 @@ describe("PlaybackComponent", () => {
         getBoundingClientRect: () => ({ left: 100, width: 200 }),
       },
     } as unknown as PointerEvent);
-    expect(component.position).toBe(900000);
-    component.seekKey(new KeyboardEvent("keydown", { key: "Home" }));
-    component.seekKey(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
-    expect(component.position).toBe(0);
+    expect(seek).toHaveBeenCalledWith(900000);
+    component.controller.state = {
+      phase: "paused",
+      requestedTime: 1000,
+      displayedTime: 1200,
+      error: null,
+    };
+    component.seekKey(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    expect(seek).toHaveBeenCalledWith(2000);
     component.seekKey(new KeyboardEvent("keydown", { key: "End" }));
-    expect(component.position).toBe(component.windowEnd - 1);
+    expect(seek).toHaveBeenCalledWith(component.windowEnd - 1);
   });
 });

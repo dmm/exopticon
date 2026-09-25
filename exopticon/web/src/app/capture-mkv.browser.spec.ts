@@ -1,4 +1,5 @@
 import { BlobSource, Input, MATROSKA, VideoSampleSink } from "mediabunny";
+import { MkvReader } from "./playback/mkv-reader";
 
 interface CaptureTimeline {
   captureSessionId: string;
@@ -27,6 +28,31 @@ function parseGstreamerComments(raw: unknown): CaptureTimeline {
 }
 
 describe("GStreamer capture MKV browser contract", () => {
+  it("maps the nanosecond anchor and seeks to the first frame at or after UTC", async () => {
+    const response = await fetch("/base/test-fixtures/capture-session-a.mkv");
+    expect(response.ok).toBe(true);
+    const reader = await MkvReader.open(await response.blob());
+    try {
+      expect(reader.captureSessionId).toBe(
+        "11111111-1111-4111-8111-111111111111",
+      );
+      const first = await reader.firstAtOrAfter(
+        Date.parse("2026-09-23T10:00:00.273Z"),
+      );
+      expect(first?.utcNanoseconds).toBe(
+        BigInt(Date.parse("2026-09-23T10:00:00Z")) * 1_000_000n + 323_456_789n,
+      );
+      first?.sample.close();
+      const next = await reader.next();
+      expect(next?.utcNanoseconds).toBe(
+        BigInt(Date.parse("2026-09-23T10:00:00Z")) * 1_000_000n + 423_456_789n,
+      );
+      next?.sample.close();
+    } finally {
+      reader.dispose();
+    }
+  });
+
   it("reads COMMENTS, nonzero timestamps, B-frames, and exact presentation order", async () => {
     const input = await openFixture("capture-session-a");
     try {
