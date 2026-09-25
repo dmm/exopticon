@@ -5,6 +5,14 @@ module.exports = function (config) {
   config.set({
     basePath: "",
     frameworks: ["jasmine", "@angular-devkit/build-angular"],
+    files: [
+      {
+        pattern: "test-fixtures/*.mkv",
+        watched: false,
+        included: false,
+        served: true,
+      },
+    ],
     plugins: [
       require("karma-jasmine"),
       require("karma-chrome-launcher"),

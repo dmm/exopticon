@@ -7,6 +7,19 @@ export interface RecordingRange {
   endTime: string;
 }
 
+export interface RecordingDescriptor {
+  fileId: number;
+  beginTime: string;
+  endTime: string;
+  byteLength: number;
+  contentUrl: string;
+  nextUrl: string;
+}
+
+export interface NextRecordingResponse {
+  recording: RecordingDescriptor | null;
+}
+
 @Injectable({ providedIn: "root" })
 export class RecordingService {
   constructor(private http: HttpClient) {}
@@ -23,5 +36,21 @@ export class RecordingService {
       `v1/recordings/${encodeURIComponent(cameraName)}`,
       { params },
     );
+  }
+
+  resolveAt(cameraName: string, at: number): Observable<RecordingDescriptor> {
+    const params = new HttpParams().set("at", new Date(at).toISOString());
+    return this.http.get<RecordingDescriptor>(
+      `v1/recordings/${encodeURIComponent(cameraName)}/samples`,
+      { params },
+    );
+  }
+
+  getNext(descriptor: RecordingDescriptor): Observable<NextRecordingResponse> {
+    return this.http.get<NextRecordingResponse>(descriptor.nextUrl);
+  }
+
+  download(descriptor: RecordingDescriptor): Observable<Blob> {
+    return this.http.get(descriptor.contentUrl, { responseType: "blob" });
   }
 }

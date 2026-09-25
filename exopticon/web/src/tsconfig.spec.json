@@ -2,6 +2,8 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "../out-tsc/spec",
+    "lib": ["ES2022", "DOM", "ESNext.Disposable"],
+    "skipLibCheck": true,
     "types": ["jasmine", "node"]
   },
   "files": ["test.ts", "polyfills.ts"],
