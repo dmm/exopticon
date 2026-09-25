@@ -340,6 +340,40 @@ describe("PlaybackController continuous playback", () => {
     expect(seek).toHaveBeenCalledWith(base + 12000);
   });
 
+  it("rounds a microsecond recording start upward when jumping across a gap", async () => {
+    const current = { ...descriptor, endTime: "2026-09-23T10:00:12.123000Z" };
+    const later = {
+      ...nextDescriptor,
+      beginTime: "2026-09-23T10:00:12.123456Z",
+    };
+    const oldReader = reader();
+    oldReader.firstAtOrAfter.and.resolveTo(frame(base + 12122));
+    oldReader.next.and.resolveTo(null);
+    const newReader = reader();
+    newReader.firstAtOrAfter.and.resolveTo(frame(base + 12124));
+    readers.push(oldReader, newReader);
+    recordings.resolveAt.and.callFake((_camera, at) => {
+      if (at === base + 12122) return of(current);
+      if (at < base + 12123.456)
+        return throwError(
+          new HttpErrorResponse({
+            status: 404,
+            error: { error: "unavailable_time" },
+          }),
+        );
+      return of(later);
+    });
+    recordings.getNext.and.returnValue(of({ recording: later }));
+    await controller.seek(base + 12122);
+    await controller.stepForward();
+    expect(controller.state.phase).toBe("gap");
+    expect(controller.nextRecordingTime).toBe(base + 12124);
+    await controller.jumpToNext();
+    expect(recordings.resolveAt).toHaveBeenCalledWith("front", base + 12124);
+    expect(controller.state.phase).toBe("paused");
+    expect(controller.state.displayedTime).toBe(base + 12124);
+  });
+
   it("keeps the current frame usable when prefetch fails and retries the transition", async () => {
     const source = reader();
     source.firstAtOrAfter.and.resolveTo(frame(base + 9000));

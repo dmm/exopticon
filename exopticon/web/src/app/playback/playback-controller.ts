@@ -36,6 +36,28 @@ const browserClock: PlaybackClock = {
 };
 const MAX_QUEUED_FRAMES = 6;
 const MAX_PREFETCH_BYTES = 32 * 1024 * 1024;
+const NANOSECONDS_PER_MILLISECOND = 1_000_000n;
+
+function recordingTimeNanoseconds(value: string): bigint {
+  const match =
+    /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)$/.exec(
+      value,
+    );
+  if (!match) throw new Error("Invalid recording interval time");
+  const seconds = Date.parse(`${match[1]}${match[3]}`);
+  if (!Number.isFinite(seconds))
+    throw new Error("Invalid recording interval time");
+  return (
+    BigInt(seconds) * NANOSECONDS_PER_MILLISECOND +
+    BigInt((match[2] ?? "").padEnd(9, "0"))
+  );
+}
+
+function ceilMilliseconds(nanoseconds: bigint): number {
+  const quotient = nanoseconds / NANOSECONDS_PER_MILLISECOND;
+  const remainder = nanoseconds % NANOSECONDS_PER_MILLISECOND;
+  return Number(quotient + (remainder > 0n ? 1n : 0n));
+}
 
 class ObsoleteOperation extends Error {}
 
@@ -362,8 +384,11 @@ export class PlaybackController {
       this.setPhase("ended");
       return;
     }
-    const nextStart = Date.parse(successor.beginTime);
-    if (nextStart > Date.parse(current.endTime)) {
+    const nextStartNanoseconds = recordingTimeNanoseconds(successor.beginTime);
+    // Date and the timeline use milliseconds. Round upward so the backend's
+    // microsecond-precision availability check accepts a jump to this file.
+    const nextStart = ceilMilliseconds(nextStartNanoseconds);
+    if (nextStartNanoseconds > recordingTimeNanoseconds(current.endTime)) {
       this.stopClock();
       this.nextRecordingTime = nextStart;
       this.setPhase("gap");
