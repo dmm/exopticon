@@ -20,7 +20,9 @@
 
 use chrono::{DateTime, Utc};
 use diesel::connection::DefaultLoadingMode;
-use diesel::{Connection, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
+use diesel::{
+    BoolExpressionMethods, Connection, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl,
+};
 use std::path::Path;
 
 use crate::schema::{cameras, video_files, video_units};
@@ -112,11 +114,31 @@ type VideoSegment = (
 );
 
 /// A continuous range for which closed video recordings exists. Maybe
-/// represent multiple VideoUnits.
+/// represent multiple `VideoUnits`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordingRange {
     pub begin_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
+}
+
+/// A published, immutable MKV and the interval assigned to it by capture.
+#[derive(Debug)]
+pub struct RecordingFile {
+    pub id: i64,
+    pub filename: String,
+    pub byte_length: i64,
+    pub begin_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+}
+
+fn recording_file(unit: &VideoUnit, file: VideoFile) -> Result<RecordingFile, super::Error> {
+    Ok(RecordingFile {
+        id: file.id,
+        filename: file.filename,
+        byte_length: i64::from(file.size),
+        begin_time: micros_to_datetime("video_units.begin_time_us", unit.begin_time_us)?,
+        end_time: micros_to_datetime("video_units.end_time_us", unit.end_time_us)?,
+    })
 }
 
 fn remove_empty_parent_dirs(file_path: &Path, storage_root: &Path) {
@@ -149,6 +171,118 @@ fn remove_empty_parent_dirs(file_path: &Path, storage_root: &Path) {
 }
 
 impl Service {
+    pub fn recording_camera_exists(&self, camera_name: &str) -> Result<bool, super::Error> {
+        db_read!(self, "recording_camera_exists", |conn| {
+            Ok(cameras::table
+                .filter(cameras::name.eq(camera_name))
+                .select(cameras::name)
+                .first::<String>(conn)
+                .optional()?
+                .is_some())
+        })
+    }
+
+    fn ensure_camera_exists(
+        conn: &mut super::DbConnection,
+        camera_name: &str,
+    ) -> Result<(), super::Error> {
+        let exists = cameras::table
+            .filter(cameras::name.eq(camera_name))
+            .select(cameras::name)
+            .first::<String>(conn)
+            .optional()?
+            .is_some();
+        if exists {
+            Ok(())
+        } else {
+            Err(super::Error::NotFound)
+        }
+    }
+
+    /// Intervals are half-open. Overlaps prefer the latest start, then highest file ID.
+    pub fn resolve_recording_file(
+        &self,
+        camera_name: &str,
+        at: DateTime<Utc>,
+    ) -> Result<Option<RecordingFile>, super::Error> {
+        let at_us = datetime_to_micros(at);
+        let row = db_read!(self, "resolve_recording_file", |conn| {
+            Self::ensure_camera_exists(conn, camera_name)?;
+            let row = video_units::table
+                .inner_join(video_files::table)
+                .filter(video_units::camera_name.eq(camera_name))
+                .filter(video_units::begin_time_us.le(at_us))
+                .filter(video_units::end_time_us.gt(at_us))
+                .filter(video_units::end_time_us.gt(video_units::begin_time_us))
+                .filter(video_files::size.gt(0))
+                .order((video_units::begin_time_us.desc(), video_files::id.desc()))
+                .first::<(VideoUnit, VideoFile)>(conn)
+                .optional()?;
+            Ok(row)
+        })?;
+        row.map(|(unit, file)| recording_file(&unit, file))
+            .transpose()
+    }
+
+    /// The reference must still exist and belong to this camera.
+    pub fn get_recording_file(
+        &self,
+        camera_name: &str,
+        file_id: i64,
+    ) -> Result<Option<RecordingFile>, super::Error> {
+        let row = db_read!(self, "get_recording_file", |conn| {
+            Self::ensure_camera_exists(conn, camera_name)?;
+            let row = video_units::table
+                .inner_join(video_files::table)
+                .filter(video_units::camera_name.eq(camera_name))
+                .filter(video_files::id.eq(file_id))
+                .filter(video_units::end_time_us.gt(video_units::begin_time_us))
+                .filter(video_files::size.gt(0))
+                .first::<(VideoUnit, VideoFile)>(conn)
+                .optional()?;
+            Ok(row)
+        })?;
+        row.map(|(unit, file)| recording_file(&unit, file))
+            .transpose()
+    }
+
+    /// Recording order is ascending begin time, then ascending file ID.
+    pub fn next_recording_file(
+        &self,
+        camera_name: &str,
+        file_id: i64,
+    ) -> Result<Option<RecordingFile>, super::Error> {
+        let row = db_read!(self, "next_recording_file", |conn| {
+            Self::ensure_camera_exists(conn, camera_name)?;
+            let reference = video_units::table
+                .inner_join(video_files::table)
+                .filter(video_units::camera_name.eq(camera_name))
+                .filter(video_files::id.eq(file_id))
+                .filter(video_units::end_time_us.gt(video_units::begin_time_us))
+                .filter(video_files::size.gt(0))
+                .first::<(VideoUnit, VideoFile)>(conn)
+                .optional()?
+                .ok_or(super::Error::NotFound)?;
+            let row = video_units::table
+                .inner_join(video_files::table)
+                .filter(video_units::camera_name.eq(camera_name))
+                .filter(video_units::end_time_us.gt(video_units::begin_time_us))
+                .filter(video_files::size.gt(0))
+                .filter(
+                    video_units::begin_time_us.gt(reference.0.begin_time_us).or(
+                        video_units::begin_time_us
+                            .eq(reference.0.begin_time_us)
+                            .and(video_files::id.gt(file_id)),
+                    ),
+                )
+                .order((video_units::begin_time_us.asc(), video_files::id.asc()))
+                .first::<(VideoUnit, VideoFile)>(conn)
+                .optional()?;
+            Ok(row)
+        })?;
+        row.map(|(unit, file)| recording_file(&unit, file))
+            .transpose()
+    }
     // reserve a VideoSegment before the capture worker creates the file
     pub fn reserve_video_segment(
         &self,
