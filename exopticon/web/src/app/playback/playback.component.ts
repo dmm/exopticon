@@ -11,7 +11,7 @@ import { ActivatedRoute, RouterLink } from "@angular/router";
 import { Subscription } from "rxjs";
 import { RecordingService } from "../recording.service";
 import { DecodedFrame } from "./mkv-reader";
-import { PlaybackController } from "./playback-controller";
+import { PlaybackController, PlaybackSpeed } from "./playback-controller";
 
 interface TimelineRange {
   begin: number;
@@ -27,6 +27,7 @@ interface TimelineRange {
 export class PlaybackComponent implements OnInit, OnDestroy {
   readonly windowDuration = 60 * 60 * 1000;
   readonly ticks = [0, 15, 30, 45, 60];
+  readonly speeds: PlaybackSpeed[] = [1, 2, 4];
   windowEnd = Date.now();
   windowStart = this.windowEnd - this.windowDuration;
   cameraName = "";
@@ -163,9 +164,28 @@ export class PlaybackComponent implements OnInit, OnDestroy {
     void this.controller.stepForward();
   }
 
+  togglePlayback(): void {
+    if (
+      this.controller.state.phase === "playing" ||
+      this.controller.state.phase === "buffering"
+    )
+      this.controller.pause();
+    else this.controller.play();
+  }
+
+  setSpeed(speed: PlaybackSpeed): void {
+    this.controller.setSpeed(speed);
+  }
+
+  jumpToNext(): void {
+    void this.controller.jumpToNext();
+  }
+
   retrySeek(): void {
-    if (this.controller.state.requestedTime !== null)
-      this.seek(this.controller.state.requestedTime);
+    if (this.controller.canRetryTransition)
+      void this.controller.retryTransition();
+    else if (this.controller.state.requestedTime !== null)
+      void this.controller.seek(this.controller.state.requestedTime);
   }
 
   private render(frame: DecodedFrame | null): void {

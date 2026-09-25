@@ -11,6 +11,14 @@
   gap: 0.75rem;
   flex-wrap: wrap;
 }
+.speed-controls {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+.speed-controls button[aria-pressed="true"] {
+  background: #098509;
+  color: #fff;
+}
 button {
   font-size: 1rem;
   min-height: 44px;

@@ -3,52 +3,85 @@ import { Observable, Subscription } from "rxjs";
 import { RecordingDescriptor, RecordingService } from "../recording.service";
 import { DecodedFrame, FrameReader, MkvReader } from "./mkv-reader";
 
-export type InspectionPhase =
+export type PlaybackPhase =
   | "idle"
   | "seeking"
   | "paused"
   | "stepping"
+  | "playing"
+  | "buffering"
+  | "gap"
   | "unavailable"
   | "ended"
   | "error";
+export type PlaybackSpeed = 1 | 2 | 4;
 
-export interface InspectionState {
-  phase: InspectionPhase;
+export interface PlaybackState {
+  phase: PlaybackPhase;
   requestedTime: number | null;
   displayedTime: number | null;
   error: string | null;
 }
 
+export interface PlaybackClock {
+  now(): number;
+  requestFrame(callback: () => void): number;
+  cancelFrame(id: number): void;
+}
+
+const browserClock: PlaybackClock = {
+  now: () => performance.now(),
+  requestFrame: (callback) => requestAnimationFrame(callback),
+  cancelFrame: (id) => cancelAnimationFrame(id),
+};
+const MAX_QUEUED_FRAMES = 6;
+const MAX_PREFETCH_BYTES = 32 * 1024 * 1024;
+
 class ObsoleteOperation extends Error {}
 
 export class PlaybackController {
-  state: InspectionState = {
+  state: PlaybackState = {
     phase: "idle",
     requestedTime: null,
     displayedTime: null,
     error: null,
   };
+  speed: PlaybackSpeed = 1;
+  nextRecordingTime: number | null = null;
 
   private generation = 0;
   private cameraName = "";
-  private request?: { cancel: () => void };
+  private requests = new Set<{ cancel: () => void }>();
   private reader?: FrameReader;
   private displayed?: DecodedFrame;
-  private cached?: { descriptor: RecordingDescriptor; blob: Blob };
+  private queue: DecodedFrame[] = [];
+  private producer?: Promise<void>;
+  private fileExhausted = false;
+  private currentFile?: { descriptor: RecordingDescriptor; blob: Blob };
+  private prefetched?: { descriptor: RecordingDescriptor; blob: Blob };
+  private successor: RecordingDescriptor | null | undefined;
+  private prefetchTask?: Promise<void>;
+  private prefetchError?: unknown;
+  private frameRequest?: number;
+  private clockStart = 0;
+  private mediaStart = 0;
+  private frozenMediaTime = 0;
   private destroyed = false;
 
   constructor(
     private recordings: RecordingService,
     private openReader: (blob: Blob) => Promise<FrameReader> = MkvReader.open,
     private render: (frame: DecodedFrame | null) => void = () => {},
-    private notify: (state: InspectionState) => void = () => {},
+    private notify: (state: PlaybackState) => void = () => {},
+    private clock: PlaybackClock = browserClock,
   ) {}
 
   setCamera(cameraName: string): void {
     if (this.cameraName === cameraName) return;
     this.cancelActive();
     this.cameraName = cameraName;
-    this.cached = undefined;
+    this.currentFile = undefined;
+    this.prefetched = undefined;
     this.state = {
       phase: "idle",
       requestedTime: null,
@@ -74,31 +107,50 @@ export class PlaybackController {
         this.recordings.resolveAt(this.cameraName, utcMilliseconds),
       );
       if (!this.current(generation)) return;
+      if (this.currentFile?.descriptor.fileId !== descriptor.fileId)
+        this.currentFile = undefined;
+      if (
+        this.prefetched?.descriptor.fileId !== descriptor.fileId &&
+        !this.currentFile
+      )
+        this.prefetched = undefined;
       let blob =
-        this.cached?.descriptor.fileId === descriptor.fileId
-          ? this.cached.blob
-          : undefined;
+        this.currentFile?.descriptor.fileId === descriptor.fileId
+          ? this.currentFile.blob
+          : this.prefetched?.descriptor.fileId === descriptor.fileId
+            ? this.prefetched.blob
+            : undefined;
       if (!blob) {
         blob = await this.fetch(this.recordings.download(descriptor));
         if (!this.current(generation)) return;
-        this.cached = { descriptor, blob };
       }
+      this.currentFile = { descriptor, blob };
+      if (this.prefetched?.descriptor.fileId === descriptor.fileId)
+        this.prefetched = undefined;
       const reader = await this.openReader(blob);
       if (!this.current(generation)) {
         reader.dispose();
         return;
       }
       this.reader = reader;
+      this.startPrefetch(generation);
       const frame = await reader.firstAtOrAfter(utcMilliseconds);
       if (!this.current(generation)) {
         frame?.sample.close();
         return;
       }
-      if (!frame) {
-        this.setPhase("unavailable");
-        return;
+      if (frame) {
+        this.show(frame, "paused", utcMilliseconds);
+      } else {
+        this.fileExhausted = true;
+        await this.produce();
+        if (!this.current(generation)) return;
+        if (this.queue.length) {
+          this.show(this.queue.shift()!, "paused", utcMilliseconds);
+        } else if (this.state.phase === "ended") {
+          this.setPhase("unavailable");
+        }
       }
-      this.show(frame, "paused", false);
     } catch (error) {
       if (!this.current(generation) || error instanceof ObsoleteOperation)
         return;
@@ -109,12 +161,7 @@ export class PlaybackController {
       ) {
         this.setPhase("unavailable");
       } else {
-        this.state = {
-          ...this.state,
-          phase: "error",
-          error: this.errorMessage(error),
-        };
-        this.notify(this.state);
+        this.fail(error);
       }
     }
   }
@@ -123,39 +170,279 @@ export class PlaybackController {
     if (this.state.phase !== "paused" || !this.reader || this.destroyed) return;
     const generation = this.generation;
     this.setPhase("stepping");
-    try {
-      const frame = await this.reader.next();
-      if (!this.current(generation)) {
-        frame?.sample.close();
-        return;
-      }
-      if (!frame) {
-        this.setPhase("ended");
-        return;
-      }
-      this.show(frame, "paused", true);
-    } catch (error) {
-      if (!this.current(generation)) return;
-      this.state = {
-        ...this.state,
-        phase: "error",
-        error: this.errorMessage(error),
-      };
-      this.notify(this.state);
+    while (
+      this.current(generation) &&
+      !this.queue.length &&
+      this.isPhase("stepping")
+    ) {
+      await this.produce();
     }
+    if (!this.current(generation) || !this.isPhase("stepping")) return;
+    const frame = this.queue.shift()!;
+    this.show(frame, "paused", frame.utcMilliseconds);
+  }
+
+  play(): void {
+    if (this.state.phase !== "paused" || !this.displayed || this.destroyed)
+      return;
+    this.frozenMediaTime = this.displayed.utcMilliseconds;
+    if (this.queue.length) this.startClock(this.frozenMediaTime);
+    else {
+      this.setPhase("buffering");
+      void this.produce();
+    }
+  }
+
+  pause(): void {
+    if (this.state.phase !== "playing" && this.state.phase !== "buffering")
+      return;
+    this.stopClock();
+    this.state = {
+      ...this.state,
+      phase: "paused",
+      requestedTime: this.state.displayedTime,
+    };
+    this.notify(this.state);
+  }
+
+  setSpeed(speed: PlaybackSpeed): void {
+    if (speed !== 1 && speed !== 2 && speed !== 4) return;
+    if (this.state.phase === "playing") {
+      this.mediaStart = this.desiredMediaTime();
+      this.clockStart = this.clock.now();
+    }
+    this.speed = speed;
+    this.notify(this.state);
+  }
+
+  async jumpToNext(): Promise<void> {
+    if (this.state.phase !== "gap" || this.nextRecordingTime === null) return;
+    await this.seek(this.nextRecordingTime);
+  }
+
+  async retryTransition(): Promise<void> {
+    if (this.state.phase !== "error" || !this.fileExhausted || !this.reader)
+      return;
+    this.prefetchError = undefined;
+    this.setPhase("paused");
+    await this.stepForward();
+  }
+
+  get canRetryTransition(): boolean {
+    return this.state.phase === "error" && this.fileExhausted && !!this.reader;
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.cancelActive();
-    this.cached = undefined;
+    this.currentFile = undefined;
+    this.prefetched = undefined;
+  }
+
+  private desiredMediaTime(): number {
+    return this.mediaStart + (this.clock.now() - this.clockStart) * this.speed;
+  }
+
+  private startClock(mediaTime: number): void {
+    this.mediaStart = mediaTime;
+    this.clockStart = this.clock.now();
+    this.setPhase("playing");
+    this.scheduleFrame();
+    if (this.queue.length < MAX_QUEUED_FRAMES) void this.produce();
+  }
+
+  private stopClock(): void {
+    if (this.frameRequest !== undefined) {
+      this.clock.cancelFrame(this.frameRequest);
+      this.frameRequest = undefined;
+    }
+  }
+
+  private scheduleFrame(): void {
+    if (this.frameRequest !== undefined || this.state.phase !== "playing")
+      return;
+    this.frameRequest = this.clock.requestFrame(() => {
+      this.frameRequest = undefined;
+      this.present();
+    });
+  }
+
+  private present(): void {
+    if (this.state.phase !== "playing") return;
+    const desired = this.desiredMediaTime();
+    let latest: DecodedFrame | undefined;
+    while (this.queue.length && this.queue[0].utcMilliseconds <= desired) {
+      latest?.sample.close();
+      latest = this.queue.shift();
+    }
+    if (latest) {
+      try {
+        this.show(latest, "playing", desired);
+      } catch (error) {
+        this.fail(error);
+        return;
+      }
+    } else {
+      this.state = { ...this.state, requestedTime: desired };
+      this.notify(this.state);
+    }
+    if (!this.queue.length) {
+      this.frozenMediaTime = desired;
+      this.setPhase("buffering");
+      void this.produce();
+      return;
+    }
+    if (this.queue.length < MAX_QUEUED_FRAMES) void this.produce();
+    this.scheduleFrame();
+  }
+
+  private produce(): Promise<void> {
+    if (this.producer) return this.producer;
+    const generation = this.generation;
+    const task = this.produceOne(generation).catch((error) => {
+      if (this.current(generation) && !(error instanceof ObsoleteOperation))
+        this.fail(error);
+    });
+    this.producer = task;
+    void task.then(() => {
+      if (this.producer === task) this.producer = undefined;
+      if (!this.current(generation)) return;
+      if (this.state.phase === "buffering" && this.queue.length) {
+        this.startClock(this.frozenMediaTime);
+      } else if (
+        (this.state.phase === "playing" || this.state.phase === "buffering") &&
+        this.queue.length < MAX_QUEUED_FRAMES &&
+        !(this.fileExhausted && this.queue.length)
+      ) {
+        void this.produce();
+      }
+    });
+    return task;
+  }
+
+  private async produceOne(generation: number): Promise<void> {
+    if (
+      !this.current(generation) ||
+      !this.reader ||
+      this.queue.length >= MAX_QUEUED_FRAMES
+    )
+      return;
+    if (this.fileExhausted) {
+      if (!this.queue.length) await this.advanceFile(generation);
+      return;
+    }
+    const frame = await this.reader.next();
+    if (!this.current(generation)) {
+      frame?.sample.close();
+      return;
+    }
+    if (frame) this.queue.push(frame);
+    else {
+      this.fileExhausted = true;
+      if (!this.queue.length) await this.advanceFile(generation);
+    }
+  }
+
+  private async advanceFile(generation: number): Promise<void> {
+    const current = this.currentFile?.descriptor;
+    if (!current) throw new Error("Missing current recording");
+    if (this.prefetchTask) await this.prefetchTask;
+    if (!this.current(generation)) return;
+    if (this.prefetchError && this.successor === undefined)
+      throw this.prefetchError;
+    if (this.successor === undefined) {
+      const result = await this.fetch(this.recordings.getNext(current));
+      if (!this.current(generation)) return;
+      this.successor = result.recording;
+    }
+    const successor = this.successor;
+    if (!successor) {
+      this.stopClock();
+      this.setPhase("ended");
+      return;
+    }
+    const nextStart = Date.parse(successor.beginTime);
+    if (nextStart > Date.parse(current.endTime)) {
+      this.stopClock();
+      this.nextRecordingTime = nextStart;
+      this.setPhase("gap");
+      return;
+    }
+    if (this.prefetchError) throw this.prefetchError;
+    let blob =
+      this.prefetched?.descriptor.fileId === successor.fileId
+        ? this.prefetched.blob
+        : undefined;
+    if (!blob) {
+      blob = await this.fetch(this.recordings.download(successor));
+      if (!this.current(generation)) return;
+    }
+    const reader = await this.openReader(blob);
+    if (!this.current(generation)) {
+      reader.dispose();
+      return;
+    }
+    this.reader?.dispose();
+    this.reader = reader;
+    this.currentFile = { descriptor: successor, blob };
+    this.prefetched = undefined;
+    this.successor = undefined;
+    this.prefetchError = undefined;
+    this.fileExhausted = false;
+    const minimum =
+      this.displayed?.utcNanoseconds ??
+      BigInt(Math.trunc(this.state.requestedTime ?? nextStart)) * 1_000_000n;
+    let frame = await reader.firstAtOrAfter(Number(minimum / 1_000_000n));
+    if (!this.current(generation)) {
+      frame?.sample.close();
+      return;
+    }
+    while (frame && frame.utcNanoseconds <= minimum) {
+      frame.sample.close();
+      frame = await reader.next();
+      if (!this.current(generation)) {
+        frame?.sample.close();
+        return;
+      }
+    }
+    if (frame) this.queue.push(frame);
+    else this.fileExhausted = true;
+    this.startPrefetch(generation);
+  }
+
+  private startPrefetch(generation: number): void {
+    const current = this.currentFile?.descriptor;
+    if (!current || !this.current(generation)) return;
+    this.successor = undefined;
+    this.prefetchError = undefined;
+    const task = (async () => {
+      const result = await this.fetch(this.recordings.getNext(current));
+      if (!this.current(generation)) return;
+      this.successor = result.recording;
+      if (this.prefetched?.descriptor.fileId !== result.recording?.fileId)
+        this.prefetched = undefined;
+      if (!result.recording || result.recording.byteLength > MAX_PREFETCH_BYTES)
+        return;
+      if (this.prefetched?.descriptor.fileId === result.recording.fileId)
+        return;
+      const blob = await this.fetch(this.recordings.download(result.recording));
+      if (this.current(generation))
+        this.prefetched = { descriptor: result.recording, blob };
+    })().catch((error) => {
+      if (this.current(generation) && !(error instanceof ObsoleteOperation))
+        this.prefetchError = error;
+    });
+    this.prefetchTask = task;
+    void task.then(() => {
+      if (this.prefetchTask === task) this.prefetchTask = undefined;
+    });
   }
 
   private show(
     frame: DecodedFrame,
-    phase: InspectionPhase,
-    advanceRequest: boolean,
+    phase: PlaybackPhase,
+    requestedTime: number | undefined,
   ): void {
     this.displayed?.sample.close();
     this.displayed = frame;
@@ -168,26 +455,43 @@ export class PlaybackController {
     }
     this.state = {
       phase,
-      requestedTime: advanceRequest
-        ? frame.utcMilliseconds
-        : this.state.requestedTime,
+      requestedTime: requestedTime ?? frame.utcMilliseconds,
       displayedTime: frame.utcMilliseconds,
       error: null,
     };
     this.notify(this.state);
   }
 
-  private setPhase(phase: InspectionPhase): void {
+  private setPhase(phase: PlaybackPhase): void {
     this.state = { ...this.state, phase };
+    this.notify(this.state);
+  }
+
+  private fail(error: unknown): void {
+    this.stopClock();
+    this.state = {
+      ...this.state,
+      phase: "error",
+      error: this.errorMessage(error),
+    };
     this.notify(this.state);
   }
 
   private cancelActive(): void {
     this.generation++;
-    this.request?.cancel();
-    this.request = undefined;
+    this.stopClock();
+    for (const request of this.requests) request.cancel();
+    this.requests.clear();
+    this.prefetchTask = undefined;
+    this.prefetchError = undefined;
+    this.successor = undefined;
+    this.producer = undefined;
+    this.fileExhausted = false;
+    this.nextRecordingTime = null;
     this.reader?.dispose();
     this.reader = undefined;
+    for (const frame of this.queue) frame.sample.close();
+    this.queue = [];
     this.displayed?.sample.close();
     this.displayed = undefined;
     this.render(null);
@@ -195,6 +499,10 @@ export class PlaybackController {
 
   private current(generation: number): boolean {
     return !this.destroyed && generation === this.generation;
+  }
+
+  private isPhase(phase: PlaybackPhase): boolean {
+    return this.state.phase === phase;
   }
 
   private fetch<T>(source: Observable<T>): Promise<T> {
@@ -206,14 +514,14 @@ export class PlaybackController {
           reject(new ObsoleteOperation());
         },
       };
-      this.request = pending;
+      this.requests.add(pending);
       subscription = source.subscribe({
         next: (value) => {
-          if (this.request === pending) this.request = undefined;
+          this.requests.delete(pending);
           resolve(value);
         },
         error: (error) => {
-          if (this.request === pending) this.request = undefined;
+          this.requests.delete(pending);
           reject(error);
         },
       });

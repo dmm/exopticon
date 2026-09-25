@@ -2,7 +2,7 @@ import { HttpErrorResponse } from "@angular/common/http";
 import { of, Subject, throwError } from "rxjs";
 import { RecordingDescriptor, RecordingService } from "../recording.service";
 import { DecodedFrame, FrameReader } from "./mkv-reader";
-import { PlaybackController } from "./playback-controller";
+import { PlaybackClock, PlaybackController } from "./playback-controller";
 
 const descriptor: RecordingDescriptor = {
   fileId: 7,
@@ -41,9 +41,11 @@ describe("PlaybackController inspection", () => {
     recordings = jasmine.createSpyObj<RecordingService>("recordings", [
       "resolveAt",
       "download",
+      "getNext",
     ]);
     recordings.resolveAt.and.returnValue(of(descriptor));
     recordings.download.and.returnValue(of(new Blob(["mkv!"])));
+    recordings.getNext.and.returnValue(of({ recording: null }));
     currentReader = reader();
     rendered = [];
     controller = new PlaybackController(
@@ -151,5 +153,187 @@ describe("PlaybackController inspection", () => {
     expect(controller.state.requestedTime).toBe(3000);
     expect(controller.state.displayedTime).toBeNull();
     expect(rendered[rendered.length - 1]).toBeNull();
+  });
+});
+
+describe("PlaybackController continuous playback", () => {
+  let recordings: jasmine.SpyObj<RecordingService>;
+  let readers: jasmine.SpyObj<FrameReader>[];
+  let controller: PlaybackController;
+  let rendered: Array<DecodedFrame | null>;
+  let now = 0;
+  let pendingFrame: (() => void) | undefined;
+  const clock: PlaybackClock = {
+    now: () => now,
+    requestFrame: (callback) => {
+      pendingFrame = callback;
+      return 1;
+    },
+    cancelFrame: () => {
+      pendingFrame = undefined;
+    },
+  };
+  const nextDescriptor: RecordingDescriptor = {
+    ...descriptor,
+    fileId: 8,
+    beginTime: "2026-09-23T10:00:10Z",
+    endTime: "2026-09-23T10:00:20Z",
+  };
+  const base = Date.parse(descriptor.beginTime);
+
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+  }
+
+  function tick(elapsed: number): void {
+    now += elapsed;
+    const callback = pendingFrame;
+    pendingFrame = undefined;
+    callback?.();
+  }
+
+  beforeEach(() => {
+    now = 0;
+    pendingFrame = undefined;
+    recordings = jasmine.createSpyObj<RecordingService>("recordings", [
+      "resolveAt",
+      "getNext",
+      "download",
+    ]);
+    recordings.resolveAt.and.returnValue(of(descriptor));
+    recordings.getNext.and.returnValue(of({ recording: null }));
+    recordings.download.and.returnValue(of(new Blob(["mkv"])));
+    readers = [];
+    rendered = [];
+    controller = new PlaybackController(
+      recordings,
+      async () => readers.shift()!,
+      (value) => rendered.push(value),
+      () => {},
+      clock,
+    );
+    controller.setCamera("front");
+  });
+  afterEach(() => controller.destroy());
+
+  it("presents the latest due frame at speed, then steps to the immediate successor", async () => {
+    const first = frame(base);
+    const skipped = frame(base + 100);
+    const due = frame(base + 200);
+    const successor = frame(base + 300);
+    const source = reader();
+    source.firstAtOrAfter.and.resolveTo(first);
+    source.next.and.returnValues(
+      Promise.resolve(skipped),
+      Promise.resolve(due),
+      Promise.resolve(successor),
+      new Promise(() => {}),
+    );
+    readers.push(source);
+    await controller.seek(base);
+    controller.play();
+    await settle();
+    controller.setSpeed(2);
+    tick(100);
+    expect(controller.state.displayedTime).toBe(base + 200);
+    expect(skipped.sample.close).toHaveBeenCalledTimes(1);
+    controller.pause();
+    await controller.stepForward();
+    expect(controller.state.displayedTime).toBe(base + 300);
+    expect(due.sample.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("freezes its clock while decoding is behind", async () => {
+    const first = frame(base);
+    const second = frame(base + 100);
+    const source = reader();
+    source.firstAtOrAfter.and.resolveTo(first);
+    let deliver!: (value: DecodedFrame) => void;
+    source.next.and.returnValue(new Promise((resolve) => (deliver = resolve)));
+    readers.push(source);
+    await controller.seek(base);
+    controller.play();
+    expect(controller.state.phase).toBe("buffering");
+    now = 10000;
+    deliver(second);
+    await settle();
+    expect(controller.state.phase).toBe("playing");
+    expect(controller.state.displayedTime).toBe(base);
+    tick(50);
+    expect(controller.state.displayedTime).toBe(base);
+    tick(50);
+    expect(controller.state.displayedTime).toBe(base + 100);
+  });
+
+  it("continues into a contiguous recording and skips overlapping UTC footage", async () => {
+    const first = frame(base + 9000);
+    const duplicate = frame(base + 9000);
+    const later = frame(base + 10000);
+    const oldReader = reader();
+    oldReader.firstAtOrAfter.and.resolveTo(first);
+    oldReader.next.and.resolveTo(null);
+    const newReader = reader();
+    newReader.firstAtOrAfter.and.resolveTo(duplicate);
+    newReader.next.and.returnValues(
+      Promise.resolve(later),
+      new Promise(() => {}),
+    );
+    readers.push(oldReader, newReader);
+    recordings.getNext.and.returnValues(
+      of({ recording: nextDescriptor }),
+      of({ recording: null }),
+    );
+    await controller.seek(base + 9000);
+    await controller.stepForward();
+    expect(controller.state.displayedTime).toBe(base + 10000);
+    expect(duplicate.sample.close).toHaveBeenCalledTimes(1);
+    expect(oldReader.dispose).toHaveBeenCalledTimes(1);
+    expect(recordings.download).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops at a gap and jumps only on request", async () => {
+    const laterDescriptor = {
+      ...nextDescriptor,
+      beginTime: "2026-09-23T10:00:12Z",
+    };
+    const source = reader();
+    source.firstAtOrAfter.and.resolveTo(frame(base + 9000));
+    source.next.and.resolveTo(null);
+    readers.push(source);
+    recordings.getNext.and.returnValue(of({ recording: laterDescriptor }));
+    await controller.seek(base + 9000);
+    await controller.stepForward();
+    expect(controller.state.phase).toBe("gap");
+    expect(controller.nextRecordingTime).toBe(base + 12000);
+    expect(controller.state.displayedTime).toBe(base + 9000);
+    expect(recordings.download).toHaveBeenCalledTimes(2);
+    const seek = spyOn(controller, "seek").and.resolveTo();
+    await controller.jumpToNext();
+    expect(seek).toHaveBeenCalledWith(base + 12000);
+  });
+
+  it("keeps the current frame usable when prefetch fails and retries the transition", async () => {
+    const source = reader();
+    source.firstAtOrAfter.and.resolveTo(frame(base + 9000));
+    source.next.and.resolveTo(null);
+    const following = reader();
+    following.firstAtOrAfter.and.resolveTo(frame(base + 10000));
+    readers.push(source, following);
+    recordings.getNext.and.returnValue(of({ recording: nextDescriptor }));
+    recordings.download.and.returnValues(
+      of(new Blob(["current"])),
+      throwError(new Error("Prefetch failed")),
+      of(new Blob(["successor"])),
+    );
+    await controller.seek(base + 9000);
+    await settle();
+    expect(controller.state.phase).toBe("paused");
+    await controller.stepForward();
+    expect(controller.state.phase).toBe("error");
+    expect(controller.state.displayedTime).toBe(base + 9000);
+    expect(controller.canRetryTransition).toBe(true);
+    await controller.retryTransition();
+    expect(controller.state.phase).toBe("paused");
+    expect(controller.state.displayedTime).toBe(base + 10000);
   });
 });

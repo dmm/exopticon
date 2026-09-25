@@ -20,11 +20,24 @@
         @case ("stepping") {
           Loading next frame…
         }
+        @case ("playing") {
+          Playing at {{ controller.speed }}×
+        }
+        @case ("buffering") {
+          Buffering…
+        }
+        @case ("gap") {
+          Next recording starts at
+          {{ controller.nextRecordingTime | date: "MMM d, y HH:mm:ss.SSS" }}.
+          <button type="button" (click)="jumpToNext()">
+            Jump to next recording
+          </button>
+        }
         @case ("unavailable") {
           No recorded frame at or after the selected time.
         }
         @case ("ended") {
-          End of recording file.
+          End of recordings.
         }
         @case ("error") {
           {{ controller.state.error }}
@@ -99,10 +112,37 @@
   <div class="transport">
     <button
       type="button"
+      (click)="togglePlayback()"
+      [disabled]="
+        controller.state.phase !== 'paused' &&
+        controller.state.phase !== 'playing' &&
+        controller.state.phase !== 'buffering'
+      "
+    >
+      {{
+        controller.state.phase === "playing" ||
+        controller.state.phase === "buffering"
+          ? "Pause"
+          : "Play"
+      }}
+    </button>
+    <button
+      type="button"
       (click)="stepForward()"
       [disabled]="controller.state.phase !== 'paused'"
     >
       Next frame →
     </button>
+    <span class="speed-controls" role="group" aria-label="Playback speed">
+      @for (speed of speeds; track speed) {
+        <button
+          type="button"
+          (click)="setSpeed(speed)"
+          [attr.aria-pressed]="controller.speed === speed"
+        >
+          {{ speed }}×
+        </button>
+      }
+    </span>
   </div>
 }
