@@ -4,6 +4,11 @@ Comment tag schema. Session A includes B-frames and starts at timestamp 5 s;
 session B restarts at timestamp 1 s with a different coded width. Both use
 nanosecond UTC clock anchors.
 
+`capture-irregular.mkv` has eight distinct H.264 frames with presentation
+offsets of 0, 100, 100, 250, 300, 500, 500, and 700 ms. It exercises equal
+timestamps and variable intervals. Its encoded timestamps are adjusted after
+the encoder because x264 drops raw input frames with duplicate timestamps.
+
 They test the browser demuxer and decoder contract, including GStreamer's
 escaped `COMMENTS` representation. They are **not** recordings emitted by the
 full capture worker and do not validate its RTSP or `splitmuxsink` path. A

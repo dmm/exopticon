@@ -154,6 +154,34 @@ describe("PlaybackController inspection", () => {
     expect(controller.state.displayedTime).toBeNull();
     expect(rendered[rendered.length - 1]).toBeNull();
   });
+
+  it("disposes a reader opened after its seek was canceled", async () => {
+    let finishOpen!: (reader: FrameReader) => void;
+    const lateReader = reader();
+    const freshReader = reader();
+    freshReader.firstAtOrAfter.and.resolveTo(frame(1600));
+    let opens = 0;
+    controller.destroy();
+    controller = new PlaybackController(
+      recordings,
+      () =>
+        ++opens === 1
+          ? new Promise((resolve) => (finishOpen = resolve))
+          : Promise.resolve(freshReader),
+      (value) => rendered.push(value),
+    );
+    controller.setCamera("front");
+    const obsolete = controller.seek(1100);
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    const current = controller.seek(1500);
+    finishOpen(lateReader);
+    await Promise.all([obsolete, current]);
+    expect(lateReader.dispose).toHaveBeenCalledTimes(1);
+    expect(controller.state.displayedTime).toBe(1600);
+    expect(rendered).not.toContain(
+      jasmine.objectContaining({ utcMilliseconds: 1100 }),
+    );
+  });
 });
 
 describe("PlaybackController continuous playback", () => {
@@ -335,5 +363,78 @@ describe("PlaybackController continuous playback", () => {
     await controller.retryTransition();
     expect(controller.state.phase).toBe("paused");
     expect(controller.state.displayedTime).toBe(base + 10000);
+  });
+
+  it("closes displayed, queued, and late decoded frames on camera change", async () => {
+    const displayed = frame(base);
+    const queued = frame(base + 100);
+    const late = frame(base + 200);
+    const source = reader();
+    source.firstAtOrAfter.and.resolveTo(displayed);
+    let finish!: (value: DecodedFrame) => void;
+    source.next.and.returnValues(
+      Promise.resolve(queued),
+      new Promise((resolve) => (finish = resolve)),
+    );
+    readers.push(source);
+    await controller.seek(base);
+    controller.play();
+    await settle();
+    controller.setCamera("back");
+    finish(late);
+    await settle();
+    expect(source.dispose).toHaveBeenCalledTimes(1);
+    expect(displayed.sample.close).toHaveBeenCalledTimes(1);
+    expect(queued.sample.close).toHaveBeenCalledTimes(1);
+    expect(late.sample.close).toHaveBeenCalledTimes(1);
+    expect(rendered[rendered.length - 1]).toBeNull();
+    expect(controller.state.phase).toBe("idle");
+  });
+
+  it("cancels an obsolete prefetch download during a new seek", async () => {
+    const oldFrame = frame(base);
+    const newFrame = frame(base + 10000);
+    const oldReader = reader();
+    oldReader.firstAtOrAfter.and.resolveTo(oldFrame);
+    const newReader = reader();
+    newReader.firstAtOrAfter.and.resolveTo(newFrame);
+    readers.push(oldReader, newReader);
+    const pendingPrefetch = new Subject<Blob>();
+    recordings.resolveAt.and.returnValues(of(descriptor), of(nextDescriptor));
+    recordings.getNext.and.returnValues(
+      of({ recording: nextDescriptor }),
+      of({ recording: null }),
+    );
+    recordings.download.and.returnValues(
+      of(new Blob(["old"])),
+      pendingPrefetch,
+      of(new Blob(["new"])),
+    );
+    await controller.seek(base);
+    expect(pendingPrefetch.observers.length).toBe(1);
+    await controller.seek(base + 10000);
+    expect(pendingPrefetch.observers.length).toBe(0);
+    expect(oldReader.dispose).toHaveBeenCalledTimes(1);
+    expect(oldFrame.sample.close).toHaveBeenCalledTimes(1);
+    expect(controller.state.displayedTime).toBe(base + 10000);
+  });
+
+  it("closes the retained frame and cancels decoding on destruction", async () => {
+    const retained = frame(base);
+    const late = frame(base + 100);
+    const source = reader();
+    source.firstAtOrAfter.and.resolveTo(retained);
+    let finish!: (value: DecodedFrame) => void;
+    source.next.and.returnValue(new Promise((resolve) => (finish = resolve)));
+    readers.push(source);
+    await controller.seek(base);
+    controller.play();
+    controller.destroy();
+    finish(late);
+    await settle();
+    expect(source.dispose).toHaveBeenCalledTimes(1);
+    expect(retained.sample.close).toHaveBeenCalledTimes(1);
+    expect(late.sample.close).toHaveBeenCalledTimes(1);
+    expect(rendered[rendered.length - 1]).toBeNull();
   });
 });

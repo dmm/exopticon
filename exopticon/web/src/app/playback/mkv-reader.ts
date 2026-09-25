@@ -78,6 +78,10 @@ export class MkvReader implements FrameReader {
 
   private anchorRunningNanoseconds: bigint;
 
+  get isDisposed(): boolean {
+    return this.input.disposed;
+  }
+
   static async open(blob: Blob): Promise<MkvReader> {
     const input = new Input({
       formats: [MATROSKA],
@@ -106,7 +110,8 @@ export class MkvReader implements FrameReader {
   }
 
   async firstAtOrAfter(utcMilliseconds: number): Promise<DecodedFrame | null> {
-    this.closeIterator();
+    await this.closeIterator();
+    if (this.disposed) return null;
     const target = BigInt(Math.trunc(utcMilliseconds)) * 1_000_000n;
     const sessionNanoseconds =
       target - this.anchorUtcNanoseconds + this.anchorRunningNanoseconds;
@@ -122,9 +127,14 @@ export class MkvReader implements FrameReader {
 
   async next(): Promise<DecodedFrame | null> {
     if (this.disposed || !this.iterator) return null;
-    const result = await this.iterator.next();
+    const iterator = this.iterator;
+    const result = await iterator.next();
     if (result.done) return null;
     const sample = result.value;
+    if (this.disposed || iterator !== this.iterator) {
+      sample.close();
+      return null;
+    }
     // Capture files use a 1 ms Matroska timecode scale. Round at that scale
     // before converting back to integer nanoseconds.
     const sessionNanoseconds =
@@ -144,12 +154,18 @@ export class MkvReader implements FrameReader {
     if (this.disposed) return;
     this.disposed = true;
     this.input.dispose();
-    this.closeIterator();
+    void this.closeIterator();
   }
 
-  private closeIterator(): void {
+  private async closeIterator(): Promise<void> {
     const iterator = this.iterator;
     this.iterator = undefined;
-    if (iterator) void iterator.return().catch(() => undefined);
+    if (iterator) {
+      try {
+        await iterator.return();
+      } catch {
+        // Input disposal can cancel a pending iterator read.
+      }
+    }
   }
 }
