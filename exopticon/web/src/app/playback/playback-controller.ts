@@ -373,7 +373,8 @@ export class PlaybackController {
     if (!this.current(generation)) return;
     if (this.prefetchError && this.successor === undefined)
       throw this.prefetchError;
-    if (this.successor === undefined) {
+    // A null found during prefetch can become stale before this file ends.
+    if (this.successor == null) {
       const result = await this.fetch(this.recordings.getNext(current));
       if (!this.current(generation)) return;
       this.successor = result.recording;

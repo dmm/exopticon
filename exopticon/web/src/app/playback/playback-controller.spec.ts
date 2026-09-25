@@ -319,6 +319,43 @@ describe("PlaybackController continuous playback", () => {
     expect(recordings.download).toHaveBeenCalledTimes(2);
   });
 
+  it("refreshes a prefetched null successor before reporting the end", async () => {
+    const oldReader = reader();
+    oldReader.firstAtOrAfter.and.resolveTo(frame(base + 9000));
+    oldReader.next.and.resolveTo(null);
+    const newReader = reader();
+    newReader.firstAtOrAfter.and.resolveTo(frame(base + 10000));
+    readers.push(oldReader, newReader);
+    recordings.getNext.and.returnValues(
+      of({ recording: null }),
+      of({ recording: nextDescriptor }),
+      of({ recording: null }),
+    );
+    await controller.seek(base + 9000);
+    await settle();
+    expect(recordings.getNext).toHaveBeenCalledTimes(1);
+    await controller.stepForward();
+    expect(recordings.getNext).toHaveBeenCalledWith(descriptor);
+    expect(
+      recordings.getNext.calls
+        .allArgs()
+        .filter(([file]) => file.fileId === descriptor.fileId).length,
+    ).toBe(2);
+    expect(controller.state.phase).toBe("paused");
+    expect(controller.state.displayedTime).toBe(base + 10000);
+  });
+
+  it("reports the end after a refreshed successor lookup is still null", async () => {
+    const source = reader();
+    source.firstAtOrAfter.and.resolveTo(frame(base + 9000));
+    source.next.and.resolveTo(null);
+    readers.push(source);
+    await controller.seek(base + 9000);
+    await controller.stepForward();
+    expect(recordings.getNext).toHaveBeenCalledTimes(2);
+    expect(controller.state.phase).toBe("ended");
+  });
+
   it("stops at a gap and jumps only on request", async () => {
     const laterDescriptor = {
       ...nextDescriptor,
