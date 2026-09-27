@@ -1,11 +1,14 @@
-<h2>Playback — {{ cameraName }}</h2>
 <p><button type="button" routerLink="/camera_panel">Back to cameras</button></p>
+<h2>Playback — {{ cameraName }}</h2>
 @if (cameraName) {
   <div class="preview">
-    <canvas #canvas aria-label="Recorded video frame"></canvas>
-    @if (displayedTime !== null) {
-      <time>{{ displayedTime | date: "MMM d, y HH:mm:ss.SSS" }}</time>
-    }
+    <div class="content">
+      <div class="canvas-width"></div>
+      <div class="canvas-wrapper">
+      <canvas #canvas aria-label="Recorded video frame"></canvas>
+      </div>
+    </div>
+    <time>{{ displayedTime | date: "MMM d, y HH:mm:ss.SSS" }}</time>
     <p class="preview-status" aria-live="polite">
       @switch (controller.state.phase) {
         @case ("idle") {
