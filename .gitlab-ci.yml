@@ -32,11 +32,10 @@ version:
 
 pre-release:
   stage: build
-  image: docker:29-dind
-  services:
-    - docker:29-dind
+  image: docker:29-cli
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+    - mkdir -p ~/.docker
+    - printf '%s' "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json
   script:
     - docker build .
   only:
@@ -46,11 +45,10 @@ pre-release:
 
 build-image:
   stage: image
-  image: docker:29-dind
-  services:
-    - docker:29-dind
+  image: docker:29-cli
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+    - mkdir -p ~/.docker
+    - printf '%s' "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json
   script:
     - rm -f build_info
     - echo "RELEASE_URL=https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/release" > build_info
