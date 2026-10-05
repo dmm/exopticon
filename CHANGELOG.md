@@ -2,6 +2,30 @@
 
 <!--- next entry here -->
 
+## 0.47.0
+2026-10-05
+
+### Features
+
+- Add recording endpoint (2426cf7b5d80c439cddd41981d0c952e2a728eee)
+- Add mock playback component (96bbf1e970aa8a4a6da839f8cb6d195b890fd337)
+- Add wall time anchor to mkv containers (9b7563050a99cc51f7d75b5f59a5dd36a7cc5db6)
+- Add compressed video sample endpoints (d0c002c6c00e02bec195243f74be2d67eb1aac1a)
+- Extend RecordingService with samples endpoint (110a3e6d45ee43d642731f6f9248b2e657e496c9)
+- Add playback controller and video decoding (d34c408c116711381c56a903929a3d75c98df3d4)
+- Implement continuous playback (d5b8a3ece24524b4912012078846ae8e386e62c7)
+
+### Fixes
+
+- Install pinned prettier instead of running `npm install` (20437d460eddb1f7b85bb23ea10ef353995ce2e3)
+- Add more playback tests (d1553a99622c727418dd551ae52cd18fec10c5e0)
+- Fix timestamp rounding in playback-controller (6bc2d4978e5ab824a66a67d64c01ee9d4dd16c86)
+- Handle successor being null in playback-controller (319241210b178eb39b679f4fecb7e294018d8372)
+- playback controller seek until eligible frame found (a8045c8bfa37a366bfeb2dcb267456e8a555125b)
+- Keep playback canvas fixed ratio and always show time (f1d9d8a96cbd8cbd6a9ad9c460ec5a5fd448bdc8)
+- **ci:** Remove dind and add DOCKER_AUTH_CONFIG inside job (34e427d3aec2045c585df2ab7223125bdb1ff3d2)
+- **playback:** formatting (4d86b14392d125b9d60a2907c5a06d465abe5450)
+
 ## 0.46.0
 2026-09-17
 
