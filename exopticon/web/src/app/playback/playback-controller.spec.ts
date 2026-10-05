@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { of, Subject, throwError } from "rxjs";
+import { defer, of, Subject, throwError } from "rxjs";
 import { RecordingDescriptor, RecordingService } from "../recording.service";
 import { DecodedFrame, FrameReader } from "./mkv-reader";
 import { PlaybackClock, PlaybackController } from "./playback-controller";
@@ -110,15 +110,55 @@ describe("PlaybackController inspection", () => {
     expect(controller.state.displayedTime).toBe(1500);
   });
 
-  it("cancels obsolete downloads and rejects stale decoded frames", async () => {
+  it("replaces the source on camera change and clears it when no camera is selected", async () => {
+    const frontReader = currentReader;
+    frontReader.firstAtOrAfter.and.resolveTo(frame(1200));
+    await controller.seek(1100);
+    controller.setCamera("front");
+    expect(frontReader.dispose).not.toHaveBeenCalled();
+
+    controller.setCamera("back");
+    expect(frontReader.dispose).toHaveBeenCalledTimes(1);
+    currentReader = reader();
+    currentReader.firstAtOrAfter.and.resolveTo(frame(1500));
+    await controller.seek(1400);
+    expect(recordings.resolveAt).toHaveBeenCalledWith("back", 1400);
+    // Even matching file IDs must not reuse another camera's cached blob.
+    expect(recordings.download).toHaveBeenCalledTimes(2);
+    expect(controller.state.displayedTime).toBe(1500);
+
+    controller.setCamera("");
+    expect(currentReader.dispose).toHaveBeenCalledTimes(1);
+    await controller.seek(1600);
+    expect(recordings.resolveAt).toHaveBeenCalledTimes(2);
+    expect(controller.state.phase).toBe("idle");
+    expect(controller.state.displayedTime).toBeNull();
+  });
+
+  it("shares downloads across seeks and rejects stale decoded frames", async () => {
     const download = new Subject<Blob>();
-    recordings.download.and.returnValues(download, of(new Blob(["new"])));
+    let subscribed!: () => void;
+    const downloadStarted = new Promise<void>(
+      (resolve) => (subscribed = resolve),
+    );
+    recordings.download.and.returnValues(
+      defer(() => {
+        subscribed();
+        return download;
+      }),
+      of(new Blob(["new"])),
+    );
     currentReader.firstAtOrAfter.and.returnValue(Promise.resolve(frame(1300)));
     const obsolete = controller.seek(1000);
-    await Promise.resolve();
+    await downloadStarted;
     expect(download.observers.length).toBe(1);
     const current = controller.seek(1200);
-    await Promise.all([obsolete, current]);
+    await obsolete;
+    expect(download.observers.length).toBe(1);
+    download.next(new Blob(["shared"]));
+    download.complete();
+    await current;
+    expect(recordings.download).toHaveBeenCalledTimes(1);
     expect(download.observers.length).toBe(0);
     expect(controller.state.displayedTime).toBe(1300);
 
@@ -161,18 +201,25 @@ describe("PlaybackController inspection", () => {
     const freshReader = reader();
     freshReader.firstAtOrAfter.and.resolveTo(frame(1600));
     let opens = 0;
+    let started!: () => void;
+    const openingStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
     controller.destroy();
     controller = new PlaybackController(
       recordings,
       () =>
         ++opens === 1
-          ? new Promise((resolve) => (finishOpen = resolve))
+          ? new Promise((resolve) => {
+              finishOpen = resolve;
+              started();
+            })
           : Promise.resolve(freshReader),
       (value) => rendered.push(value),
     );
     controller.setCamera("front");
     const obsolete = controller.seek(1100);
-    for (let i = 0; i < 4; i++) await Promise.resolve();
+    await openingStarted;
     const current = controller.seek(1500);
     finishOpen(lateReader);
     await Promise.all([obsolete, current]);
@@ -210,7 +257,9 @@ describe("PlaybackController continuous playback", () => {
   const base = Date.parse(descriptor.beginTime);
 
   async function settle(): Promise<void> {
-    for (let i = 0; i < 12; i++) await Promise.resolve();
+    for (let i = 0; i < 12; i++) {
+      await Promise.resolve();
+    }
   }
 
   function tick(elapsed: number): void {
@@ -443,14 +492,17 @@ describe("PlaybackController continuous playback", () => {
     newReader.firstAtOrAfter.and.resolveTo(frame(base + 12124));
     readers.push(oldReader, newReader);
     recordings.resolveAt.and.callFake((_camera, at) => {
-      if (at === base + 12122) return of(current);
-      if (at < base + 12123.456)
+      if (at === base + 12122) {
+        return of(current);
+      }
+      if (at < base + 12123.456) {
         return throwError(
           new HttpErrorResponse({
             status: 404,
             error: { error: "unavailable_time" },
           }),
         );
+      }
       return of(later);
     });
     recordings.getNext.and.returnValue(of({ recording: later }));
@@ -515,7 +567,7 @@ describe("PlaybackController continuous playback", () => {
     expect(controller.state.phase).toBe("idle");
   });
 
-  it("cancels an obsolete prefetch download during a new seek", async () => {
+  it("reuses a pending prefetch download during a new seek", async () => {
     const oldFrame = frame(base);
     const newFrame = frame(base + 10000);
     const oldReader = reader();
@@ -536,7 +588,12 @@ describe("PlaybackController continuous playback", () => {
     );
     await controller.seek(base);
     expect(pendingPrefetch.observers.length).toBe(1);
-    await controller.seek(base + 10000);
+    const seeking = controller.seek(base + 10000);
+    expect(pendingPrefetch.observers.length).toBe(1);
+    pendingPrefetch.next(new Blob(["shared successor"]));
+    pendingPrefetch.complete();
+    await seeking;
+    expect(recordings.download).toHaveBeenCalledTimes(2);
     expect(pendingPrefetch.observers.length).toBe(0);
     expect(oldReader.dispose).toHaveBeenCalledTimes(1);
     expect(oldFrame.sample.close).toHaveBeenCalledTimes(1);
