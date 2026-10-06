@@ -78,6 +78,7 @@ diesel::table! {
         camera_name -> Text,
         begin_time_us -> BigInt,
         end_time_us -> BigInt,
+        state -> Text,
     }
 }
 

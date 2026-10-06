@@ -686,6 +686,9 @@ mod tests {
 
     #[test]
     fn reserves_opens_closes_and_cleans_unopened_video_segments() {
+        use super::video_units::{VideoUnit, VideoUnitState};
+        use diesel::QueryDsl;
+
         let (temp_dir, service) = migrated_service();
         service
             .apply_config(&sample_config("secret", vec!["front"]))
@@ -703,17 +706,29 @@ mod tests {
         assert_eq!(video_unit.end_time, reserved_at);
         assert_eq!(video_file.size, 0);
 
+        let persisted_state = || {
+            let mut conn = service.pool.get().expect("state query connection");
+            crate::schema::video_units::table
+                .find(video_unit.id)
+                .first::<VideoUnit>(&mut conn)
+                .expect("persisted video unit loaded")
+                .state
+        };
+        assert!(matches!(persisted_state(), VideoUnitState::Reserved));
+
         let opened_unit = service
             .open_video_segment(video_unit.id, video_file.id, begin_time)
             .expect("video segment opened");
         assert_eq!(opened_unit.begin_time, begin_time);
         assert_eq!(opened_unit.end_time, begin_time);
+        assert!(matches!(persisted_state(), VideoUnitState::Open));
 
         std::fs::write(&filename, b"video").expect("video file written");
         let (_closed_unit, closed_file) = service
             .close_video_segment(video_unit.id, video_file.id, end_time, 5)
             .expect("video segment closed");
         assert_eq!(closed_file.size, 5);
+        assert!(matches!(persisted_state(), VideoUnitState::Finalized));
 
         let unopened_filename = temp_dir.path().join("unopened.mkv");
         std::fs::write(&unopened_filename, b"unused").expect("unused file written");

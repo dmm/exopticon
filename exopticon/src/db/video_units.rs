@@ -20,14 +20,53 @@
 
 use chrono::{DateTime, Utc};
 use diesel::connection::DefaultLoadingMode;
+use diesel::deserialize::FromSql;
+use diesel::serialize::ToSql;
 use diesel::{
     BoolExpressionMethods, Connection, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl,
+    sql_types::Text,
 };
 use std::path::Path;
 
 use crate::schema::{cameras, video_files, video_units};
 
 use super::{Service, datetime_to_micros, micros_to_datetime};
+
+#[derive(AsExpression, FromSqlRow, Serialize, Clone, Debug)]
+#[diesel(sql_type = Text)]
+pub enum VideoUnitState {
+    Reserved,
+    Open,
+    Finalized,
+}
+
+impl ToSql<Text, diesel::sqlite::Sqlite> for VideoUnitState {
+    fn to_sql<'b>(
+        &'b self,
+        out: &mut diesel::serialize::Output<'b, '_, diesel::sqlite::Sqlite>,
+    ) -> diesel::serialize::Result {
+        let val = match self {
+            VideoUnitState::Reserved => "Reserved",
+            VideoUnitState::Open => "Open",
+            VideoUnitState::Finalized => "Finalized",
+        };
+
+        <str as ToSql<Text, diesel::sqlite::Sqlite>>::to_sql(val, out)
+    }
+}
+
+impl FromSql<Text, diesel::sqlite::Sqlite> for VideoUnitState {
+    fn from_sql(
+        bytes: <diesel::sqlite::Sqlite as diesel::backend::Backend>::RawValue<'_>,
+    ) -> diesel::deserialize::Result<Self> {
+        match <String as FromSql<Text, diesel::sqlite::Sqlite>>::from_sql(bytes)?.as_str() {
+            "Reserved" => Ok(VideoUnitState::Reserved),
+            "Open" => Ok(VideoUnitState::Open),
+            "Finalized" => Ok(VideoUnitState::Finalized),
+            x => Err(format!("Unrecognized variant {}", x).into()),
+        }
+    }
+}
 
 /// Full video unit model, represents entire database row
 #[derive(Identifiable, Serialize, Queryable, Clone)]
@@ -42,6 +81,8 @@ pub struct VideoUnit {
     pub begin_time_us: i64,
     /// end time in UTC epoch microseconds
     pub end_time_us: i64,
+    /// `VideoUnit` state
+    pub state: VideoUnitState,
 }
 
 impl TryFrom<VideoUnit> for crate::api::video_units::VideoUnit {
@@ -67,6 +108,8 @@ struct NewVideoUnit {
     begin_time_us: i64,
     /// end time in UTC epoch microseconds
     end_time_us: i64,
+    /// `VideoUnit` state
+    state: VideoUnitState,
 }
 
 /// Full video file model, represents full database row
@@ -306,6 +349,7 @@ impl Service {
         video_unit: &crate::api::video_units::CreateVideoUnit,
         video_file: crate::api::video_units::CreateVideoFile,
     ) -> Result<VideoSegment, super::Error> {
+        let state = VideoUnitState::Reserved;
         db_write!(self, "create_video_segment", |conn| {
             let res: (VideoUnit, VideoFile) = conn.transaction::<_, super::Error, _>(|conn| {
                 let video_unit = diesel::insert_into(video_units::dsl::video_units)
@@ -313,6 +357,7 @@ impl Service {
                         camera_name: video_unit.camera_name.clone(),
                         begin_time_us: datetime_to_micros(video_unit.begin_time),
                         end_time_us: datetime_to_micros(video_unit.end_time),
+                        state,
                     })
                     .get_result::<VideoUnit>(conn)?;
 
@@ -357,6 +402,7 @@ impl Service {
             .set((
                 crate::schema::video_units::columns::begin_time_us.eq(begin_time_us),
                 crate::schema::video_units::columns::end_time_us.eq(begin_time_us),
+                crate::schema::video_units::columns::state.eq(VideoUnitState::Open),
             ))
             .get_result::<VideoUnit>(conn)?;
 
@@ -379,7 +425,10 @@ impl Service {
                 video_units::dsl::video_units
                     .filter(crate::schema::video_units::columns::id.eq(video_unit_id)),
             )
-            .set(crate::schema::video_units::columns::end_time_us.eq(datetime_to_micros(end_time)))
+            .set((
+                crate::schema::video_units::columns::end_time_us.eq(datetime_to_micros(end_time)),
+                crate::schema::video_units::columns::state.eq(VideoUnitState::Finalized),
+            ))
             .get_result::<VideoUnit>(conn)?;
 
             let video_file = diesel::update(
