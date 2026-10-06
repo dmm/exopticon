@@ -25,7 +25,7 @@ interface TimelineRange {
   styleUrls: ["./playback.component.css"],
 })
 export class PlaybackComponent implements OnInit, OnDestroy {
-  readonly windowDuration = 60 * 60 * 1000;
+  readonly windowDuration = 30 * 60 * 1000;
   readonly ticks = [0, 15, 30, 45, 60];
   readonly speeds: PlaybackSpeed[] = [1, 2, 4];
   windowEnd = Date.now();
