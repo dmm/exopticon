@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.0
+2026-10-06
+
+### Features
+
+- **web:** Change playback window to 30mins (c48071adf17736329948c8e70a6f015f46cfb4ad)
+
 ## 0.47.0
 2026-10-05
 
