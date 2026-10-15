@@ -46,9 +46,9 @@ impl ToSql<Text, diesel::sqlite::Sqlite> for VideoUnitState {
         out: &mut diesel::serialize::Output<'b, '_, diesel::sqlite::Sqlite>,
     ) -> diesel::serialize::Result {
         let val = match self {
-            VideoUnitState::Reserved => "Reserved",
-            VideoUnitState::Open => "Open",
-            VideoUnitState::Finalized => "Finalized",
+            Self::Reserved => "Reserved",
+            Self::Open => "Open",
+            Self::Finalized => "Finalized",
         };
 
         <str as ToSql<Text, diesel::sqlite::Sqlite>>::to_sql(val, out)
@@ -60,9 +60,9 @@ impl FromSql<Text, diesel::sqlite::Sqlite> for VideoUnitState {
         bytes: <diesel::sqlite::Sqlite as diesel::backend::Backend>::RawValue<'_>,
     ) -> diesel::deserialize::Result<Self> {
         match <String as FromSql<Text, diesel::sqlite::Sqlite>>::from_sql(bytes)?.as_str() {
-            "Reserved" => Ok(VideoUnitState::Reserved),
-            "Open" => Ok(VideoUnitState::Open),
-            "Finalized" => Ok(VideoUnitState::Finalized),
+            "Reserved" => Ok(Self::Reserved),
+            "Open" => Ok(Self::Open),
+            "Finalized" => Ok(Self::Finalized),
             x => Err(format!("Unrecognized variant {}", x).into()),
         }
     }
@@ -113,7 +113,7 @@ struct NewVideoUnit {
 }
 
 /// Full video file model, represents full database row
-#[derive(Queryable, Associations, Identifiable, Insertable, Serialize)]
+#[derive(Queryable, Associations, Identifiable, Insertable, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[diesel(table_name = video_files)]
 #[diesel(belongs_to(VideoUnit))]
@@ -257,7 +257,7 @@ impl Service {
                 .filter(video_units::begin_time_us.le(at_us))
                 .filter(video_units::end_time_us.gt(at_us))
                 .filter(video_units::end_time_us.gt(video_units::begin_time_us))
-                .filter(video_files::size.gt(0))
+                .filter(video_units::state.eq(VideoUnitState::Finalized))
                 .order((video_units::begin_time_us.desc(), video_files::id.desc()))
                 .first::<(VideoUnit, VideoFile)>(conn)
                 .optional()?;
@@ -280,7 +280,7 @@ impl Service {
                 .filter(video_units::camera_name.eq(camera_name))
                 .filter(video_files::id.eq(file_id))
                 .filter(video_units::end_time_us.gt(video_units::begin_time_us))
-                .filter(video_files::size.gt(0))
+                .filter(video_units::state.eq(VideoUnitState::Finalized))
                 .first::<(VideoUnit, VideoFile)>(conn)
                 .optional()?;
             Ok(row)
@@ -302,7 +302,7 @@ impl Service {
                 .filter(video_units::camera_name.eq(camera_name))
                 .filter(video_files::id.eq(file_id))
                 .filter(video_units::end_time_us.gt(video_units::begin_time_us))
-                .filter(video_files::size.gt(0))
+                .filter(video_units::state.eq(VideoUnitState::Finalized))
                 .first::<(VideoUnit, VideoFile)>(conn)
                 .optional()?
                 .ok_or(super::Error::NotFound)?;
@@ -310,7 +310,7 @@ impl Service {
                 .inner_join(video_files::table)
                 .filter(video_units::camera_name.eq(camera_name))
                 .filter(video_units::end_time_us.gt(video_units::begin_time_us))
-                .filter(video_files::size.gt(0))
+                .filter(video_units::state.eq(VideoUnitState::Finalized))
                 .filter(
                     video_units::begin_time_us.gt(reference.0.begin_time_us).or(
                         video_units::begin_time_us
@@ -452,8 +452,7 @@ impl Service {
                 let unopened_units: Vec<(VideoUnit, VideoFile)> = video_units::table
                     .inner_join(video_files::table)
                     .filter(video_units::camera_name.eq(camera_name))
-                    .filter(video_units::begin_time_us.eq(video_units::end_time_us))
-                    .filter(video_files::size.eq(0))
+                    .filter(video_units::state.eq(VideoUnitState::Reserved))
                     .load(conn)?;
 
                 Ok(unopened_units)
@@ -509,6 +508,7 @@ impl Service {
                 .filter(dsl::camera_name.eq(camera_name))
                 .filter(dsl::begin_time_us.le(datetime_to_micros(end_time)))
                 .filter(dsl::end_time_us.ge(datetime_to_micros(begin_time)))
+                .filter(video_units::state.eq(VideoUnitState::Finalized))
                 .order(dsl::begin_time_us.asc())
                 .limit(999)
                 .load(conn)?;
@@ -549,6 +549,7 @@ impl Service {
                 .filter(video_units::begin_time_us.lt(requested_end_us))
                 .filter(video_units::end_time_us.gt(requested_begin_us))
                 .filter(video_units::end_time_us.gt(video_units::begin_time_us))
+                .filter(video_units::state.eq(VideoUnitState::Finalized))
                 .order(video_units::begin_time_us.asc())
                 .select((video_units::begin_time_us, video_units::end_time_us))
                 .load_iter::<(i64, i64), DefaultLoadingMode>(conn)?;

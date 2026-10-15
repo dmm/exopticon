@@ -248,7 +248,7 @@ impl CaptureActor {
     ) -> anyhow::Result<()> {
         if let Ok(metadata) = fs::metadata(filename).await {
             let db = self.db.clone();
-            let file_size: i32 = metadata.len().try_into().unwrap_or(-1);
+            let file_size: i32 = metadata.len().try_into().unwrap_or(i32::MAX);
             spawn_blocking(move || {
                 db.close_video_segment(video_unit_id, video_file_id, end_time, file_size)
             })

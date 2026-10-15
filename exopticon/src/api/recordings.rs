@@ -301,7 +301,7 @@ mod tests {
         fetch_recording_ranges, next_recording, recording_content, recording_file_open_error,
         resolve_recording,
     };
-    use crate::db::Service;
+    use crate::db::{Service, video_units::VideoUnitState};
 
     fn test_app() -> (TempDir, Service, Router) {
         let temp_dir = TempDir::new().expect("temp dir created");
@@ -423,6 +423,7 @@ mod tests {
         end: &str,
         filename: &str,
         size: i32,
+        state: VideoUnitState,
     ) -> i64 {
         use crate::schema::{video_files, video_units};
         let begin_us = DateTime::parse_from_rfc3339(begin)
@@ -437,6 +438,7 @@ mod tests {
                 video_units::camera_name.eq(camera),
                 video_units::begin_time_us.eq(begin_us),
                 video_units::end_time_us.eq(end_us),
+                video_units::state.eq(state),
             ))
             .returning(video_units::id)
             .get_result(&mut conn)
@@ -453,6 +455,113 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolution_rejects_nonfinalized_files_with_positive_sizes_and_intervals() {
+        let (_dir, service, app) = test_app();
+        for state in [VideoUnitState::Reserved, VideoUnitState::Open] {
+            add_file(
+                &service,
+                "front",
+                "2026-09-23T10:00:00Z",
+                "2026-09-23T10:00:10Z",
+                "/unused.mkv",
+                4,
+                state,
+            );
+        }
+
+        let response = get(&app, "/front/samples?at=2026-09-23T10%3A00%3A05Z").await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            json_body(response).await,
+            json!({"error":"unavailable_time"})
+        );
+    }
+
+    #[tokio::test]
+    async fn content_rejects_nonfinalized_files_even_when_bytes_match() {
+        let (dir, service, app) = test_app();
+        let path = dir.path().join("recording.mkv");
+        std::fs::write(&path, b"mkv!").unwrap();
+        for state in [VideoUnitState::Reserved, VideoUnitState::Open] {
+            let id = add_file(
+                &service,
+                "front",
+                "2026-09-23T10:00:00Z",
+                "2026-09-23T10:00:10Z",
+                path.to_str().unwrap(),
+                4,
+                state,
+            );
+            let response = get(&app, &format!("/front/files/{id}/content")).await;
+            assert_eq!(response.status(), StatusCode::GONE);
+            assert_eq!(
+                json_body(response).await,
+                json!({"error":"unavailable_file"})
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn successor_skips_nonfinalized_files_with_positive_sizes_and_intervals() {
+        let (_dir, service, app) = test_app();
+        let first = add_file(
+            &service,
+            "front",
+            "2026-09-23T10:00:00Z",
+            "2026-09-23T10:00:10Z",
+            "/first.mkv",
+            4,
+            VideoUnitState::Finalized,
+        );
+        for state in [VideoUnitState::Reserved, VideoUnitState::Open] {
+            add_file(
+                &service,
+                "front",
+                "2026-09-23T10:00:10Z",
+                "2026-09-23T10:00:20Z",
+                "/pending.mkv",
+                4,
+                state,
+            );
+        }
+        let next = add_file(
+            &service,
+            "front",
+            "2026-09-23T10:00:20Z",
+            "2026-09-23T10:00:30Z",
+            "/next.mkv",
+            4,
+            VideoUnitState::Finalized,
+        );
+
+        let response = get(&app, &format!("/front/files/{first}/next")).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(json_body(response).await["recording"]["fileId"], next);
+    }
+
+    #[tokio::test]
+    async fn successor_rejects_nonfinalized_reference_files() {
+        let (_dir, service, app) = test_app();
+        for state in [VideoUnitState::Reserved, VideoUnitState::Open] {
+            let id = add_file(
+                &service,
+                "front",
+                "2026-09-23T10:00:00Z",
+                "2026-09-23T10:00:10Z",
+                "/pending.mkv",
+                4,
+                state,
+            );
+            let response = get(&app, &format!("/front/files/{id}/next")).await;
+            assert_eq!(response.status(), StatusCode::GONE);
+            assert_eq!(
+                json_body(response).await,
+                json!({"error":"unavailable_file"})
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn resolves_half_open_intervals_overlaps_and_gaps() {
         let (dir, service, app) = test_app();
         let path = dir.path().join("one.mkv");
@@ -465,6 +574,7 @@ mod tests {
             "2026-09-23T10:00:10Z",
             name,
             4,
+            VideoUnitState::Finalized,
         );
         let second = add_file(
             &service,
@@ -473,6 +583,7 @@ mod tests {
             "2026-09-23T10:00:12Z",
             name,
             4,
+            VideoUnitState::Finalized,
         );
         let tie = add_file(
             &service,
@@ -481,6 +592,7 @@ mod tests {
             "2026-09-23T10:00:09Z",
             name,
             4,
+            VideoUnitState::Finalized,
         );
         add_file(
             &service,
@@ -489,6 +601,7 @@ mod tests {
             "2026-09-23T10:00:20Z",
             name,
             -1,
+            VideoUnitState::Open,
         );
         assert_eq!(
             json_body(get(&app, "/front/samples?at=2026-09-23T10%3A00%3A00Z").await).await,
@@ -547,6 +660,7 @@ mod tests {
             "2026-09-23T10:00:10Z",
             "/unused.mkv",
             10,
+            VideoUnitState::Finalized,
         );
         let mut conn = service.pool.get().unwrap();
         let unit_id: i64 = video_files::table
@@ -576,6 +690,7 @@ mod tests {
             "2026-09-23T10:00:05Z",
             &name,
             4,
+            VideoUnitState::Finalized,
         );
         let second = add_file(
             &service,
@@ -584,6 +699,7 @@ mod tests {
             "2026-09-23T10:00:25Z",
             &name,
             4,
+            VideoUnitState::Finalized,
         );
         let third = add_file(
             &service,
@@ -592,6 +708,7 @@ mod tests {
             "2026-09-23T10:00:26Z",
             &name,
             4,
+            VideoUnitState::Finalized,
         );
         let pending = add_file(
             &service,
@@ -600,6 +717,7 @@ mod tests {
             "2026-09-23T10:00:31Z",
             &name,
             -1,
+            VideoUnitState::Open,
         );
         assert_eq!(
             json_body(get(&app, &format!("/front/files/{first}/next")).await).await["recording"]["fileId"],
@@ -647,6 +765,7 @@ mod tests {
             "2026-09-23T10:01:05Z",
             &name,
             4,
+            VideoUnitState::Finalized,
         );
         assert!(replacement > pending, "deleted IDs must never be reused");
     }
@@ -663,6 +782,7 @@ mod tests {
             "2026-09-23T10:00:10Z",
             path.to_str().unwrap(),
             10,
+            VideoUnitState::Finalized,
         );
         let uri = format!("/front/files/{file}/content");
         let response = get(&app, &uri).await;
@@ -729,6 +849,7 @@ mod tests {
             "2026-09-23T10:00:10Z",
             path.to_str().unwrap(),
             10,
+            VideoUnitState::Finalized,
         );
         let original_permissions = std::fs::metadata(&path).unwrap().permissions();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
@@ -794,6 +915,7 @@ mod tests {
                 crate::schema::video_units::camera_name.eq("front"),
                 crate::schema::video_units::begin_time_us.eq(begin_time_us),
                 crate::schema::video_units::end_time_us.eq(end_time_us),
+                crate::schema::video_units::state.eq(VideoUnitState::Finalized),
             ))
             .execute(&mut conn)
             .expect("video unit inserted");

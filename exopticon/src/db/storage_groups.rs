@@ -104,14 +104,14 @@ impl super::Service {
                 .select(diesel::dsl::sum(video_files::size))
                 .inner_join(video_units::table.inner_join(cameras::table))
                 .filter(cameras::storage_group_name.eq(storage_group_name))
-                .filter(video_files::size.ne(-1))
+                .filter(video_units::state.eq(crate::db::video_units::VideoUnitState::Finalized))
                 .first::<Option<i64>>(conn)?
                 .unwrap_or(0);
 
             let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras::table
                 .inner_join(video_units::table.inner_join(video_files::table))
                 .filter(cameras::storage_group_name.eq(storage_group_name))
-                .filter(video_files::size.gt(-1))
+                .filter(video_units::state.eq(crate::db::video_units::VideoUnitState::Finalized))
                 .filter(video_units::begin_time_us.ne(video_units::end_time_us))
                 .order(video_units::begin_time_us.asc())
                 .limit(count)
@@ -119,6 +119,12 @@ impl super::Service {
 
             let units = c
                 .into_iter()
+                .map(|(c, (unit, mut file))| {
+                    if file.size < 0 {
+                        file.size = i32::MAX;
+                    }
+                    (c, (unit, file))
+                })
                 .map(|(_c, (unit, file))| (file.size.into(), unit, file))
                 .collect();
 

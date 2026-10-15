@@ -286,7 +286,7 @@ mod tests {
     use diesel_migrations::MigrationHarness;
     use tempfile::TempDir;
 
-    use super::Service;
+    use super::{Service, video_units::VideoUnitState};
     use crate::{
         api::{
             auth::CreateUserSession,
@@ -388,12 +388,168 @@ mod tests {
                         crate::schema::video_units::camera_name.eq(camera_name),
                         crate::schema::video_units::begin_time_us.eq(begin_time.timestamp_micros()),
                         crate::schema::video_units::end_time_us.eq(end_time.timestamp_micros()),
+                        crate::schema::video_units::state.eq(VideoUnitState::Finalized),
                     ))
                     .execute(conn)?;
             }
             Ok(())
         })
         .expect("video units inserted");
+    }
+
+    #[test]
+    fn recording_ranges_exclude_nonfinalized_units_with_positive_intervals() {
+        use diesel::connection::SimpleConnection;
+
+        let (_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+        service
+            .pool
+            .get()
+            .unwrap()
+            .batch_execute(
+                "INSERT INTO video_units (camera_name, begin_time_us, end_time_us, state) VALUES
+             ('front', 0, 1000000, 'Reserved'),
+             ('front', 2000000, 3000000, 'Open'),
+             ('front', 4000000, 5000000, 'Finalized');",
+            )
+            .unwrap();
+
+        let ranges = service
+            .fetch_recording_ranges(
+                "front",
+                test_time("1970-01-01T00:00:00Z"),
+                test_time("1970-01-01T00:00:06Z"),
+            )
+            .unwrap();
+        assert_eq!(
+            ranges,
+            vec![super::video_units::RecordingRange {
+                begin_time: test_time("1970-01-01T00:00:04Z"),
+                end_time: test_time("1970-01-01T00:00:05Z"),
+            }]
+        );
+    }
+
+    #[test]
+    fn video_unit_listing_excludes_nonfinalized_units() {
+        use diesel::connection::SimpleConnection;
+
+        let (_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+        service.pool.get().unwrap().batch_execute(
+            "INSERT INTO video_units (id, camera_name, begin_time_us, end_time_us, state) VALUES
+             (1, 'front', 0, 1000000, 'Reserved'),
+             (2, 'front', 0, 1000000, 'Open'),
+             (3, 'front', 0, 1000000, 'Finalized');
+             INSERT INTO video_files (filename, size, video_unit_id) VALUES
+             ('reserved.mkv', 5, 1), ('open.mkv', 5, 2), ('finalized.mkv', 0, 3);"
+        ).unwrap();
+
+        let segments = service
+            .fetch_video_units_between(
+                "front",
+                test_time("1970-01-01T00:00:00Z"),
+                test_time("1970-01-01T00:00:02Z"),
+            )
+            .unwrap();
+        assert_eq!(
+            segments.iter().map(|(unit, _)| unit.id).collect::<Vec<_>>(),
+            vec![3]
+        );
+    }
+
+    #[test]
+    fn retention_counts_and_selects_only_finalized_units() {
+        use diesel::connection::SimpleConnection;
+
+        let (_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+        service.pool.get().unwrap().batch_execute(
+            "INSERT INTO video_units (id, camera_name, begin_time_us, end_time_us, state) VALUES
+             (1, 'front', 0, 1000000, 'Reserved'),
+             (2, 'front', 0, 1000000, 'Open'),
+             (3, 'front', 2000000, 3000000, 'Finalized'),
+             (4, 'front', 4000000, 5000000, 'Finalized');
+             INSERT INTO video_files (filename, size, video_unit_id) VALUES
+             ('reserved.mkv', 11, 1), ('open.mkv', 13, 2),
+             ('empty.mkv', 0, 3), ('finalized.mkv', 7, 4);"
+        ).unwrap();
+
+        let old = service
+            .fetch_storage_group_old_units("primary", 10)
+            .unwrap();
+        assert_eq!(old.storage_group_size, 7);
+        assert_eq!(
+            old.video_units
+                .iter()
+                .map(|(_, unit, _)| unit.id)
+                .collect::<Vec<_>>(),
+            vec![3, 4]
+        );
+    }
+
+    #[test]
+    fn unopened_cleanup_uses_state_instead_of_timestamp_and_size_sentinels() {
+        use crate::schema::video_units;
+        use diesel::QueryDsl;
+
+        let (dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front"]))
+            .expect("config applied");
+        let begin = test_time("2026-09-22T10:00:00Z");
+        let mut survivors = Vec::new();
+        for (name, state, end, size) in [
+            (
+                "reserved",
+                VideoUnitState::Reserved,
+                begin + Duration::seconds(1),
+                5,
+            ),
+            ("open", VideoUnitState::Open, begin, 0),
+            ("finalized", VideoUnitState::Finalized, begin, 0),
+        ] {
+            let path = dir.path().join(format!("{name}.mkv"));
+            std::fs::write(&path, b"video").unwrap();
+            let (unit, _) = service
+                .create_video_segment(
+                    &CreateVideoUnit {
+                        camera_name: "front".into(),
+                        begin_time: begin,
+                        end_time: end,
+                    },
+                    CreateVideoFile {
+                        filename: path.display().to_string(),
+                        size,
+                    },
+                )
+                .unwrap();
+            diesel::update(video_units::table.find(unit.id))
+                .set(video_units::state.eq(state))
+                .execute(&mut service.pool.get().unwrap())
+                .unwrap();
+            if name != "reserved" {
+                survivors.push(unit.id);
+            }
+        }
+
+        assert_eq!(service.delete_unopened_video_segments("front").unwrap(), 1);
+        assert!(!dir.path().join("reserved.mkv").exists());
+        assert!(dir.path().join("open.mkv").exists());
+        assert!(dir.path().join("finalized.mkv").exists());
+        let remaining: Vec<i64> = video_units::table
+            .order(video_units::id)
+            .select(video_units::id)
+            .load(&mut service.pool.get().unwrap())
+            .unwrap();
+        assert_eq!(remaining, survivors);
     }
 
     #[test]
