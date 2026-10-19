@@ -2468,8 +2468,9 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "oxvif"
-version = "0.16.0"
-source = "git+https://github.com/dmm/oxvif.git?branch=media-sync#3ea7a34503e77a92afcebe0fca6550a93bd03c27"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4945a128825df93310e05bb3c8ae56b6bf6d811aab26eb907ec527a31e0d4878"
 dependencies = [
  "async-stream",
  "async-trait",
