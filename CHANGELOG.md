@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.2
+2026-10-19
+
+### Fixes
+
+- Switch to upstream oxvif (b483168e81a6a2e985bd034a3f21e8f821f960ef)
+
 ## 0.48.1
 2026-10-19
 
