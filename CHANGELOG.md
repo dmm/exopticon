@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.1
+2026-10-19
+
+### Fixes
+
+- **db:** Add state column to video_unit and Rust models (1d0b4bfdcafdc2dbbae4b8c1f819059af596d455)
+
 ## 0.48.0
 2026-10-06
 
