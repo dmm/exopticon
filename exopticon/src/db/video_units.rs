@@ -91,6 +91,7 @@ impl TryFrom<VideoUnit> for crate::api::video_units::VideoUnit {
     fn try_from(v: VideoUnit) -> Result<Self, Self::Error> {
         Ok(Self {
             id: v.id,
+            state: v.state.into(),
             camera_name: v.camera_name,
             begin_time: micros_to_datetime("video_units.begin_time_us", v.begin_time_us)?,
             end_time: micros_to_datetime("video_units.end_time_us", v.end_time_us)?,

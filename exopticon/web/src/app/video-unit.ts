@@ -21,10 +21,17 @@
 import { ZonedDateTime } from "@js-joda/core";
 import { Observation } from "./observation";
 
+enum VideoUnitState {
+  Reserved = "Reserved",
+  Open = "Open",
+  Finalized = "Finalized",
+}
+
 export class VideoUnit {
   constructor(public obj: any) {
     this.id = obj.id;
     this.cameraName = obj.cameraName;
+    this.state = obj.state;
     this.beginTime = ZonedDateTime.parse(obj.beginTime + "Z");
     this.endTime = ZonedDateTime.parse(obj.endTime + "Z");
     this.observations = obj.observations;
@@ -32,6 +39,7 @@ export class VideoUnit {
 
   id: number;
   cameraName: string;
+  state: VideoUnitState;
   beginTime: ZonedDateTime;
   endTime: ZonedDateTime;
   observations: Observation[];

@@ -28,6 +28,23 @@ use tokio::task::spawn_blocking;
 
 use crate::AppState;
 
+#[derive(Debug, Serialize, Clone)]
+pub enum VideoUnitState {
+    Reserved,
+    Open,
+    Finalized,
+}
+
+impl From<crate::db::video_units::VideoUnitState> for VideoUnitState {
+    fn from(value: crate::db::video_units::VideoUnitState) -> Self {
+        match value {
+            crate::db::video_units::VideoUnitState::Reserved => Self::Reserved,
+            crate::db::video_units::VideoUnitState::Open => Self::Open,
+            crate::db::video_units::VideoUnitState::Finalized => Self::Finalized,
+        }
+    }
+}
+
 /// Public video unit model
 /// Full video unit model, represents entire database row
 #[derive(Debug, Serialize, Clone)]
@@ -35,6 +52,8 @@ use crate::AppState;
 pub struct VideoUnit {
     /// id of video unit
     pub id: i64,
+    /// `VideoUnit` state
+    pub state: VideoUnitState,
     /// name of associated camera
     pub camera_name: String,
     /// begin time in UTC
