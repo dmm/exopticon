@@ -282,11 +282,14 @@ mod tests {
     use std::thread;
 
     use chrono::{DateTime, Duration, Utc};
-    use diesel::{Connection, ExpressionMethods, RunQueryDsl};
+    use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
     use diesel_migrations::MigrationHarness;
     use tempfile::TempDir;
 
-    use super::{Service, video_units::VideoUnitState};
+    use super::{
+        Service,
+        video_units::{RecordingRange, VideoUnit, VideoUnitState},
+    };
     use crate::{
         api::{
             auth::CreateUserSession,
@@ -375,639 +378,986 @@ mod tests {
             .with_timezone(&Utc)
     }
 
-    fn insert_video_units(
+    fn configured_service() -> (TempDir, Service) {
+        let (temp_dir, service) = migrated_service();
+        service
+            .apply_config(&sample_config("secret", vec!["front", "back"]))
+            .expect("config applied");
+        (temp_dir, service)
+    }
+
+    fn insert_video_unit(
         service: &Service,
         camera_name: &str,
-        intervals: impl IntoIterator<Item = (DateTime<Utc>, DateTime<Utc>)>,
-    ) {
-        let mut conn = service.pool.get().expect("insert connection");
-        conn.transaction::<_, diesel::result::Error, _>(|conn| {
-            for (begin_time, end_time) in intervals {
-                diesel::insert_into(crate::schema::video_units::table)
-                    .values((
-                        crate::schema::video_units::camera_name.eq(camera_name),
-                        crate::schema::video_units::begin_time_us.eq(begin_time.timestamp_micros()),
-                        crate::schema::video_units::end_time_us.eq(end_time.timestamp_micros()),
-                        crate::schema::video_units::state.eq(VideoUnitState::Finalized),
-                    ))
-                    .execute(conn)?;
-            }
-            Ok(())
-        })
-        .expect("video units inserted");
+        state: VideoUnitState,
+        begin_time: DateTime<Utc>,
+        end_time: DateTime<Utc>,
+    ) -> i64 {
+        use crate::schema::video_units;
+
+        diesel::insert_into(video_units::table)
+            .values((
+                video_units::camera_name.eq(camera_name),
+                video_units::state.eq(state),
+                video_units::begin_time_us.eq(begin_time.timestamp_micros()),
+                video_units::end_time_us.eq(end_time.timestamp_micros()),
+            ))
+            .returning(video_units::id)
+            .get_result(&mut service.pool.get().expect("insert connection"))
+            .expect("video unit inserted")
+    }
+
+    fn at(seconds: i64) -> DateTime<Utc> {
+        test_time("2026-09-22T10:00:00Z") + Duration::seconds(seconds)
+    }
+
+    fn insert_segment(
+        service: &Service,
+        camera_name: &str,
+        state: VideoUnitState,
+        begin_time: DateTime<Utc>,
+        end_time: DateTime<Utc>,
+        filename: &str,
+        size: i32,
+    ) -> (i64, i64) {
+        use crate::schema::video_files;
+
+        let unit_id = insert_video_unit(service, camera_name, state, begin_time, end_time);
+        let file_id = diesel::insert_into(video_files::table)
+            .values((
+                video_files::video_unit_id.eq(unit_id),
+                video_files::filename.eq(filename),
+                video_files::size.eq(size),
+            ))
+            .returning(video_files::id)
+            .get_result(&mut service.pool.get().expect("insert connection"))
+            .expect("video file inserted");
+        (unit_id, file_id)
+    }
+
+    fn persisted_unit(service: &Service, unit_id: i64) -> VideoUnit {
+        crate::schema::video_units::table
+            .find(unit_id)
+            .first(&mut service.pool.get().expect("query connection"))
+            .expect("video unit loaded")
+    }
+
+    fn persisted_file(service: &Service, file_id: i64) -> super::video_units::VideoFile {
+        crate::schema::video_files::table
+            .find(file_id)
+            .first(&mut service.pool.get().expect("query connection"))
+            .expect("video file loaded")
+    }
+
+    fn remaining_segment_ids(service: &Service) -> (Vec<i64>, Vec<i64>) {
+        use crate::schema::{video_files, video_units};
+
+        let mut conn = service.pool.get().expect("query connection");
+        let units = video_units::table
+            .order(video_units::id)
+            .select(video_units::id)
+            .load(&mut conn)
+            .expect("video unit IDs loaded");
+        let files = video_files::table
+            .order(video_files::id)
+            .select(video_files::id)
+            .load(&mut conn)
+            .expect("video file IDs loaded");
+        (units, files)
+    }
+
+    fn create_session(
+        service: &Service,
+        user_name: &str,
+        session_key: &str,
+        is_token: bool,
+        expiration: DateTime<Utc>,
+    ) -> String {
+        service
+            .create_user_session(&CreateUserSession {
+                name: "ci-token".to_string(),
+                user_name: user_name.to_string(),
+                session_key: session_key.to_string(),
+                is_token,
+                expiration,
+            })
+            .expect("session created")
+    }
+
+    // Session validation uses the wall clock. These bounds keep expiration
+    // well away from it without depending on test execution speed.
+    fn unexpired() -> DateTime<Utc> {
+        test_time("9999-01-01T00:00:00Z")
     }
 
     #[test]
     fn recording_ranges_exclude_nonfinalized_units_with_positive_intervals() {
-        use diesel::connection::SimpleConnection;
+        let (_dir, service) = configured_service();
+        let base = test_time("2026-09-22T10:00:00Z");
+        let at = |seconds: i64| base + Duration::seconds(seconds);
 
-        let (_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
-        service
-            .pool
-            .get()
-            .unwrap()
-            .batch_execute(
-                "INSERT INTO video_units (camera_name, begin_time_us, end_time_us, state) VALUES
-             ('front', 0, 1000000, 'Reserved'),
-             ('front', 2000000, 3000000, 'Open'),
-             ('front', 4000000, 5000000, 'Finalized');",
-            )
-            .unwrap();
+        insert_video_unit(&service, "front", VideoUnitState::Reserved, at(0), at(1));
+        insert_video_unit(&service, "front", VideoUnitState::Open, at(2), at(3));
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(4), at(5));
 
         let ranges = service
-            .fetch_recording_ranges(
-                "front",
-                test_time("1970-01-01T00:00:00Z"),
-                test_time("1970-01-01T00:00:06Z"),
-            )
-            .unwrap();
+            .fetch_recording_ranges("front", at(0), at(6))
+            .expect("recording ranges fetched");
+
         assert_eq!(
             ranges,
             vec![super::video_units::RecordingRange {
-                begin_time: test_time("1970-01-01T00:00:04Z"),
-                end_time: test_time("1970-01-01T00:00:05Z"),
+                begin_time: at(4),
+                end_time: at(5),
             }]
         );
     }
 
     #[test]
     fn video_unit_listing_excludes_nonfinalized_units() {
-        use diesel::connection::SimpleConnection;
-
-        let (_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
-        service.pool.get().unwrap().batch_execute(
-            "INSERT INTO video_units (id, camera_name, begin_time_us, end_time_us, state) VALUES
-             (1, 'front', 0, 1000000, 'Reserved'),
-             (2, 'front', 0, 1000000, 'Open'),
-             (3, 'front', 0, 1000000, 'Finalized');
-             INSERT INTO video_files (filename, size, video_unit_id) VALUES
-             ('reserved.mkv', 5, 1), ('open.mkv', 5, 2), ('finalized.mkv', 0, 3);"
-        ).unwrap();
+        let (_dir, service) = configured_service();
+        insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Reserved,
+            at(0),
+            at(1),
+            "reserved.mkv",
+            5,
+        );
+        insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Open,
+            at(0),
+            at(1),
+            "open.mkv",
+            5,
+        );
+        let finalized = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(0),
+            at(1),
+            "finalized.mkv",
+            0,
+        );
 
         let segments = service
-            .fetch_video_units_between(
-                "front",
-                test_time("1970-01-01T00:00:00Z"),
-                test_time("1970-01-01T00:00:02Z"),
-            )
-            .unwrap();
+            .fetch_video_units_between("front", at(0), at(2))
+            .expect("video segments fetched");
+
         assert_eq!(
-            segments.iter().map(|(unit, _)| unit.id).collect::<Vec<_>>(),
-            vec![3]
+            segments
+                .iter()
+                .map(|(unit, file)| (unit.id, file.id))
+                .collect::<Vec<_>>(),
+            vec![finalized]
         );
     }
 
     #[test]
     fn retention_counts_and_selects_only_finalized_units() {
-        use diesel::connection::SimpleConnection;
-
-        let (_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
-        service.pool.get().unwrap().batch_execute(
-            "INSERT INTO video_units (id, camera_name, begin_time_us, end_time_us, state) VALUES
-             (1, 'front', 0, 1000000, 'Reserved'),
-             (2, 'front', 0, 1000000, 'Open'),
-             (3, 'front', 2000000, 3000000, 'Finalized'),
-             (4, 'front', 4000000, 5000000, 'Finalized');
-             INSERT INTO video_files (filename, size, video_unit_id) VALUES
-             ('reserved.mkv', 11, 1), ('open.mkv', 13, 2),
-             ('empty.mkv', 0, 3), ('finalized.mkv', 7, 4);"
-        ).unwrap();
+        let (_dir, service) = configured_service();
+        insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Reserved,
+            at(0),
+            at(1),
+            "reserved.mkv",
+            11,
+        );
+        insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Open,
+            at(0),
+            at(1),
+            "open.mkv",
+            13,
+        );
+        let (empty, _) = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(2),
+            at(3),
+            "empty.mkv",
+            0,
+        );
+        let (finalized, _) = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(4),
+            at(5),
+            "finalized.mkv",
+            7,
+        );
 
         let old = service
             .fetch_storage_group_old_units("primary", 10)
-            .unwrap();
+            .expect("retention candidates fetched");
+
         assert_eq!(old.storage_group_size, 7);
         assert_eq!(
             old.video_units
                 .iter()
                 .map(|(_, unit, _)| unit.id)
                 .collect::<Vec<_>>(),
-            vec![3, 4]
+            vec![empty, finalized]
         );
     }
 
     #[test]
-    fn unopened_cleanup_uses_state_instead_of_timestamp_and_size_sentinels() {
-        use crate::schema::video_units;
-        use diesel::QueryDsl;
-
-        let (dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
-        let begin = test_time("2026-09-22T10:00:00Z");
-        let mut survivors = Vec::new();
-        for (name, state, end, size) in [
-            (
-                "reserved",
-                VideoUnitState::Reserved,
-                begin + Duration::seconds(1),
-                5,
-            ),
-            ("open", VideoUnitState::Open, begin, 0),
-            ("finalized", VideoUnitState::Finalized, begin, 0),
+    fn unopened_cleanup_deletes_only_reserved_segments_regardless_of_timestamps_and_size() {
+        let (dir, service) = configured_service();
+        let reserved_path = dir.path().join("reserved.mkv");
+        let open_path = dir.path().join("open.mkv");
+        let finalized_path = dir.path().join("finalized.mkv");
+        let other_camera_path = dir.path().join("back.mkv");
+        for path in [
+            &reserved_path,
+            &open_path,
+            &finalized_path,
+            &other_camera_path,
         ] {
-            let path = dir.path().join(format!("{name}.mkv"));
-            std::fs::write(&path, b"video").unwrap();
-            let (unit, _) = service
-                .create_video_segment(
-                    &CreateVideoUnit {
-                        camera_name: "front".into(),
-                        begin_time: begin,
-                        end_time: end,
-                    },
-                    CreateVideoFile {
-                        filename: path.display().to_string(),
-                        size,
-                    },
-                )
-                .unwrap();
-            diesel::update(video_units::table.find(unit.id))
-                .set(video_units::state.eq(state))
-                .execute(&mut service.pool.get().unwrap())
-                .unwrap();
-            if name != "reserved" {
-                survivors.push(unit.id);
-            }
+            std::fs::write(path, b"video").expect("video file written");
         }
+        insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Reserved,
+            at(0),
+            at(1),
+            reserved_path.to_str().unwrap(),
+            5,
+        );
+        let open = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Open,
+            at(0),
+            at(0),
+            open_path.to_str().unwrap(),
+            0,
+        );
+        let finalized = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(0),
+            at(0),
+            finalized_path.to_str().unwrap(),
+            0,
+        );
+        let other_camera = insert_segment(
+            &service,
+            "back",
+            VideoUnitState::Reserved,
+            at(0),
+            at(0),
+            other_camera_path.to_str().unwrap(),
+            0,
+        );
 
-        assert_eq!(service.delete_unopened_video_segments("front").unwrap(), 1);
-        assert!(!dir.path().join("reserved.mkv").exists());
-        assert!(dir.path().join("open.mkv").exists());
-        assert!(dir.path().join("finalized.mkv").exists());
-        let remaining: Vec<i64> = video_units::table
-            .order(video_units::id)
-            .select(video_units::id)
-            .load(&mut service.pool.get().unwrap())
-            .unwrap();
-        assert_eq!(remaining, survivors);
+        let deleted = service
+            .delete_unopened_video_segments("front")
+            .expect("reserved segments deleted");
+
+        assert_eq!(deleted, 1);
+        assert!(!reserved_path.exists());
+        assert!(open_path.exists());
+        assert!(finalized_path.exists());
+        assert!(other_camera_path.exists());
+        assert_eq!(
+            remaining_segment_ids(&service),
+            (
+                vec![open.0, finalized.0, other_camera.0],
+                vec![open.1, finalized.1, other_camera.1]
+            )
+        );
     }
 
     #[test]
-    fn applies_config_and_replaces_camera_group_memberships() {
-        let (_temp_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front", "back"]))
-            .expect("initial config applied");
+    fn applying_config_persists_camera_group_memberships() {
+        let (_dir, service) = migrated_service();
+        let config = sample_config("secret", vec!["front", "back"]);
+
+        service.apply_config(&config).expect("config applied");
 
         let group = service
             .fetch_camera_group("all")
             .expect("camera group fetched");
         assert_eq!(group.spec.members, vec!["front", "back"]);
+    }
+
+    #[test]
+    fn applying_config_replaces_camera_group_memberships() {
+        let (_dir, service) = configured_service();
+        let config = sample_config("secret", vec!["back"]);
 
         service
-            .apply_config(&sample_config("secret", vec!["back"]))
+            .apply_config(&config)
             .expect("updated config applied");
 
         let group = service
             .fetch_camera_group("all")
             .expect("camera group fetched");
         assert_eq!(group.spec.members, vec!["back"]);
-
-        let storage_group = service
-            .fetch_storage_group("primary")
-            .expect("storage group fetched");
-        assert_eq!(storage_group.metadata.display_name, "Primary");
     }
 
     #[test]
-    fn creates_closes_fetches_and_deletes_video_segment() {
-        let (temp_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
+    fn applying_config_persists_storage_group_metadata() {
+        let (_dir, service) = migrated_service();
+        let mut config = sample_config("secret", vec![]);
+        config.storage_groups[0].display_name = "Archive".to_string();
 
-        let filename = temp_dir.path().join("segment.mkv");
-        std::fs::write(&filename, b"video").expect("video file written");
-        let begin_time = test_time("2026-05-21T00:00:00Z");
-        let end_time = test_time("2026-05-21T00:00:05Z");
+        service.apply_config(&config).expect("config applied");
 
-        let (video_unit, video_file) = service
+        let group = service
+            .fetch_storage_group("primary")
+            .expect("storage group fetched");
+        assert_eq!(group.metadata.display_name, "Archive");
+    }
+
+    #[test]
+    fn creating_a_segment_persists_a_reserved_unit_and_its_file() {
+        let (_dir, service) = configured_service();
+
+        let (unit, file) = service
             .create_video_segment(
                 &CreateVideoUnit {
                     camera_name: "front".to_string(),
-                    begin_time,
-                    end_time: begin_time,
+                    begin_time: at(0),
+                    end_time: at(0),
                 },
                 CreateVideoFile {
-                    filename: filename.display().to_string(),
+                    filename: "segment.mkv".to_string(),
                     size: 0,
                 },
             )
             .expect("video segment created");
 
-        assert!(video_unit.id > 0);
-        assert!(video_file.id > 0);
-        assert_eq!(video_file.video_unit_id, video_unit.id);
-
-        let (_video_unit, video_file) = service
-            .close_video_segment(video_unit.id, video_file.id, end_time, 4)
-            .expect("video segment closed");
-        assert_eq!(video_file.size, 4);
-
-        let segments = service
-            .fetch_video_units_between("front", begin_time, end_time)
-            .expect("video segments fetched");
-        assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].0.id, video_unit.id);
-        assert_eq!(segments[0].0.begin_time, begin_time);
-        assert_eq!(segments[0].0.end_time, end_time);
-
-        let old_units = service
-            .fetch_storage_group_old_units("primary", 10)
-            .expect("old units fetched");
-        assert_eq!(old_units.video_units.len(), 1);
-
-        service
-            .delete_video_unit(video_unit.id)
-            .expect("video unit deleted");
-        assert!(!filename.exists());
-
-        let old_units = service
-            .fetch_storage_group_old_units("primary", 10)
-            .expect("old units fetched");
-        assert!(old_units.video_units.is_empty());
+        assert!(unit.id > 0);
+        assert!(file.id > 0);
+        assert_eq!(file.video_unit_id, unit.id);
+        let stored_unit = persisted_unit(&service, unit.id);
+        assert_eq!(stored_unit.camera_name, "front");
+        assert_eq!(stored_unit.begin_time_us, at(0).timestamp_micros());
+        assert_eq!(stored_unit.end_time_us, at(0).timestamp_micros());
+        assert!(matches!(stored_unit.state, VideoUnitState::Reserved));
+        let stored_file = persisted_file(&service, file.id);
+        assert_eq!(stored_file.video_unit_id, unit.id);
+        assert_eq!(stored_file.filename, "segment.mkv");
+        assert_eq!(stored_file.size, 0);
     }
 
     #[test]
-    fn recording_ranges_merge_clip_and_isolate_cameras() {
-        let (_temp_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front", "back"]))
-            .expect("config applied");
+    fn reserving_a_segment_persists_the_reservation_time_and_an_empty_file_record() {
+        let (_dir, service) = configured_service();
 
-        let requested_begin = test_time("2026-09-22T10:00:10Z");
-        let requested_end = test_time("2026-09-22T10:00:50Z");
-        assert!(
-            service
-                .fetch_recording_ranges("front", requested_begin, requested_end)
-                .expect("empty availability fetched")
-                .is_empty()
-        );
+        let (unit, file) = service
+            .reserve_video_segment("front", "reserved.mkv".to_string(), at(0))
+            .expect("video segment reserved");
 
-        insert_video_units(
+        assert_eq!(unit.begin_time, at(0));
+        assert_eq!(unit.end_time, at(0));
+        assert_eq!(file.size, 0);
+        let stored = persisted_unit(&service, unit.id);
+        assert!(matches!(stored.state, VideoUnitState::Reserved));
+        assert_eq!(stored.camera_name, "front");
+        assert_eq!(stored.begin_time_us, at(0).timestamp_micros());
+        assert_eq!(stored.end_time_us, at(0).timestamp_micros());
+        let stored_file = persisted_file(&service, file.id);
+        assert_eq!(stored_file.video_unit_id, unit.id);
+        assert_eq!(stored_file.filename, "reserved.mkv");
+        assert_eq!(stored_file.size, 0);
+    }
+
+    #[test]
+    fn opening_a_reserved_segment_persists_the_actual_begin_time_and_open_state() {
+        let (_dir, service) = configured_service();
+        let (unit_id, file_id) = insert_segment(
             &service,
             "front",
-            [
-                // Exact left boundary exclusion.
-                (
-                    test_time("2026-09-22T10:00:00Z"),
-                    test_time("2026-09-22T10:00:10Z"),
-                ),
-                // Left clipping, touching, nesting, and overlap.
-                (
-                    test_time("2026-09-22T10:00:05Z"),
-                    test_time("2026-09-22T10:00:15Z"),
-                ),
-                (
-                    test_time("2026-09-22T10:00:15Z"),
-                    test_time("2026-09-22T10:00:20Z"),
-                ),
-                (
-                    test_time("2026-09-22T10:00:16Z"),
-                    test_time("2026-09-22T10:00:18Z"),
-                ),
-                (
-                    test_time("2026-09-22T10:00:19Z"),
-                    test_time("2026-09-22T10:00:25Z"),
-                ),
-                // A positive gap followed by touching intervals.
-                (
-                    test_time("2026-09-22T10:00:30Z"),
-                    test_time("2026-09-22T10:00:35Z"),
-                ),
-                (
-                    test_time("2026-09-22T10:00:35Z"),
-                    test_time("2026-09-22T10:00:45Z"),
-                ),
-                // A second positive gap and right clipping.
-                (
-                    test_time("2026-09-22T10:00:48Z"),
-                    test_time("2026-09-22T10:01:00Z"),
-                ),
-                // Exact right boundary exclusion.
-                (
-                    test_time("2026-09-22T10:00:50Z"),
-                    test_time("2026-09-22T10:00:55Z"),
-                ),
-                // Reserved/open and invalid metadata rows.
-                (
-                    test_time("2026-09-22T10:00:26Z"),
-                    test_time("2026-09-22T10:00:26Z"),
-                ),
-                (
-                    test_time("2026-09-22T10:00:47Z"),
-                    test_time("2026-09-22T10:00:46Z"),
-                ),
-            ],
-        );
-        insert_video_units(
-            &service,
-            "back",
-            [(
-                test_time("2026-09-22T10:00:25Z"),
-                test_time("2026-09-22T10:00:40Z"),
-            )],
+            VideoUnitState::Reserved,
+            at(0),
+            at(0),
+            "segment.mkv",
+            0,
         );
 
+        let opened = service
+            .open_video_segment(unit_id, file_id, at(5))
+            .expect("video segment opened");
+
+        assert_eq!(opened.begin_time, at(5));
+        assert_eq!(opened.end_time, at(5));
+        let stored = persisted_unit(&service, unit_id);
+        assert!(matches!(stored.state, VideoUnitState::Open));
+        assert_eq!(stored.begin_time_us, at(5).timestamp_micros());
+        assert_eq!(stored.end_time_us, at(5).timestamp_micros());
+        assert_eq!(persisted_file(&service, file_id).size, -1);
+    }
+
+    #[test]
+    fn closing_an_open_segment_persists_the_finalized_interval_and_size() {
+        let (_dir, service) = configured_service();
+        let (unit_id, file_id) = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Open,
+            at(5),
+            at(5),
+            "segment.mkv",
+            -1,
+        );
+
+        let (closed, file) = service
+            .close_video_segment(unit_id, file_id, at(35), 5)
+            .expect("video segment closed");
+
+        assert_eq!(closed.begin_time, at(5));
+        assert_eq!(closed.end_time, at(35));
+        assert_eq!(file.size, 5);
+        let stored = persisted_unit(&service, unit_id);
+        assert!(matches!(stored.state, VideoUnitState::Finalized));
+        assert_eq!(stored.begin_time_us, at(5).timestamp_micros());
+        assert_eq!(stored.end_time_us, at(35).timestamp_micros());
+        assert_eq!(persisted_file(&service, file_id).size, 5);
+    }
+
+    #[test]
+    fn video_unit_listing_returns_the_finalized_interval_and_file_size() {
+        let (_dir, service) = configured_service();
+        let (unit_id, file_id) = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(5),
+            at(35),
+            "segment.mkv",
+            5,
+        );
+
+        let segments = service
+            .fetch_video_units_between("front", at(0), at(40))
+            .expect("video segments fetched");
+
+        assert_eq!(segments.len(), 1);
+        let (unit, file) = &segments[0];
+        assert_eq!((unit.id, file.id), (unit_id, file_id));
+        assert_eq!(unit.begin_time, at(5));
+        assert_eq!(unit.end_time, at(35));
+        assert_eq!(file.size, 5);
+    }
+
+    #[test]
+    fn deleting_a_video_unit_removes_its_file_and_database_records() {
+        let (dir, service) = configured_service();
+        let filename = dir.path().join("segment.mkv");
+        std::fs::write(&filename, b"video").expect("video file written");
+        let (unit_id, _) = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(0),
+            at(5),
+            filename.to_str().unwrap(),
+            5,
+        );
+
+        service
+            .delete_video_unit(unit_id)
+            .expect("video unit deleted");
+
+        assert!(!filename.exists());
+        assert_eq!(remaining_segment_ids(&service), (vec![], vec![]));
+        let old = service
+            .fetch_storage_group_old_units("primary", 10)
+            .expect("retention candidates fetched");
+        assert!(old.video_units.is_empty());
+        assert_eq!(old.storage_group_size, 0);
+    }
+
+    #[test]
+    fn recording_ranges_are_empty_without_recordings() {
+        let (_dir, service) = configured_service();
+
         let ranges = service
-            .fetch_recording_ranges("front", requested_begin, requested_end)
-            .expect("availability fetched");
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn touching_recording_ranges_are_merged() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(15), at(20));
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(5), at(15));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert_eq!(
+            ranges,
+            vec![RecordingRange {
+                begin_time: at(5),
+                end_time: at(20)
+            },]
+        );
+    }
+
+    #[test]
+    fn overlapping_recording_ranges_are_merged() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(5), at(15));
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(10), at(20));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert_eq!(
+            ranges,
+            vec![RecordingRange {
+                begin_time: at(5),
+                end_time: at(20)
+            },]
+        );
+    }
+
+    #[test]
+    fn nested_recording_ranges_do_not_shorten_the_outer_range() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(5), at(25));
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(10), at(15));
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(20), at(30));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert_eq!(
+            ranges,
+            vec![RecordingRange {
+                begin_time: at(5),
+                end_time: at(30)
+            },]
+        );
+    }
+
+    #[test]
+    fn gaps_between_recording_ranges_are_preserved() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(20), at(25));
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(5), at(10));
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(12), at(15));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
         assert_eq!(
             ranges,
             vec![
-                super::video_units::RecordingRange {
-                    begin_time: requested_begin,
-                    end_time: test_time("2026-09-22T10:00:25Z"),
+                RecordingRange {
+                    begin_time: at(5),
+                    end_time: at(10)
                 },
-                super::video_units::RecordingRange {
-                    begin_time: test_time("2026-09-22T10:00:30Z"),
-                    end_time: test_time("2026-09-22T10:00:45Z"),
+                RecordingRange {
+                    begin_time: at(12),
+                    end_time: at(15)
                 },
-                super::video_units::RecordingRange {
-                    begin_time: test_time("2026-09-22T10:00:48Z"),
-                    end_time: requested_end,
+                RecordingRange {
+                    begin_time: at(20),
+                    end_time: at(25)
                 },
             ]
         );
+    }
 
-        let back_ranges = service
-            .fetch_recording_ranges("back", requested_begin, requested_end)
-            .expect("other camera availability fetched");
-        assert_eq!(back_ranges.len(), 1);
+    #[test]
+    fn recording_ranges_are_clipped_at_the_request_begin() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(0), at(15));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
         assert_eq!(
-            back_ranges[0],
-            super::video_units::RecordingRange {
-                begin_time: test_time("2026-09-22T10:00:25Z"),
-                end_time: test_time("2026-09-22T10:00:40Z"),
-            }
+            ranges,
+            vec![RecordingRange {
+                begin_time: at(5),
+                end_time: at(15)
+            },]
+        );
+    }
+
+    #[test]
+    fn recording_ranges_are_clipped_at_the_request_end() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(20), at(35));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert_eq!(
+            ranges,
+            vec![RecordingRange {
+                begin_time: at(20),
+                end_time: at(30)
+            },]
+        );
+    }
+
+    #[test]
+    fn recording_ranges_ending_at_the_request_begin_are_excluded() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(0), at(5));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn recording_ranges_beginning_at_the_request_end_are_excluded() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(30), at(35));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn recording_ranges_with_zero_duration_are_excluded() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(15), at(15));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn recording_ranges_with_reversed_timestamps_are_excluded() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(20), at(15));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn recording_ranges_exclude_other_cameras() {
+        let (_dir, service) = configured_service();
+        insert_video_unit(&service, "front", VideoUnitState::Finalized, at(5), at(10));
+        insert_video_unit(&service, "back", VideoUnitState::Finalized, at(10), at(20));
+
+        let ranges = service
+            .fetch_recording_ranges("front", at(5), at(30))
+            .expect("recording ranges fetched");
+
+        assert_eq!(
+            ranges,
+            vec![RecordingRange {
+                begin_time: at(5),
+                end_time: at(10)
+            },]
         );
     }
 
     #[test]
     fn recording_ranges_are_not_limited_to_999_units() {
-        let (_temp_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
-
-        let begin_time = test_time("2026-09-22T00:00:00Z");
-        insert_video_units(
-            &service,
-            "front",
-            (0_i64..1_001).map(|index| {
-                let range_begin = begin_time + Duration::seconds(index * 2);
-                (range_begin, range_begin + Duration::seconds(1))
-            }),
-        );
+        let (_dir, service) = configured_service();
+        for index in 0..1_001 {
+            insert_video_unit(
+                &service,
+                "front",
+                VideoUnitState::Finalized,
+                at(index * 2),
+                at(index * 2 + 1),
+            );
+        }
 
         let ranges = service
-            .fetch_recording_ranges("front", begin_time, begin_time + Duration::seconds(2_002))
-            .expect("availability fetched");
+            .fetch_recording_ranges("front", at(0), at(2_002))
+            .expect("recording ranges fetched");
+
         assert_eq!(ranges.len(), 1_001);
-        assert_eq!(ranges[0].begin_time, begin_time);
         assert_eq!(
-            ranges[1_000].end_time,
-            begin_time + Duration::seconds(2_001)
+            ranges[0],
+            RecordingRange {
+                begin_time: at(0),
+                end_time: at(1)
+            }
+        );
+        assert_eq!(
+            ranges[1_000],
+            RecordingRange {
+                begin_time: at(2_000),
+                end_time: at(2_001)
+            }
         );
     }
 
     #[test]
     fn recording_ranges_reject_an_unknown_camera() {
-        let (_temp_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
+        let (_dir, service) = configured_service();
 
-        assert!(matches!(
-            service.fetch_recording_ranges(
-                "missing",
-                test_time("2026-09-22T10:00:00Z"),
-                test_time("2026-09-22T10:15:00Z"),
-            ),
-            Err(super::Error::NotFound)
-        ));
+        let result = service.fetch_recording_ranges("missing", at(0), at(900));
+
+        assert!(matches!(result, Err(super::Error::NotFound)));
     }
 
     #[test]
-    fn delete_video_unit_removes_empty_parent_directories_within_storage_root() {
-        let (temp_dir, service) = migrated_service();
-        let storage_root = temp_dir.path().join("video");
+    fn deleting_a_video_unit_removes_empty_parent_directories_within_the_storage_root() {
+        let (dir, service) = migrated_service();
+        let storage_root = dir.path().join("video");
         let mut config = sample_config("secret", vec!["front"]);
         config.storage_groups[0].storage_path = storage_root.display().to_string();
         service.apply_config(&config).expect("config applied");
-
-        let segment_dir = storage_root.join("front/2026/05/21/00");
+        let segment_dir = storage_root.join("front/2026/09/22/10");
         std::fs::create_dir_all(&segment_dir).expect("segment directory created");
         let filename = segment_dir.join("segment.mkv");
         std::fs::write(&filename, b"video").expect("video file written");
-        let begin_time = test_time("2026-05-21T00:00:00Z");
-        let end_time = test_time("2026-05-21T00:00:05Z");
-
-        let (video_unit, video_file) = service
-            .create_video_segment(
-                &CreateVideoUnit {
-                    camera_name: "front".to_string(),
-                    begin_time,
-                    end_time: begin_time,
-                },
-                CreateVideoFile {
-                    filename: filename.display().to_string(),
-                    size: 0,
-                },
-            )
-            .expect("video segment created");
+        let (unit_id, _) = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(0),
+            at(5),
+            filename.to_str().unwrap(),
+            5,
+        );
 
         service
-            .close_video_segment(video_unit.id, video_file.id, end_time, 4)
-            .expect("video segment closed");
-        service
-            .delete_video_unit(video_unit.id)
+            .delete_video_unit(unit_id)
             .expect("video unit deleted");
 
         assert!(!filename.exists());
         assert!(!segment_dir.exists());
         assert!(!storage_root.join("front").exists());
         assert!(storage_root.exists());
+        assert_eq!(remaining_segment_ids(&service), (vec![], vec![]));
     }
 
     #[test]
-    fn reserves_opens_closes_and_cleans_unopened_video_segments() {
-        use super::video_units::{VideoUnit, VideoUnitState};
-        use diesel::QueryDsl;
-
-        let (temp_dir, service) = migrated_service();
+    fn login_accepts_the_configured_password() {
+        let (_dir, service) = migrated_service();
         service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
-
-        let reserved_at = test_time("2026-05-21T02:00:00Z");
-        let begin_time = test_time("2026-05-21T02:00:05Z");
-        let end_time = test_time("2026-05-21T02:00:35Z");
-        let filename = temp_dir.path().join("reserved.mkv");
-
-        let (video_unit, video_file) = service
-            .reserve_video_segment("front", filename.display().to_string(), reserved_at)
-            .expect("video segment reserved");
-        assert_eq!(video_unit.begin_time, reserved_at);
-        assert_eq!(video_unit.end_time, reserved_at);
-        assert_eq!(video_file.size, 0);
-
-        let persisted_state = || {
-            let mut conn = service.pool.get().expect("state query connection");
-            crate::schema::video_units::table
-                .find(video_unit.id)
-                .first::<VideoUnit>(&mut conn)
-                .expect("persisted video unit loaded")
-                .state
-        };
-        assert!(matches!(persisted_state(), VideoUnitState::Reserved));
-
-        let opened_unit = service
-            .open_video_segment(video_unit.id, video_file.id, begin_time)
-            .expect("video segment opened");
-        assert_eq!(opened_unit.begin_time, begin_time);
-        assert_eq!(opened_unit.end_time, begin_time);
-        assert!(matches!(persisted_state(), VideoUnitState::Open));
-
-        std::fs::write(&filename, b"video").expect("video file written");
-        let (_closed_unit, closed_file) = service
-            .close_video_segment(video_unit.id, video_file.id, end_time, 5)
-            .expect("video segment closed");
-        assert_eq!(closed_file.size, 5);
-        assert!(matches!(persisted_state(), VideoUnitState::Finalized));
-
-        let unopened_filename = temp_dir.path().join("unopened.mkv");
-        std::fs::write(&unopened_filename, b"unused").expect("unused file written");
-        service
-            .reserve_video_segment(
-                "front",
-                unopened_filename.display().to_string(),
-                reserved_at,
-            )
-            .expect("unopened video segment reserved");
-
-        let deleted_count = service
-            .delete_unopened_video_segments("front")
-            .expect("unopened video segments deleted");
-        assert_eq!(deleted_count, 1);
-        assert!(!unopened_filename.exists());
-
-        let segments = service
-            .fetch_video_units_between("front", begin_time, end_time)
-            .expect("video segments fetched");
-        assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].0.id, video_unit.id);
-        assert_eq!(segments[0].1.size, 5);
-    }
-
-    #[test]
-    fn handles_sessions_tokens_and_expired_cleanup() {
-        let (_temp_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front"]))
+            .apply_config(&sample_config("secret", vec![]))
             .expect("config applied");
 
         let user = service.login("alice", "secret").expect("login succeeds");
-        assert_eq!(user.username, "alice");
 
-        let expiration = Utc::now() + Duration::days(1);
-        let token_key = service
+        assert_eq!(user.username, "alice");
+    }
+
+    #[test]
+    fn creating_a_session_returns_and_persists_its_key() {
+        use crate::schema::user_sessions;
+        let (_dir, service) = configured_service();
+
+        let key = service
             .create_user_session(&CreateUserSession {
                 name: "ci-token".to_string(),
                 user_name: "alice".to_string(),
                 session_key: "token-key".to_string(),
                 is_token: true,
-                expiration,
+                expiration: unexpired(),
             })
             .expect("token created");
-        assert_eq!(token_key, "token-key");
+
+        assert_eq!(key, "token-key");
+        let stored = user_sessions::table
+            .first::<super::auth::UserSession>(&mut service.pool.get().expect("query connection"))
+            .expect("session loaded");
+        assert_eq!(stored.session_key, "token-key");
+        assert_eq!(stored.user_name, "alice");
+        assert_eq!(stored.name, "ci-token");
+        assert!(stored.is_token);
+        assert_eq!(stored.expiration_us, unexpired().timestamp_micros());
+    }
+
+    #[test]
+    fn unexpired_sessions_validate_as_their_user() {
+        let (_dir, service) = configured_service();
+        create_session(&service, "alice", "token-key", true, unexpired());
 
         let user = service
             .validate_user_session("token-key")
             .expect("session validates");
+
         assert_eq!(user.username, "alice");
-
-        let tokens = service.fetch_users_tokens("alice").expect("tokens fetched");
-        assert_eq!(tokens.len(), 1);
-        assert!(tokens[0].id > 0);
-        assert_eq!(
-            tokens[0].expiration.timestamp_micros(),
-            expiration.timestamp_micros()
-        );
-
-        service
-            .delete_user_session(tokens[0].id)
-            .expect("token deleted");
-        let tokens = service.fetch_users_tokens("alice").expect("tokens fetched");
-        assert!(tokens.is_empty());
-
-        service
-            .create_user_session(&CreateUserSession {
-                name: String::new(),
-                user_name: "alice".to_string(),
-                session_key: "expired-key".to_string(),
-                is_token: false,
-                expiration: Utc::now() - Duration::days(1),
-            })
-            .expect("expired session created");
-        assert!(matches!(
-            service.validate_user_session("expired-key"),
-            Err(super::Error::NotFound)
-        ));
     }
 
     #[test]
-    fn creates_and_closes_video_segments_concurrently() {
-        let (_temp_dir, service) = migrated_service();
+    fn token_listing_excludes_regular_sessions() {
+        let (_dir, service) = configured_service();
+        create_session(&service, "alice", "session-key", false, unexpired());
+        create_session(&service, "alice", "token-key", true, unexpired());
+
+        let tokens = service.fetch_users_tokens("alice").expect("tokens fetched");
+
+        assert_eq!(tokens.len(), 1);
+        assert!(tokens[0].id > 0);
+        assert_eq!(tokens[0].name, "ci-token");
+        assert_eq!(tokens[0].user_name, "alice");
+        assert_eq!(tokens[0].expiration, unexpired());
+    }
+
+    #[test]
+    fn deleting_a_session_removes_its_database_record() {
+        use crate::schema::user_sessions;
+        let (_dir, service) = configured_service();
+        create_session(&service, "alice", "token-key", true, unexpired());
+        let tokens = service.fetch_users_tokens("alice").expect("tokens fetched");
+        let session_id = tokens[0].id;
+
         service
-            .apply_config(&sample_config("secret", vec!["front"]))
-            .expect("config applied");
+            .delete_user_session(session_id)
+            .expect("token deleted");
 
-        let begin_time = test_time("2026-05-21T01:00:00Z");
-        let end_time = test_time("2026-05-21T01:00:30Z");
+        assert!(
+            service
+                .fetch_users_tokens("alice")
+                .expect("tokens fetched")
+                .is_empty()
+        );
+        let count: i64 = user_sessions::table
+            .count()
+            .get_result(&mut service.pool.get().expect("query connection"))
+            .expect("sessions counted");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn expired_sessions_are_rejected() {
+        let (_dir, service) = configured_service();
+        create_session(
+            &service,
+            "alice",
+            "expired-key",
+            false,
+            DateTime::UNIX_EPOCH,
+        );
+
+        let result = service.validate_user_session("expired-key");
+
+        assert!(matches!(result, Err(super::Error::NotFound)));
+    }
+
+    #[test]
+    fn successful_session_validation_deletes_expired_sessions() {
+        use crate::schema::user_sessions;
+        let (_dir, service) = configured_service();
+        create_session(
+            &service,
+            "alice",
+            "expired-key",
+            false,
+            DateTime::UNIX_EPOCH,
+        );
+        create_session(&service, "alice", "valid-key", false, unexpired());
+
+        service
+            .validate_user_session("valid-key")
+            .expect("session validates");
+
+        let remaining: Vec<String> = user_sessions::table
+            .select(user_sessions::session_key)
+            .load(&mut service.pool.get().expect("query connection"))
+            .expect("remaining sessions loaded");
+        assert_eq!(remaining, vec!["valid-key"]);
+    }
+
+    #[test]
+    fn concurrent_segment_writes_persist_every_finalized_segment() {
+        let (dir, service) = configured_service();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(4));
         let mut handles = Vec::new();
-
         for worker in 0..4 {
             let service = service.clone();
+            let barrier = barrier.clone();
+            let directory = dir.path().to_path_buf();
             handles.push(thread::spawn(move || {
+                barrier.wait();
                 for segment in 0..5 {
-                    let (video_unit, video_file) = service
+                    let filename = directory.join(format!("segment-{worker}-{segment}.mkv"));
+                    let (unit, file) = service
                         .create_video_segment(
                             &CreateVideoUnit {
                                 camera_name: "front".to_string(),
-                                begin_time,
-                                end_time: begin_time,
+                                begin_time: at(0),
+                                end_time: at(0),
                             },
                             CreateVideoFile {
-                                filename: format!("/tmp/segment-{worker}-{segment}.mkv"),
+                                filename: filename.display().to_string(),
                                 size: 0,
                             },
                         )
                         .expect("video segment created");
                     service
-                        .close_video_segment(video_unit.id, video_file.id, end_time, 1)
+                        .close_video_segment(unit.id, file.id, at(30), 1)
                         .expect("video segment closed");
                 }
             }));
         }
-
         for handle in handles {
             handle.join().expect("worker joined");
         }
 
         let segments = service
-            .fetch_video_units_between("front", begin_time, end_time)
+            .fetch_video_units_between("front", at(0), at(30))
             .expect("video segments fetched");
+
         assert_eq!(segments.len(), 20);
+        let filenames: std::collections::HashSet<_> = segments
+            .iter()
+            .map(|(_, file)| file.filename.clone())
+            .collect();
+        assert_eq!(filenames.len(), 20);
+        for worker in 0..4 {
+            for segment in 0..5 {
+                assert!(
+                    filenames.contains(
+                        &dir.path()
+                            .join(format!("segment-{worker}-{segment}.mkv"))
+                            .display()
+                            .to_string()
+                    )
+                );
+            }
+        }
+        for (unit, file) in segments {
+            assert_eq!(unit.camera_name, "front");
+            assert_eq!(unit.begin_time, at(0));
+            assert_eq!(unit.end_time, at(30));
+            assert!(matches!(
+                unit.state,
+                crate::api::video_units::VideoUnitState::Finalized
+            ));
+            assert_eq!(file.video_unit_id, unit.id);
+            assert_eq!(file.size, 1);
+        }
     }
 }
