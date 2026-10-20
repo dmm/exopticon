@@ -2,6 +2,15 @@
 
 <!--- next entry here -->
 
+## 0.48.3
+2026-10-20
+
+### Fixes
+
+- Add testing conventions to README (183f0b19618cd826f5af395646655ae49277b4af)
+- **db:** Refactor db tests (b74aa178ace4580b747813b6e806d6b7c6b23b79)
+- Update webpki crates (df681bb2e64f6225c2115dab661cfe8c91479639)
+
 ## 0.48.2
 2026-10-19
 
