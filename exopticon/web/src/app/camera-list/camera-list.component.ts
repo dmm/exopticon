@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { Component, OnInit } from "@angular/core";
+import { Component, OnInit, ChangeDetectionStrategy } from "@angular/core";
 import { Observable } from "rxjs";
 import { Camera } from "../camera";
 import { CameraService } from "../camera.service";
@@ -29,6 +29,7 @@ import { AsyncPipe } from "@angular/common";
   selector: "app-camera-list",
   templateUrl: "./camera-list.component.html",
   styleUrls: ["./camera-list.component.css"],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, AsyncPipe],
 })
 export class CameraListComponent implements OnInit {

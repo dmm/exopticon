@@ -18,7 +18,14 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  ChangeDetectionStrategy,
+} from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { Camera, CameraId } from "../camera";
 import { CameraPanelService } from "../camera-panel.service";
@@ -28,6 +35,7 @@ import { CameraService, PtzDirection } from "../camera.service";
   selector: "app-camera-overlay",
   imports: [RouterLink],
   templateUrl: "./camera-overlay.component.html",
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["./camera-overlay.component.css"],
 })
 export class CameraOverlayComponent implements OnInit {

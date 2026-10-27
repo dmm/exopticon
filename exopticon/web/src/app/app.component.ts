@@ -17,7 +17,11 @@
  * You should have received a copy of the GNU General Public License
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { Component } from "@angular/core";
+import {
+  ChangeDetectorRef,
+  Component,
+  ChangeDetectionStrategy,
+} from "@angular/core";
 import {
   ActivatedRoute,
   Router,
@@ -38,6 +42,7 @@ export enum MenuState {
   selector: "app-root",
   templateUrl: "./app.component.html",
   styleUrls: ["./app.component.css"],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterOutlet, AsyncPipe],
 })
 export class AppComponent {
@@ -51,6 +56,7 @@ export class AppComponent {
     private route: ActivatedRoute,
     public router: Router,
     private authService: AuthService,
+    private changeDetector: ChangeDetectorRef,
   ) {}
 
   ngOnInit() {
@@ -60,6 +66,7 @@ export class AppComponent {
       } else {
         this.fullscreen = false;
       }
+      this.changeDetector.markForCheck();
     });
     this.isLoggedIn$ = this.authService.isLoggedIn;
   }

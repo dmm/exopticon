@@ -18,7 +18,12 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { Component, OnInit } from "@angular/core";
+import {
+  ChangeDetectorRef,
+  Component,
+  OnInit,
+  ChangeDetectionStrategy,
+} from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { DateTimeFormatter, Instant, ZonedDateTime } from "@js-joda/core";
 import { Observable } from "rxjs";
@@ -36,6 +41,7 @@ enum EventListState {
   selector: "app-event-list",
   templateUrl: "./event-list.component.html",
   styleUrls: ["./event-list.component.css"],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [AsyncPipe],
 })
 export class EventListComponent implements OnInit {
@@ -53,6 +59,7 @@ export class EventListComponent implements OnInit {
     private router: Router,
     private eventService: EventService,
     private userService: UserService,
+    private changeDetector: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -80,6 +87,7 @@ export class EventListComponent implements OnInit {
   refreshEvents(): void {
     this.state = EventListState.Loading;
     this.selectedEvent = -1;
+    this.changeDetector.markForCheck();
     this.user$.subscribe((user) => {
       this.now = ZonedDateTime.now().minusDays(this.offset);
       let startOfDay = this.now
@@ -100,6 +108,7 @@ export class EventListComponent implements OnInit {
           return groups;
         }),
       );
+      this.changeDetector.markForCheck();
     });
   }
 

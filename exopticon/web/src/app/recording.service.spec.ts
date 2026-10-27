@@ -1,4 +1,4 @@
-import { provideHttpClient } from "@angular/common/http";
+import { provideHttpClient, withXhr } from "@angular/common/http";
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -18,7 +18,7 @@ const descriptor: RecordingDescriptor = {
 describe("RecordingService", () => {
   it("requests UTC ranges using the recording API contract", () => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(withXhr()), provideHttpClientTesting()],
     });
     const http = TestBed.inject(HttpTestingController);
     let ranges: unknown;
@@ -41,7 +41,7 @@ describe("RecordingService", () => {
 
   it("resolves a time and follows the descriptor's successor URL", () => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(withXhr()), provideHttpClientTesting()],
     });
     const http = TestBed.inject(HttpTestingController);
     const service = TestBed.inject(RecordingService);
@@ -69,7 +69,7 @@ describe("RecordingService", () => {
 
   it("downloads a whole Blob and cancels the request on unsubscribe", () => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(withXhr()), provideHttpClientTesting()],
     });
     const http = TestBed.inject(HttpTestingController);
     const service = TestBed.inject(RecordingService);

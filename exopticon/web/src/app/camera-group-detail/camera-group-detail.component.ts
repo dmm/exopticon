@@ -1,5 +1,5 @@
 import { AsyncPipe } from "@angular/common";
-import { Component, OnInit } from "@angular/core";
+import { Component, OnInit, ChangeDetectionStrategy } from "@angular/core";
 import { ActivatedRoute, ParamMap, Router } from "@angular/router";
 import { forkJoin, Observable } from "rxjs";
 import { map, switchMap } from "rxjs/operators";
@@ -17,6 +17,7 @@ interface CameraGroupDetail {
   selector: "app-camera-group-detail",
   templateUrl: "./camera-group-detail.component.html",
   styleUrls: ["./camera-group-detail.component.css"],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [AsyncPipe],
 })
 export class CameraGroupDetailComponent implements OnInit {

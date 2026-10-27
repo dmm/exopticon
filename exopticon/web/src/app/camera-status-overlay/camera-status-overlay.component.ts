@@ -18,11 +18,17 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { Component, Input, OnInit } from "@angular/core";
+import {
+  Component,
+  Input,
+  OnInit,
+  ChangeDetectionStrategy,
+} from "@angular/core";
 
 @Component({
   selector: "app-camera-status-overlay",
   templateUrl: "./camera-status-overlay.component.html",
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["./camera-status-overlay.component.css"],
 })
 export class CameraStatusOverlayComponent implements OnInit {

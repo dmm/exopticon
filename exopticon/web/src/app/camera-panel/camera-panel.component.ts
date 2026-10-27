@@ -25,6 +25,7 @@ import {
   HostListener,
   NgZone,
   OnInit,
+  ChangeDetectionStrategy,
 } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { AsyncPipe } from "@angular/common";
@@ -49,6 +50,7 @@ interface CameraPanelFocusHistoryState {
   templateUrl: "./camera-panel.component.html",
   styleUrls: ["./camera-panel.component.css"],
   providers: [CameraPanelService],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [IntersectionObserverModule, CameraViewComponent, AsyncPipe],
 })
 export class CameraPanelComponent implements OnInit {
@@ -117,6 +119,7 @@ export class CameraPanelComponent implements OnInit {
         this.fullscreen = false;
       }
 
+      this.cdr.markForCheck();
       this.normalizeFocusedUrlIfNeeded();
     });
 

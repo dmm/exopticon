@@ -29,6 +29,7 @@ import {
   Output,
   SimpleChanges,
   ViewChild,
+  ChangeDetectionStrategy,
 } from "@angular/core";
 import { Subscription } from "rxjs";
 import { Camera, CameraId } from "../camera";
@@ -56,6 +57,7 @@ type CameraViewStatus = NewState | ConnectingState | PlayingState;
   selector: "app-camera-view",
   templateUrl: "./camera-view.component.html",
   styleUrls: ["./camera-view.component.css"],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CameraOverlayComponent, CameraStatusOverlayComponent],
 })
 export class CameraViewComponent implements OnInit, OnDestroy {
@@ -226,6 +228,7 @@ export class CameraViewComponent implements OnInit, OnDestroy {
   onVideoStatusChange(status: string) {
     setTimeout(() => {
       this.status = status;
+      this.changeRef.markForCheck();
     }, 0);
   }
 }

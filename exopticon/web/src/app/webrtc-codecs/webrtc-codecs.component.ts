@@ -1,4 +1,4 @@
-import { Component, OnInit } from "@angular/core";
+import { Component, OnInit, ChangeDetectionStrategy } from "@angular/core";
 import { CommonModule } from "@angular/common";
 
 interface CodecInfo {
@@ -13,6 +13,7 @@ interface CodecInfo {
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./webrtc-codecs.component.html",
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["./webrtc-codecs.component.css"],
 })
 export class WebrtcCodecsComponent implements OnInit {

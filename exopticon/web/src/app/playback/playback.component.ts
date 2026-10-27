@@ -6,6 +6,7 @@ import {
   OnDestroy,
   OnInit,
   ViewChild,
+  ChangeDetectionStrategy,
 } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { Subscription } from "rxjs";
@@ -22,6 +23,7 @@ interface TimelineRange {
   selector: "app-playback",
   imports: [DatePipe, RouterLink],
   templateUrl: "./playback.component.html",
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["./playback.component.css"],
 })
 export class PlaybackComponent implements OnInit, OnDestroy {

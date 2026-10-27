@@ -1,20 +1,12 @@
-import {
-  enableProdMode,
-  provideZoneChangeDetection,
-  isDevMode,
-  importProvidersFrom,
-} from "@angular/core";
+import { enableProdMode, isDevMode, importProvidersFrom } from "@angular/core";
 
 import { environment } from "./environments/environment";
-import {
-  platformBrowser,
-  BrowserModule,
-  bootstrapApplication,
-} from "@angular/platform-browser";
+import { BrowserModule, bootstrapApplication } from "@angular/platform-browser";
 import {
   HTTP_INTERCEPTORS,
   provideHttpClient,
   withInterceptorsFromDi,
+  withXhr,
 } from "@angular/common/http";
 import { AuthInterceptor } from "./app/auth.interceptor";
 import { APP_BASE_HREF } from "@angular/common";
@@ -47,6 +39,6 @@ bootstrapApplication(AppComponent, {
     { provide: APP_BASE_HREF, useValue: "/" },
     CameraService,
     TokenService,
-    provideHttpClient(withInterceptorsFromDi()),
+    provideHttpClient(withXhr(), withInterceptorsFromDi()),
   ],
 }).catch((err) => console.error(err));

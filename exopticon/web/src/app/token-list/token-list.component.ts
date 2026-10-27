@@ -18,7 +18,12 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { Component, OnInit } from "@angular/core";
+import {
+  ChangeDetectorRef,
+  Component,
+  OnInit,
+  ChangeDetectionStrategy,
+} from "@angular/core";
 import { Router } from "@angular/router";
 import { LocalDate } from "@js-joda/core";
 import { Observable } from "rxjs";
@@ -30,6 +35,7 @@ import { AsyncPipe } from "@angular/common";
   selector: "app-token-list",
   templateUrl: "./token-list.component.html",
   styleUrls: ["./token-list.component.css"],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, AsyncPipe],
 })
 export class TokenListComponent implements OnInit {
@@ -43,6 +49,7 @@ export class TokenListComponent implements OnInit {
   constructor(
     private router: Router,
     private tokenService: TokenService,
+    private changeDetector: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -56,6 +63,7 @@ export class TokenListComponent implements OnInit {
       .then(() => {
         this.newToken = null;
         this.tokens$ = this.tokenService.getTokens();
+        this.changeDetector.markForCheck();
       });
   }
 
@@ -70,10 +78,12 @@ export class TokenListComponent implements OnInit {
       .then((tokenKey) => {
         this.newToken = tokenKey;
         this.tokens$ = this.tokenService.getTokens();
+        this.changeDetector.markForCheck();
       })
       .catch((err) => {
         console.log(`Error creating token: ${err}`);
         this.error = "Error creating token!";
+        this.changeDetector.markForCheck();
       });
   }
 
