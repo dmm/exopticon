@@ -2,6 +2,20 @@
 
 <!--- next entry here -->
 
+## 0.48.4
+2026-10-27
+
+### Fixes
+
+- Remove unused dependencies (358182d19713e6524187dd9dc7859e8d43464d2e)
+- Update thiserror and socket2 (fbda6c0caaccde5c11970b2b0596cc3147218629)
+- Switch from bincode to postcard serialization (bdee5b85656e0f28111658815b53590248a82956)
+- Update diesel/sqlite (d935b3debb71eb501b154478a9f6b86f2ec2fe00)
+- Update media crates (a0735200257806374da6a3011abb98c1cdc7b9dc)
+- Upgrade crates (753abd9e61afbfe4050d0043f3f6ffeeb036ff18)
+- Remove multiple_crate_versions lint (c949369de8a22155f2ec2300deddc52c170991ad)
+- Upgrade to Angular v22 (22df360c232e7750c8fa6226af223faae24e701b)
+
 ## 0.48.3
 2026-10-20
 
