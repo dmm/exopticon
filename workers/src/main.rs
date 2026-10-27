@@ -31,6 +31,7 @@
 )]
 #![allow(clippy::arithmetic_side_effects)]
 #![allow(clippy::integer_division)]
+#![allow(clippy::multiple_crate_versions)]
 #![allow(clippy::implicit_return)]
 #![allow(clippy::print_stdout)]
 

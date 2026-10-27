@@ -891,7 +891,7 @@ mod tests {
             .fetch_recording_ranges("front", at(5), at(30))
             .expect("recording ranges fetched");
 
-        assert!(ranges.is_empty());
+        assert_eq!(ranges, Vec::<RecordingRange>::new());
     }
 
     #[test]
@@ -1027,7 +1027,7 @@ mod tests {
             .fetch_recording_ranges("front", at(5), at(30))
             .expect("recording ranges fetched");
 
-        assert!(ranges.is_empty());
+        assert_eq!(ranges, Vec::<RecordingRange>::new());
     }
 
     #[test]
@@ -1039,7 +1039,7 @@ mod tests {
             .fetch_recording_ranges("front", at(5), at(30))
             .expect("recording ranges fetched");
 
-        assert!(ranges.is_empty());
+        assert_eq!(ranges, Vec::<RecordingRange>::new());
     }
 
     #[test]
@@ -1051,7 +1051,7 @@ mod tests {
             .fetch_recording_ranges("front", at(5), at(30))
             .expect("recording ranges fetched");
 
-        assert!(ranges.is_empty());
+        assert_eq!(ranges, Vec::<RecordingRange>::new());
     }
 
     #[test]
@@ -1063,7 +1063,7 @@ mod tests {
             .fetch_recording_ranges("front", at(5), at(30))
             .expect("recording ranges fetched");
 
-        assert!(ranges.is_empty());
+        assert_eq!(ranges, Vec::<RecordingRange>::new());
     }
 
     #[test]
