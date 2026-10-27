@@ -55,10 +55,10 @@ serde_repr = "0.1"
 serde_json="1.0"
 serde = { version = "1.0", features = ["derive"] }
 str0m = { version = "0.18.1" }
-socket2 = "0.5"
+socket2 = "0.6"
 url = "^2.5"
 uuid = { version = "^1", features = ["serde", "v4", "v7"] }
-thiserror = "1.0"
+thiserror = "2.0"
 toml = "0.8.19"
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["fs", "trace"] }
