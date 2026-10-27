@@ -1173,6 +1173,34 @@ mod tests {
     }
 
     #[test]
+    fn login_accepts_hashes_created_with_bcrypt_0_15() {
+        // Fixed fixtures generated before upgrading bcrypt, including its 72-byte truncation.
+        let fixtures = [
+            (
+                "legacy-password".to_string(),
+                "$2b$04$sfvEOsyNjC.cOJR6DtFHy.F7D4JiDjrQFTy0v/JCuL33KxvXrWo1u",
+            ),
+            (
+                "a".repeat(80),
+                "$2b$04$gI0g3w9Cym3WgHlBtRpU7.Ht5Rx4NacxjT0czfeJYxp6AdDzWXaSS",
+            ),
+        ];
+
+        for (password, hash) in fixtures {
+            let (_dir, service) = migrated_service();
+            let mut config = sample_config("unused", vec![]);
+            config.users[0].password_hash = hash.to_string();
+            service.apply_config(&config).expect("config applied");
+
+            let user = service
+                .login("alice", &password)
+                .expect("legacy login succeeds");
+            assert_eq!(user.username, "alice");
+            assert!(service.login("alice", "incorrect-password").is_err());
+        }
+    }
+
+    #[test]
     fn creating_a_session_returns_and_persists_its_key() {
         use crate::schema::user_sessions;
         let (_dir, service) = configured_service();

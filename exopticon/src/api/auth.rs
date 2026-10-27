@@ -28,7 +28,6 @@ use axum::{
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use chrono::{DateTime, Duration, Utc};
-use rand::Rng;
 use tokio::task::spawn_blocking;
 
 use crate::AppState;
@@ -103,7 +102,7 @@ pub async fn login(
 
     let user = spawn_blocking(move || db.login(&auth_data.username, &auth_data.password)).await??;
     // We found a valid user with that password. Create a login session.
-    let session_key = BASE64_STANDARD.encode(rand::thread_rng().r#gen::<[u8; 32]>());
+    let session_key = BASE64_STANDARD.encode(rand::random::<[u8; 32]>());
     let valid_time = Duration::days(7);
     let Some(expiration) = Utc::now().checked_add_signed(valid_time) else {
         error!("expiration date calculation failed!");
@@ -142,7 +141,7 @@ pub async fn create_personal_access_token(
 ) -> Result<Json<String>, UserError> {
     let db = state.db_service;
 
-    let session_key = BASE64_STANDARD.encode(rand::thread_rng().r#gen::<[u8; 32]>());
+    let session_key = BASE64_STANDARD.encode(rand::random::<[u8; 32]>());
 
     let new_session = CreateUserSession {
         name: create_token_request.name,
