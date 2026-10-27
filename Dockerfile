@@ -1,3 +1,5 @@
+FROM docker.io/library/node:24.21.0-bookworm-slim AS node
+
 FROM quay.io/almalinuxorg/almalinux:10 AS base
 
 # Install EPEL
@@ -91,8 +93,6 @@ RUN dnf install -y \
     gstreamer1-plugins-good \
     gstreamer1-plugins-ugly-free \
     sqlite-devel \
-    nodejs \
-    nodejs-npm \
     python3-pip \
     # for Rust openssl crate:
     pkgconf \
@@ -105,6 +105,13 @@ RUN dnf install -y \
     && dnf clean all \
     && rm -rf /var/cache/yum/*
 
+# Match the Node.js version used to build and test the Angular app locally.
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && node --version \
+    && npm --version
 
 RUN mkdir /cargo && mkdir /rust
 RUN chown 1000:1000 /cargo /rust
