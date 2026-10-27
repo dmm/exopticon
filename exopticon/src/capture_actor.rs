@@ -410,7 +410,7 @@ impl CaptureActor {
     ) -> anyhow::Result<()> {
         let item = msg?;
 
-        let frame: CaptureMessage = bincode::deserialize(&item[..])?;
+        let frame: CaptureMessage = exserial::deserialize_message(&item[..])?;
 
         self.message_to_action(frame).await?;
 

@@ -63,7 +63,7 @@ impl PacketEncoding {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 /// Message from captureworker
 pub enum CaptureMessage {
     /// Log
@@ -108,7 +108,7 @@ pub enum CaptureMessage {
     Metric { label: String, values: Vec<f64> },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 /// Command from capture actor to capture worker
 pub enum CaptureCommand {
     /// Reserved file location response

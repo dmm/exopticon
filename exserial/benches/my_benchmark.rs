@@ -20,45 +20,42 @@
 
 use std::{hint::black_box, time::Duration};
 
-use bincode::{deserialize, serialize};
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 
-use exserial::models::{CameraFrame, FrameResolution, FrameSource};
+use exserial::models::{CaptureMessage, PacketEncoding};
 
 extern crate exserial;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    // make a vec of about 318KiB to represent a typical frame
-    let mut jpeg: Vec<u8> = Vec::with_capacity(321900);
+    // make a vec of about 318KiB to represent a compressed video packet
+    let mut data: Vec<u8> = Vec::with_capacity(321900);
     // initialize with random values
-    for _ in 0..jpeg.capacity() {
-        jpeg.push(rand::random());
+    for _ in 0..data.capacity() {
+        data.push(rand::random());
     }
 
-    let frame = CameraFrame {
-        camera_id: 8,
-        jpeg,
-        resolution: FrameResolution::HD,
-        source: FrameSource::Camera { camera_id: 8 },
-        offset: 0,
-        unscaled_width: 1920,
-        unscaled_height: 1080,
+    let frame = CaptureMessage::Packet {
+        encoding: PacketEncoding::H264,
+        data,
+        timestamp: 90_000,
+        duration: 33_333,
     };
 
-    let serialized = serialize(&frame).expect("Unable to serialize message!");
+    let serialized = postcard::to_allocvec(&frame).expect("Unable to serialize message!");
 
     let mut group = c.benchmark_group("serialize deserialize throughput");
     group.throughput(Throughput::Elements(1));
     group.measurement_time(Duration::from_secs(20));
-    group.bench_function("bincode serialize frame", |b| {
+    group.bench_function("postcard serialize packet", |b| {
         b.iter(|| {
-            serialize(black_box(&frame)).expect("Unable to serialize message!");
+            postcard::to_allocvec(black_box(&frame)).expect("Unable to serialize message!");
         });
     });
 
-    group.bench_function("bincode deserialize frame", |b| {
+    group.bench_function("postcard deserialize packet", |b| {
         b.iter(|| {
-            let _frame: Result<CameraFrame, bincode::Error> = deserialize(black_box(&serialized));
+            let _frame: CaptureMessage = postcard::from_bytes(black_box(&serialized))
+                .expect("Unable to deserialize message!");
         })
     });
 }
