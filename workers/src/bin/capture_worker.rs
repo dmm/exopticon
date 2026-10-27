@@ -62,10 +62,7 @@ use exserial::{
 };
 use gstreamer::{
     self as gst, Bin, Element, Pad, PadProbeId, PadProbeReturn, PadProbeType,
-    glib::{
-        self,
-        object::{Cast, ObjectExt},
-    },
+    glib::object::{Cast, ObjectExt},
     prelude::{
         ClockExt, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, GstValueExt, PadExt,
         PadExtManual, TagSetterExtManual,
@@ -406,15 +403,9 @@ fn caps_are_compatible(old: &gst::CapsRef, new: &gst::CapsRef) -> bool {
     ];
 
     for field in &significant_fields {
-        let old_serialized = old_s
-            .value_by_quark(glib::Quark::from_str(*field))
-            .ok()
-            .map(|v| v.serialize().ok());
+        let old_serialized = old_s.value(*field).ok().map(|v| v.serialize().ok());
 
-        let new_serialized = new_s
-            .value_by_quark(glib::Quark::from_str(*field))
-            .ok()
-            .map(|v| v.serialize().ok());
+        let new_serialized = new_s.value(*field).ok().map(|v| v.serialize().ok());
 
         match (&old_serialized, &new_serialized) {
             (Some(o), Some(n)) => {
@@ -477,7 +468,7 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
                 let element = pad.parent_element()?;
                 let clock = element.clock()?;
                 let base_time = element.base_time()?;
-                Some(clock.time()?.saturating_sub(base_time))
+                Some(clock.time().saturating_sub(base_time))
             })();
             match pts {
                 Some(rt) => {

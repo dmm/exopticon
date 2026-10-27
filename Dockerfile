@@ -1,4 +1,4 @@
-FROM docker.io/almalinux:10 AS base
+FROM quay.io/almalinuxorg/almalinux:10 AS base
 
 # Install EPEL
 RUN  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
@@ -119,8 +119,8 @@ ENV CARGO_HOME=/cargo
 ENV RUST_HOME=/rust
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-  && /cargo/bin/rustup toolchain install 1.90.0 \
-  && /cargo/bin/rustup default 1.90.0 \
+  && /cargo/bin/rustup toolchain install 1.99.1 \
+  && /cargo/bin/rustup default 1.99.1 \
   && /cargo/bin/rustup component add clippy
 
 ENV EXOPTICONWORKERS=/target/debug/

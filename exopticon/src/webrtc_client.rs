@@ -102,6 +102,16 @@ pub struct Client {
 }
 
 impl Client {
+    fn new_rtc() -> Rtc {
+        Rtc::builder()
+            .set_send_buffer_video(100_000)
+            .set_reordering_size_video(500)
+            .clear_codecs()
+            .enable_h264(true)
+            .enable_pcmu(true, false)
+            .build(Instant::now())
+    }
+
     pub fn new(
         websocket: WebSocket,
         udp_receiver: tokio::sync::broadcast::Receiver<(usize, SocketAddr, Vec<u8>)>,
@@ -111,13 +121,7 @@ impl Client {
         udp_socket: Arc<UdpSocket>,
         candidate_ips: Vec<String>,
     ) -> Self {
-        let rtc = Rtc::builder()
-            .set_send_buffer_video(100_000)
-            .set_reordering_size_video(500)
-            .clear_codecs()
-            .enable_h264(true)
-            .enable_pcmu(true)
-            .build(Instant::now());
+        let rtc = Self::new_rtc();
 
         Self {
             id: Uuid::new_v4(),
@@ -463,7 +467,29 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::{HashMap, Mid, MidPair, camera_for_video_mid};
+    use super::{Client, HashMap, Mid, MidPair, camera_for_video_mid};
+    use str0m::media::{Direction, MediaKind};
+
+    #[test]
+    fn negotiates_h264_and_pcmu_without_audio_redundancy() {
+        let mut viewer = Client::new_rtc();
+        let mut server = Client::new_rtc();
+        let mut changes = viewer.sdp_api();
+        let video = changes.add_media(MediaKind::Video, Direction::RecvOnly, None, None, None);
+        let audio = changes.add_media(MediaKind::Audio, Direction::RecvOnly, None, None, None);
+        let (offer, pending) = changes.apply().expect("viewer offer");
+        let answer = server.sdp_api().accept_offer(offer).expect("server answer");
+        let sdp = answer.to_sdp_string();
+        assert!(sdp.contains(" H264/90000"));
+        assert!(sdp.contains(" PCMU/8000"));
+        assert!(!sdp.contains(" red/"));
+        viewer
+            .sdp_api()
+            .accept_answer(pending, answer)
+            .expect("viewer accepts answer");
+        assert!(server.writer(video).is_some());
+        assert!(server.writer(audio).is_some());
+    }
 
     #[test]
     fn keyframes_route_only_to_the_matching_video_camera() {
