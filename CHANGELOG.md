@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.5
+2026-10-28
+
+### Fixes
+
+- chore(deps): pin dependencies (8c08b071e2606c79e9c095b28406543358dd49b3)
+
 ## 0.48.4
 2026-10-27
 
