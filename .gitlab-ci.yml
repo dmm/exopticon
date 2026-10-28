@@ -1,4 +1,4 @@
-image: rust:1.47.0-buster
+image: rust:1.47.0-buster@sha256:48f4b36c3f3492b82a5e14b2fc991d3163c1d2ce18ac1f0561e9657103192713
 
 # Set any required environment variables here
 variables:
@@ -21,7 +21,7 @@ stages:
 
 version:
   stage: version
-  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.19.0
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.19.0@sha256:37d80d80bf4c2c6b7111092902d90be796e617fed5438eaddfac4a1f89c26685
   script:
     - release next-version --bump-patch > .next-version
   artifacts:
@@ -32,7 +32,7 @@ version:
 
 pre-release:
   stage: build
-  image: docker:29-cli
+  image: docker:29-cli@sha256:5e6baf67325a79f64ed3bed6863954d5e05d0f3d4e57cbdb14809346814bbfdb
   before_script:
     - mkdir -p ~/.docker
     - printf '%s' "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json
@@ -45,7 +45,7 @@ pre-release:
 
 build-image:
   stage: image
-  image: docker:29-cli
+  image: docker:29-cli@sha256:5e6baf67325a79f64ed3bed6863954d5e05d0f3d4e57cbdb14809346814bbfdb
   before_script:
     - mkdir -p ~/.docker
     - printf '%s' "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json
@@ -70,7 +70,7 @@ build-image:
 
 release:
   stage: release
-  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1@sha256:9bde0390b066498c3fe3065971651e4e7a3f34c3dbabc0ac7f85b33d9a693fdb
   script:
     - rm -f release_info
     - mv build_info release_info

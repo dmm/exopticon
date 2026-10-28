@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
   caddy:
-    image: quay.io/fariszr/caddy-dns:desec
+    image: quay.io/fariszr/caddy-dns:desec@sha256:e4032e8964aaba97126f77f272b527592f260d472b5ab5a94254eaded622291c
     restart: always
     ports:
       - 80:80  # Needed for the ACME HTTP-01 challenge.

@@ -1,6 +1,6 @@
-FROM docker.io/library/node:24.21.0-bookworm-slim AS node
+FROM docker.io/library/node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS node
 
-FROM quay.io/almalinuxorg/almalinux:10 AS base
+FROM quay.io/almalinuxorg/almalinux:10@sha256:96336c2e1a61ba389a943ca68069ea803ccfabe12c4461a6e869496ddc9cad8e AS base
 
 # Install EPEL
 RUN  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
