@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.6
+2026-10-28
+
+### Fixes
+
+- chore(deps): update axum monorepo (97b752c021210157fdbef41384a95dff1525ef05)
+
 ## 0.48.5
 2026-10-28
 
