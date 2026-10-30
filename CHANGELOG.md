@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.9
+2026-10-30
+
+### Fixes
+
+- chore(deps): update dependency @ng-web-apis/intersection-observer to v3.2.3 (a2af0008d070637d8d0e02ac21168d84c8155e51)
+
 ## 0.48.8
 2026-10-30
 
