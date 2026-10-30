@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.7
+2026-10-30
+
+### Fixes
+
+- chore(deps): update dependency karma to v6.4.4 (bc3b9635dbed38c14d1b5c0c462c9f910e62d308)
+
 ## 0.48.6
 2026-10-28
 
