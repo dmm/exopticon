@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.49.0
+2026-10-30
+
+### Features
+
+- **web:** Add +- 1 sec seek button to PlaybackView (78588422460074617088ce4fb865d11d1b1c97aa)
+- **web:** Add png export button to playback component (b95426ee9c3e0465e349f50c81692d4af7c08c66)
+
 ## 0.48.10
 2026-10-30
 
