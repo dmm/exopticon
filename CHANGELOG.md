@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.48.8
+2026-10-30
+
+### Fixes
+
+- chore(deps): update dependency @types/jasmine to v3.10.19 (124d80e4203e0b47b084f0525eed3a2ae8a5355f)
+
 ## 0.48.7
 2026-10-30
 
