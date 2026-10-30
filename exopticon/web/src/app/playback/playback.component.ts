@@ -8,7 +8,7 @@ import {
   ViewChild,
   ChangeDetectionStrategy,
 } from "@angular/core";
-import { ActivatedRoute, RouterLink } from "@angular/router";
+import { ActivatedRoute } from "@angular/router";
 import { Subscription } from "rxjs";
 import { RecordingService } from "../recording.service";
 import { DecodedFrame } from "./mkv-reader";
@@ -21,7 +21,7 @@ interface TimelineRange {
 
 @Component({
   selector: "app-playback",
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe],
   templateUrl: "./playback.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["./playback.component.css"],
@@ -141,6 +141,10 @@ export class PlaybackComponent implements OnInit, OnDestroy {
           ((event.clientX - bounds.left) / bounds.width) * this.windowDuration,
       );
     }
+  }
+
+  seekButton(offset: number) {
+    this.seek(this.position + offset);
   }
 
   seekKey(event: KeyboardEvent): void {

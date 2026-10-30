@@ -1,4 +1,3 @@
-<p><button type="button" routerLink="/camera_panel">Back to cameras</button></p>
 <h2>Playback — {{ cameraName }}</h2>
 @if (cameraName) {
   <div class="preview">
@@ -67,7 +66,6 @@
     role="slider"
     tabindex="0"
     aria-label="Playback time"
-    aria-describedby="timeline-help"
     [attr.aria-valuemin]="windowStart"
     [attr.aria-valuemax]="windowEnd - 1"
     [attr.aria-valuenow]="playheadVisible ? position : null"
@@ -96,10 +94,6 @@
       <span>{{ windowStart + tick * 60000 | date: "HH:mm" }}</span>
     }
   </div>
-  <p id="timeline-help">
-    Green marks available video. Click or touch to seek; use arrow keys for
-    one-second seeks.
-  </p>
   <div class="availability-status" aria-live="polite">
     @if (loading) {
       <p>Loading recording ranges…</p>
@@ -147,5 +141,20 @@
         </button>
       }
     </span>
+    <span class="seek-controls" role="group" aria-label="Seek by one second">
+      <button
+        type="button"
+        (click)="seekButton(-1000)"
+        >
+        -1s
+      </button>
+      <button
+        type="button"
+        (click)="seekButton(1000)"
+        >
+        +1s
+      </button>
+    </span>
+
   </div>
 }
