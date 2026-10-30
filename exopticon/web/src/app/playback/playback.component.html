@@ -142,19 +142,22 @@
       }
     </span>
     <span class="seek-controls" role="group" aria-label="Seek by one second">
-      <button
-        type="button"
-        (click)="seekButton(-1000)"
-        >
-        -1s
-      </button>
-      <button
-        type="button"
-        (click)="seekButton(1000)"
-        >
-        +1s
-      </button>
+      <button type="button" (click)="seekButton(-1000)">-1s</button>
+      <button type="button" (click)="seekButton(1000)">+1s</button>
     </span>
 
+    <button
+      type="button"
+      (click)="exportPng()"
+      [disabled]="
+        controller.state.phase !== 'paused' &&
+        controller.state.phase !== 'playing' &&
+        controller.state.phase !== 'ended' &&
+        controller.state.phase !== 'gap' &&
+        controller.state.phase !== 'buffering'
+      "
+    >
+      Export png
+    </button>
   </div>
 }

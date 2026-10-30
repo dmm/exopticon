@@ -194,6 +194,22 @@ export class PlaybackComponent implements OnInit, OnDestroy {
       void this.controller.seek(this.controller.state.requestedTime);
   }
 
+  exportPng() {
+    let time = this.controller.state.displayedTime;
+    if (!time || time == 0) return;
+    let date = new Date(time);
+    let cameraName = this.cameraName;
+    let canvas = this.canvas?.nativeElement;
+    if (!canvas) return;
+    const img = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = img;
+    a.download = `${cameraName}-${date.toISOString()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   private render(frame: DecodedFrame | null): void {
     const canvas = this.canvas?.nativeElement;
     if (!canvas) return;
