@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
   grafana:
-    image: grafana/grafana:7.5.4@sha256:ba39bf5131dcc0464134a3ff0e26e8c6380415249fa725e5f619176601255172
+    image: grafana/grafana:7.5.17@sha256:15abb652aa82eeb9f45589278b34ae6ef0e96f74c389cadde31831eb0b1ce228
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana_datasource.yml:/etc/grafana/provisioning/datasources/exopticon.yml
