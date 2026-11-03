@@ -26,6 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use anyhow::Context;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
@@ -127,6 +128,81 @@ fn publish_recording(
     Ok(())
 }
 
+fn cleanup_staged_recordings(staging_path: &Path) -> anyhow::Result<()> {
+    std::fs::create_dir_all(staging_path).with_context(|| {
+        format!(
+            "failed to create staging directory {}",
+            staging_path.display()
+        )
+    })?;
+    let entries = std::fs::read_dir(staging_path).with_context(|| {
+        format!(
+            "failed to read staging directory {}",
+            staging_path.display()
+        )
+    })?;
+    let mut removed_count = 0;
+    let mut removed_bytes = 0u64;
+
+    for entry in entries {
+        let entry = entry.with_context(|| {
+            format!("failed to read staging entry in {}", staging_path.display())
+        })?;
+        let filename = entry.file_name();
+        let Some(filename) = filename.to_str() else {
+            continue;
+        };
+        let Some(uuid) = filename
+            .strip_suffix(".mkv")
+            .and_then(|stem| Uuid::parse_str(stem).ok())
+        else {
+            continue;
+        };
+        if uuid.get_version_num() != 7 || filename != format!("{uuid}.mkv") {
+            continue;
+        }
+
+        let path = entry.path();
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                warn!(
+                    "Failed to inspect staged recording {}: {}",
+                    path.display(),
+                    err
+                );
+                continue;
+            }
+        };
+        if !metadata.is_file() {
+            continue;
+        }
+        match std::fs::remove_file(&path) {
+            Ok(()) => {
+                removed_count += 1;
+                removed_bytes += metadata.len();
+            }
+            Err(err) => {
+                warn!(
+                    "Failed to remove abandoned staged recording {}: {}",
+                    path.display(),
+                    err
+                );
+            }
+        }
+    }
+
+    if removed_count > 0 {
+        info!(
+            "Removed {} abandoned staged recordings ({} bytes) from {}",
+            removed_count,
+            removed_bytes,
+            staging_path.display()
+        );
+    }
+    Ok(())
+}
+
 pub struct CaptureActor {
     state: State,
     db: crate::db::Service,
@@ -172,7 +248,7 @@ impl CaptureActor {
         }
     }
 
-    fn start_worker(&mut self) -> anyhow::Result<()> {
+    async fn start_worker(&mut self) -> anyhow::Result<()> {
         debug!(
             "Starting worker process for camera: {}, id: {}, stream: {}",
             self.camera.name, self.camera.name, self.camera.rtsp_url
@@ -180,7 +256,8 @@ impl CaptureActor {
         let storage_path = Path::new(&self.storage_group.spec.storage_path)
             .join(".staging")
             .join(&self.camera.name);
-        std::fs::create_dir_all(&storage_path)?;
+        let staging_path = storage_path.clone();
+        spawn_blocking(move || cleanup_staged_recordings(&staging_path)).await??;
         let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
         let executable_path: PathBuf = [worker_path, "capture_worker".to_string()].iter().collect();
 
@@ -422,7 +499,7 @@ impl CaptureActor {
                 if let Err(e) = self.cleanup_unopened_video_segments().await {
                     error!("error cleaning unopened video segments: {}", e);
                 }
-                if let Err(e) = self.start_worker() {
+                if let Err(e) = self.start_worker().await {
                     error!("error starting capture worker: {}", e);
                     had_error = true;
                     break;
@@ -482,5 +559,60 @@ impl CaptureActor {
             },
         );
         self.camera.name
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn staging_cleanup_removes_only_this_cameras_abandoned_recordings() {
+        let directory = tempfile::tempdir().unwrap();
+        let staging = directory.path().join(".staging/front");
+        std::fs::create_dir_all(&staging).unwrap();
+        let filename = "019a2c8e-7200-7000-8000-000000000001.mkv";
+        let abandoned = staging.join(filename);
+        std::fs::write(&abandoned, b"interrupted recording").unwrap();
+
+        let preserved = [
+            staging.join("notes.mkv"),
+            staging.join("019A2C8E-7200-7000-8000-000000000001.mkv"),
+            staging.join("019a2c8e-7200-4000-8000-000000000001.mkv"),
+            staging.join("019a2c8e-7200-7000-8000-000000000001.tmp"),
+            staging.join("nested").join(filename),
+            staging.join("019a2c8e-7200-7000-8000-000000000002.mkv/keep"),
+            directory.path().join(".staging/back").join(filename),
+            directory.path().join("front/2026/11/03/21").join(filename),
+        ];
+        for path in &preserved {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"keep").unwrap();
+        }
+
+        cleanup_staged_recordings(&staging).unwrap();
+        cleanup_staged_recordings(&staging).unwrap();
+
+        assert!(!abandoned.exists());
+        for path in &preserved {
+            assert_eq!(std::fs::read(path).unwrap(), b"keep", "{}", path.display());
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn staging_cleanup_preserves_symlinks_and_their_targets() {
+        let directory = tempfile::tempdir().unwrap();
+        let staging = directory.path().join(".staging/front");
+        std::fs::create_dir_all(&staging).unwrap();
+        let target = directory.path().join("recording.mkv");
+        std::fs::write(&target, b"keep").unwrap();
+        let link = staging.join("019a2c8e-7200-7000-8000-000000000001.mkv");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        cleanup_staged_recordings(&staging).unwrap();
+
+        assert!(std::fs::symlink_metadata(link).unwrap().is_symlink());
+        assert_eq!(std::fs::read(target).unwrap(), b"keep");
     }
 }
