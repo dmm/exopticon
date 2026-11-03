@@ -278,7 +278,7 @@ const fn classify_database_error_kind(kind: diesel::result::DatabaseErrorKind) -
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::thread;
 
     use chrono::{DateTime, Duration, Utc};
@@ -378,7 +378,7 @@ mod tests {
             .with_timezone(&Utc)
     }
 
-    fn configured_service() -> (TempDir, Service) {
+    pub fn configured_service() -> (TempDir, Service) {
         let (temp_dir, service) = migrated_service();
         service
             .apply_config(&sample_config("secret", vec!["front", "back"]))
@@ -756,51 +756,58 @@ mod tests {
     }
 
     #[test]
-    fn reserving_a_segment_persists_the_reservation_time_and_an_empty_file_record() {
-        let (_dir, service) = configured_service();
-
-        let (unit, file) = service
-            .reserve_video_segment("front", "reserved.mkv".to_string(), at(0))
-            .expect("video segment reserved");
-
-        assert_eq!(unit.begin_time, at(0));
-        assert_eq!(unit.end_time, at(0));
-        assert_eq!(file.size, 0);
-        let stored = persisted_unit(&service, unit.id);
-        assert!(matches!(stored.state, VideoUnitState::Reserved));
-        assert_eq!(stored.camera_name, "front");
-        assert_eq!(stored.begin_time_us, at(0).timestamp_micros());
-        assert_eq!(stored.end_time_us, at(0).timestamp_micros());
-        let stored_file = persisted_file(&service, file.id);
-        assert_eq!(stored_file.video_unit_id, unit.id);
-        assert_eq!(stored_file.filename, "reserved.mkv");
-        assert_eq!(stored_file.size, 0);
-    }
-
-    #[test]
-    fn opening_a_reserved_segment_persists_the_actual_begin_time_and_open_state() {
-        let (_dir, service) = configured_service();
+    fn discarding_an_unpublished_segment_preserves_its_destination_file() {
+        let (dir, service) = configured_service();
+        let destination = dir.path().join("existing.mkv");
+        std::fs::write(&destination, b"existing recording").unwrap();
         let (unit_id, file_id) = insert_segment(
             &service,
             "front",
             VideoUnitState::Reserved,
             at(0),
-            at(0),
-            "segment.mkv",
+            at(30),
+            destination.to_str().unwrap(),
             0,
         );
 
-        let opened = service
-            .open_video_segment(unit_id, file_id, at(5))
-            .expect("video segment opened");
+        service.discard_unpublished_video_segment(unit_id).unwrap();
 
-        assert_eq!(opened.begin_time, at(5));
-        assert_eq!(opened.end_time, at(5));
-        let stored = persisted_unit(&service, unit_id);
-        assert!(matches!(stored.state, VideoUnitState::Open));
-        assert_eq!(stored.begin_time_us, at(5).timestamp_micros());
-        assert_eq!(stored.end_time_us, at(5).timestamp_micros());
-        assert_eq!(persisted_file(&service, file_id).size, -1);
+        assert_eq!(std::fs::read(destination).unwrap(), b"existing recording");
+        let mut conn = service.pool.get().unwrap();
+        assert_eq!(
+            crate::schema::video_units::table
+                .filter(crate::schema::video_units::id.eq(unit_id))
+                .count()
+                .get_result::<i64>(&mut conn)
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            crate::schema::video_files::table
+                .filter(crate::schema::video_files::id.eq(file_id))
+                .count()
+                .get_result::<i64>(&mut conn)
+                .unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn discarding_an_unpublished_segment_rejects_open_and_finalized_recordings() {
+        let (_dir, service) = configured_service();
+        for state in [VideoUnitState::Open, VideoUnitState::Finalized] {
+            let expected_state = std::mem::discriminant(&state);
+            let (unit_id, file_id) =
+                insert_segment(&service, "front", state, at(0), at(30), "segment.mkv", 16);
+
+            assert!(service.discard_unpublished_video_segment(unit_id).is_err());
+
+            assert_eq!(
+                std::mem::discriminant(&persisted_unit(&service, unit_id).state),
+                expected_state
+            );
+            assert_eq!(persisted_file(&service, file_id).size, 16);
+        }
     }
 
     #[test]

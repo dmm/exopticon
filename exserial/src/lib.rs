@@ -86,7 +86,7 @@ pub fn print_message(message: CaptureMessage) {
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{CaptureCommand, CaptureMessage, PacketEncoding};
+    use crate::models::{CaptureMessage, PacketEncoding};
 
     #[test]
     fn all_capture_message_variants_round_trip() {
@@ -107,18 +107,10 @@ mod tests {
                 timestamp: 90_000,
                 duration: 20_000,
             },
-            CaptureMessage::ReserveFile,
-            CaptureMessage::FileOpened {
-                video_unit_id: 11,
-                video_file_id: 13,
-                filename: "/tmp/video.mkv".to_string(),
-                begin_time: "2026-10-27T00:00:00Z".to_string(),
-            },
             CaptureMessage::EndFile {
-                video_unit_id: 11,
-                video_file_id: 13,
-                filename: "/tmp/video.mkv".to_string(),
-                end_time: "2026-10-27T00:01:00Z".to_string(),
+                filename: "019a2c8e-7200-7000-8000-000000000001.mkv".to_string(),
+                begin_time: "2026-10-27T00:00:00.123456789Z".to_string(),
+                end_time: "2026-10-27T00:01:00.987654321Z".to_string(),
             },
             CaptureMessage::Metric {
                 label: "capture".to_string(),
@@ -143,59 +135,8 @@ mod tests {
     }
 
     #[test]
-    fn failed_file_reservation_round_trips() {
-        let command = CaptureCommand::FileReservationFailed {
-            message: "storage unavailable".to_string(),
-        };
-        let frame = crate::serialize_frame(&command).expect("command serialized");
-        let decoded: CaptureCommand =
-            crate::read_framed(&mut frame.as_slice()).expect("command deserialized");
-        assert_eq!(decoded, command);
-    }
-
-    #[test]
     fn invalid_payload_is_an_io_error() {
         let error = crate::deserialize_message::<CaptureMessage>(&[]).unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
-    }
-
-    #[test]
-    fn framed_capture_message_round_trips() {
-        let msg = CaptureMessage::ReserveFile;
-        let mut frame = Vec::new();
-        crate::write_framed(&mut frame, &msg).expect("message serialized");
-        let round_trip: CaptureMessage =
-            crate::read_framed(&mut frame.as_slice()).expect("message deserialized");
-
-        match round_trip {
-            CaptureMessage::ReserveFile => {}
-            _ => panic!("unexpected capture message"),
-        }
-    }
-
-    #[test]
-    fn framed_capture_command_round_trips() {
-        let msg = CaptureCommand::FileReserved {
-            video_unit_id: 11,
-            video_file_id: 13,
-            filename: "/tmp/video.mkv".to_string(),
-        };
-        let mut frame = Vec::new();
-        crate::write_framed(&mut frame, &msg).expect("command serialized");
-        let round_trip: CaptureCommand =
-            crate::read_framed(&mut frame.as_slice()).expect("command deserialized");
-
-        match round_trip {
-            CaptureCommand::FileReserved {
-                video_unit_id,
-                video_file_id,
-                filename,
-            } => {
-                assert_eq!(video_unit_id, 11);
-                assert_eq!(video_file_id, 13);
-                assert_eq!(filename, "/tmp/video.mkv");
-            }
-            _ => panic!("unexpected capture command"),
-        }
     }
 }

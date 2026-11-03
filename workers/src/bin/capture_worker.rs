@@ -45,21 +45,14 @@
 
 use std::{
     collections::HashMap,
-    io,
     path::PathBuf,
-    sync::{
-        Arc, Mutex, Weak,
-        mpsc::{Receiver, RecvTimeoutError, SyncSender, sync_channel},
-    },
+    sync::{Arc, Mutex, Weak},
     thread,
     time::{Duration, Instant},
 };
 
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
-use exserial::{
-    exlog::ExLog,
-    models::{CaptureCommand, CaptureMessage},
-};
+use exserial::{exlog::ExLog, models::CaptureMessage};
 use gstreamer::{
     self as gst, Bin, Element, Pad, PadProbeId, PadProbeReturn, PadProbeType,
     glib::object::{Cast, ObjectExt},
@@ -160,16 +153,7 @@ impl CaptureClock {
 }
 
 #[derive(Clone, Debug)]
-struct FileReservation {
-    video_unit_id: i64,
-    video_file_id: i64,
-    filename: String,
-}
-
-#[derive(Clone, Debug)]
 struct FragmentCapture {
-    video_unit_id: i64,
-    video_file_id: i64,
     filename: String,
     begin_running_time: gst::ClockTime,
     capture_clock: CaptureClock,
@@ -240,94 +224,11 @@ impl StartupPreroll {
     }
 }
 
-#[derive(Debug)]
-struct ReservationClient {
-    receiver: Mutex<Receiver<Result<FileReservation, String>>>,
-    timeout: Duration,
-}
-
-impl ReservationClient {
-    fn start(timeout: Duration) -> Arc<Self> {
-        let (sender, receiver) = sync_channel(1);
-        let client = Arc::new(Self {
-            receiver: Mutex::new(receiver),
-            timeout,
-        });
-
-        thread::Builder::new()
-            .name("capture-command-reader".to_string())
-            .spawn(move || Self::read_commands(&sender))
-            .expect("failed to spawn capture command reader");
-
-        client
-    }
-
-    fn request_next() {
-        exserial::print_message(CaptureMessage::ReserveFile);
-    }
-
-    fn wait_for_reservation(&self) -> Result<FileReservation, String> {
-        let receiver = self
-            .receiver
-            .lock()
-            .expect("reservation receiver lock poisoned");
-        match receiver.recv_timeout(self.timeout) {
-            Ok(result) => result,
-            Err(RecvTimeoutError::Timeout) => Err(format!(
-                "timed out waiting {} seconds for file reservation",
-                self.timeout.as_secs()
-            )),
-            Err(RecvTimeoutError::Disconnected) => Err(
-                "capture actor command stream closed before file reservation arrived".to_string(),
-            ),
-        }
-    }
-
-    fn read_commands(sender: &SyncSender<Result<FileReservation, String>>) {
-        let stdin = io::stdin();
-        let mut stdin = stdin.lock();
-
-        loop {
-            match exserial::read_framed::<_, CaptureCommand>(&mut stdin) {
-                Ok(command) => {
-                    let reservation = match command {
-                        CaptureCommand::FileReserved {
-                            video_unit_id,
-                            video_file_id,
-                            filename,
-                        } => Ok(FileReservation {
-                            video_unit_id,
-                            video_file_id,
-                            filename,
-                        }),
-                        CaptureCommand::FileReservationFailed { message } => Err(message),
-                    };
-
-                    if sender.send(reservation).is_err() {
-                        break;
-                    }
-                }
-                Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
-                    let _ = sender.try_send(Err("capture actor command stream closed".to_string()));
-                    break;
-                }
-                Err(err) => {
-                    let _ = sender
-                        .try_send(Err(format!("failed to read capture actor command: {err}")));
-                    break;
-                }
-            }
-        }
-    }
-}
-
 /// `CaptureWorker` state
 #[derive(Debug)]
 struct CustomData {
-    /// DB-backed file reservations
-    reservations: Arc<ReservationClient>,
-    /// prefetched reservation for the first output file
-    next_file: Option<FileReservation>,
+    /// Camera staging directory; filenames are generated locally.
+    storage_path: PathBuf,
     /// splitmuxsink and associated video sink pad, used by gstreamer
     /// callbacks
     mkv_sink_pad: (Element, Option<Pad>),
@@ -349,7 +250,7 @@ struct CustomData {
 }
 
 impl CustomData {
-    pub fn new(reservations: Arc<ReservationClient>, next_file: FileReservation) -> Self {
+    pub fn new(storage_path: PathBuf) -> Self {
         let muxer_properties = gst::Structure::builder("properties")
             // Keep every fragment in the capture session's running-time domain.
             .field("offset-to-zero", false)
@@ -371,8 +272,7 @@ impl CustomData {
             .expect("Could not create sink element.");
 
         Self {
-            reservations,
-            next_file: Some(next_file),
+            storage_path,
             mkv_sink_pad: (mkv_sink, None),
             video_appsink: None,
             audio_appsink: None,
@@ -925,7 +825,7 @@ fn handle_file_location_request(
     let Some(data) = data_weak.upgrade() else {
         panic!("Failed to upgrade the weak reference");
     };
-    let (reservations, next_file, capture_clock) = {
+    let (storage_path, capture_clock) = {
         let mut d = data.lock().unwrap();
         let mut capture_clock = d
             .capture_clock
@@ -949,71 +849,36 @@ fn handle_file_location_request(
         );
 
         (
-            Arc::clone(&d.reservations),
-            d.next_file.take(),
+            d.storage_path.clone(),
             d.capture_clock
                 .clone()
                 .expect("capture clock was just stored"),
         )
     };
 
-    let reservation = next_file.unwrap_or_else(|| {
-        reservations.wait_for_reservation().unwrap_or_else(|err| {
-            error!("Failed to get file reservation: {err}");
-            panic!("failed to get file reservation: {err}");
-        })
-    });
-    let filename = reservation.filename.clone();
-    debug!("New reserved file: {filename}");
+    let filename = format!("{}.mkv", Uuid::now_v7());
+    let path = storage_path.join(&filename);
+    debug!("New staged file: {}", path.display());
 
     {
         let mut d = data.lock().unwrap();
         d.fragments.insert(
             fragment_id,
             FragmentCapture {
-                video_unit_id: reservation.video_unit_id,
-                video_file_id: reservation.video_file_id,
-                filename: filename.clone(),
+                filename,
                 begin_running_time: reference_running_time,
                 capture_clock,
             },
         );
     }
 
-    ReservationClient::request_next();
-    PathBuf::from(filename).into()
+    path.into()
 }
 
-fn handle_fragment_opened(structure: &gst::StructureRef, data_weak: &Weak<Mutex<CustomData>>) {
-    let fragment_id = structure
-        .get::<u32>("fragment-id")
-        .expect("fragment-opened message has no fragment ID");
-    let data = data_weak
-        .upgrade()
-        .expect("capture data dropped before fragment-opened");
-    let d = data.lock().unwrap();
-    let fragment = d
-        .fragments
-        .get(&fragment_id)
-        .expect("fragment-opened arrived before format-location-full");
-    // File bookkeeping uses the reference stream's fragment boundary. Sample
-    // playback uses the session timestamps stored directly in the MKV.
-    let begin_time = fragment
-        .capture_clock
-        .utc_at_running_time(fragment.begin_running_time)
-        .expect("fragment start is too far from its UTC anchor")
-        .to_rfc3339_opts(SecondsFormat::Nanos, true);
-    let message = CaptureMessage::FileOpened {
-        video_unit_id: fragment.video_unit_id,
-        video_file_id: fragment.video_file_id,
-        filename: fragment.filename.clone(),
-        begin_time,
-    };
-    drop(d);
-    exserial::print_message(message);
-}
-
-fn handle_fragment_closed(structure: &gst::StructureRef, data_weak: &Weak<Mutex<CustomData>>) {
+fn closed_fragment_message(
+    structure: &gst::StructureRef,
+    data_weak: &Weak<Mutex<CustomData>>,
+) -> CaptureMessage {
     let fragment_id = structure
         .get::<u32>("fragment-id")
         .expect("fragment-closed message has no fragment ID");
@@ -1039,12 +904,18 @@ fn handle_fragment_closed(structure: &gst::StructureRef, data_weak: &Weak<Mutex<
         .expect("fragment end is too far from its UTC anchor")
         .to_rfc3339_opts(SecondsFormat::Nanos, true);
 
-    exserial::print_message(CaptureMessage::EndFile {
-        video_unit_id: fragment.video_unit_id,
-        video_file_id: fragment.video_file_id,
+    let begin_time = fragment
+        .capture_clock
+        .utc_at_running_time(fragment.begin_running_time)
+        .expect("fragment start is too far from its UTC anchor")
+        .to_rfc3339_opts(SecondsFormat::Nanos, true);
+
+    // The muxer has closed the file. The worker never touches it after handoff.
+    CaptureMessage::EndFile {
         filename: fragment.filename,
+        begin_time,
         end_time,
-    });
+    }
 }
 
 fn schedule_startup_preroll_timeout(data_weak: Weak<Mutex<CustomData>>) {
@@ -1281,46 +1152,8 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
     }
 }
 
-fn main() {
-    log::set_logger(&LOGGER)
-        .map(|()| log::set_max_level(log::LevelFilter::Info))
-        .expect("failed to initialize logger");
-
-    // Initialize GStreamer
-    gstreamer::init().expect("gstreamer::init failed");
-
-    if std::env::args().len() < 3 {
-        println!("USAGE: capture_worker <rtsp_url> <storage_path>");
-        return;
-    }
-
-    let url = std::env::args().nth(1).expect("Failed to get url");
-    let _storage_path: PathBuf = std::env::args()
-        .nth(2)
-        .expect("Failed to get storage path")
-        .into();
-    let reservations = ReservationClient::start(TIMEOUT);
-    ReservationClient::request_next();
-    let initial_reservation = reservations
-        .wait_for_reservation()
-        .expect("failed to reserve initial file");
-    let data = CustomData::new(reservations, initial_reservation);
-
-    let source = gst::ElementFactory::make("rtspsrc")
-        .name("source")
-        .property_from_str("location", &url)
-        .build()
-        .expect("Could not create source element.");
-
-    let pipeline = gst::Pipeline::with_name("capture-pipeline");
-
-    pipeline
-        .add_many([&source, &data.mkv_sink_pad.0])
-        .expect("Failed to add elements to pipeline.");
-
-    let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(data));
-    let data_weak = Arc::downgrade(&data);
-
+fn connect_recording_sink(data: &Arc<Mutex<CustomData>>) {
+    let data_weak = Arc::downgrade(data);
     let mkv_sink = data.lock().unwrap().mkv_sink_pad.0.clone();
     mkv_sink.connect("muxer-added", false, {
         let data_weak = data_weak.clone();
@@ -1335,8 +1168,6 @@ fn main() {
     });
 
     mkv_sink.connect("format-location-full", false, {
-        let data_weak = data_weak.clone();
-
         move |values| -> Option<gstreamer::glib::Value> {
             let splitmuxsink = values[0]
                 .get::<Element>()
@@ -1362,6 +1193,45 @@ fn main() {
         .request_pad_simple("video")
         .expect("Failed to get video sink pad from splitmuxsink");
     data.lock().unwrap().mkv_sink_pad.1 = Some(video_sink_pad);
+}
+
+fn main() {
+    log::set_logger(&LOGGER)
+        .map(|()| log::set_max_level(log::LevelFilter::Info))
+        .expect("failed to initialize logger");
+
+    // Initialize GStreamer
+    gstreamer::init().expect("gstreamer::init failed");
+
+    if std::env::args().len() < 3 {
+        println!("USAGE: capture_worker <rtsp_url> <staging_path>");
+        return;
+    }
+
+    let url = std::env::args().nth(1).expect("Failed to get url");
+    let storage_path: PathBuf = std::env::args()
+        .nth(2)
+        .expect("Failed to get storage path")
+        .into();
+    std::fs::create_dir_all(&storage_path).expect("failed to create camera staging directory");
+    let data = CustomData::new(storage_path);
+
+    let source = gst::ElementFactory::make("rtspsrc")
+        .name("source")
+        .property_from_str("location", &url)
+        .build()
+        .expect("Could not create source element.");
+
+    let pipeline = gst::Pipeline::with_name("capture-pipeline");
+
+    pipeline
+        .add_many([&source, &data.mkv_sink_pad.0])
+        .expect("Failed to add elements to pipeline.");
+
+    let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(data));
+    let data_weak = Arc::downgrade(&data);
+
+    connect_recording_sink(&data);
 
     // Connect the pad-added signal
     source.connect_pad_added({
@@ -1407,14 +1277,8 @@ fn main() {
                     let Some(structure) = element.structure() else {
                         continue;
                     };
-                    match structure.name().as_str() {
-                        "splitmuxsink-fragment-opened" => {
-                            handle_fragment_opened(structure, &data_weak);
-                        }
-                        "splitmuxsink-fragment-closed" => {
-                            handle_fragment_closed(structure, &data_weak);
-                        }
-                        _ => {}
+                    if structure.name() == "splitmuxsink-fragment-closed" {
+                        exserial::print_message(closed_fragment_message(structure, &data_weak));
                     }
                 }
 
@@ -1443,4 +1307,132 @@ fn main() {
     pipeline
         .set_state(gstreamer::State::Null)
         .expect("Unable to set the pipeline to the `Null` state");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotation_creates_closed_staged_recordings_without_a_parent() {
+        gst::init().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let staging_path = directory.path().join(".staging/front");
+        std::fs::create_dir_all(&staging_path).unwrap();
+        let abandoned = staging_path.join(format!("{}.mkv", Uuid::now_v7()));
+        std::fs::write(&abandoned, b"interrupted recording").unwrap();
+        let data = Arc::new(Mutex::new(CustomData::new(staging_path.clone())));
+        let sink = data.lock().unwrap().mkv_sink_pad.0.clone();
+        sink.set_property("max-size-bytes", 30_000u64);
+        let pipeline = gst::Pipeline::new();
+        let source = gst::parse::bin_from_description(
+            "videotestsrc is-live=true num-buffers=120 pattern=snow ! \
+             video/x-raw,width=160,height=120,framerate=30/1 ! \
+             x264enc tune=zerolatency speed-preset=ultrafast key-int-max=15 bitrate=500 ! \
+             h264parse",
+            true,
+        )
+        .expect("rotation test needs videotestsrc, x264enc, and h264parse");
+        pipeline.add_many([source.upcast_ref(), &sink]).unwrap();
+        connect_recording_sink(&data);
+        source
+            .static_pad("src")
+            .unwrap()
+            .link(data.lock().unwrap().mkv_sink_pad.1.as_ref().unwrap())
+            .unwrap();
+        pipeline.set_state(gst::State::Playing).unwrap();
+
+        let bus = pipeline.bus().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let weak = Arc::downgrade(&data);
+        let mut recordings = Vec::new();
+        let mut saw_eos = false;
+        while Instant::now() < deadline {
+            let Some(message) = bus.timed_pop(gst::ClockTime::from_seconds(1)) else {
+                continue;
+            };
+            match message.view() {
+                gst::MessageView::Element(element) => {
+                    let Some(structure) = element.structure() else {
+                        continue;
+                    };
+                    if structure.name() == "splitmuxsink-fragment-closed" {
+                        recordings.push(closed_fragment_message(structure, &weak));
+                    }
+                }
+                gst::MessageView::Eos(_) => {
+                    saw_eos = true;
+                    break;
+                }
+                gst::MessageView::Error(err) => {
+                    pipeline.set_state(gst::State::Null).unwrap();
+                    panic!("capture failed: {} {:?}", err.error(), err.debug());
+                }
+                _ => {}
+            }
+        }
+        pipeline.set_state(gst::State::Null).unwrap();
+        assert!(saw_eos, "rotation test timed out");
+        assert!(
+            recordings.len() >= 3,
+            "expected multiple completed rotations"
+        );
+        assert!(data.lock().unwrap().fragments.is_empty());
+        let capture_clock = data.lock().unwrap().capture_clock.clone().unwrap();
+        let mut boundaries = Vec::new();
+        let mut filenames = std::collections::HashSet::new();
+        for message in recordings {
+            let CaptureMessage::EndFile {
+                filename,
+                begin_time,
+                end_time,
+            } = message
+            else {
+                panic!("unexpected completion message");
+            };
+            let uuid: Uuid = filename.strip_suffix(".mkv").unwrap().parse().unwrap();
+            assert_eq!(uuid.get_version_num(), 7);
+            assert_eq!(filename, format!("{uuid}.mkv"));
+            assert!(filenames.insert(filename.clone()));
+            let begin: DateTime<Utc> = begin_time.parse().unwrap();
+            let end: DateTime<Utc> = end_time.parse().unwrap();
+            assert!(end > begin);
+            boundaries.push((begin, end));
+            assert_eq!(begin_time.split('.').nth(1).unwrap().len(), 10);
+            assert_eq!(end_time.split('.').nth(1).unwrap().len(), 10);
+            let bytes = std::fs::read(staging_path.join(&filename)).unwrap();
+            assert_eq!(&bytes[..4], &[0x1a, 0x45, 0xdf, 0xa3], "MKV header");
+            // matroskamux stores the Comment as a quoted GstStructure string.
+            let content = String::from_utf8_lossy(&bytes).replace('\\', "");
+            let start = content.find("{\"captureSessionId\"").unwrap();
+            let metadata = serde_json::Deserializer::from_str(&content[start..])
+                .into_iter::<serde_json::Value>()
+                .next()
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                metadata["captureSessionId"],
+                capture_clock.session_id.to_string()
+            );
+            assert_ne!(uuid, capture_clock.session_id);
+            assert_eq!(
+                metadata["clockAnchor"]["pipelineRunningTimeNs"],
+                capture_clock.anchor_running_time.nseconds()
+            );
+            assert_eq!(
+                metadata["clockAnchor"]["utcTime"],
+                capture_clock
+                    .anchor_utc
+                    .to_rfc3339_opts(SecondsFormat::Nanos, true)
+            );
+        }
+        // Async finalizers may report completions out of order. At 30 fps,
+        // integer nanosecond buffer durations can leave a one-nanosecond gap.
+        boundaries.sort_unstable();
+        for pair in boundaries.windows(2) {
+            let gap = pair[1].0 - pair[0].1;
+            assert!(gap.abs() <= TimeDelta::nanoseconds(1));
+        }
+        assert_eq!(std::fs::read(abandoned).unwrap(), b"interrupted recording");
+    }
 }

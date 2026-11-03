@@ -327,23 +327,6 @@ impl Service {
         row.map(|(unit, file)| recording_file(&unit, file))
             .transpose()
     }
-    // reserve a VideoSegment before the capture worker creates the file
-    pub fn reserve_video_segment(
-        &self,
-        camera_name: &str,
-        filename: String,
-        reserved_at: DateTime<Utc>,
-    ) -> Result<VideoSegment, super::Error> {
-        let create_video_unit = crate::api::video_units::CreateVideoUnit {
-            camera_name: camera_name.to_string(),
-            begin_time: reserved_at,
-            end_time: reserved_at,
-        };
-        let create_video_file = crate::api::video_units::CreateVideoFile { filename, size: 0 };
-
-        self.create_video_segment(&create_video_unit, create_video_file)
-    }
-
     // create VideoSegment
     pub fn create_video_segment(
         &self,
@@ -380,37 +363,18 @@ impl Service {
         })
     }
 
-    pub fn open_video_segment(
-        &self,
-        video_unit_id: i64,
-        video_file_id: i64,
-        begin_time: DateTime<Utc>,
-    ) -> Result<crate::api::video_units::VideoUnit, super::Error> {
-        let video_unit = db_write!(self, "open_video_segment", |conn| {
-            let _video_file = diesel::update(
-                video_files::dsl::video_files
-                    .filter(video_files::dsl::id.eq(video_file_id))
-                    .filter(video_files::dsl::video_unit_id.eq(video_unit_id)),
-            )
-            .set(video_files::dsl::size.eq(-1))
-            .get_result::<VideoFile>(conn)?;
-
-            let begin_time_us = datetime_to_micros(begin_time);
-            let video_unit = diesel::update(
-                video_units::dsl::video_units
-                    .filter(crate::schema::video_units::columns::id.eq(video_unit_id)),
-            )
-            .set((
-                crate::schema::video_units::columns::begin_time_us.eq(begin_time_us),
-                crate::schema::video_units::columns::end_time_us.eq(begin_time_us),
-                crate::schema::video_units::columns::state.eq(VideoUnitState::Open),
-            ))
-            .get_result::<VideoUnit>(conn)?;
-
-            Ok(video_unit)
-        })?;
-
-        video_unit.try_into()
+    /// Drop pending publication rows without touching the destination file.
+    pub fn discard_unpublished_video_segment(&self, unit_id: i64) -> Result<(), super::Error> {
+        db_write!(self, "discard_unpublished_video_segment", |conn| {
+            let unit = video_units::table
+                .filter(video_units::id.eq(unit_id))
+                .filter(video_units::state.eq(VideoUnitState::Reserved))
+                .first::<VideoUnit>(conn)?;
+            diesel::delete(video_files::table.filter(video_files::video_unit_id.eq(unit.id)))
+                .execute(conn)?;
+            diesel::delete(video_units::table.filter(video_units::id.eq(unit.id))).execute(conn)?;
+            Ok(())
+        })
     }
 
     // update video unit/video file

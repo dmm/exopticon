@@ -32,9 +32,7 @@ use futures::stream::StreamExt;
 use metrics::{Counter, counter};
 use regex::Regex;
 use tokio::{
-    fs,
-    io::AsyncWriteExt,
-    process::{self, Child, ChildStdin, ChildStdout},
+    process::{self, Child, ChildStdout},
     sync::mpsc,
     task::{JoinSet, spawn_blocking},
 };
@@ -47,7 +45,7 @@ use crate::{
     db::cameras::Camera,
     video_router::VideoRouter,
 };
-use exserial::models::{CaptureCommand, CaptureMessage, PacketEncoding};
+use exserial::models::{CaptureMessage, PacketEncoding};
 
 const PACKET_STATUS_UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -68,7 +66,6 @@ pub enum Command {
 enum State {
     Ready,
     Started,
-    Recording,
 }
 
 fn uuid_to_filename(parent_path: &Path, uuid: Uuid) -> PathBuf {
@@ -85,16 +82,57 @@ fn uuid_to_filename(parent_path: &Path, uuid: Uuid) -> PathBuf {
     parent_path.join(&path)
 }
 
+fn publish_recording(
+    db: &crate::db::Service,
+    camera_name: &str,
+    storage_root: &Path,
+    filename: &str,
+    begin_time: DateTime<Utc>,
+    end_time: DateTime<Utc>,
+) -> anyhow::Result<()> {
+    use crate::api::video_units::{CreateVideoFile, CreateVideoUnit};
+
+    let uuid = filename
+        .strip_suffix(".mkv")
+        .ok_or_else(|| anyhow::anyhow!("staged recording must have an .mkv extension"))?
+        .parse::<Uuid>()?;
+
+    let source = storage_root
+        .join(".staging")
+        .join(camera_name)
+        .join(filename);
+    let metadata = std::fs::symlink_metadata(&source)?;
+    let destination = uuid_to_filename(&storage_root.join(camera_name), uuid);
+    std::fs::create_dir_all(destination.parent().expect("archive path has a parent"))?;
+
+    let (unit, file) = db.create_video_segment(
+        &CreateVideoUnit {
+            camera_name: camera_name.to_string(),
+            begin_time,
+            end_time,
+        },
+        CreateVideoFile {
+            filename: destination.to_string_lossy().into_owned(),
+            size: 0,
+        },
+    )?;
+
+    // Same-filesystem publication, with no copy fallback.
+    if let Err(err) = std::fs::rename(&source, &destination) {
+        db.discard_unpublished_video_segment(unit.id)?;
+        return Err(err.into());
+    }
+    let size = i32::try_from(metadata.len()).unwrap_or(i32::MAX);
+    db.close_video_segment(unit.id, file.id, end_time, size)?;
+    Ok(())
+}
+
 pub struct CaptureActor {
     state: State,
     db: crate::db::Service,
     camera: Camera,
     storage_group: StorageGroup,
-    child: Option<(
-        Child,
-        ChildStdin,
-        FramedRead<ChildStdout, LengthDelimitedCodec>,
-    )>,
+    child: Option<(Child, FramedRead<ChildStdout, LengthDelimitedCodec>)>,
 
     /// Video Packet Router
     video_router: Arc<VideoRouter>,
@@ -134,19 +172,15 @@ impl CaptureActor {
         }
     }
 
-    fn start_worker(&mut self) {
+    fn start_worker(&mut self) -> anyhow::Result<()> {
         debug!(
             "Starting worker process for camera: {}, id: {}, stream: {}",
             self.camera.name, self.camera.name, self.camera.rtsp_url
         );
-        let storage_path =
-            Path::new(&self.storage_group.spec.storage_path).join(self.camera.name.clone());
-        if std::fs::create_dir(&storage_path).is_err() {
-            // The error returned by create_dir has no information so
-            // we can't really distinguish between failure
-            // scenarios. If the directory already exists everything
-            // is fine, otherwise we fail later.
-        }
+        let storage_path = Path::new(&self.storage_group.spec.storage_path)
+            .join(".staging")
+            .join(&self.camera.name);
+        std::fs::create_dir_all(&storage_path)?;
         let worker_path = env::var("EXOPTICONWORKERS").unwrap_or_else(|_| "/".to_string());
         let executable_path: PathBuf = [worker_path, "capture_worker".to_string()].iter().collect();
 
@@ -157,104 +191,41 @@ impl CaptureActor {
         cmd.arg(&storage_path);
         cmd.arg(hwaccel_method);
         cmd.stdout(Stdio::piped());
-        cmd.stdin(Stdio::piped());
+        cmd.stdin(Stdio::null());
+        cmd.kill_on_drop(true);
 
-        let mut child = cmd.spawn().expect("Failed to launch");
+        let mut child = cmd.spawn()?;
         let stdout = child
             .stdout
             .take()
             .expect("Failed to open stdout on worker child");
-        let stdin = child.stdin.take().expect("Failed to open stdin");
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
 
-        self.child = Some((child, stdin, framed_stream));
+        self.child = Some((child, framed_stream));
         self.state = State::Started;
-    }
-
-    fn worker_storage_path(&self) -> PathBuf {
-        Path::new(&self.storage_group.spec.storage_path).join(self.camera.name.clone())
-    }
-
-    async fn reserve_file(&self) -> anyhow::Result<(i64, i64, String)> {
-        let path = uuid_to_filename(&self.worker_storage_path(), Uuid::now_v7());
-        let parent = path
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("reserved filename has no parent directory"))?;
-        fs::create_dir_all(parent).await?;
-
-        let filename = path.to_string_lossy().to_string();
-        let db_filename = filename.clone();
-        let db = self.db.clone();
-        let camera_name = self.camera.name.clone();
-        let reserved_at = Utc::now();
-        let (video_unit, video_file) = spawn_blocking(move || {
-            db.reserve_video_segment(&camera_name, db_filename, reserved_at)
-        })
-        .await??;
-
-        Ok((video_unit.id, video_file.id, filename))
-    }
-
-    async fn send_worker_command(&mut self, command: CaptureCommand) -> anyhow::Result<()> {
-        let Some((_, stdin, _)) = &mut self.child else {
-            anyhow::bail!("capture worker stdin is not available");
-        };
-
-        let frame = exserial::serialize_frame(&command)?;
-        stdin.write_all(&frame).await?;
-        stdin.flush().await?;
-        Ok(())
-    }
-
-    async fn handle_reserve_file(&mut self) -> anyhow::Result<()> {
-        let command = match self.reserve_file().await {
-            Ok((video_unit_id, video_file_id, filename)) => CaptureCommand::FileReserved {
-                video_unit_id,
-                video_file_id,
-                filename,
-            },
-            Err(err) => CaptureCommand::FileReservationFailed {
-                message: err.to_string(),
-            },
-        };
-
-        self.send_worker_command(command).await
-    }
-
-    async fn handle_file_opened(
-        &mut self,
-        video_unit_id: i64,
-        video_file_id: i64,
-        filename: String,
-        begin_time: String,
-    ) -> anyhow::Result<()> {
-        let begin_time = begin_time.parse::<DateTime<Utc>>().expect("Parse failure!");
-        debug!("Reserved file opened: {filename}");
-
-        let db = self.db.clone();
-        spawn_blocking(move || db.open_video_segment(video_unit_id, video_file_id, begin_time))
-            .await??;
-
-        self.state = State::Recording;
         Ok(())
     }
 
     async fn handle_close_file(
         &self,
-        video_unit_id: i64,
-        video_file_id: i64,
-        filename: &str,
+        filename: String,
+        begin_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        if let Ok(metadata) = fs::metadata(filename).await {
-            let db = self.db.clone();
-            let file_size: i32 = metadata.len().try_into().unwrap_or(i32::MAX);
-            spawn_blocking(move || {
-                db.close_video_segment(video_unit_id, video_file_id, end_time, file_size)
-            })
-            .await??;
-        }
-        Ok(())
+        let db = self.db.clone();
+        let camera_name = self.camera.name.clone();
+        let storage_root = PathBuf::from(&self.storage_group.spec.storage_path);
+        spawn_blocking(move || {
+            publish_recording(
+                &db,
+                &camera_name,
+                &storage_root,
+                &filename,
+                begin_time,
+                end_time,
+            )
+        })
+        .await?
     }
 
     async fn cleanup_unopened_video_segments(&self) -> anyhow::Result<()> {
@@ -371,27 +342,12 @@ impl CaptureActor {
                 self.handle_packet(encoding, data, timestamp, duration)
                     .await;
             }
-            CaptureMessage::ReserveFile => {
-                self.handle_reserve_file().await?;
-            }
-            CaptureMessage::FileOpened {
-                video_unit_id,
-                video_file_id,
+            CaptureMessage::EndFile {
                 filename,
                 begin_time,
-            } => {
-                self.handle_file_opened(video_unit_id, video_file_id, filename, begin_time)
-                    .await?;
-            }
-
-            CaptureMessage::EndFile {
-                video_unit_id,
-                video_file_id,
-                filename,
                 end_time,
             } => {
-                let end_time = end_time.parse::<DateTime<Utc>>().expect("Parse failure!");
-                self.handle_close_file(video_unit_id, video_file_id, &filename, end_time)
+                self.handle_close_file(filename, begin_time.parse()?, end_time.parse()?)
                     .await?;
             }
             CaptureMessage::Metric {
@@ -419,7 +375,7 @@ impl CaptureActor {
 
     async fn select_next(&mut self) -> anyhow::Result<bool> {
         match &mut self.child {
-            Some((child, _, framed_stream)) => {
+            Some((child, framed_stream)) => {
                 tokio::select! {
                     biased;
                     Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
@@ -466,7 +422,11 @@ impl CaptureActor {
                 if let Err(e) = self.cleanup_unopened_video_segments().await {
                     error!("error cleaning unopened video segments: {}", e);
                 }
-                self.start_worker();
+                if let Err(e) = self.start_worker() {
+                    error!("error starting capture worker: {}", e);
+                    had_error = true;
+                    break;
+                }
             }
             let res = self.select_next().await;
             match res {
@@ -485,8 +445,7 @@ impl CaptureActor {
             .await;
         keyframe_tasks.shutdown().await;
 
-        if let Some((mut child, stdin, _)) = self.child.take() {
-            drop(stdin);
+        if let Some((mut child, _)) = self.child.take() {
             // wait for child to exit...
             if let Err(e) = child.kill().await {
                 error!("error killing child: {}", e);

@@ -12,7 +12,6 @@ categories = ["web-programming"]
 
 [[bin]]
 name = "capture_worker"
-test = false
 bench = false
 
 
@@ -29,3 +28,6 @@ uuid = { version = "^1", features = ["serde", "v4", "v7"] }
 
 [build-dependencies]
 exserial = { path = "../exserial" }
+
+[dev-dependencies]
+tempfile = "3"
