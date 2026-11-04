@@ -224,34 +224,27 @@ impl StartupPreroll {
     }
 }
 
-/// `CaptureWorker` state
-#[derive(Debug)]
-struct CustomData {
-    /// set once video pad is connected
-    video_appsink: Option<AppSink>,
-    /// set if audio stream is provided
-    audio_appsink: Option<AppSink>,
-    /// blocks mux branches until `rtspsrc` has exposed all startup pads
+/// Serializes branch attachment with startup preroll completion.
+/// Recording callbacks must never acquire this state's lock.
+#[derive(Debug, Default)]
+struct StreamSetupState {
+    /// set once the video branch is fully connected and synchronized
+    video_attached: bool,
+    /// set once the audio branch is fully connected, including drained late audio
+    audio_attached: bool,
+    /// blocks mux branches during the startup attachment window
     startup_preroll: StartupPreroll,
+}
+
+/// Recording bookkeeping shared by splitmux callbacks and the bus loop.
+#[derive(Debug, Default)]
+struct RecordingState {
     /// muxer created for the fragment whose location is requested next
     pending_muxer: Option<Element>,
     /// files currently being written or finalized, keyed by splitmux fragment ID
     fragments: HashMap<u32, FragmentCapture>,
     /// identity and UTC mapping for the current `GStreamer` running-time domain
     capture_clock: Option<CaptureClock>,
-}
-
-impl CustomData {
-    pub fn new() -> Self {
-        Self {
-            video_appsink: None,
-            audio_appsink: None,
-            startup_preroll: StartupPreroll::default(),
-            pending_muxer: None,
-            fragments: HashMap::new(),
-            capture_clock: None,
-        }
-    }
 }
 
 fn create_recording_sink() -> Element {
@@ -792,11 +785,11 @@ fn write_capture_timeline_tag(muxer: Element, metadata: &CaptureTimelineMetadata
     debug!("MKV capture timeline metadata: {metadata_json}");
 }
 
-fn handle_muxer_added(data_weak: &Weak<Mutex<CustomData>>, muxer: &Element) {
-    let data = data_weak
+fn handle_muxer_added(recording_weak: &Weak<Mutex<RecordingState>>, muxer: &Element) {
+    let recording = recording_weak
         .upgrade()
-        .expect("capture data dropped before muxer-added");
-    data.lock().unwrap().pending_muxer = Some(muxer.clone());
+        .expect("recording state dropped before muxer-added");
+    recording.lock().unwrap().pending_muxer = Some(muxer.clone());
 }
 
 fn handle_file_location_request(
@@ -804,16 +797,20 @@ fn handle_file_location_request(
     fragment_id: u32,
     first_sample: &gst::Sample,
     storage_path: &Path,
-    data_weak: &Weak<Mutex<CustomData>>,
+    recording_weak: &Weak<Mutex<RecordingState>>,
 ) -> gstreamer::glib::Value {
     let reference_running_time = sample_running_time(first_sample)
         .expect("first fragment sample does not have a PTS in a TIME segment");
-    let Some(data) = data_weak.upgrade() else {
-        panic!("Failed to upgrade the weak reference");
-    };
-    let capture_clock = {
-        let mut d = data.lock().unwrap();
-        let mut capture_clock = d
+    let recording = recording_weak
+        .upgrade()
+        .expect("recording state dropped before format-location-full");
+    let filename = format!("{}.mkv", Uuid::now_v7());
+    let path = storage_path.join(&filename);
+    debug!("New staged file: {}", path.display());
+
+    let (pending_muxer, metadata) = {
+        let mut recording = recording.lock().unwrap();
+        let mut capture_clock = recording
             .capture_clock
             .take()
             .or_else(|| CaptureClock::anchored_to(splitmuxsink))
@@ -821,31 +818,12 @@ fn handle_file_location_request(
         let (capture_session_id, clock_anchor) = capture_clock
             .metadata_for_reference(splitmuxsink, reference_running_time)
             .expect("splitmuxsink does not have a running-time clock");
-        d.capture_clock = Some(capture_clock);
-        let pending_muxer = d
+        recording.capture_clock = Some(capture_clock.clone());
+        let pending_muxer = recording
             .pending_muxer
             .take()
             .expect("format-location-full arrived before muxer-added");
-        write_capture_timeline_tag(
-            pending_muxer,
-            &CaptureTimelineMetadata {
-                capture_session_id,
-                clock_anchor,
-            },
-        );
-
-        d.capture_clock
-            .clone()
-            .expect("capture clock was just stored")
-    };
-
-    let filename = format!("{}.mkv", Uuid::now_v7());
-    let path = storage_path.join(&filename);
-    debug!("New staged file: {}", path.display());
-
-    {
-        let mut d = data.lock().unwrap();
-        d.fragments.insert(
+        recording.fragments.insert(
             fragment_id,
             FragmentCapture {
                 filename,
@@ -853,14 +831,24 @@ fn handle_file_location_request(
                 capture_clock,
             },
         );
-    }
+        drop(recording);
+        (
+            pending_muxer,
+            CaptureTimelineMetadata {
+                capture_session_id,
+                clock_anchor,
+            },
+        )
+    };
+
+    write_capture_timeline_tag(pending_muxer, &metadata);
 
     path.into()
 }
 
 fn closed_fragment_message(
     structure: &gst::StructureRef,
-    data_weak: &Weak<Mutex<CustomData>>,
+    recording_weak: &Weak<Mutex<RecordingState>>,
 ) -> CaptureMessage {
     let fragment_id = structure
         .get::<u32>("fragment-id")
@@ -868,10 +856,10 @@ fn closed_fragment_message(
     let duration = structure
         .get::<gst::ClockTime>("fragment-duration")
         .expect("fragment-closed message has no duration");
-    let data = data_weak
+    let recording = recording_weak
         .upgrade()
-        .expect("capture data dropped before fragment-closed");
-    let fragment = data
+        .expect("recording state dropped before fragment-closed");
+    let fragment = recording
         .lock()
         .unwrap()
         .fragments
@@ -901,17 +889,17 @@ fn closed_fragment_message(
     }
 }
 
-fn schedule_startup_preroll_timeout(data_weak: Weak<Mutex<CustomData>>) {
+fn schedule_startup_preroll_timeout(setup_weak: Weak<Mutex<StreamSetupState>>) {
     thread::Builder::new()
         .name("startup-preroll-timeout".to_string())
         .spawn(move || {
             thread::sleep(STARTUP_PREROLL_TIMEOUT);
 
-            let Some(data) = data_weak.upgrade() else {
+            let Some(setup) = setup_weak.upgrade() else {
                 return;
             };
 
-            data.lock().unwrap().startup_preroll.finish("timeout");
+            setup.lock().unwrap().startup_preroll.finish("timeout");
         })
         .expect("failed to spawn startup preroll timeout");
 }
@@ -941,7 +929,7 @@ fn drain_unmuxed_branch(pipeline: &gst::Pipeline, src_pad: &Pad, sink_name: &str
 }
 
 fn handle_connect_pad_added(
-    data_weak: Weak<Mutex<CustomData>>,
+    setup_weak: Weak<Mutex<StreamSetupState>>,
     src: &Element,
     src_pad: &Pad,
     mkv_sink: &Element,
@@ -950,11 +938,11 @@ fn handle_connect_pad_added(
 ) {
     info!("Received new pad {} from {}", src_pad.name(), src.name());
 
-    let Some(data) = data_weak.upgrade() else {
-        error!("Failed to upgrade the weak reference");
+    let Some(setup) = setup_weak.upgrade() else {
+        error!("Stream setup state dropped before pad-added");
         return;
     };
-    let mut d = data.lock().unwrap();
+    let mut setup = setup.lock().unwrap();
 
     src.downcast_ref::<gstreamer::Bin>()
         .expect("src downcast failed.")
@@ -973,8 +961,8 @@ fn handle_connect_pad_added(
         .get::<&str>("encoding-name")
         .unwrap_or_default();
 
-    if media == "video" && d.video_appsink.is_some() {
-        info!("Video is already linked. Ignoring.");
+    if (media == "video" && setup.video_attached) || (media == "audio" && setup.audio_attached) {
+        info!("{media} is already linked. Ignoring.");
         return;
     }
 
@@ -990,9 +978,7 @@ fn handle_connect_pad_added(
 
     info!("New pad type {new_pad_type}, {media} {encoding_name}");
 
-    if let ("video", Some(depay_name), Some(parser_name), &None) =
-        (media, depayloader_name, parser_name, &d.video_appsink)
-    {
+    if let ("video", Some(depay_name), Some(parser_name)) = (media, depayloader_name, parser_name) {
         let bin = create_video_branch(depay_name, parser_name);
         let pipeline = src
             .parent()
@@ -1007,9 +993,9 @@ fn handle_connect_pad_added(
         let bin_mkv_src_pad = bin
             .static_pad("mkv_src")
             .expect("failed to get bin src pad");
-        let preroll_block = d.startup_preroll.block_pad(&bin_mkv_src_pad, "video");
+        let preroll_block = setup.startup_preroll.block_pad(&bin_mkv_src_pad, "video");
         if preroll_block.start_timeout {
-            schedule_startup_preroll_timeout(data_weak);
+            schedule_startup_preroll_timeout(setup_weak);
         }
 
         src_pad
@@ -1042,7 +1028,6 @@ fn handle_connect_pad_added(
         appsink
             .sync_state_with_parent()
             .expect("failed to sync video appsink state");
-        d.video_appsink = Some(appsink);
 
         // link the bin pipeline to the mkv splitmuxsink
         bin_mkv_src_pad
@@ -1053,7 +1038,8 @@ fn handle_connect_pad_added(
 
         bin.sync_state_with_parent()
             .expect("failed to sync bin state");
-    } else if let ("audio", Some(depay_name), &None) = (media, depayloader_name, &d.audio_appsink) {
+        setup.video_attached = true;
+    } else if let ("audio", Some(depay_name)) = (media, depayloader_name) {
         let bin = create_audio_branch(depay_name, parser_name);
 
         let pipeline = src
@@ -1069,9 +1055,9 @@ fn handle_connect_pad_added(
         let bin_mkv_src_pad = bin
             .static_pad("mkv_src")
             .expect("failed to get bin src pad");
-        let preroll_block = d.startup_preroll.block_pad(&bin_mkv_src_pad, "audio");
+        let preroll_block = setup.startup_preroll.block_pad(&bin_mkv_src_pad, "audio");
         if preroll_block.start_timeout {
-            schedule_startup_preroll_timeout(data_weak);
+            schedule_startup_preroll_timeout(setup_weak);
         }
 
         src_pad
@@ -1103,14 +1089,10 @@ fn handle_connect_pad_added(
         appsink
             .sync_state_with_parent()
             .expect("failed to sync video appsink state");
-        d.audio_appsink = Some(appsink);
-
-        let request_audio_pad = preroll_block.blocked;
-        drop(d);
-
-        // Requesting a pad synchronously emits muxer-added, whose handler also
-        // accesses CustomData, so the CustomData lock must not be held here.
-        let audio_sink_pad = request_audio_pad.then(|| {
+        // Requesting a pad can synchronously emit muxer-added, which only locks
+        // RecordingState. Keep setup locked until attachment is complete so the
+        // timeout cannot release preroll while this branch is still being linked.
+        let audio_sink_pad = preroll_block.blocked.then(|| {
             mkv_sink
                 .request_pad_simple("audio_%u")
                 .expect("Failed to get audio sink pad from splitmuxsink")
@@ -1130,25 +1112,27 @@ fn handle_connect_pad_added(
 
         bin.sync_state_with_parent()
             .expect("failed to sync bin state");
+        setup.audio_attached = true;
     } else {
         error!("Unknown RTP encoding: {media} / {encoding_name}");
     }
+    drop(setup);
 }
 
 fn connect_recording_sink(
     mkv_sink: &Element,
     storage_path: PathBuf,
-    data: &Arc<Mutex<CustomData>>,
+    recording: &Arc<Mutex<RecordingState>>,
 ) -> Pad {
-    let data_weak = Arc::downgrade(data);
+    let recording_weak = Arc::downgrade(recording);
     mkv_sink.connect("muxer-added", false, {
-        let data_weak = data_weak.clone();
+        let recording_weak = recording_weak.clone();
 
         move |values| {
             let muxer = values[1]
                 .get::<Element>()
                 .expect("muxer-added did not provide a GstElement");
-            handle_muxer_added(&data_weak, &muxer);
+            handle_muxer_added(&recording_weak, &muxer);
             None
         }
     });
@@ -1169,7 +1153,7 @@ fn connect_recording_sink(
                 fragment_id,
                 &first_sample,
                 &storage_path,
-                &data_weak,
+                &recording_weak,
             ))
         }
     });
@@ -1200,7 +1184,8 @@ fn main() {
         .expect("Failed to get storage path")
         .into();
     std::fs::create_dir_all(&storage_path).expect("failed to create camera staging directory");
-    let data = CustomData::new();
+    let setup = Arc::new(Mutex::new(StreamSetupState::default()));
+    let recording = Arc::new(Mutex::new(RecordingState::default()));
     let last_frame_time = Arc::new(Mutex::new(Instant::now()));
     let mkv_sink = create_recording_sink();
 
@@ -1216,18 +1201,17 @@ fn main() {
         .add_many([&source, &mkv_sink])
         .expect("Failed to add elements to pipeline.");
 
-    let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(data));
-    let data_weak = Arc::downgrade(&data);
+    let recording_weak = Arc::downgrade(&recording);
 
-    let video_sink_pad = connect_recording_sink(&mkv_sink, storage_path, &data);
+    let video_sink_pad = connect_recording_sink(&mkv_sink, storage_path, &recording);
 
     // Connect the pad-added signal
     source.connect_pad_added({
-        let data_weak = data_weak.clone();
+        let setup_weak = Arc::downgrade(&setup);
         let last_frame_time = Arc::clone(&last_frame_time);
         move |src, src_pad| {
             handle_connect_pad_added(
-                data_weak.clone(),
+                setup_weak.clone(),
                 src,
                 src_pad,
                 &mkv_sink,
@@ -1256,7 +1240,6 @@ fn main() {
             break;
         }
 
-        let data_weak = data_weak.clone();
         if let Some(msg) = bus.timed_pop(gstreamer::ClockTime::from_seconds(3)) {
             use gstreamer::MessageView;
             match msg.view() {
@@ -1285,7 +1268,10 @@ fn main() {
                         continue;
                     };
                     if structure.name() == "splitmuxsink-fragment-closed" {
-                        exserial::print_message(closed_fragment_message(structure, &data_weak));
+                        exserial::print_message(closed_fragment_message(
+                            structure,
+                            &recording_weak,
+                        ));
                     }
                 }
 
@@ -1302,7 +1288,173 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use gst::prelude::GstBinExt;
+
     use super::*;
+
+    struct StreamSetupFixture {
+        pipeline: gst::Pipeline,
+        source: Bin,
+        sink: Element,
+        video_sink_pad: Pad,
+        setup: Arc<Mutex<StreamSetupState>>,
+        recording: Arc<Mutex<RecordingState>>,
+    }
+
+    impl StreamSetupFixture {
+        fn new() -> Self {
+            gst::init().unwrap();
+            let pipeline = gst::Pipeline::new();
+            let source = Bin::new();
+            let sink = create_recording_sink();
+            pipeline.add_many([source.upcast_ref(), &sink]).unwrap();
+            let recording = Arc::new(Mutex::new(RecordingState::default()));
+            let video_sink_pad = connect_recording_sink(&sink, PathBuf::new(), &recording);
+            let setup = Arc::new(Mutex::new(StreamSetupState {
+                // Tests finish preroll explicitly instead of racing a real timer.
+                startup_preroll: StartupPreroll {
+                    timeout_scheduled: true,
+                    ..StartupPreroll::default()
+                },
+                ..StreamSetupState::default()
+            }));
+            Self {
+                pipeline,
+                source,
+                sink,
+                video_sink_pad,
+                setup,
+                recording,
+            }
+        }
+
+        fn attach(&self, media: &str, encoding: &str) -> Pad {
+            let pad = Pad::new(gst::PadDirection::Src);
+            self.source.add_pad(&pad).unwrap();
+            pad.set_active(true).unwrap();
+            let caps = gst::Caps::builder("application/x-rtp")
+                .field("media", media)
+                .field("encoding-name", encoding)
+                .field(
+                    "clock-rate",
+                    if media == "video" { 90_000i32 } else { 8_000 },
+                )
+                .build();
+            pad.store_sticky_event(&gst::event::Caps::new(&caps))
+                .unwrap();
+            handle_connect_pad_added(
+                Arc::downgrade(&self.setup),
+                self.source.upcast_ref(),
+                &pad,
+                &self.sink,
+                &self.video_sink_pad,
+                &Arc::new(Mutex::new(Instant::now())),
+            );
+            pad
+        }
+    }
+
+    #[test]
+    fn startup_audio_attachment_keeps_preroll_serialized_without_locking_recording() {
+        use std::sync::{
+            TryLockError,
+            atomic::{AtomicBool, Ordering},
+        };
+
+        let fixture = StreamSetupFixture::new();
+        fixture.attach("video", "H264");
+        let attachment_was_serialized = Arc::new(AtomicBool::new(false));
+        fixture.pipeline.connect_element_added({
+            let setup_weak = Arc::downgrade(&fixture.setup);
+            let recording_weak = Arc::downgrade(&fixture.recording);
+            let attachment_was_serialized = Arc::clone(&attachment_was_serialized);
+            move |_, element| {
+                if element.name() != "audio_sink_bin" {
+                    return;
+                }
+                element.static_pad("mkv_src").unwrap().connect_linked({
+                    let setup_weak = setup_weak.clone();
+                    let recording_weak = recording_weak.clone();
+                    let attachment_was_serialized = Arc::clone(&attachment_was_serialized);
+                    move |_, _| {
+                        let setup = setup_weak.upgrade().unwrap();
+                        let recording = recording_weak.upgrade().unwrap();
+                        attachment_was_serialized.store(
+                            matches!(setup.try_lock(), Err(TryLockError::WouldBlock))
+                                && recording.try_lock().is_ok(),
+                            Ordering::SeqCst,
+                        );
+                    }
+                });
+            }
+        });
+
+        fixture.attach("audio", "PCMU");
+
+        assert!(attachment_was_serialized.load(Ordering::SeqCst));
+        let audio_pad = fixture.sink.static_pad("audio_0").unwrap();
+        assert!(audio_pad.is_linked());
+        assert!(fixture.pipeline.by_name("late_audio_fakesink").is_none());
+        let mut setup = fixture.setup.lock().unwrap();
+        assert!(setup.video_attached && setup.audio_attached);
+        assert_eq!(setup.startup_preroll.blocked_pads.len(), 2);
+        setup.startup_preroll.finish("test timeout");
+        assert!(setup.startup_preroll.blocked_pads.is_empty());
+        drop(setup);
+    }
+
+    #[test]
+    fn audio_after_preroll_is_attached_and_drained_outside_the_recording() {
+        let fixture = StreamSetupFixture::new();
+        fixture.attach("video", "H264");
+        fixture
+            .setup
+            .lock()
+            .unwrap()
+            .startup_preroll
+            .finish("test timeout");
+
+        fixture.attach("audio", "PCMU");
+
+        assert!(fixture.setup.lock().unwrap().audio_attached);
+        assert!(fixture.sink.static_pad("audio_0").is_none());
+        let drain = fixture.pipeline.by_name("late_audio_fakesink").unwrap();
+        let audio = fixture.pipeline.by_name("audio_sink_bin").unwrap();
+        assert_eq!(
+            audio.static_pad("mkv_src").unwrap().peer(),
+            drain.static_pad("sink")
+        );
+        assert!(
+            fixture
+                .pipeline
+                .by_name("audio_appsink")
+                .unwrap()
+                .static_pad("sink")
+                .unwrap()
+                .is_linked()
+        );
+    }
+
+    #[test]
+    fn duplicate_streams_leave_the_original_branches_attached() {
+        let fixture = StreamSetupFixture::new();
+        let video = fixture.attach("video", "H264");
+        let audio = fixture.attach("audio", "PCMU");
+        let video_peer = video.peer();
+        let audio_peer = audio.peer();
+
+        let duplicate_video = fixture.attach("video", "H264");
+        let duplicate_audio = fixture.attach("audio", "PCMU");
+
+        assert!(!duplicate_video.is_linked());
+        assert!(!duplicate_audio.is_linked());
+        assert!(video_peer.is_some() && audio_peer.is_some());
+        assert_eq!(video.peer(), video_peer);
+        assert_eq!(audio.peer(), audio_peer);
+        let mut setup = fixture.setup.lock().unwrap();
+        assert_eq!(setup.startup_preroll.blocked_pads.len(), 2);
+        setup.startup_preroll.finish("test timeout");
+    }
 
     #[test]
     fn rotation_creates_closed_staged_recordings_without_a_parent() {
@@ -1312,7 +1464,7 @@ mod tests {
         std::fs::create_dir_all(&staging_path).unwrap();
         let abandoned = staging_path.join(format!("{}.mkv", Uuid::now_v7()));
         std::fs::write(&abandoned, b"interrupted recording").unwrap();
-        let data = Arc::new(Mutex::new(CustomData::new()));
+        let recording = Arc::new(Mutex::new(RecordingState::default()));
         let sink = create_recording_sink();
         sink.set_property("max-size-bytes", 30_000u64);
         let pipeline = gst::Pipeline::new();
@@ -1325,7 +1477,7 @@ mod tests {
         )
         .expect("rotation test needs videotestsrc, x264enc, and h264parse");
         pipeline.add_many([source.upcast_ref(), &sink]).unwrap();
-        let video_sink_pad = connect_recording_sink(&sink, staging_path.clone(), &data);
+        let video_sink_pad = connect_recording_sink(&sink, staging_path.clone(), &recording);
         source
             .static_pad("src")
             .unwrap()
@@ -1335,7 +1487,7 @@ mod tests {
 
         let bus = pipeline.bus().unwrap();
         let deadline = Instant::now() + Duration::from_secs(20);
-        let weak = Arc::downgrade(&data);
+        let weak = Arc::downgrade(&recording);
         let mut recordings = Vec::new();
         let mut saw_eos = false;
         while Instant::now() < deadline {
@@ -1368,8 +1520,8 @@ mod tests {
             recordings.len() >= 3,
             "expected multiple completed rotations"
         );
-        assert!(data.lock().unwrap().fragments.is_empty());
-        let capture_clock = data.lock().unwrap().capture_clock.clone().unwrap();
+        assert!(recording.lock().unwrap().fragments.is_empty());
+        let capture_clock = recording.lock().unwrap().capture_clock.clone().unwrap();
         let mut boundaries = Vec::new();
         let mut filenames = std::collections::HashSet::new();
         for message in recordings {
