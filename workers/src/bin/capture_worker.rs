@@ -1245,6 +1245,17 @@ fn main() {
     // Wait until error or EOS
     let bus = pipeline.bus().unwrap();
     loop {
+        // Check even when unrelated bus messages keep arriving.
+        let last_frame_duration = last_frame_time.lock().unwrap().elapsed();
+        if last_frame_duration > TIMEOUT {
+            error!(
+                "Haven't received frame for {} seconds. Which is longer than the configured timeout {} seconds. Exiting...",
+                last_frame_duration.as_secs(),
+                TIMEOUT.as_secs()
+            );
+            break;
+        }
+
         let data_weak = data_weak.clone();
         if let Some(msg) = bus.timed_pop(gstreamer::ClockTime::from_seconds(3)) {
             use gstreamer::MessageView;
@@ -1280,22 +1291,6 @@ fn main() {
 
                 MessageView::Progress(_progress) => {}
                 _ => {}
-            }
-        } else {
-            // Timeout occurrred - check for hung stream
-            let data = data_weak.upgrade().expect("failed to get data for timeout");
-
-            let d = data.lock().unwrap();
-
-            let last_frame_duration = Instant::now().duration_since(d.last_frame_time);
-            drop(d);
-            if last_frame_duration > TIMEOUT {
-                error!(
-                    "Haven't received frame for {} seconds. Which is longer than the configured timeout {} seconds. Exiting...",
-                    last_frame_duration.as_secs(),
-                    TIMEOUT.as_secs()
-                );
-                break;
             }
         }
     }
