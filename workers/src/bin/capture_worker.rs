@@ -305,6 +305,22 @@ fn caps_are_compatible(old: &gst::CapsRef, new: &gst::CapsRef) -> bool {
     true
 }
 
+fn add_ghost_pad(bin: &Bin, name: &str, target: &Pad) {
+    let ghost_pad = gst::GhostPad::builder_with_target(target)
+        .expect("failed to get ghost pad builder")
+        .name(name)
+        .build();
+
+    // Source pads are activated explicitly; sink pads follow the bin's state.
+    if target.direction() == gst::PadDirection::Src {
+        ghost_pad
+            .set_active(true)
+            .expect("failed to activate ghost source pad");
+    }
+
+    bin.add_pad(&ghost_pad).expect("failed to add ghost pad");
+}
+
 fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
     let bin = gst::Bin::with_name("video_sink_bin");
 
@@ -524,43 +540,19 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
 
     // Ghost Pads
 
-    let ghost_sink = gst::GhostPad::builder_with_target(&depay_sink_pad)
-        .expect("failed to get ghost sink builder")
-        .name("sink")
-        .build();
-
-    bin.add_pad(&ghost_sink).expect("failed to add ghost sink");
+    add_ghost_pad(&bin, "sink", &depay_sink_pad);
 
     let mkv_src = mkv_capsfilter
         .static_pad("src")
         .expect("failed to get mkv parser src pad");
 
-    let ghost_src = gst::GhostPad::builder_with_target(&mkv_src)
-        .expect("Failed to get ghost src builder")
-        .name("mkv_src")
-        .build();
-
-    ghost_src
-        .set_active(true)
-        .expect("failed to set ghost_src as active");
-
-    bin.add_pad(&ghost_src).expect("failed to add ghost src");
+    add_ghost_pad(&bin, "mkv_src", &mkv_src);
 
     let app_src = capsfilter
         .static_pad("src")
         .expect("failed to get app queue src pad");
 
-    let app_ghost_src = gst::GhostPad::builder_with_target(&app_src)
-        .expect("Failed to get app ghost src builder")
-        .name("app_src")
-        .build();
-
-    app_ghost_src
-        .set_active(true)
-        .expect("failed to set app_ghost_src as active");
-
-    bin.add_pad(&app_ghost_src)
-        .expect("failed to add app ghost src");
+    add_ghost_pad(&bin, "app_src", &app_src);
 
     bin
 }
@@ -647,43 +639,19 @@ fn create_audio_branch(depay_name: &str, parser_name: Option<&str>) -> Bin {
 
     // Ghost Pads
 
-    let ghost_sink = gst::GhostPad::builder_with_target(&depay_sink_pad)
-        .expect("failed to get ghost sink builder")
-        .name("sink")
-        .build();
-
-    bin.add_pad(&ghost_sink).expect("failed to add ghost sink");
+    add_ghost_pad(&bin, "sink", &depay_sink_pad);
 
     let mkv_src = mkv_queue
         .static_pad("src")
         .expect("failed to get mkv parser src pad");
 
-    let ghost_src = gst::GhostPad::builder_with_target(&mkv_src)
-        .expect("Failed to get ghost src builder")
-        .name("mkv_src")
-        .build();
-
-    ghost_src
-        .set_active(true)
-        .expect("failed to set ghost_src as active");
-
-    bin.add_pad(&ghost_src).expect("failed to add ghost src");
+    add_ghost_pad(&bin, "mkv_src", &mkv_src);
 
     let app_src = app_queue
         .static_pad("src")
         .expect("failed to get app queue src pad");
 
-    let app_ghost_src = gst::GhostPad::builder_with_target(&app_src)
-        .expect("Failed to get app ghost src builder")
-        .name("app_src")
-        .build();
-
-    app_ghost_src
-        .set_active(true)
-        .expect("failed to set app_ghost_src as active");
-
-    bin.add_pad(&app_ghost_src)
-        .expect("failed to add app ghost src");
+    add_ghost_pad(&bin, "app_src", &app_src);
 
     bin
 }
@@ -928,8 +896,169 @@ fn drain_unmuxed_branch(pipeline: &gst::Pipeline, src_pad: &Pad, sink_name: &str
         .expect("failed to sync fakesink state");
 }
 
+#[derive(Clone, Copy)]
+struct VideoCodec {
+    depayloader: &'static str,
+    parser: &'static str,
+}
+
+#[derive(Clone, Copy)]
+struct AudioCodec {
+    depayloader: &'static str,
+    parser: Option<&'static str>,
+}
+
+enum RtpCodec {
+    Video(VideoCodec),
+    Audio(AudioCodec),
+}
+
+fn select_rtp_codec(media: &str, encoding: &str) -> Option<RtpCodec> {
+    match (media, encoding) {
+        ("video", "H264") => Some(RtpCodec::Video(VideoCodec {
+            depayloader: "rtph264depay",
+            parser: "h264parse",
+        })),
+        ("audio", "OPUS") => Some(RtpCodec::Audio(AudioCodec {
+            depayloader: "rtpopusdepay",
+            parser: Some("opusparse"),
+        })),
+        ("audio", "MPEG4-GENERIC" | "AAC") => Some(RtpCodec::Audio(AudioCodec {
+            depayloader: "rtpmp4gdepay",
+            parser: Some("aacparse"),
+        })),
+        ("audio", "PCMU") => Some(RtpCodec::Audio(AudioCodec {
+            depayloader: "rtppcmudepay",
+            parser: None,
+        })),
+        ("audio", "PCMA") => Some(RtpCodec::Audio(AudioCodec {
+            depayloader: "rtppcmadepay",
+            parser: None,
+        })),
+        _ => None,
+    }
+}
+
+fn attach_appsink(pipeline: &gst::Pipeline, bin: &Bin, name: &str, callbacks: AppSinkCallbacks) {
+    let appsink = AppSink::builder().name(name).sync(false).build();
+    pipeline
+        .add_many([appsink.upcast_ref::<gst::Element>()])
+        .expect("failed to add appsink to pipeline");
+    appsink.set_callbacks(callbacks);
+
+    let app_src_pad = bin
+        .static_pad("app_src")
+        .expect("failed to get bin app_src pad");
+    let sink_pad = appsink
+        .static_pad("sink")
+        .expect("failed to get appsink sink pad");
+    app_src_pad
+        .link(&sink_pad)
+        .expect("failed to link branch to appsink");
+    appsink
+        .sync_state_with_parent()
+        .expect("failed to sync appsink state");
+}
+
+// The lock on StreamSetupState is held by the caller for branch
+// attachment, so startup preroll can't finish before linking and
+// state synch is complete.
+fn attach_video_branch(
+    preroll: &mut StartupPreroll,
+    setup_weak: &Weak<Mutex<StreamSetupState>>,
+    pipeline: &gst::Pipeline,
+    src_pad: &Pad,
+    codec: VideoCodec,
+    video_sink_pad: &Pad,
+    last_frame_time: &Arc<Mutex<Instant>>,
+) {
+    let bin = create_video_branch(codec.depayloader, codec.parser);
+    pipeline.add_many([&bin]).expect("Failed to add bin");
+
+    let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
+    let bin_mkv_src_pad = bin
+        .static_pad("mkv_src")
+        .expect("failed to get bin src pad");
+    let preroll_block = preroll.block_pad(&bin_mkv_src_pad, "video");
+    if preroll_block.start_timeout {
+        schedule_startup_preroll_timeout(setup_weak.clone());
+    }
+
+    src_pad
+        .link(&bin_sink_pad)
+        .expect("failed to link new_src_pad to bin_sink_pad");
+
+    let last_frame_time = Arc::clone(last_frame_time);
+    attach_appsink(
+        pipeline,
+        &bin,
+        "video_appsink",
+        AppSinkCallbacks::builder()
+            .new_sample(move |appsink: &AppSink| handle_video_sample(&last_frame_time, appsink))
+            .build(),
+    );
+
+    bin_mkv_src_pad
+        .link(video_sink_pad)
+        .expect("linking bin to video sink failed");
+    bin.sync_state_with_parent()
+        .expect("failed to sync bin state");
+}
+
+fn attach_audio_branch(
+    preroll: &mut StartupPreroll,
+    setup_weak: &Weak<Mutex<StreamSetupState>>,
+    pipeline: &gst::Pipeline,
+    src_pad: &Pad,
+    codec: AudioCodec,
+    mkv_sink: &Element,
+) {
+    let bin = create_audio_branch(codec.depayloader, codec.parser);
+    pipeline.add_many([&bin]).expect("Failed to add bin");
+
+    let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
+    let bin_mkv_src_pad = bin
+        .static_pad("mkv_src")
+        .expect("failed to get bin src pad");
+    let preroll_block = preroll.block_pad(&bin_mkv_src_pad, "audio");
+    if preroll_block.start_timeout {
+        schedule_startup_preroll_timeout(setup_weak.clone());
+    }
+
+    src_pad
+        .link(&bin_sink_pad)
+        .expect("failed to link new_src_pad to bin_sink_pad");
+
+    attach_appsink(
+        pipeline,
+        &bin,
+        "audio_appsink",
+        AppSinkCallbacks::builder()
+            .new_sample(handle_audio_sample)
+            .build(),
+    );
+
+    // Requesting a pad can synchronously emit muxer-added, which only
+    // locks RecordingState. The caller keeps setup locked through
+    // attachment.
+    if preroll_block.blocked {
+        let audio_sink_pad = mkv_sink
+            .request_pad_simple("audio_%u")
+            .expect("Failed to get audio sink pad from splitmuxsink");
+        bin_mkv_src_pad
+            .link(&audio_sink_pad)
+            .expect("linking bin to audio sink failed");
+    } else {
+        info!("Audio arrived after startup preroll; draining it outside of the MKV muxer");
+        drain_unmuxed_branch(pipeline, &bin_mkv_src_pad, "late_audio_fakesink");
+    }
+
+    bin.sync_state_with_parent()
+        .expect("failed to sync bin state");
+}
+
 fn handle_connect_pad_added(
-    setup_weak: Weak<Mutex<StreamSetupState>>,
+    setup_weak: &Weak<Mutex<StreamSetupState>>,
     src: &Element,
     src_pad: &Pad,
     mkv_sink: &Element,
@@ -942,6 +1071,9 @@ fn handle_connect_pad_added(
         error!("Stream setup state dropped before pad-added");
         return;
     };
+    // Serialize duplicate detection, attachment, and preroll
+    // completion. In particular, recording callbacks invoked during
+    // attachment must not lock setup.
     let mut setup = setup.lock().unwrap();
 
     src.downcast_ref::<gstreamer::Bin>()
@@ -955,7 +1087,6 @@ fn handle_connect_pad_added(
         .structure(0)
         .expect("Failed to get first structure of caps.");
     let new_pad_type = new_pad_struct.name();
-
     let media = new_pad_struct.get::<&str>("media").unwrap_or_default();
     let encoding_name = new_pad_struct
         .get::<&str>("encoding-name")
@@ -966,156 +1097,43 @@ fn handle_connect_pad_added(
         return;
     }
 
-    let (depayloader_name, parser_name) = match (&media, &encoding_name) {
-        (&"video", &"H264") => (Some("rtph264depay"), Some("h264parse")),
-        // (&"video", &"H265") => (Some("rtph265depay"), Some("h265parse")),
-        (&"audio", &"OPUS") => (Some("rtpopusdepay"), Some("opusparse")),
-        (&"audio", &"MPEG4-GENERIC" | &"AAC") => (Some("rtpmp4gdepay"), Some("aacparse")),
-        (&"audio", &"PCMU") => (Some("rtppcmudepay"), None),
-        (&"audio", &"PCMA") => (Some("rtppcmadepay"), None),
-        _ => (None, None),
-    };
-
     info!("New pad type {new_pad_type}, {media} {encoding_name}");
-
-    if let ("video", Some(depay_name), Some(parser_name)) = (media, depayloader_name, parser_name) {
-        let bin = create_video_branch(depay_name, parser_name);
-        let pipeline = src
-            .parent()
-            .expect("Failed to get src parent")
-            .downcast::<gst::Pipeline>()
-            .expect("failed to get unwrap src parent");
-
-        pipeline.add_many([&bin]).expect("Failed to add bin");
-
-        let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
-
-        let bin_mkv_src_pad = bin
-            .static_pad("mkv_src")
-            .expect("failed to get bin src pad");
-        let preroll_block = setup.startup_preroll.block_pad(&bin_mkv_src_pad, "video");
-        if preroll_block.start_timeout {
-            schedule_startup_preroll_timeout(setup_weak);
-        }
-
-        src_pad
-            .link(&bin_sink_pad)
-            .expect("failed to link new_src_pad to bin_sink_pad");
-
-        // the bin pipeline to appsink
-        let appsink = AppSink::builder().name("video_appsink").sync(false).build();
-
-        pipeline
-            .add_many([appsink.upcast_ref::<gst::Element>()])
-            .expect("failed to add video appsink to pipeline");
-
-        let last_frame_time = Arc::clone(last_frame_time);
-        appsink.set_callbacks(
-            AppSinkCallbacks::builder()
-                .new_sample(move |appsink: &AppSink| handle_video_sample(&last_frame_time, appsink))
-                .build(),
-        );
-
-        let bin_app_src_pad = bin
-            .static_pad("app_src")
-            .expect("failed to get bin app_src pad");
-        let appsink_sink_pad = appsink
-            .static_pad("sink")
-            .expect("failed to get appsink src pad");
-        bin_app_src_pad
-            .link(&appsink_sink_pad)
-            .expect("failed to link appsink_sink_pad");
-        appsink
-            .sync_state_with_parent()
-            .expect("failed to sync video appsink state");
-
-        // link the bin pipeline to the mkv splitmuxsink
-        bin_mkv_src_pad
-            .link(video_sink_pad)
-            .expect("linking bin to video sink failed");
-
-        info!("Link succeeded (type {new_pad_type}).");
-
-        bin.sync_state_with_parent()
-            .expect("failed to sync bin state");
-        setup.video_attached = true;
-    } else if let ("audio", Some(depay_name)) = (media, depayloader_name) {
-        let bin = create_audio_branch(depay_name, parser_name);
-
-        let pipeline = src
-            .parent()
-            .expect("Failed to get src parent")
-            .downcast::<gst::Pipeline>()
-            .expect("failed to get unwrap src parent");
-
-        pipeline.add_many([&bin]).expect("Failed to add bin");
-
-        let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
-
-        let bin_mkv_src_pad = bin
-            .static_pad("mkv_src")
-            .expect("failed to get bin src pad");
-        let preroll_block = setup.startup_preroll.block_pad(&bin_mkv_src_pad, "audio");
-        if preroll_block.start_timeout {
-            schedule_startup_preroll_timeout(setup_weak);
-        }
-
-        src_pad
-            .link(&bin_sink_pad)
-            .expect("failed to link new_src_pad to bin_sink_pad");
-
-        // the bin pipeline to appsink
-        let appsink = AppSink::builder().name("audio_appsink").sync(false).build();
-
-        pipeline
-            .add_many([appsink.upcast_ref::<gst::Element>()])
-            .expect("failed to add audio appsink to pipeline");
-
-        appsink.set_callbacks(
-            AppSinkCallbacks::builder()
-                .new_sample(handle_audio_sample)
-                .build(),
-        );
-
-        let bin_app_src_pad = bin
-            .static_pad("app_src")
-            .expect("failed to get bin app_src pad");
-        let appsink_sink_pad = appsink
-            .static_pad("sink")
-            .expect("failed to get appsink src pad");
-        bin_app_src_pad
-            .link(&appsink_sink_pad)
-            .expect("failed to link appsink_sink_pad");
-        appsink
-            .sync_state_with_parent()
-            .expect("failed to sync video appsink state");
-        // Requesting a pad can synchronously emit muxer-added, which only locks
-        // RecordingState. Keep setup locked until attachment is complete so the
-        // timeout cannot release preroll while this branch is still being linked.
-        let audio_sink_pad = preroll_block.blocked.then(|| {
-            mkv_sink
-                .request_pad_simple("audio_%u")
-                .expect("Failed to get audio sink pad from splitmuxsink")
-        });
-
-        if let Some(audio_sink_pad) = audio_sink_pad {
-            // link the bin pipeline to the mkv splitmuxsink
-            bin_mkv_src_pad
-                .link(&audio_sink_pad)
-                .expect("linking bin to audio sink failed");
-        } else {
-            info!("Audio arrived after startup preroll; draining it outside of the MKV muxer");
-            drain_unmuxed_branch(&pipeline, &bin_mkv_src_pad, "late_audio_fakesink");
-        }
-
-        info!("Link succeeded (type {new_pad_type}).");
-
-        bin.sync_state_with_parent()
-            .expect("failed to sync bin state");
-        setup.audio_attached = true;
-    } else {
+    let Some(codec) = select_rtp_codec(media, encoding_name) else {
         error!("Unknown RTP encoding: {media} / {encoding_name}");
+        return;
+    };
+    let pipeline = src
+        .parent()
+        .expect("Failed to get src parent")
+        .downcast::<gst::Pipeline>()
+        .expect("failed to get unwrap src parent");
+
+    match codec {
+        RtpCodec::Video(codec) => {
+            attach_video_branch(
+                &mut setup.startup_preroll,
+                setup_weak,
+                &pipeline,
+                src_pad,
+                codec,
+                video_sink_pad,
+                last_frame_time,
+            );
+            setup.video_attached = true;
+        }
+        RtpCodec::Audio(codec) => {
+            attach_audio_branch(
+                &mut setup.startup_preroll,
+                setup_weak,
+                &pipeline,
+                src_pad,
+                codec,
+                mkv_sink,
+            );
+            setup.audio_attached = true;
+        }
     }
+    info!("Link succeeded (type {new_pad_type}).");
     drop(setup);
 }
 
@@ -1211,7 +1229,7 @@ fn main() {
         let last_frame_time = Arc::clone(&last_frame_time);
         move |src, src_pad| {
             handle_connect_pad_added(
-                setup_weak.clone(),
+                &setup_weak,
                 src,
                 src_pad,
                 &mkv_sink,
@@ -1337,13 +1355,17 @@ mod tests {
                 .field("encoding-name", encoding)
                 .field(
                     "clock-rate",
-                    if media == "video" { 90_000i32 } else { 8_000 },
+                    match (media, encoding) {
+                        ("video", _) => 90_000i32,
+                        ("audio", "OPUS" | "MPEG4-GENERIC") => 48_000,
+                        _ => 8_000,
+                    },
                 )
                 .build();
             pad.store_sticky_event(&gst::event::Caps::new(&caps))
                 .unwrap();
             handle_connect_pad_added(
-                Arc::downgrade(&self.setup),
+                &Arc::downgrade(&self.setup),
                 self.source.upcast_ref(),
                 &pad,
                 &self.sink,
@@ -1433,6 +1455,57 @@ mod tests {
                 .unwrap()
                 .is_linked()
         );
+    }
+
+    #[test]
+    fn supported_audio_codecs_attach_to_both_outputs() {
+        for encoding in ["OPUS", "MPEG4-GENERIC", "PCMU", "PCMA"] {
+            let fixture = StreamSetupFixture::new();
+            let source_pad = fixture.attach("audio", encoding);
+
+            assert!(source_pad.is_linked(), "{encoding}");
+            assert!(fixture.setup.lock().unwrap().audio_attached, "{encoding}");
+            assert!(fixture.sink.static_pad("audio_0").unwrap().is_linked());
+            assert!(
+                fixture
+                    .pipeline
+                    .by_name("audio_appsink")
+                    .unwrap()
+                    .static_pad("sink")
+                    .unwrap()
+                    .is_linked()
+            );
+            fixture
+                .setup
+                .lock()
+                .unwrap()
+                .startup_preroll
+                .finish("test timeout");
+        }
+    }
+
+    #[test]
+    fn unsupported_codecs_leave_setup_available_for_supported_streams() {
+        let fixture = StreamSetupFixture::new();
+        let unsupported_video = fixture.attach("video", "H265");
+        let unsupported_audio = fixture.attach("audio", "unknown");
+
+        assert!(!unsupported_video.is_linked());
+        assert!(!unsupported_audio.is_linked());
+        {
+            let setup = fixture.setup.lock().unwrap();
+            assert!(!setup.video_attached && !setup.audio_attached);
+            assert!(setup.startup_preroll.blocked_pads.is_empty());
+            drop(setup);
+        }
+        assert!(fixture.pipeline.by_name("video_sink_bin").is_none());
+        assert!(fixture.pipeline.by_name("audio_sink_bin").is_none());
+
+        assert!(fixture.attach("video", "H264").is_linked());
+        assert!(fixture.attach("audio", "PCMU").is_linked());
+        let mut setup = fixture.setup.lock().unwrap();
+        assert!(setup.video_attached && setup.audio_attached);
+        setup.startup_preroll.finish("test timeout");
     }
 
     #[test]
