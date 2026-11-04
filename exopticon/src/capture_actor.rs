@@ -33,7 +33,7 @@ use futures::stream::StreamExt;
 use metrics::{Counter, counter};
 use regex::Regex;
 use tokio::{
-    process::{self, Child, ChildStdout},
+    process::{self, Child, ChildStdin, ChildStdout},
     sync::mpsc,
     task::{JoinSet, spawn_blocking},
 };
@@ -209,6 +209,9 @@ pub struct CaptureActor {
     camera: Camera,
     storage_group: StorageGroup,
     child: Option<(Child, FramedRead<ChildStdout, LengthDelimitedCodec>)>,
+    // Keep stdin separate because Child::wait closes any stdin it
+    // still owns.
+    child_stdin: Option<ChildStdin>,
 
     /// Video Packet Router
     video_router: Arc<VideoRouter>,
@@ -238,6 +241,7 @@ impl CaptureActor {
             camera,
             storage_group,
             child: None,
+            child_stdin: None,
             command_receiver,
             video_router,
             camera_status_registry,
@@ -268,10 +272,16 @@ impl CaptureActor {
         cmd.arg(&storage_path);
         cmd.arg(hwaccel_method);
         cmd.stdout(Stdio::piped());
-        cmd.stdin(Stdio::null());
+        cmd.stdin(Stdio::piped());
         cmd.kill_on_drop(true);
 
         let mut child = cmd.spawn()?;
+        self.child_stdin = Some(
+            child
+                .stdin
+                .take()
+                .expect("Failed to open stdin on worker child"),
+        );
         let stdout = child
             .stdout
             .take()
@@ -455,19 +465,22 @@ impl CaptureActor {
             Some((child, framed_stream)) => {
                 tokio::select! {
                     biased;
-                    Some(msg) = framed_stream.next() => self.stream_handler(msg).await?,
+                    Some(Command::Stop) = self.command_receiver.recv() => {
+                        info!("Received stop command for {} {}.",
+                              self.camera.name, self.camera.name,
+                        );
+                        return Ok(false)
+                    }
+                    msg = framed_stream.next() => match msg {
+                        Some(msg) => self.stream_handler(msg).await?,
+                        None => return Ok(false),
+                    },
                     _ = child.wait() => {
                         info!(
                             "Capture process for {} {} died. Restarting...",
                             self.camera.name, self.camera.name,
                         );
                         return Ok(false);
-                    }
-                    Some(Command::Stop) = self.command_receiver.recv() => {
-                        info!("Received stop command for {} {}.",
-                              self.camera.name, self.camera.name,
-                        );
-                        return Ok(false)
                     }
                     else => return Ok(false)
                 }
@@ -517,20 +530,32 @@ impl CaptureActor {
             }
         }
 
+        // EOF requests a graceful shutdown. Keep reading stdout until
+        // the worker closes it so final messages are published before
+        // cleanup.
+        drop(self.child_stdin.take());
+
         self.video_router
             .unregister_keyframe_requests(&self.camera.name)
             .await;
         keyframe_tasks.shutdown().await;
 
-        if let Some((mut child, _)) = self.child.take() {
-            // wait for child to exit...
-            if let Err(e) = child.kill().await {
-                error!("error killing child: {}", e);
+        if let Some((mut child, mut framed_stream)) = self.child.take() {
+            while let Some(msg) = framed_stream.next().await {
+                if let Err(e) = self.stream_handler(msg).await {
+                    error!(
+                        "Error handling capture worker message during shutdown: {}",
+                        e
+                    );
+                    had_error = true;
+                }
             }
             if let Err(e) = child.wait().await {
                 error!("error waiting for child exit: {}", e);
+                had_error = true;
             }
         }
+
         if let Err(e) = self.cleanup_unopened_video_segments().await {
             error!("error cleaning unopened video segments after stop: {}", e);
         }

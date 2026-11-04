@@ -45,6 +45,7 @@
 
 use std::{
     collections::HashMap,
+    io::{self, Read},
     path::{Path, PathBuf},
     sync::{Arc, Mutex, Weak},
     thread,
@@ -70,6 +71,7 @@ static LOGGER: ExLog = ExLog;
 static TIMEOUT: Duration = Duration::from_secs(10);
 static STARTUP_PREROLL_TIMEOUT: Duration = Duration::from_secs(1);
 static MATROSKA_TIMECODE_SCALE: gst::ClockTime = gst::ClockTime::from_mseconds(1);
+const SHUTDOWN_MESSAGE: &str = "capture-worker-shutdown";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -228,6 +230,8 @@ impl StartupPreroll {
 /// Recording callbacks must never acquire this state's lock.
 #[derive(Debug, Default)]
 struct StreamSetupState {
+    /// prevents new branches from being attached once shutdown starts
+    shutting_down: bool,
     /// set once the video branch is fully connected and synchronized
     video_attached: bool,
     /// set once the audio branch is fully connected, including drained late audio
@@ -1066,6 +1070,9 @@ fn handle_connect_pad_added(
     // completion. In particular, recording callbacks invoked during
     // attachment must not lock setup.
     let mut setup = setup.lock().unwrap();
+    if setup.shutting_down {
+        return;
+    }
 
     src.downcast_ref::<gstreamer::Bin>()
         .expect("src downcast failed.")
@@ -1174,6 +1181,17 @@ fn connect_recording_sink(
         .expect("Failed to get video sink pad from splitmuxsink")
 }
 
+/// Only the bus loop changes the pipeline; the input thread just wakes it.
+fn monitor_shutdown(mut input: impl Read, bus: &gst::Bus) {
+    if let Err(err) = io::copy(&mut input, &mut io::sink()) {
+        error!("Error reading capture worker stdin: {err}");
+    }
+    // A flushing bus means the pipeline has already stopped.
+    let _ = bus.post(gst::message::Application::new(gst::Structure::new_empty(
+        SHUTDOWN_MESSAGE,
+    )));
+}
+
 fn main() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Info))
@@ -1210,8 +1228,6 @@ fn main() {
         .add_many([&source, &mkv_sink])
         .expect("Failed to add elements to pipeline.");
 
-    let recording_weak = Arc::downgrade(&recording);
-
     let video_sink_pad = connect_recording_sink(&mkv_sink, storage_path, &recording);
 
     // Connect the pad-added signal
@@ -1235,12 +1251,20 @@ fn main() {
         .set_state(gstreamer::State::Playing)
         .expect("Unable to set the pipeline to the `Playing` state");
 
-    // Wait until error or EOS
     let bus = pipeline.bus().unwrap();
+    let stdin_bus = bus.clone();
+    thread::Builder::new()
+        .name("capture-stdin".to_string())
+        .spawn(move || monitor_shutdown(io::stdin(), &stdin_bus))
+        .expect("failed to spawn capture stdin monitor");
+
+    let recording_weak = Arc::downgrade(&recording);
+    let mut shutting_down = false;
+    let mut saw_eos = false;
     loop {
         // Check even when unrelated bus messages keep arriving.
         let last_frame_duration = last_frame_time.lock().unwrap().elapsed();
-        if last_frame_duration > TIMEOUT {
+        if !shutting_down && last_frame_duration > TIMEOUT {
             error!(
                 "Haven't received frame for {} seconds. Which is longer than the configured timeout {} seconds. Exiting...",
                 last_frame_duration.as_secs(),
@@ -1270,7 +1294,36 @@ fn main() {
                         );
                     }
                 }
-                MessageView::Eos(..) => break,
+                MessageView::Application(application)
+                    if application
+                        .structure()
+                        .is_some_and(|structure| structure.name() == SHUTDOWN_MESSAGE) =>
+                {
+                    if shutting_down {
+                        continue;
+                    }
+                    info!("Stdin closed; draining capture pipeline");
+                    shutting_down = true;
+                    let video_attached = {
+                        let mut setup = setup.lock().unwrap();
+                        setup.shutting_down = true;
+                        setup.startup_preroll.finish("shutdown");
+                        setup.video_attached
+                    };
+                    // An unconnected splitmux video pad cannot reach EOS. No
+                    // video branch means there is no recording to finalize.
+                    if !video_attached {
+                        break;
+                    }
+                    if !pipeline.send_event(gst::event::Eos::new()) {
+                        error!("Capture pipeline rejected shutdown EOS");
+                        break;
+                    }
+                }
+                MessageView::Eos(..) => {
+                    saw_eos = true;
+                    shutting_down = true;
+                }
 
                 MessageView::Element(element) => {
                     let Some(structure) = element.structure() else {
@@ -1287,6 +1340,11 @@ fn main() {
                 MessageView::Progress(_progress) => {}
                 _ => {}
             }
+        }
+        // Async finalizers may still have fragment-closed messages to deliver
+        // after pipeline EOS. Keep the bus alive until every handoff is sent.
+        if saw_eos && recording.lock().unwrap().fragments.is_empty() {
+            break;
         }
     }
 
