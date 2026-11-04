@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.2
+2026-11-04
+
+### Fixes
+
+- Correctly set final duration of mkv (48a39d19039b6ee33dfbf311641d0e904019fb33)
+
 ## 0.51.1
 2026-11-04
 
