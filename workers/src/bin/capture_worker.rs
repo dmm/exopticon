@@ -63,7 +63,7 @@ use gstreamer::{
     },
 };
 use gstreamer_app::{AppSink, AppSinkCallbacks};
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -222,7 +222,7 @@ impl StartupPreroll {
             blocked.pad.remove_probe(blocked.probe_id);
         }
 
-        info!("Startup preroll complete via {reason}; released {blocked_count} mux branch(es)");
+        debug!("Startup preroll complete via {reason}; released {blocked_count} mux branch(es)");
     }
 }
 
@@ -691,7 +691,7 @@ fn handle_video_sample(
     exserial::print_message(msg);
     nal_count += 1;
 
-    debug!(
+    trace!(
         "SAMPLE PTS: {} 90Hz pts: {:?} offset: {}, NAL COUNT: {}",
         buffer.pts().expect("failed to get pts"),
         pts_90khz,
@@ -712,7 +712,7 @@ fn handle_audio_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowE
 
     // Only u-law PCM is supported right now
     if sample_type != "audio/x-mulaw" {
-        debug!("Invalid sample encoding \"{sample_type}\"");
+        trace!("Invalid sample encoding \"{sample_type}\"");
         return Ok(gst::FlowSuccess::Ok);
     }
 
@@ -1060,7 +1060,7 @@ fn handle_connect_pad_added(
     video_sink_pad: &Pad,
     last_frame_time: &Arc<Mutex<Instant>>,
 ) {
-    info!("Received new pad {} from {}", src_pad.name(), src.name());
+    debug!("Received new pad {} from {}", src_pad.name(), src.name());
 
     let Some(setup) = setup_weak.upgrade() else {
         error!("Stream setup state dropped before pad-added");
@@ -1095,7 +1095,7 @@ fn handle_connect_pad_added(
         return;
     }
 
-    info!("New pad type {new_pad_type}, {media} {encoding_name}");
+    debug!("New pad type {new_pad_type}, {media} {encoding_name}");
     let Some(codec) = select_rtp_codec(media, encoding_name) else {
         error!("Unknown RTP encoding: {media} / {encoding_name}");
         return;
@@ -1131,7 +1131,7 @@ fn handle_connect_pad_added(
             setup.audio_attached = true;
         }
     }
-    info!("Link succeeded (type {new_pad_type}).");
+    debug!("Link succeeded (type {new_pad_type}).");
     drop(setup);
 }
 
@@ -1194,7 +1194,7 @@ fn monitor_shutdown(mut input: impl Read, bus: &gst::Bus) {
 
 fn main() {
     log::set_logger(&LOGGER)
-        .map(|()| log::set_max_level(log::LevelFilter::Info))
+        .map(|()| log::set_max_level(log::LevelFilter::Debug))
         .expect("failed to initialize logger");
 
     // Initialize GStreamer

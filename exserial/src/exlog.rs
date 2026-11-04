@@ -5,8 +5,8 @@ use crate::models::CaptureMessage;
 pub struct ExLog;
 
 impl log::Log for ExLog {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
     }
 
     fn log(&self, record: &Record) {
