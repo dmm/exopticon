@@ -788,6 +788,10 @@ fn handle_file_location_request(
     let (capture_session_id, clock_anchor) = capture_clock
         .metadata_for_reference(splitmuxsink, reference_running_time)
         .expect("splitmuxsink does not have a running-time clock");
+    debug!(
+        "splitmuxsink fragment start: fragment_id={fragment_id} filename={filename} capture_session_id={capture_session_id} begin_running_time_ns={}",
+        reference_running_time.nseconds(),
+    );
     let fragment = FragmentCapture {
         filename,
         begin_running_time: reference_running_time,
@@ -819,6 +823,9 @@ fn closed_fragment_message(
     let duration = structure
         .get::<gst::ClockTime>("fragment-duration")
         .expect("fragment-closed message has no duration");
+    let reference_running_time = structure
+        .get::<gst::ClockTime>("running-time")
+        .expect("fragment-closed message has no reference running time");
     let recording = recording_weak
         .upgrade()
         .expect("recording state dropped before fragment-closed");
@@ -828,10 +835,16 @@ fn closed_fragment_message(
         .fragments
         .remove(&fragment_id)
         .expect("fragment-closed arrived for an unknown fragment");
-    let end_running_time = fragment
+    let duration_end_running_time = fragment
         .begin_running_time
         .checked_add(duration)
         .expect("fragment running-time end overflowed");
+    // On rotation, running-time is the next reference buffer's timestamp.
+    // Without buffer durations, fragment-duration stops at the final frame's
+    // PTS and omits its display interval. At EOS, running-time is the final
+    // timestamp instead, so retain the duration-based end when it is later.
+    // Both values belong to this fragment, even with async finalization.
+    let end_running_time = duration_end_running_time.max(reference_running_time);
     let end_time = fragment
         .capture_clock
         .utc_at_running_time(end_running_time)
@@ -843,6 +856,16 @@ fn closed_fragment_message(
         .utc_at_running_time(fragment.begin_running_time)
         .expect("fragment start is too far from its UTC anchor")
         .to_rfc3339_opts(SecondsFormat::Nanos, true);
+
+    debug!(
+        "splitmuxsink fragment closed: fragment_id={fragment_id} filename={} capture_session_id={} begin_running_time_ns={} fragment_duration_ns={} reference_running_time_ns={} end_running_time_ns={} begin_time={begin_time} end_time={end_time}",
+        fragment.filename,
+        fragment.capture_clock.session_id,
+        fragment.begin_running_time.nseconds(),
+        duration.nseconds(),
+        reference_running_time.nseconds(),
+        end_running_time.nseconds(),
+    );
 
     // The muxer has closed the file. The worker never touches it after handoff.
     CaptureMessage::EndFile {
