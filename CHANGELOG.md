@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.0
+2026-11-04
+
+### Features
+
+- Cleanup worker logs (ff81ffb980673cc74e5c31804ce6707f0805f909)
+
 ## 0.50.0
 2026-11-04
 
