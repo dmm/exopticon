@@ -239,9 +239,6 @@ struct CustomData {
     fragments: HashMap<u32, FragmentCapture>,
     /// identity and UTC mapping for the current `GStreamer` running-time domain
     capture_clock: Option<CaptureClock>,
-    /// `last_frame_time` is set to detect a hung process not
-    /// producing frames
-    last_frame_time: Instant,
 }
 
 impl CustomData {
@@ -253,7 +250,6 @@ impl CustomData {
             pending_muxer: None,
             fragments: HashMap::new(),
             capture_clock: None,
-            last_frame_time: Instant::now(),
         }
     }
 }
@@ -700,16 +696,10 @@ fn create_audio_branch(depay_name: &str, parser_name: Option<&str>) -> Bin {
 }
 
 fn handle_video_sample(
-    data_weak: &Weak<Mutex<CustomData>>,
+    last_frame_time: &Mutex<Instant>,
     appsink: &AppSink,
 ) -> Result<gst::FlowSuccess, gst::FlowError> {
-    let Some(data) = data_weak.upgrade() else {
-        error!("Failed to upgrade the weak reference");
-        return Err(gst::FlowError::CustomError);
-    };
-    let mut d = data.lock().unwrap();
-    d.last_frame_time = Instant::now();
-    drop(d);
+    *last_frame_time.lock().unwrap() = Instant::now();
 
     let sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
     let buffer = sample.buffer().expect("failed to get sample buffer");
@@ -956,6 +946,7 @@ fn handle_connect_pad_added(
     src_pad: &Pad,
     mkv_sink: &Element,
     video_sink_pad: &Pad,
+    last_frame_time: &Arc<Mutex<Instant>>,
 ) {
     info!("Received new pad {} from {}", src_pad.name(), src.name());
 
@@ -1018,7 +1009,7 @@ fn handle_connect_pad_added(
             .expect("failed to get bin src pad");
         let preroll_block = d.startup_preroll.block_pad(&bin_mkv_src_pad, "video");
         if preroll_block.start_timeout {
-            schedule_startup_preroll_timeout(data_weak.clone());
+            schedule_startup_preroll_timeout(data_weak);
         }
 
         src_pad
@@ -1032,11 +1023,10 @@ fn handle_connect_pad_added(
             .add_many([appsink.upcast_ref::<gst::Element>()])
             .expect("failed to add video appsink to pipeline");
 
+        let last_frame_time = Arc::clone(last_frame_time);
         appsink.set_callbacks(
             AppSinkCallbacks::builder()
-                .new_sample(move |appsink: &AppSink| {
-                    handle_video_sample(&data_weak.clone(), appsink)
-                })
+                .new_sample(move |appsink: &AppSink| handle_video_sample(&last_frame_time, appsink))
                 .build(),
         );
 
@@ -1211,6 +1201,7 @@ fn main() {
         .into();
     std::fs::create_dir_all(&storage_path).expect("failed to create camera staging directory");
     let data = CustomData::new();
+    let last_frame_time = Arc::new(Mutex::new(Instant::now()));
     let mkv_sink = create_recording_sink();
 
     let source = gst::ElementFactory::make("rtspsrc")
@@ -1233,8 +1224,16 @@ fn main() {
     // Connect the pad-added signal
     source.connect_pad_added({
         let data_weak = data_weak.clone();
+        let last_frame_time = Arc::clone(&last_frame_time);
         move |src, src_pad| {
-            handle_connect_pad_added(data_weak.clone(), src, src_pad, &mkv_sink, &video_sink_pad);
+            handle_connect_pad_added(
+                data_weak.clone(),
+                src,
+                src_pad,
+                &mkv_sink,
+                &video_sink_pad,
+                &last_frame_time,
+            );
         }
     });
 
