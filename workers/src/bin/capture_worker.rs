@@ -45,7 +45,7 @@
 
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex, Weak},
     thread,
     time::{Duration, Instant},
@@ -227,11 +227,6 @@ impl StartupPreroll {
 /// `CaptureWorker` state
 #[derive(Debug)]
 struct CustomData {
-    /// Camera staging directory; filenames are generated locally.
-    storage_path: PathBuf,
-    /// splitmuxsink and associated video sink pad, used by gstreamer
-    /// callbacks
-    mkv_sink_pad: (Element, Option<Pad>),
     /// set once video pad is connected
     video_appsink: Option<AppSink>,
     /// set if audio stream is provided
@@ -250,30 +245,8 @@ struct CustomData {
 }
 
 impl CustomData {
-    pub fn new(storage_path: PathBuf) -> Self {
-        let muxer_properties = gst::Structure::builder("properties")
-            // Keep every fragment in the capture session's running-time domain.
-            .field("offset-to-zero", false)
-            .field(
-                "timecodescale",
-                i64::try_from(MATROSKA_TIMECODE_SCALE.nseconds())
-                    .expect("Matroska timecode scale exceeds i64"),
-            )
-            .field("writing-app", "EXOPTICON")
-            .build();
-
-        let mkv_sink = gst::ElementFactory::make("splitmuxsink")
-            .name("sink")
-            .property("async-finalize", true)
-            .property("max-size-bytes", 15_000_000u64)
-            .property_from_str("muxer-factory", "matroskamux")
-            .property("muxer-properties", muxer_properties)
-            .build()
-            .expect("Could not create sink element.");
-
+    pub fn new() -> Self {
         Self {
-            storage_path,
-            mkv_sink_pad: (mkv_sink, None),
             video_appsink: None,
             audio_appsink: None,
             startup_preroll: StartupPreroll::default(),
@@ -283,6 +256,28 @@ impl CustomData {
             last_frame_time: Instant::now(),
         }
     }
+}
+
+fn create_recording_sink() -> Element {
+    let muxer_properties = gst::Structure::builder("properties")
+        // Keep every fragment in the capture session's running-time domain.
+        .field("offset-to-zero", false)
+        .field(
+            "timecodescale",
+            i64::try_from(MATROSKA_TIMECODE_SCALE.nseconds())
+                .expect("Matroska timecode scale exceeds i64"),
+        )
+        .field("writing-app", "EXOPTICON")
+        .build();
+
+    gst::ElementFactory::make("splitmuxsink")
+        .name("sink")
+        .property("async-finalize", true)
+        .property("max-size-bytes", 15_000_000u64)
+        .property_from_str("muxer-factory", "matroskamux")
+        .property("muxer-properties", muxer_properties)
+        .build()
+        .expect("Could not create sink element.")
 }
 
 fn caps_are_compatible(old: &gst::CapsRef, new: &gst::CapsRef) -> bool {
@@ -818,6 +813,7 @@ fn handle_file_location_request(
     splitmuxsink: &Element,
     fragment_id: u32,
     first_sample: &gst::Sample,
+    storage_path: &Path,
     data_weak: &Weak<Mutex<CustomData>>,
 ) -> gstreamer::glib::Value {
     let reference_running_time = sample_running_time(first_sample)
@@ -825,7 +821,7 @@ fn handle_file_location_request(
     let Some(data) = data_weak.upgrade() else {
         panic!("Failed to upgrade the weak reference");
     };
-    let (storage_path, capture_clock) = {
+    let capture_clock = {
         let mut d = data.lock().unwrap();
         let mut capture_clock = d
             .capture_clock
@@ -848,12 +844,9 @@ fn handle_file_location_request(
             },
         );
 
-        (
-            d.storage_path.clone(),
-            d.capture_clock
-                .clone()
-                .expect("capture clock was just stored"),
-        )
+        d.capture_clock
+            .clone()
+            .expect("capture clock was just stored")
     };
 
     let filename = format!("{}.mkv", Uuid::now_v7());
@@ -957,7 +950,13 @@ fn drain_unmuxed_branch(pipeline: &gst::Pipeline, src_pad: &Pad, sink_name: &str
         .expect("failed to sync fakesink state");
 }
 
-fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, src_pad: &Pad) {
+fn handle_connect_pad_added(
+    data_weak: Weak<Mutex<CustomData>>,
+    src: &Element,
+    src_pad: &Pad,
+    mkv_sink: &Element,
+    video_sink_pad: &Pad,
+) {
     info!("Received new pad {} from {}", src_pad.name(), src.name());
 
     let Some(data) = data_weak.upgrade() else {
@@ -1057,12 +1056,7 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
 
         // link the bin pipeline to the mkv splitmuxsink
         bin_mkv_src_pad
-            .link(
-                d.mkv_sink_pad
-                    .1
-                    .as_ref()
-                    .expect("splitmuxsink video pad was not requested"),
-            )
+            .link(video_sink_pad)
             .expect("linking bin to video sink failed");
 
         info!("Link succeeded (type {new_pad_type}).");
@@ -1122,7 +1116,6 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
         d.audio_appsink = Some(appsink);
 
         let request_audio_pad = preroll_block.blocked;
-        let mkv_sink = d.mkv_sink_pad.0.clone();
         drop(d);
 
         // Requesting a pad synchronously emits muxer-added, whose handler also
@@ -1152,9 +1145,12 @@ fn handle_connect_pad_added(data_weak: Weak<Mutex<CustomData>>, src: &Element, s
     }
 }
 
-fn connect_recording_sink(data: &Arc<Mutex<CustomData>>) {
+fn connect_recording_sink(
+    mkv_sink: &Element,
+    storage_path: PathBuf,
+    data: &Arc<Mutex<CustomData>>,
+) -> Pad {
     let data_weak = Arc::downgrade(data);
-    let mkv_sink = data.lock().unwrap().mkv_sink_pad.0.clone();
     mkv_sink.connect("muxer-added", false, {
         let data_weak = data_weak.clone();
 
@@ -1182,6 +1178,7 @@ fn connect_recording_sink(data: &Arc<Mutex<CustomData>>) {
                 &splitmuxsink,
                 fragment_id,
                 &first_sample,
+                &storage_path,
                 &data_weak,
             ))
         }
@@ -1189,10 +1186,9 @@ fn connect_recording_sink(data: &Arc<Mutex<CustomData>>) {
 
     // Request the primary video pad only after muxer-added is connected. The
     // request creates the initial muxer and emits muxer-added synchronously.
-    let video_sink_pad = mkv_sink
+    mkv_sink
         .request_pad_simple("video")
-        .expect("Failed to get video sink pad from splitmuxsink");
-    data.lock().unwrap().mkv_sink_pad.1 = Some(video_sink_pad);
+        .expect("Failed to get video sink pad from splitmuxsink")
 }
 
 fn main() {
@@ -1214,7 +1210,8 @@ fn main() {
         .expect("Failed to get storage path")
         .into();
     std::fs::create_dir_all(&storage_path).expect("failed to create camera staging directory");
-    let data = CustomData::new(storage_path);
+    let data = CustomData::new();
+    let mkv_sink = create_recording_sink();
 
     let source = gst::ElementFactory::make("rtspsrc")
         .name("source")
@@ -1225,19 +1222,19 @@ fn main() {
     let pipeline = gst::Pipeline::with_name("capture-pipeline");
 
     pipeline
-        .add_many([&source, &data.mkv_sink_pad.0])
+        .add_many([&source, &mkv_sink])
         .expect("Failed to add elements to pipeline.");
 
     let data: Arc<Mutex<CustomData>> = Arc::new(Mutex::new(data));
     let data_weak = Arc::downgrade(&data);
 
-    connect_recording_sink(&data);
+    let video_sink_pad = connect_recording_sink(&mkv_sink, storage_path, &data);
 
     // Connect the pad-added signal
     source.connect_pad_added({
         let data_weak = data_weak.clone();
         move |src, src_pad| {
-            handle_connect_pad_added(data_weak.clone(), src, src_pad);
+            handle_connect_pad_added(data_weak.clone(), src, src_pad, &mkv_sink, &video_sink_pad);
         }
     });
 
@@ -1321,8 +1318,8 @@ mod tests {
         std::fs::create_dir_all(&staging_path).unwrap();
         let abandoned = staging_path.join(format!("{}.mkv", Uuid::now_v7()));
         std::fs::write(&abandoned, b"interrupted recording").unwrap();
-        let data = Arc::new(Mutex::new(CustomData::new(staging_path.clone())));
-        let sink = data.lock().unwrap().mkv_sink_pad.0.clone();
+        let data = Arc::new(Mutex::new(CustomData::new()));
+        let sink = create_recording_sink();
         sink.set_property("max-size-bytes", 30_000u64);
         let pipeline = gst::Pipeline::new();
         let source = gst::parse::bin_from_description(
@@ -1334,11 +1331,11 @@ mod tests {
         )
         .expect("rotation test needs videotestsrc, x264enc, and h264parse");
         pipeline.add_many([source.upcast_ref(), &sink]).unwrap();
-        connect_recording_sink(&data);
+        let video_sink_pad = connect_recording_sink(&sink, staging_path.clone(), &data);
         source
             .static_pad("src")
             .unwrap()
-            .link(data.lock().unwrap().mkv_sink_pad.1.as_ref().unwrap())
+            .link(&video_sink_pad)
             .unwrap();
         pipeline.set_state(gst::State::Playing).unwrap();
 
