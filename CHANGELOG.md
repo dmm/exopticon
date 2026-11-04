@@ -2,6 +2,25 @@
 
 <!--- next entry here -->
 
+## 0.50.0
+2026-11-04
+
+### Features
+
+- Cleanup abandoned recordings (480ace30a0f77adadf1cfce0b60612190bf4184c)
+- implement shutdown for capture_worker (fbcb7d23a7a2ca7311e0f1048cd6f25fe22b24c7)
+- graceful shutdown on SIGTERM and SIGINT (f3005f4f35201476723cfce1734ede6b6646db0d)
+
+### Fixes
+
+- Switch filename ownership to CaptureWorker (bf7cdde479343ca5a75e06ea0a973d3e67611b00)
+- Move storage_path and recording sink out of CustomData (b5f19001fe20676e750afde63b15ce7247d3e7cb)
+- Move last_frame_time out of CustomData (cd28b1e9ac8d9748f4657a01e5e26f9a57f2c857)
+- Move last_frame_timeout check to top of loop (92a1c6b8d3e7f24010b0f2fe657f3967bb512a3f)
+- Split CustomData (43f4141b34bfc5dfe75243d468bef163e181bf78)
+- Split handle_connect_pad_added (f2164145a3506ecf5d33e950401c20535524a322)
+- Simplify handle_file_location_request (5c0d6e5279f904879008964ff94370b6e32a869d)
+
 ## 0.49.0
 2026-10-30
 
