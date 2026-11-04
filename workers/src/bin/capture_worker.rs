@@ -776,39 +776,30 @@ fn handle_file_location_request(
     let path = storage_path.join(&filename);
     debug!("New staged file: {}", path.display());
 
-    let (pending_muxer, metadata) = {
-        let mut recording = recording.lock().unwrap();
-        let mut capture_clock = recording
-            .capture_clock
-            .take()
-            .or_else(|| CaptureClock::anchored_to(splitmuxsink))
-            .expect("splitmuxsink does not have a running-time clock");
-        let (capture_session_id, clock_anchor) = capture_clock
-            .metadata_for_reference(splitmuxsink, reference_running_time)
-            .expect("splitmuxsink does not have a running-time clock");
-        recording.capture_clock = Some(capture_clock.clone());
-        let pending_muxer = recording
-            .pending_muxer
-            .take()
-            .expect("format-location-full arrived before muxer-added");
-        recording.fragments.insert(
-            fragment_id,
-            FragmentCapture {
-                filename,
-                begin_running_time: reference_running_time,
-                capture_clock,
-            },
-        );
-        drop(recording);
-        (
-            pending_muxer,
-            CaptureTimelineMetadata {
-                capture_session_id,
-                clock_anchor,
-            },
-        )
+    let mut recording = recording.lock().unwrap();
+    let capture_clock = recording.capture_clock.get_or_insert_with(|| {
+        CaptureClock::anchored_to(splitmuxsink)
+            .expect("splitmuxsink does not have a running-time clock")
+    });
+    let (capture_session_id, clock_anchor) = capture_clock
+        .metadata_for_reference(splitmuxsink, reference_running_time)
+        .expect("splitmuxsink does not have a running-time clock");
+    let fragment = FragmentCapture {
+        filename,
+        begin_running_time: reference_running_time,
+        capture_clock: capture_clock.clone(),
     };
+    let pending_muxer = recording
+        .pending_muxer
+        .take()
+        .expect("format-location-full arrived before muxer-added");
+    recording.fragments.insert(fragment_id, fragment);
+    drop(recording);
 
+    let metadata = CaptureTimelineMetadata {
+        capture_session_id,
+        clock_anchor,
+    };
     write_capture_timeline_tag(pending_muxer, &metadata);
 
     path.into()
