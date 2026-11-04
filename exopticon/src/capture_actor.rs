@@ -274,6 +274,9 @@ impl CaptureActor {
         cmd.stdout(Stdio::piped());
         cmd.stdin(Stdio::piped());
         cmd.kill_on_drop(true);
+        // Keep terminal Ctrl-C from killing the worker before stdin EOF can
+        // request a graceful shutdown and finalize the recording.
+        cmd.process_group(0);
 
         let mut child = cmd.spawn()?;
         self.child_stdin = Some(

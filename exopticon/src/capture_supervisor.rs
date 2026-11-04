@@ -35,6 +35,7 @@ use crate::{CameraStatusRegistry, db::cameras::Camera};
 
 pub enum Command {
     RestartAll,
+    Shutdown,
 }
 
 #[derive(Debug)]
@@ -147,16 +148,6 @@ impl CaptureSupervisor {
         Ok(())
     }
 
-    fn handle_supervisor_command(&mut self, cmd: &Command) {
-        info!("Got supervisor command!");
-        match cmd {
-            Command::RestartAll => {
-                info!("Got capture restart all command!");
-                self.state = State::Restarting;
-            }
-        }
-    }
-
     fn handle_camera_event(&mut self, res: &Result<String, JoinError>) {
         match self.state {
             State::Running => {
@@ -227,13 +218,103 @@ impl CaptureSupervisor {
             tokio::pin!(tick); // required for select()
 
             tokio::select! {
-                Some(cmd) = self.command_receiver.recv()
-                    => self.handle_supervisor_command(&cmd),
+                biased;
+                Some(cmd) = self.command_receiver.recv() => match cmd {
+                    Command::RestartAll => {
+                        info!("Got capture restart all command!");
+                        self.state = State::Restarting;
+                    }
+                    Command::Shutdown => {
+                        info!("Shutting down capture supervisor...");
+                        self.command_receiver.close();
+                        self.stop_cameras().await?;
+                        while let Some(result) = self.capture_handles.next().await {
+                            if let Err(error) = result {
+                                error!("Capture actor failed during shutdown: {}", error);
+                            }
+                        }
+                        return Ok(());
+                    }
+                },
                 Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id),
                 _inst = tick => self.handle_tick().await,
                 else => break
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::{RwLock, oneshot};
+    use tokio::time::timeout;
+
+    fn supervisor() -> CaptureSupervisor {
+        CaptureSupervisor::new(
+            crate::db::Service::new(":memory:"),
+            Arc::new(VideoRouter::new()),
+            Arc::new(RwLock::new(HashMap::new())),
+        )
+    }
+
+    #[tokio::test]
+    async fn shutdown_stops_all_cameras_and_waits_for_cleanup() {
+        let mut supervisor = supervisor();
+        supervisor.state = State::Running;
+        let commands = supervisor.get_command_channel();
+        let (stopped_sender, mut stopped_receiver) = mpsc::channel(2);
+        let mut finish_senders = Vec::new();
+
+        for name in ["front", "back"] {
+            let (sender, mut receiver) = mpsc::channel(1);
+            let (finish_sender, finish_receiver) = oneshot::channel();
+            let stopped_sender = stopped_sender.clone();
+            supervisor.capture_channels.insert(name.to_string(), sender);
+            supervisor.capture_handles.push(tokio::spawn(async move {
+                assert!(matches!(
+                    receiver.recv().await,
+                    Some(capture_actor::Command::Stop)
+                ));
+                stopped_sender.send(name).await.unwrap();
+                finish_receiver.await.unwrap();
+                name.to_string()
+            }));
+            finish_senders.push(finish_sender);
+        }
+
+        commands.send(Command::Shutdown).await.unwrap();
+        let task = tokio::spawn(supervisor.supervise());
+        for _ in 0..2 {
+            timeout(Duration::from_secs(1), stopped_receiver.recv())
+                .await
+                .unwrap()
+                .unwrap();
+        }
+        assert!(!task.is_finished());
+        assert!(commands.send(Command::RestartAll).await.is_err());
+
+        finish_senders.pop().unwrap().send(()).unwrap();
+        assert!(!task.is_finished());
+        finish_senders.pop().unwrap().send(()).unwrap();
+        timeout(Duration::from_secs(1), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn shutdown_before_startup_exits_without_starting_cameras() {
+        let supervisor = supervisor();
+        let commands = supervisor.get_command_channel();
+        commands.send(Command::Shutdown).await.unwrap();
+
+        timeout(Duration::from_secs(1), supervisor.supervise())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(commands.is_closed());
     }
 }

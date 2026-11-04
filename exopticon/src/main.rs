@@ -177,6 +177,11 @@ async fn main() {
     }
     dotenv().ok();
 
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("register SIGTERM handler");
+    let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+        .expect("register SIGINT handler");
+
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let db_service = crate::db::Service::new(&database_url);
@@ -235,6 +240,10 @@ async fn main() {
     let (udp_channel, _rx) = broadcast::channel(10);
     tokio::spawn(udp_listener(udp_socket.clone(), udp_channel.clone()));
 
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .expect("to listen on 0.0.0.0:3000");
+
     // Start capture supervisor
     let video_router = Arc::new(VideoRouter::new());
     let camera_status_registry: CameraStatusRegistry = Arc::new(RwLock::new(HashMap::new()));
@@ -244,6 +253,7 @@ async fn main() {
         camera_status_registry.clone(),
     );
     let capture_channel = capture_supervisor.get_command_channel();
+    let shutdown_channel = capture_channel.clone();
 
     let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone());
 
@@ -257,9 +267,8 @@ async fn main() {
         camera_status_registry,
     };
 
-    // TODO: watch this future for exit...
     info!("Launching capture supervisor...");
-    tokio::spawn(capture_supervisor.supervise());
+    let capture_supervisor_task = tokio::spawn(capture_supervisor.supervise());
     tokio::spawn(deletion_supervisor.supervise());
 
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
@@ -302,10 +311,30 @@ async fn main() {
         )
         .layer(prometheus_layer);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    let signal_shutdown_channel = shutdown_channel.clone();
+    let server_result = axum::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(async move {
+            tokio::select! {
+                _ = terminate.recv() => info!("Received SIGTERM, shutting down..."),
+                _ = interrupt.recv() => info!("Received SIGINT, shutting down..."),
+            }
+            if let Err(error) = signal_shutdown_channel.send(Command::Shutdown).await {
+                error!("Failed to request capture shutdown: {}", error);
+            }
+        })
+        .await;
+
+    if server_result.is_err()
+        && let Err(error) = shutdown_channel.send(Command::Shutdown).await
+    {
+        error!(
+            "Failed to request capture shutdown after server error: {}",
+            error
+        );
+    }
+    capture_supervisor_task
         .await
-        .expect("to listen on 0.0.0.0:3000");
-    axum::serve(listener, app.into_make_service())
-        .await
-        .expect("to start server");
+        .expect("capture supervisor task failed")
+        .expect("capture supervisor failed");
+    server_result.expect("to run server");
 }
