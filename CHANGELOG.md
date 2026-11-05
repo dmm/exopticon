@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.5
+2026-11-05
+
+### Fixes
+
+- chore(deps): update rust crate log to v0.4.35 (340c785032e74a97607136c9772d8bbbd2622b01)
+
 ## 0.51.4
 2026-11-05
 
