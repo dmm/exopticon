@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.6
+2026-11-05
+
+### Fixes
+
+- chore(deps): update angular-cli monorepo to v22.2.6 (91ec0fe763e79cdb883de093da50d0ee6c6ca763)
+
 ## 0.51.5
 2026-11-05
 
