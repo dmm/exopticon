@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.3
+2026-11-05
+
+### Fixes
+
+- chore(deps): update grafana/grafana docker tag to v7.5.17 (d42fb846d95dbe1cafef96f64e7c62e6e58e5b88)
+
 ## 0.51.2
 2026-11-04
 
