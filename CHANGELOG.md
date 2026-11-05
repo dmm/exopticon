@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.4
+2026-11-05
+
+### Fixes
+
+- chore(deps): update rust crate anyhow to v1.0.104 (cb905f7c81b0d05ab5c2e9e04e9e2775c42c4520)
+
 ## 0.51.3
 2026-11-05
 
