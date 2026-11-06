@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.9
+2026-11-06
+
+### Fixes
+
+- chore(deps): update rust crate libc to v0.2.191 (70d1dd60b789e9e66647aae6c55c2a9f0545837d)
+
 ## 0.51.8
 2026-11-06
 
