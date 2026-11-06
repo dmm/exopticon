@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.11
+2026-11-06
+
+### Fixes
+
+- chore(deps): update rust crate chrono-tz to v0.10.4 (2df9071b17e623c3d9b3442b2536bc01a4efe010)
+
 ## 0.51.10
 2026-11-06
 
