@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.13
+2026-11-06
+
+### Fixes
+
+- chore(deps): update dependency prettier to v3.9.10 (4431f78bcfc2b21addb58ac984688ced6e64c38b)
+
 ## 0.51.12
 2026-11-06
 
