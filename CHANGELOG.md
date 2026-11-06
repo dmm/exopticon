@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.12
+2026-11-06
+
+### Fixes
+
+- chore(deps): update rust crate axum-prometheus to v0.10.1 (5d9120092dfc02a88821b822436b3e5f99bd225d)
+
 ## 0.51.11
 2026-11-06
 
