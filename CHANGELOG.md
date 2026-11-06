@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.10
+2026-11-06
+
+### Fixes
+
+- chore(deps): update rust crate lazy_static to v1.5.1 (1a91c7feb9982e4fa744f33b8f3aa022016f8426)
+
 ## 0.51.9
 2026-11-06
 
