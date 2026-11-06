@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.7
+2026-11-06
+
+### Fixes
+
+- chore(deps): update rust crate mimalloc to v0.1.52 (fa37fa00df28a3a3f23f079e3ae43e57c7fa3d0c)
+
 ## 0.51.6
 2026-11-05
 
