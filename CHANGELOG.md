@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.15
+2026-11-07
+
+### Fixes
+
+- chore(deps): update rust crate serde_repr to v0.1.21 (bd986a85fe9d8daa1d1bc27639928aa7088fe492)
+
 ## 0.51.14
 2026-11-07
 
