@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.14
+2026-11-07
+
+### Fixes
+
+- chore(deps): update rust crate chrono to v0.4.45 (87402d8f798f413062c56e8834241f58214afca9)
+
 ## 0.51.13
 2026-11-06
 
