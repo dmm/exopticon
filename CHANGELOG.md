@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.17
+2026-11-08
+
+### Fixes
+
+- chore(deps): update rust crate time to v0.3.55 (20fbdd21422726f5dd26b73e5385aeaa58da59b1)
+
 ## 0.51.16
 2026-11-07
 
