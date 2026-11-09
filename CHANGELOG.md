@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.18
+2026-11-09
+
+### Fixes
+
+- chore(deps): update rust crate thiserror to v2.0.21 (da6f4f4fe3b29514d3ed942718fd41f12bbf9d6c)
+
 ## 0.51.17
 2026-11-08
 
