@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.20
+2026-11-09
+
+### Fixes
+
+- chore(deps): update rust crate tower to v0.5.3 (21e6773f4310d6a31551e1d8fca2594d0eb7dbf6)
+
 ## 0.51.19
 2026-11-09
 
