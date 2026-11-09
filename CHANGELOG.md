@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.19
+2026-11-09
+
+### Fixes
+
+- chore(deps): update rust crate tokio-util to v0.7.20 (6bc8b7b6142bc937fd76dd5b170b32d0b95e7595)
+
 ## 0.51.18
 2026-11-09
 
