@@ -36,8 +36,7 @@
     "rxjs": "^6.6.7",
     "rxjs-compat": "^6.6.7",
     "tslib": "^2.3.1",
-    "uuid": "^9",
-    "zone.js": "~0.15.1"
+    "uuid": "^9"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^22.2.4",

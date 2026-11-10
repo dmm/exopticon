@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Observable, Subscriber } from "rxjs";
 import { Camera } from "../camera";
 import { CameraPanelService } from "../camera-panel.service";
@@ -32,7 +32,7 @@ describe("CameraViewComponent", () => {
   let unsubscribed: boolean;
   let cameraPanelService: jasmine.SpyObj<CameraPanelService>;
 
-  beforeEach(waitForAsync(() => {
+  beforeEach(async () => {
     unsubscribed = false;
     const media$ = new Observable<MediaStream>((subscriber) => {
       mediaSubscriber = subscriber;
@@ -49,14 +49,14 @@ describe("CameraViewComponent", () => {
       ["setMute"],
     );
 
-    TestBed.configureTestingModule({
+    await TestBed.configureTestingModule({
       imports: [CameraViewComponent],
       providers: [
         { provide: WebrtcService, useValue: webrtcService },
         { provide: CameraPanelService, useValue: cameraPanelService },
       ],
     }).compileComponents();
-  }));
+  });
 
   beforeEach(() => {
     fixture = TestBed.createComponent(CameraViewComponent);

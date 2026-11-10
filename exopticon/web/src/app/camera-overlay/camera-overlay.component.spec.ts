@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { Camera } from "../camera";
 import { CameraPanelService } from "../camera-panel.service";
 import { CameraService } from "../camera.service";
@@ -28,15 +28,15 @@ describe("CameraOverlayComponent", () => {
   let component: CameraOverlayComponent;
   let fixture: ComponentFixture<CameraOverlayComponent>;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       imports: [CameraOverlayComponent],
       providers: [
         { provide: CameraService, useValue: {} },
         { provide: CameraPanelService, useValue: {} },
       ],
     }).compileComponents();
-  }));
+  });
 
   beforeEach(() => {
     fixture = TestBed.createComponent(CameraOverlayComponent);
