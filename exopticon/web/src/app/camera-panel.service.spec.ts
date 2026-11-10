@@ -18,12 +18,8 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {
-  TestBed,
-  fakeAsync,
-  flushMicrotasks,
-  tick,
-} from "@angular/core/testing";
+import { ApplicationRef } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
 import { of } from "rxjs";
 import { Camera } from "./camera";
 import { ALL_GROUP_NAME, CameraGroup } from "./camera-group";
@@ -89,8 +85,8 @@ describe("CameraPanelService", () => {
     TestBed.resetTestingModule();
   });
 
-  it("keeps normal projection unchanged when focus is not set", fakeAsync(() => {
-    const service = loadService();
+  it("keeps normal projection unchanged when focus is not set", async () => {
+    const service = await loadService();
 
     service.setRows(1);
     service.setCols(2);
@@ -104,10 +100,10 @@ describe("CameraPanelService", () => {
     ]);
     expect(vm.layout.columnCount).toBe(2);
     expect(vm.layout.rowCount).toBe(1);
-  }));
+  });
 
-  it("returns one full-width tile for a valid focus camera", fakeAsync(() => {
-    const service = loadService();
+  it("returns one full-width tile for a valid focus camera", async () => {
+    const service = await loadService();
     service.setRows(1);
     service.setCols(1);
     service.setOffset(2);
@@ -126,22 +122,23 @@ describe("CameraPanelService", () => {
       itemHeightVh: 100,
       usesIntrinsicWidthSpacer: false,
     });
-  }));
+  });
 
-  it("updates active cameras to only the focused camera and preserves audio", fakeAsync(() => {
-    const service = loadService();
+  it("updates active cameras to only the focused camera and preserves audio", async () => {
+    const service = await loadService();
     service.setMute("porch", false);
     service.setFocusedCamera("porch");
 
-    tick(200);
+    await TestBed.inject(ApplicationRef).whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     const activeCameras = lastActiveCameraUpdate();
     expect(Array.from(activeCameras.keys())).toEqual(["porch"]);
     expect(activeCameras.get("porch")).toEqual({ video: true, audio: true });
-  }));
+  });
 
-  it("validates focus against the active group while ignoring pagination", fakeAsync(() => {
-    const service = loadService();
+  it("validates focus against the active group while ignoring pagination", async () => {
+    const service = await loadService();
     service.setDesiredCameraGroup("front");
     service.setRows(1);
     service.setCols(1);
@@ -159,9 +156,9 @@ describe("CameraPanelService", () => {
       kind: "invalid",
       cameraId: "driveway",
     });
-  }));
+  });
 
-  it("does not report invalid focus until cameras and groups have loaded", fakeAsync(() => {
+  it("does not report invalid focus until cameras and groups have loaded", async () => {
     const service = TestBed.inject(CameraPanelService);
 
     service.setFocusedCamera("missing");
@@ -170,15 +167,15 @@ describe("CameraPanelService", () => {
       cameraId: "missing",
     });
 
-    flushMicrotasks();
+    await TestBed.inject(ApplicationRef).whenStable();
     expect(service.vm().focusState).toEqual({
       kind: "invalid",
       cameraId: "missing",
     });
-  }));
+  });
 
-  it("sends PTZ commands to the keyboard-control camera first", fakeAsync(() => {
-    const service = loadService();
+  it("sends PTZ commands to the keyboard-control camera first", async () => {
+    const service = await loadService();
     service.touchCamera("front_door");
     service.setFocusedCamera("porch");
 
@@ -188,10 +185,10 @@ describe("CameraPanelService", () => {
       "porch",
       PtzDirection.up,
     );
-  }));
+  });
 
-  it("falls back to the selected camera when keyboard control is not projected", fakeAsync(() => {
-    const service = loadService();
+  it("falls back to the selected camera when keyboard control is not projected", async () => {
+    const service = await loadService();
     service.setDesiredCameraGroup("front");
     service.setRows(1);
     service.setCols(1);
@@ -204,11 +201,11 @@ describe("CameraPanelService", () => {
       "front_door",
       PtzDirection.down,
     );
-  }));
+  });
 
-  function loadService(): CameraPanelService {
+  async function loadService(): Promise<CameraPanelService> {
     const service = TestBed.inject(CameraPanelService);
-    flushMicrotasks();
+    await TestBed.inject(ApplicationRef).whenStable();
     return service;
   }
 

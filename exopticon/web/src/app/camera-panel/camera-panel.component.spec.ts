@@ -18,13 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {
-  ComponentFixture,
-  TestBed,
-  fakeAsync,
-  flushMicrotasks,
-  waitForAsync,
-} from "@angular/core/testing";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, Router } from "@angular/router";
 import { of } from "rxjs";
 import { CameraPanelService } from "../camera-panel.service";
@@ -40,7 +34,7 @@ describe("CameraPanelComponent", () => {
   let router: jasmine.SpyObj<Router>;
   let focusedCameraId: string | null;
 
-  beforeEach(waitForAsync(() => {
+  beforeEach(async () => {
     focusedCameraId = null;
     cameraPanelService = jasmine.createSpyObj<CameraPanelService>(
       "CameraPanelService",
@@ -77,7 +71,7 @@ describe("CameraPanelComponent", () => {
     router = jasmine.createSpyObj<Router>("Router", ["navigate"]);
     router.navigate.and.returnValue(Promise.resolve(true));
 
-    TestBed.configureTestingModule({
+    await TestBed.configureTestingModule({
       imports: [CameraPanelComponent],
       providers: [
         { provide: ActivatedRoute, useFactory: () => route },
@@ -96,7 +90,7 @@ describe("CameraPanelComponent", () => {
         },
       })
       .compileComponents();
-  }));
+  });
 
   beforeEach(() => {
     fixture = TestBed.createComponent(CameraPanelComponent);
@@ -173,7 +167,7 @@ describe("CameraPanelComponent", () => {
     );
   });
 
-  it("restores the previous scroll position after returning from focus", fakeAsync(() => {
+  it("restores the previous scroll position after returning from focus", async () => {
     route = setRouteSnapshot(
       route,
       { group: "front", focus: "front_door" },
@@ -198,14 +192,14 @@ describe("CameraPanelComponent", () => {
     );
 
     component.returnFromFocus();
-    flushMicrotasks();
+    await router.navigate.calls.mostRecent().returnValue;
 
     expect(scrollTo).toHaveBeenCalledOnceWith({
       left: 12,
       top: 345,
       behavior: "auto",
     });
-  }));
+  });
 
   it("normalizes a direct focused URL without fs", () => {
     route = setRouteSnapshot(route, { focus: "front_door" }, {});

@@ -18,18 +18,18 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { CameraStatusOverlayComponent } from "./camera-status-overlay.component";
 
 describe("CameraStatusOverlayComponent", () => {
   let component: CameraStatusOverlayComponent;
   let fixture: ComponentFixture<CameraStatusOverlayComponent>;
 
-  beforeEach(waitForAsync(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       imports: [CameraStatusOverlayComponent],
     }).compileComponents();
-  }));
+  });
 
   beforeEach(() => {
     fixture = TestBed.createComponent(CameraStatusOverlayComponent);
