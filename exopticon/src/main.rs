@@ -79,8 +79,9 @@ mod keyframe_requests;
 mod video_router;
 mod webrtc_client;
 
-use crate::api::static_files::{index_file_handler, manifest_file_handler, static_file_handler};
-use crate::api::{auth, camera_groups, cameras, recordings, storage_groups, video_units};
+use crate::api::{
+    auth, camera_groups, cameras, recordings, static_files, storage_groups, video_units,
+};
 use crate::file_deletion_supervisor::FileDeletionSupervisor;
 
 use axum::routing::{get, post};
@@ -297,12 +298,7 @@ async fn main() {
         )
         // public routes
         .route("/auth", post(auth::login))
-        .route("/index.html", get(index_file_handler))
-        .route("/manifest.webmanifest", get(manifest_file_handler))
-        .route("/assets/{*path}", get(static_file_handler))
-        .route("/icons/{path}", get(static_file_handler))
-        .route("/", get(index_file_handler))
-        .route("/{*path}", get(index_file_handler))
+        .merge(static_files::router())
         .with_state(state)
         .layer(
             TraceLayer::new_for_http()

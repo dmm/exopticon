@@ -27,7 +27,7 @@ run:
 .PHONY: watch-web
 watch-web:
 	cd exopticon/web; npm install
-	cd exopticon/web;	npm run build -- --deploy-url assets/ --watch
+	cd exopticon/web;	npm run build -- --watch
 
 .PHONY: build-web
 build-web:
@@ -36,7 +36,7 @@ build-web:
 $(WEB_OBJ_FILES): $(WEB_SRC_FILES)
 	cd exopticon/web; npm install
 	cd exopticon/web; npm run check-format
-	cd exopticon/web; npm run ng build -- --configuration=production --deploy-url assets/
+	cd exopticon/web; npm run build:production
 
 .PHONY: check-web
 check-web:
