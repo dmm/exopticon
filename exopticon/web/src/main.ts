@@ -1,4 +1,10 @@
-import { enableProdMode, isDevMode, importProvidersFrom } from "@angular/core";
+import {
+  enableProdMode,
+  isDevMode,
+  importProvidersFrom,
+  inject,
+  provideAppInitializer,
+} from "@angular/core";
 
 import { environment } from "./environments/environment";
 import { BrowserModule, bootstrapApplication } from "@angular/platform-browser";
@@ -17,6 +23,7 @@ import { AppRoutingModule } from "./app/app-routing.module";
 import { IntersectionObserverModule } from "@ng-web-apis/intersection-observer";
 import { ServiceWorkerModule } from "@angular/service-worker";
 import { AppComponent } from "./app/app.component";
+import { PwaUpdateService } from "./app/pwa-update.service";
 
 if (environment.production) {
   enableProdMode();
@@ -24,6 +31,7 @@ if (environment.production) {
 
 bootstrapApplication(AppComponent, {
   providers: [
+    provideAppInitializer(() => inject(PwaUpdateService).start()),
     importProvidersFrom(
       BrowserModule,
       FormsModule,
