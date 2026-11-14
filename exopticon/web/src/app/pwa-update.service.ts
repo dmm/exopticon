@@ -1,5 +1,6 @@
 import { DOCUMENT } from "@angular/common";
 import { DestroyRef, Injectable, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { SwUpdate } from "@angular/service-worker";
 
 @Injectable({ providedIn: "root" })
@@ -11,6 +12,32 @@ export class PwaUpdateService {
 
   start(): void {
     if (!this.updates.isEnabled) return;
+
+    this.updates.versionUpdates
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((event) => {
+        switch (event.type) {
+          case "VERSION_DETECTED":
+            console.info("Downloading PWA update:", event.version.hash);
+            break;
+          case "VERSION_READY":
+            console.info("PWA update ready:", {
+              currentVersion: event.currentVersion.hash,
+              latestVersion: event.latestVersion.hash,
+            });
+            break;
+          case "VERSION_INSTALLATION_FAILED":
+            console.error(
+              "Failed to install PWA update:",
+              event.version.hash,
+              event.error,
+            );
+            break;
+          case "NO_NEW_VERSION_DETECTED":
+            console.debug("PWA is up to date:", event.version.hash);
+            break;
+        }
+      });
 
     const onVisibilityChange = () => {
       if (this.document.visibilityState === "visible") {
