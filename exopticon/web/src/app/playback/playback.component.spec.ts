@@ -343,6 +343,52 @@ describe("PlaybackComponent", () => {
         timeline.getBoundingClientRect().top - root.getBoundingClientRect().top,
       ).toBe(narrowTop);
       expect(summary.getBoundingClientRect().height).toBeLessThan(60);
+      root.style.width = "700px";
+      const transport = root.querySelector<HTMLElement>(".transport")!;
+      const controls = Array.from(
+        transport.querySelectorAll<HTMLButtonElement>("button"),
+      );
+      expect(controls.map((button) => button.textContent!.trim())).toEqual([
+        "−1s",
+        "Play",
+        "Next frame",
+        "+1s",
+      ]);
+      expect(
+        controls.every(
+          (button) =>
+            button.getBoundingClientRect().top ===
+            controls[0].getBoundingClientRect().top,
+        ),
+      ).toBe(true);
+      const speed = transport.querySelector<HTMLSelectElement>("select")!;
+      speed.value = "2";
+      speed.dispatchEvent(new Event("change"));
+      expect(fixture.componentInstance.controller.speed).toBe(2);
+      expect(speed.getBoundingClientRect().top).toBe(
+        controls[1].getBoundingClientRect().top,
+      );
+      expect(
+        speed.getBoundingClientRect().left -
+          controls[3].getBoundingClientRect().right,
+      ).toBeGreaterThanOrEqual(20);
+      transport.style.width = "180px";
+      expect(transport.scrollWidth).toBeLessThanOrEqual(transport.clientWidth);
+      expect(speed.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+        Math.max(
+          ...controls.map((button) => button.getBoundingClientRect().bottom),
+        ),
+      );
+      expect(
+        Math.abs(
+          (speed.getBoundingClientRect().left +
+            speed.getBoundingClientRect().right) /
+            2 -
+            (transport.getBoundingClientRect().left +
+              transport.getBoundingClientRect().right) /
+              2,
+        ),
+      ).toBeLessThan(1);
       const seek = spyOn(
         fixture.componentInstance.controller,
         "seek",

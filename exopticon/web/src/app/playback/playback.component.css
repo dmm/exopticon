@@ -5,31 +5,44 @@
 }
 .scale-controls,
 .date-navigation,
-.date-navigation form,
-.transport {
+.date-navigation form {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
-.speed-controls,
-.transport-actions,
-.scale-presets,
-.seek-controls {
+.scale-presets {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
 }
 .transport {
-  column-gap: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 1.25rem;
+}
+.transport-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+  max-width: 100%;
+}
+.transport button {
+  white-space: nowrap;
+  padding: 0.5rem 0.6rem;
+}
+.speed-select {
+  min-height: 44px;
+  font: inherit;
+  color-scheme: dark;
+  text-align: center;
 }
 .control-label {
   color: #a9c4a9;
   font-size: 0.9rem;
-}
-.speed-controls .control-label,
-.seek-controls .control-label {
-  margin-right: 0.25rem;
 }
 .timeline-navigation,
 .export-controls {
@@ -37,7 +50,6 @@
   margin-top: 1.5rem;
   padding-top: 1.25rem;
 }
-.speed-controls button[aria-pressed="true"],
 .scale-presets button[aria-pressed="true"] {
   background: #098509;
   color: #fff;
@@ -53,6 +65,7 @@ button:disabled {
 }
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 .timeline:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 4px;
@@ -214,11 +227,6 @@ canvas {
   }
 }
 
-.timeline-legend {
-  color: #a9c4a9;
-  font-size: 0.9rem;
-  margin: 0.5rem 0 0;
-}
 .preview-summary {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);

@@ -27,7 +27,7 @@
             Paused
           }
           @case ("stepping") {
-            Loading next frame…
+            Loading frame…
           }
           @case ("playing") {
             Playing at {{ controller.speed }}×
@@ -68,6 +68,14 @@
     <span class="transport-actions">
       <button
         type="button"
+        (click)="seekButton(-1000)"
+        aria-label="Seek back one second"
+      >
+        −1s
+      </button>
+      <button
+        class="play-button"
+        type="button"
         (click)="togglePlayback()"
         [disabled]="
           controller.state.phase !== 'paused' &&
@@ -87,26 +95,27 @@
         (click)="stepForward()"
         [disabled]="controller.state.phase !== 'paused'"
       >
-        Next frame →
+        Next frame
+      </button>
+      <button
+        type="button"
+        (click)="seekButton(1000)"
+        aria-label="Seek forward one second"
+      >
+        +1s
       </button>
     </span>
-    <span class="speed-controls" role="group" aria-label="Playback speed">
-      <span class="control-label">Speed</span>
+    <select
+      #playbackSpeed
+      class="speed-select"
+      aria-label="Playback speed"
+      [value]="controller.speed"
+      (change)="speedChanged(playbackSpeed.value)"
+    >
       @for (speed of speeds; track speed) {
-        <button
-          type="button"
-          (click)="setSpeed(speed)"
-          [attr.aria-pressed]="controller.speed === speed"
-        >
-          {{ speed }}×
-        </button>
+        <option [value]="speed">{{ speed }}×</option>
       }
-    </span>
-    <span class="seek-controls" role="group" aria-label="Seek by one second">
-      <span class="control-label">Seek</span>
-      <button type="button" (click)="seekButton(-1000)">-1s</button>
-      <button type="button" (click)="seekButton(1000)">+1s</button>
-    </span>
+    </select>
   </div>
   <section class="timeline-navigation" aria-label="Timeline navigation">
     <div class="window-controls">
@@ -170,9 +179,6 @@
         <span class="playhead" [style.left.%]="percent(position)"></span>
       }
     </div>
-    <p class="timeline-legend">
-      White marker: selected time · Amber marker: displayed frame
-    </p>
     <div class="ticks" aria-hidden="true">
       @for (tick of ticks; track $index) {
         <span

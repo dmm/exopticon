@@ -302,6 +302,10 @@ export class PlaybackComponent implements OnInit, OnDestroy {
     event.preventDefault();
   }
 
+  speedChanged(value: string): void {
+    this.setSpeed(Number(value) as PlaybackSpeed);
+  }
+
   stepForward(): void {
     void this.controller.stepForward();
   }
