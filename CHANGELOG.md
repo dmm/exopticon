@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.4
+2026-11-14
+
+### Fixes
+
+- chore(deps): update caddy docker tag to v2.11.9 (c835cf544574fc51cd2bba0f771877dd7d53d1de)
+
 ## 0.52.3
 2026-11-14
 
