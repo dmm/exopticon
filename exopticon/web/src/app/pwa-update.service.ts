@@ -1,10 +1,13 @@
 import { DOCUMENT } from "@angular/common";
-import { DestroyRef, Injectable, inject } from "@angular/core";
+import { DestroyRef, Injectable, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { SwUpdate } from "@angular/service-worker";
 
 @Injectable({ providedIn: "root" })
 export class PwaUpdateService {
+  private readonly ready = signal(false);
+  readonly updateReady = this.ready.asReadonly();
+
   private readonly updates = inject(SwUpdate);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
@@ -21,6 +24,7 @@ export class PwaUpdateService {
             console.info("Downloading PWA update:", event.version.hash);
             break;
           case "VERSION_READY":
+            this.ready.set(true);
             console.info("PWA update ready:", {
               currentVersion: event.currentVersion.hash,
               latestVersion: event.latestVersion.hash,
@@ -52,6 +56,10 @@ export class PwaUpdateService {
 
     // The worker registers immediately; checking must not block app startup.
     void this.checkForUpdate();
+  }
+
+  reload(): void {
+    this.document.defaultView?.location.reload();
   }
 
   private async checkForUpdate(): Promise<void> {

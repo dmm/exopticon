@@ -21,6 +21,7 @@ import {
   ChangeDetectorRef,
   Component,
   ChangeDetectionStrategy,
+  inject,
 } from "@angular/core";
 import {
   ActivatedRoute,
@@ -31,6 +32,7 @@ import {
 import { Observable } from "rxjs";
 import { AuthService } from "./auth.service";
 import { AsyncPipe } from "@angular/common";
+import { PwaUpdateService } from "./pwa-update.service";
 
 export enum MenuState {
   None,
@@ -46,6 +48,7 @@ export enum MenuState {
   imports: [RouterLink, RouterOutlet, AsyncPipe],
 })
 export class AppComponent {
+  readonly pwaUpdates = inject(PwaUpdateService);
   public menuStates = MenuState;
   title = "exopticon";
   fullscreen = false;

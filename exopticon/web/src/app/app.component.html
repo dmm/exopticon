@@ -17,6 +17,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
+@if (pwaUpdates.updateReady()) {
+  <div class="update-banner" role="status">
+    <span>An update is available!</span>
+    <button type="button" (click)="pwaUpdates.reload()">Reload</button>
+  </div>
+}
 @if (!fullscreen && (isLoggedIn$ | async)) {
   <div class="top-menu">
     <div class="logo">
