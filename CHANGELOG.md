@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.22
+2026-11-14
+
+### Fixes
+
+- chore(deps): update dependency @ng-web-apis/common to v3.2.3 (1e15303fed3a6083f27d4f152f4198b75a85f722)
+
 ## 0.51.21
 2026-11-14
 
