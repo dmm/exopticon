@@ -1,6 +1,5 @@
 import {
   enableProdMode,
-  isDevMode,
   importProvidersFrom,
   inject,
   provideAppInitializer,
@@ -39,7 +38,7 @@ bootstrapApplication(AppComponent, {
       IntersectionObserverModule,
       ReactiveFormsModule,
       ServiceWorkerModule.register("ngsw-worker.js", {
-        enabled: !isDevMode(),
+        enabled: true,
         registrationStrategy: "registerImmediately",
       }),
     ),
