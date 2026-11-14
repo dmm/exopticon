@@ -52,7 +52,8 @@ time {
   width: 100%;
 }
 .canvas-width {
-  /* Enforce 16:9 aspect ratio */
+  /* Reserve a stable preview area; the canvas preserves the frame's
+   proportions. */
   padding-top: 56.25%;
 }
 
@@ -70,6 +71,7 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .preview-status {
   margin-bottom: 0;
