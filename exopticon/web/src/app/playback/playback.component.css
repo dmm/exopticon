@@ -121,11 +121,21 @@ canvas {
   border-top: 8px solid #fff;
 }
 .ticks {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 1.2em;
   margin-top: 0.5rem;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
+}
+.ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.ticks span:first-child {
+  transform: none;
+}
+.ticks span:last-child {
+  transform: translateX(-100%);
 }
 .availability-status {
   min-height: 1rem;

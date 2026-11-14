@@ -7,7 +7,7 @@
         <canvas #canvas aria-label="Recorded video frame"></canvas>
       </div>
     </div>
-    <time>{{ displayedTime | date: "MMM d, y HH:mm:ss.SSS" }}</time>
+    <time>{{ displayedTime | date: "MMM d, y HH:mm:ss.SSS zzzz" }}</time>
     <p class="preview-status" aria-live="polite">
       @switch (controller.state.phase) {
         @case ("idle") {
@@ -30,7 +30,9 @@
         }
         @case ("gap") {
           Next recording starts at
-          {{ controller.nextRecordingTime | date: "MMM d, y HH:mm:ss.SSS" }}.
+          {{
+            controller.nextRecordingTime | date: "MMM d, y HH:mm:ss.SSS zzzz"
+          }}.
           <button type="button" (click)="jumpToNext()">
             Jump to next recording
           </button>
@@ -52,14 +54,14 @@
     <button (click)="shiftWindow(-1)" aria-label="Show 15 minutes earlier">
       ← 15 min
     </button>
-    <button (click)="latest()">Latest hour</button>
+    <button (click)="latest()">Latest 30 minutes</button>
     <button (click)="shiftWindow(1)" aria-label="Show 15 minutes later">
       15 min →
     </button>
   </div>
   <p class="window-label">
-    {{ windowStart | date: "MMM d, y HH:mm" }} –
-    {{ windowEnd | date: "MMM d, y HH:mm" }} (local time)
+    {{ windowStart | date: "MMM d, y HH:mm zzzz" }} –
+    {{ windowEnd | date: "MMM d, y HH:mm zzzz" }}
   </p>
   <div
     class="timeline"
@@ -71,7 +73,7 @@
     [attr.aria-valuenow]="playheadVisible ? position : null"
     [attr.aria-valuetext]="
       playheadVisible
-        ? (position | date: 'MMM d, y HH:mm:ss.SSS')
+        ? (position | date: 'MMM d, y HH:mm:ss.SSS zzzz')
         : 'No time selected in this window'
     "
     [attr.aria-busy]="loading || controller.state.phase === 'seeking'"
@@ -91,7 +93,9 @@
   </div>
   <div class="ticks" aria-hidden="true">
     @for (tick of ticks; track tick) {
-      <span>{{ windowStart + tick * 60000 | date: "HH:mm" }}</span>
+      <span [style.left.%]="tick * 100">{{
+        windowStart + tick * windowDuration | date: "HH:mm"
+      }}</span>
     }
   </div>
   <div class="availability-status" aria-live="polite">
@@ -103,7 +107,7 @@
         <button (click)="loadRanges()">Retry</button>
       </p>
     } @else if (!ranges.length) {
-      <p>No recordings in this hour. Try an earlier window.</p>
+      <p>No recordings in this window. Try an earlier window.</p>
     }
   </div>
   <div class="transport">

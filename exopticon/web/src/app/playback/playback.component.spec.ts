@@ -1,4 +1,6 @@
+import { formatDate } from "@angular/common";
 import { ChangeDetectorRef } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, ParamMap } from "@angular/router";
 import { of, Subject } from "rxjs";
 import { RecordingRange, RecordingService } from "../recording.service";
@@ -64,11 +66,7 @@ describe("PlaybackComponent", () => {
     component.loadRanges();
     component.shiftWindow(-1);
     expect(old.observers.length).toBe(0);
-    expect(recordings.getRanges).toHaveBeenCalledWith(
-      "front",
-      -1800000,
-      1800000,
-    );
+    expect(recordings.getRanges).toHaveBeenCalledWith("front", -900000, 900000);
     current.next({
       ranges: [
         {
@@ -92,7 +90,7 @@ describe("PlaybackComponent", () => {
         getBoundingClientRect: () => ({ left: 100, width: 200 }),
       },
     } as unknown as PointerEvent);
-    expect(seek).toHaveBeenCalledWith(900000);
+    expect(seek).toHaveBeenCalledWith(450000);
     component.controller.state = {
       phase: "paused",
       requestedTime: 1000,
