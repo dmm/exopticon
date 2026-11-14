@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.7
+2026-11-14
+
+### Fixes
+
+- chore(deps): update rust-futures monorepo to v0.3.34 (4fa5708469cbb0f9337b6f59873813f6163498f8)
+
 ## 0.52.6
 2026-11-14
 
