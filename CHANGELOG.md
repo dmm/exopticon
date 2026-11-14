@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.1
+2026-11-14
+
+### Fixes
+
+- chore(deps): update dependency @js-joda/core to v5.7.0 (ba42cfe032e33c6bded9e697a53758cc552596c7)
+
 ## 0.52.0
 2026-11-14
 
