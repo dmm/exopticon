@@ -55,6 +55,7 @@ pub enum PacketEncoding {
 }
 
 impl PacketEncoding {
+    #[must_use]
     pub fn codec_name(&self) -> &'static str {
         match self {
             Self::H264 => "h264",
