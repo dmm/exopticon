@@ -688,7 +688,7 @@ fn handle_video_sample(
         timestamp: i64::try_from(pts_90khz).expect("i64 overflow"),
         duration: 100,
     };
-    exserial::print_message(msg);
+    exserial::print_message(&msg);
     nal_count += 1;
 
     trace!(
@@ -736,7 +736,7 @@ fn handle_audio_sample(appsink: &AppSink) -> Result<gst::FlowSuccess, gst::FlowE
         timestamp: i64::try_from(pts_90khz).expect("i64 overflow"),
         duration: 100,
     };
-    exserial::print_message(msg);
+    exserial::print_message(&msg);
 
     Ok(gst::FlowSuccess::Ok)
 }
@@ -1353,7 +1353,7 @@ fn main() {
                         continue;
                     };
                     if structure.name() == "splitmuxsink-fragment-closed" {
-                        exserial::print_message(closed_fragment_message(
+                        exserial::print_message(&closed_fragment_message(
                             structure,
                             &recording_weak,
                         ));

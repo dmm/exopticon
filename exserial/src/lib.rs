@@ -18,6 +18,20 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#![deny(
+    nonstandard_style,
+    warnings,
+    unused,
+    future_incompatible,
+    clippy::all,
+    clippy::pedantic,
+    clippy::cargo
+)]
+#![allow(clippy::arithmetic_side_effects)]
+#![allow(clippy::integer_division)]
+#![allow(clippy::multiple_crate_versions)]
+#![allow(clippy::implicit_return)]
+
 use std::convert::TryFrom;
 use std::io::{self, Read, Write};
 
@@ -28,6 +42,16 @@ use crate::models::CaptureMessage;
 pub mod exlog;
 pub mod models;
 
+/// Writes framed message to W
+///
+/// # Errors
+///
+/// Returns `Err` on write errors.
+///
+/// # Panics
+///
+/// Panics if unable to serialize message or if framed message is too
+/// large.
 pub fn write_framed<W, T>(writer: &mut W, message: &T) -> io::Result<()>
 where
     W: Write,
@@ -45,6 +69,15 @@ where
     writer.flush()
 }
 
+/// Reads framed message.
+///
+/// # Errors
+///
+/// Will return `Err` on read or deserialization errors.
+///
+/// # Panics
+///
+/// Will panic if message is too long.
 pub fn read_framed<R, T>(reader: &mut R) -> io::Result<T>
 where
     R: Read,
@@ -61,6 +94,9 @@ where
     deserialize_message(&serialized)
 }
 
+/// # Errors
+///
+/// Returns `Err` on deserialization error.
 pub fn deserialize_message<T>(serialized: &[u8]) -> io::Result<T>
 where
     T: DeserializeOwned,
@@ -68,6 +104,11 @@ where
     postcard::from_bytes(serialized).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
+/// Serialize message, including big-endian u32 length prefix.
+///
+/// # Errors
+///
+/// Returns `Err` on serialization or write errors.
 pub fn serialize_frame<T>(message: &T) -> io::Result<Vec<u8>>
 where
     T: Serialize,
@@ -77,7 +118,12 @@ where
     Ok(frame)
 }
 
-pub fn print_message(message: CaptureMessage) {
+/// Writes serialized message to stdout
+///
+/// # Panics
+///
+/// Panics on write or serialization errors.
+pub fn print_message(message: &CaptureMessage) {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
 
