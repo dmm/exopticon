@@ -203,7 +203,7 @@
     </div>
 
     <div class="date-navigation">
-      <form (submit)="$event.preventDefault(); jumpToTime(jumpTime.value)">
+      <div class="date-selection">
         <label for="playback-date">Choose date/time (local)</label>
         <input
           #jumpTime
@@ -212,9 +212,9 @@
           step="1"
           required
           [max]="currentTime | date: 'yyyy-MM-dd\'T\'HH:mm:ss'"
+          (change)="jumpTime.validity.valid && jumpToTime(jumpTime.value)"
         />
-        <button type="submit">Show recording</button>
-      </form>
+      </div>
       <button type="button" (click)="latest()">Latest</button>
     </div>
     <div class="availability-status" aria-live="polite">

@@ -5,7 +5,7 @@
 }
 .scale-controls,
 .date-navigation,
-.date-navigation form {
+.date-selection {
   display: flex;
   align-items: center;
   gap: 0.75rem;
