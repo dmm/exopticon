@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.6
+2026-11-14
+
+### Fixes
+
+- chore(deps): update serde monorepo to v1.0.229 (e848100d433a6c8b67da27948b27761391425c1f)
+
 ## 0.52.5
 2026-11-14
 
