@@ -1,5 +1,21 @@
 <h2>Playback — {{ cameraName }}</h2>
 @if (cameraName) {
+  <section class="export-controls" aria-label="Frame export">
+    <button
+      type="button"
+      (click)="exportPng()"
+      [disabled]="
+        controller.state.phase !== 'paused' &&
+        controller.state.phase !== 'playing' &&
+        controller.state.phase !== 'ended' &&
+        controller.state.phase !== 'gap' &&
+        controller.state.phase !== 'buffering'
+      "
+    >
+      Export PNG
+    </button>
+  </section>
+
   <div class="preview" [attr.aria-busy]="controller.state.phase === 'seeking'">
     <div class="content">
       <div class="canvas-width"></div>
@@ -229,20 +245,5 @@
         <p>No recordings in this window. Try an earlier window.</p>
       }
     </div>
-  </section>
-  <section class="export-controls" aria-label="Frame export">
-    <button
-      type="button"
-      (click)="exportPng()"
-      [disabled]="
-        controller.state.phase !== 'paused' &&
-        controller.state.phase !== 'playing' &&
-        controller.state.phase !== 'ended' &&
-        controller.state.phase !== 'gap' &&
-        controller.state.phase !== 'buffering'
-      "
-    >
-      Export PNG
-    </button>
   </section>
 }

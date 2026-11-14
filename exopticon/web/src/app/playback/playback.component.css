@@ -46,9 +46,7 @@
 }
 .timeline-navigation,
 .export-controls {
-  border-top: 1px solid #355035;
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 .scale-presets button[aria-pressed="true"] {
   background: #098509;
@@ -127,6 +125,7 @@ canvas {
   text-align: center;
 }
 .scale-controls {
+  margin-top: 1rem;
   margin-bottom: 1rem;
 }
 .date-navigation {
