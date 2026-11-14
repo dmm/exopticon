@@ -7,7 +7,9 @@
         <canvas #canvas aria-label="Recorded video frame"></canvas>
       </div>
     </div>
-    <time>{{ displayedTime | date: "MMM d, y HH:mm:ss.SSS zzzz" }}</time>
+    <div class="frame-details">
+      <time>{{ displayedTime | date: "MMM d, y HH:mm:ss.SSS zzzz" }}</time>
+    </div>
     <p class="preview-status" aria-live="polite">
       @switch (controller.state.phase) {
         @case ("idle") {
@@ -50,91 +52,34 @@
       }
     </p>
   </div>
-  <div class="window-controls">
-    <button (click)="shiftWindow(-1)" aria-label="Show 15 minutes earlier">
-      ← 15 min
-    </button>
-    <button (click)="latest()">Latest 30 minutes</button>
-    <button (click)="shiftWindow(1)" aria-label="Show 15 minutes later">
-      15 min →
-    </button>
-  </div>
-  <p class="window-label">
-    {{ windowStart | date: "MMM d, y HH:mm zzzz" }} –
-    {{ windowEnd | date: "MMM d, y HH:mm zzzz" }}
-  </p>
-  <div
-    class="timeline"
-    role="slider"
-    tabindex="0"
-    aria-label="Playback time"
-    [attr.aria-valuemin]="windowStart"
-    [attr.aria-valuemax]="windowEnd - 1"
-    [attr.aria-valuenow]="playheadVisible ? position : null"
-    [attr.aria-valuetext]="
-      playheadVisible
-        ? (position | date: 'MMM d, y HH:mm:ss.SSS zzzz')
-        : 'No time selected in this window'
-    "
-    [attr.aria-busy]="loading || controller.state.phase === 'seeking'"
-    (pointerdown)="seekPointer($event)"
-    (keydown)="seekKey($event)"
-  >
-    @for (range of ranges; track range.begin) {
-      <span
-        class="recording"
-        [style.left.%]="percent(range.begin)"
-        [style.width.%]="percent(range.end) - percent(range.begin)"
-      ></span>
-    }
-    @if (playheadVisible) {
-      <span class="playhead" [style.left.%]="percent(position)"></span>
-    }
-  </div>
-  <div class="ticks" aria-hidden="true">
-    @for (tick of ticks; track tick) {
-      <span [style.left.%]="tick * 100">{{
-        windowStart + tick * windowDuration | date: "HH:mm"
-      }}</span>
-    }
-  </div>
-  <div class="availability-status" aria-live="polite">
-    @if (loading) {
-      <p>Loading recording ranges…</p>
-    } @else if (error) {
-      <p>
-        Could not load recording ranges.
-        <button (click)="loadRanges()">Retry</button>
-      </p>
-    } @else if (!ranges.length) {
-      <p>No recordings in this window. Try an earlier window.</p>
-    }
-  </div>
-  <div class="transport">
-    <button
-      type="button"
-      (click)="togglePlayback()"
-      [disabled]="
-        controller.state.phase !== 'paused' &&
-        controller.state.phase !== 'playing' &&
-        controller.state.phase !== 'buffering'
-      "
-    >
-      {{
-        controller.state.phase === "playing" ||
-        controller.state.phase === "buffering"
-          ? "Pause"
-          : "Play"
-      }}
-    </button>
-    <button
-      type="button"
-      (click)="stepForward()"
-      [disabled]="controller.state.phase !== 'paused'"
-    >
-      Next frame →
-    </button>
+  <div class="transport" role="group" aria-label="Playback controls">
+    <span class="transport-actions">
+      <button
+        type="button"
+        (click)="togglePlayback()"
+        [disabled]="
+          controller.state.phase !== 'paused' &&
+          controller.state.phase !== 'playing' &&
+          controller.state.phase !== 'buffering'
+        "
+      >
+        {{
+          controller.state.phase === "playing" ||
+          controller.state.phase === "buffering"
+            ? "Pause"
+            : "Play"
+        }}
+      </button>
+      <button
+        type="button"
+        (click)="stepForward()"
+        [disabled]="controller.state.phase !== 'paused'"
+      >
+        Next frame →
+      </button>
+    </span>
     <span class="speed-controls" role="group" aria-label="Playback speed">
+      <span class="control-label">Speed</span>
       @for (speed of speeds; track speed) {
         <button
           type="button"
@@ -146,10 +91,112 @@
       }
     </span>
     <span class="seek-controls" role="group" aria-label="Seek by one second">
+      <span class="control-label">Seek</span>
       <button type="button" (click)="seekButton(-1000)">-1s</button>
       <button type="button" (click)="seekButton(1000)">+1s</button>
     </span>
+  </div>
+  <section class="timeline-navigation" aria-label="Timeline navigation">
+    <div class="window-controls">
+      <button
+        (click)="shiftWindow(-1)"
+        [attr.aria-label]="'Show ' + shiftLabel + ' earlier'"
+      >
+        ← {{ shiftLabel }}
+      </button>
+      <p class="window-label">
+        {{ windowStart | date: "MMM d, y HH:mm:ss zzzz" }} –
+        {{ windowEnd | date: "MMM d, y HH:mm:ss zzzz" }}
+      </p>
+      <button
+        (click)="shiftWindow(1)"
+        [attr.aria-label]="'Show ' + shiftLabel + ' later'"
+      >
+        {{ shiftLabel }} →
+      </button>
+    </div>
+    <div
+      class="timeline"
+      role="slider"
+      tabindex="0"
+      aria-label="Playback time"
+      [attr.aria-valuemin]="windowStart"
+      [attr.aria-valuemax]="windowEnd - 1"
+      [attr.aria-valuenow]="playheadVisible ? position : null"
+      [attr.aria-valuetext]="
+        playheadVisible
+          ? (position | date: 'MMM d, y HH:mm:ss.SSS zzzz')
+          : 'No time selected in this window'
+      "
+      [attr.aria-busy]="loading || controller.state.phase === 'seeking'"
+      (pointerdown)="seekPointer($event)"
+      (keydown)="seekKey($event)"
+    >
+      @for (range of ranges; track range.begin) {
+        <span
+          class="recording"
+          [style.left.%]="percent(range.begin)"
+          [style.width.%]="percent(range.end) - percent(range.begin)"
+        ></span>
+      }
+      @if (playheadVisible) {
+        <span class="playhead" [style.left.%]="percent(position)"></span>
+      }
+    </div>
+    <div class="ticks" aria-hidden="true">
+      @for (tick of ticks; track $index) {
+        <span
+          [style.left]="'clamp(3em, ' + percent(tick) + '%, calc(100% - 3em))'"
+          >{{ tick | date: tickFormat }}</span
+        >
+      }
+    </div>
+    <div class="scale-controls" role="group" aria-label="Timeline visible span">
+      <span class="control-label">Visible span</span>
+      <span class="scale-presets">
+        @for (scale of scales; track scale.duration; let index = $index) {
+          <button
+            type="button"
+            (click)="setScale(index)"
+            [attr.aria-pressed]="scaleIndex === index"
+          >
+            {{ scale.label }}
+          </button>
+        }
+      </span>
+    </div>
 
+
+
+    <div class="date-navigation">
+      <form (submit)="$event.preventDefault(); jumpToTime(jumpTime.value)">
+        <label for="playback-date">Choose date/time (local)</label>
+        <input
+          #jumpTime
+          id="playback-date"
+          type="datetime-local"
+          step="1"
+          required
+          [max]="currentTime | date: 'yyyy-MM-dd\'T\'HH:mm:ss'"
+        />
+        <button type="submit">Show recording</button>
+      </form>
+      <button type="button" (click)="latest()">Latest</button>
+    </div>
+    <div class="availability-status" aria-live="polite">
+      @if (loading) {
+        <p>Loading recording ranges…</p>
+      } @else if (error) {
+        <p>
+          Could not load recording ranges.
+          <button (click)="loadRanges()">Retry</button>
+        </p>
+      } @else if (!ranges.length) {
+        <p>No recordings in this window. Try an earlier window.</p>
+      }
+    </div>
+  </section>
+  <section class="export-controls" aria-label="Frame export">
     <button
       type="button"
       (click)="exportPng()"
@@ -161,7 +208,7 @@
         controller.state.phase !== 'buffering'
       "
     >
-      Export png
+      Export PNG
     </button>
-  </div>
+  </section>
 }

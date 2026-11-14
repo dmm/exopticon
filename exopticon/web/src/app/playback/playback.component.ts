@@ -27,8 +27,49 @@ interface TimelineRange {
   styleUrls: ["./playback.component.css"],
 })
 export class PlaybackComponent implements OnInit, OnDestroy {
-  readonly windowDuration = 30 * 60 * 1000;
-  readonly ticks = [0, 0.5, 1];
+  readonly scales = [
+    { label: "24h", duration: 24 * 60 * 60 * 1000, tick: 3 * 60 * 60 * 1000 },
+    { label: "1h", duration: 60 * 60 * 1000, tick: 10 * 60 * 1000 },
+    { label: "30m", duration: 30 * 60 * 1000, tick: 5 * 60 * 1000 },
+    { label: "10m", duration: 10 * 60 * 1000, tick: 2 * 60 * 1000 },
+    { label: "1m", duration: 60 * 1000, tick: 10 * 1000 },
+  ];
+  scaleIndex = 2;
+  get windowDuration(): number {
+    return this.scales[this.scaleIndex].duration;
+  }
+
+  get ticks(): number[] {
+    const interval = this.scales[this.scaleIndex].tick;
+    // Align to local clock boundaries, including time zones with half-hour offsets.
+    const midnight = new Date(this.windowStart);
+    midnight.setHours(0, 0, 0, 0);
+    const first =
+      midnight.getTime() +
+      Math.ceil((this.windowStart - midnight.getTime()) / interval) * interval;
+    const ticks: number[] = [];
+    for (let time = first; time < this.windowEnd; time += interval) {
+      ticks.push(time);
+    }
+    return ticks;
+  }
+
+  get tickFormat(): string {
+    return this.windowDuration <= 60000 ? "HH:mm:ss" : "HH:mm";
+  }
+
+  get currentTime(): number {
+    return Date.now();
+  }
+
+  get shiftLabel(): string {
+    const minutes = this.windowDuration / 120000;
+    return minutes < 1
+      ? "30 sec"
+      : minutes >= 60
+        ? `${minutes / 60} hr`
+        : `${minutes} min`;
+  }
   readonly speeds: PlaybackSpeed[] = [1, 2, 4];
   windowEnd = Date.now();
   windowStart = this.windowEnd - this.windowDuration;
@@ -110,6 +151,23 @@ export class PlaybackComponent implements OnInit, OnDestroy {
     this.setWindow(Date.now());
   }
 
+  setScale(index: number): void {
+    if (index < 0 || index >= this.scales.length || index === this.scaleIndex)
+      return;
+    const anchor = this.playheadVisible
+      ? this.position
+      : (this.windowStart + this.windowEnd) / 2;
+    this.scaleIndex = index;
+    this.setWindow(Math.min(Date.now(), anchor + this.windowDuration / 2));
+  }
+
+  jumpToTime(value: string): void {
+    const time = new Date(value).getTime();
+    if (!Number.isFinite(time) || time > Date.now()) return;
+    this.setWindow(Math.min(Date.now(), time + this.windowDuration / 2));
+    this.seek(time);
+  }
+
   private setWindow(end: number): void {
     this.windowEnd = end;
     this.windowStart = end - this.windowDuration;
@@ -121,7 +179,11 @@ export class PlaybackComponent implements OnInit, OnDestroy {
   }
 
   get playheadVisible(): boolean {
-    return this.position >= this.windowStart && this.position < this.windowEnd;
+    return (
+      this.controller.state.requestedTime !== null &&
+      this.position >= this.windowStart &&
+      this.position < this.windowEnd
+    );
   }
 
   seek(time: number): void {

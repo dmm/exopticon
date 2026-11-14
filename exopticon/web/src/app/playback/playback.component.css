@@ -3,7 +3,10 @@
   margin: 0 auto;
   padding: 0 1rem 2rem;
 }
-.window-controls,
+.frame-details,
+.scale-controls,
+.date-navigation,
+.date-navigation form,
 .transport {
   display: flex;
   align-items: center;
@@ -11,11 +14,36 @@
   flex-wrap: wrap;
 }
 .speed-controls,
+.transport-actions,
+.scale-presets,
 .seek-controls {
   display: inline-flex;
+  align-items: center;
   gap: 0.25rem;
 }
-.speed-controls button[aria-pressed="true"] {
+.transport {
+  column-gap: 2rem;
+}
+.control-label {
+  color: #a9c4a9;
+  font-size: 0.9rem;
+}
+.speed-controls .control-label,
+.seek-controls .control-label {
+  margin-right: 0.25rem;
+}
+.timeline-navigation,
+.export-controls {
+  border-top: 1px solid #355035;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+}
+.frame-details {
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+.speed-controls button[aria-pressed="true"],
+.scale-presets button[aria-pressed="true"] {
   background: #098509;
   color: #fff;
 }
@@ -29,6 +57,7 @@ button:disabled {
   cursor: default;
 }
 button:focus-visible,
+input:focus-visible,
 .timeline:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 4px;
@@ -45,7 +74,7 @@ button:focus-visible,
   padding: 1rem;
 }
 time {
-  height: 19px;
+  min-height: 19px;
 }
 .preview > .content {
   position: relative;
@@ -81,7 +110,29 @@ canvas {
   font-variant-numeric: tabular-nums;
 }
 .window-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.window-label {
+  margin: 0;
+  text-align: center;
+}
+.scale-controls {
+  margin-bottom: 1rem;
+}
+.date-navigation {
   justify-content: space-between;
+  margin-top: 1rem;
+}
+.date-navigation input {
+  color-scheme: dark;
+  font: inherit;
+  min-height: 44px;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 .window-label,
 .help {
@@ -133,16 +184,32 @@ canvas {
   position: absolute;
   transform: translateX(-50%);
 }
-.ticks span:first-child {
-  transform: none;
-}
-.ticks span:last-child {
-  transform: translateX(-100%);
-}
 .availability-status {
   min-height: 1rem;
 }
+@media (max-width: 640px) {
+  .window-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .window-label {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .window-controls button:first-child {
+    justify-self: start;
+  }
+  .window-controls button:last-child {
+    justify-self: end;
+  }
+}
 @media (max-width: 480px) {
+  .ticks span:nth-child(even) {
+    display: none;
+  }
+  .scale-controls,
+  .scale-presets {
+    gap: 0.2rem;
+  }
   .window-controls {
     gap: 0.3rem;
   }
