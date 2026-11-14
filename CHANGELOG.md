@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.51.21
+2026-11-14
+
+### Fixes
+
+- chore(deps): update rust crate url to v2.5.8 (9297cecad6bd364edc9aeb22bfe88029deb94c25)
+
 ## 0.51.20
 2026-11-09
 
