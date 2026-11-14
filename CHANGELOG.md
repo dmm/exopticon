@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.5
+2026-11-14
+
+### Fixes
+
+- chore(deps): update tokio-tracing monorepo (a0c8e00213e1f3e9c4bf05161978f2880230a845)
+
 ## 0.52.4
 2026-11-14
 
