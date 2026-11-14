@@ -58,7 +58,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
           <div class="playbutton" (click)="onEventClick(index)">&#9654;</div>
         }
         @if (selectedEvent == index && event.observations.length > 0) {
-          <video controls autoplay loop>
+          <video controls autoplay loop playsinline>
             <source src="/v1/events/{{ event.id }}/clip" type="video/mp4" />
           </video>
         }

@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <div #wrapperDiv>
-  <video #videoElement (play)="setStatus($event)"></video>
+  <video #videoElement playsinline (play)="setStatus($event)"></video>
 
   @if (selected && status === "active") {
     <app-camera-overlay
