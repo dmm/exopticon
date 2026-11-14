@@ -1,6 +1,6 @@
 import { ActivatedRoute, convertToParamMap } from "@angular/router";
 import { TestBed } from "@angular/core/testing";
-import { of } from "rxjs";
+import { of, Subject } from "rxjs";
 import { RecordingDescriptor, RecordingService } from "../recording.service";
 import { PlaybackComponent } from "./playback.component";
 
@@ -66,6 +66,30 @@ describe("Playback canvas inspection", () => {
       await component.controller.stepForward();
       fixture.detectChanges();
       expect(component.displayedTime).toBe(begin + 423);
+
+      const beforeSeek = canvas.toDataURL();
+      const pending = new Subject<RecordingDescriptor>();
+      recordings.resolveAt.and.returnValue(pending);
+      const seeking = component.controller.seek(begin + 623);
+      fixture.detectChanges();
+      expect(canvas.toDataURL()).toBe(beforeSeek);
+      expect(component.displayedTime).toBe(begin + 423);
+      expect(component.position).toBe(begin + 623);
+      expect(
+        fixture.nativeElement
+          .querySelector(".preview")
+          .getAttribute("aria-busy"),
+      ).toBe("true");
+      pending.next(descriptor);
+      pending.complete();
+      await seeking;
+      fixture.detectChanges();
+      expect(component.displayedTime).toBe(begin + 623);
+      expect(
+        fixture.nativeElement
+          .querySelector(".preview")
+          .getAttribute("aria-busy"),
+      ).toBe("false");
     } finally {
       fixture.destroy();
     }

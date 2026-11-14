@@ -86,6 +86,7 @@ describe("PlaybackComponent", () => {
       button: 0,
       clientX: 150,
       currentTarget: {
+        focus: () => {},
         getBoundingClientRect: () => ({ left: 100, width: 200 }),
       },
     } as unknown as PointerEvent);
@@ -101,6 +102,84 @@ describe("PlaybackComponent", () => {
     component.seekKey(new KeyboardEvent("keydown", { key: "End" }));
     expect(seek).toHaveBeenCalledWith(component.windowEnd - 1);
   });
+  it("bounds drag previews, moves the selection immediately and resolves the release", () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(10000));
+    try {
+      const seek = spyOn(component.controller, "seek").and.resolveTo();
+      spyOn(component.controller, "selectTime").and.callFake((time) => {
+        component.controller.state.requestedTime = time;
+      });
+      const element = {
+        focus: () => {},
+        getBoundingClientRect: () => ({ left: 0, width: 1800 }),
+        setPointerCapture: jasmine.createSpy(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: jasmine.createSpy(),
+      };
+      const pointer = (x: number, type = "pointermove", pointerId = 1) =>
+        ({
+          button: 0,
+          clientX: x,
+          pointerId,
+          type,
+          currentTarget: element,
+        }) as unknown as PointerEvent;
+      component.seekPointer(pointer(1, "pointerdown"));
+      expect(seek).toHaveBeenCalledTimes(1);
+      expect(seek).toHaveBeenCalledWith(1000);
+      component.movePointer(pointer(2));
+      component.movePointer(pointer(3));
+      expect(component.position).toBe(3000);
+      expect(seek).toHaveBeenCalledTimes(1);
+      component.movePointer(pointer(99, "pointermove", 2));
+      expect(component.position).toBe(3000);
+      jasmine.clock().tick(150);
+      expect(seek).toHaveBeenCalledWith(3000);
+      component.movePointer(pointer(4));
+      component.releasePointer(pointer(5, "pointerup"));
+      expect(seek).toHaveBeenCalledTimes(3);
+      expect(seek.calls.mostRecent().args).toEqual([5000]);
+      jasmine.clock().tick(500);
+      expect(seek).toHaveBeenCalledTimes(3);
+      expect(element.releasePointerCapture).toHaveBeenCalledWith(1);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it("finishes canceled drags and removes scheduled previews on destruction", () => {
+    jasmine.clock().install();
+    try {
+      const seek = spyOn(component.controller, "seek").and.resolveTo();
+      spyOn(component.controller, "selectTime").and.callFake((time) => {
+        component.controller.state.requestedTime = time;
+      });
+      const event = (x: number) =>
+        ({
+          button: 0,
+          pointerId: 1,
+          clientX: x,
+          currentTarget: {
+            focus: () => {},
+            getBoundingClientRect: () => ({ left: 0, width: 1800 }),
+          },
+        }) as unknown as PointerEvent;
+      component.seekPointer(event(1));
+      component.movePointer(event(2));
+      component.releasePointer(event(2));
+      expect(seek.calls.mostRecent().args).toEqual([2000]);
+      component.seekPointer(event(3));
+      component.movePointer(event(4));
+      component.ngOnDestroy();
+      const count = seek.calls.count();
+      jasmine.clock().tick(500);
+      expect(seek.calls.count()).toBe(count);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
   it("zooms around the visible playhead without changing playback", () => {
     component.controller.state = {
       phase: "playing",
@@ -212,6 +291,81 @@ describe("PlaybackComponent", () => {
       presets[3].click();
       fixture.detectChanges();
       expect(presets[3].getAttribute("aria-pressed")).toBe("true");
+      fixture.componentInstance.controller.state = {
+        phase: "seeking",
+        requestedTime: 1000,
+        displayedTime: 5000,
+        error: null,
+      };
+      fixture.componentInstance.setSpeed(1);
+      fixture.detectChanges();
+      const times = root.querySelectorAll(".frame-details time");
+      expect(times.length).toBe(1);
+      expect(times[0].getAttribute("aria-label")).toBe("Displayed frame time");
+      expect(root.querySelector(".frame-details")!.textContent).not.toContain(
+        "Selected time:",
+      );
+      expect(root.querySelector(".preview-status")!.textContent).toContain(
+        "Seeking…",
+      );
+      expect(root.querySelector(".frame-offset")!.textContent).toContain(
+        "4.000s",
+      );
+      const timeline = root.querySelector<HTMLElement>(".timeline")!;
+      const timelineTop =
+        timeline.getBoundingClientRect().top - root.getBoundingClientRect().top;
+      expect(root.querySelector('[role="tooltip"]')).toBeNull();
+      const summary = root.querySelector<HTMLElement>(".preview-summary")!;
+      expect(summary.querySelector("time")).not.toBeNull();
+      expect(summary.querySelector(".preview-status")).not.toBeNull();
+      expect(summary.querySelector(".frame-offset")).not.toBeNull();
+      fixture.componentInstance.controller.state.phase = "paused";
+      fixture.componentInstance.setSpeed(1);
+      fixture.detectChanges();
+      expect(
+        timeline.getBoundingClientRect().top - root.getBoundingClientRect().top,
+      ).toBe(timelineTop);
+      fixture.componentInstance.controller.state.displayedTime = 1050;
+      fixture.componentInstance.setSpeed(1);
+      fixture.detectChanges();
+      expect(root.querySelector(".frame-offset")!.textContent!.trim()).toBe("");
+      expect(
+        timeline.getBoundingClientRect().top - root.getBoundingClientRect().top,
+      ).toBe(timelineTop);
+      root.style.width = "380px";
+      const narrowTop =
+        timeline.getBoundingClientRect().top - root.getBoundingClientRect().top;
+      expect(summary.getBoundingClientRect().height).toBeLessThan(60);
+      fixture.componentInstance.controller.state.displayedTime = 5000;
+      fixture.componentInstance.setSpeed(1);
+      fixture.detectChanges();
+      expect(
+        timeline.getBoundingClientRect().top - root.getBoundingClientRect().top,
+      ).toBe(narrowTop);
+      expect(summary.getBoundingClientRect().height).toBeLessThan(60);
+      const seek = spyOn(
+        fixture.componentInstance.controller,
+        "seek",
+      ).and.callFake(async (time) => {
+        fixture.componentInstance.controller.state.requestedTime = time;
+      });
+      spyOn(timeline, "setPointerCapture");
+      const bounds = timeline.getBoundingClientRect();
+      const pointer = {
+        button: 0,
+        pointerId: 1,
+        clientX: bounds.left + bounds.width / 2,
+        bubbles: true,
+        cancelable: true,
+      };
+      timeline.dispatchEvent(new PointerEvent("pointerdown", pointer));
+      expect(document.activeElement).toBe(timeline);
+      timeline.dispatchEvent(new PointerEvent("pointerup", pointer));
+      const selected = fixture.componentInstance.position;
+      timeline.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      );
+      expect(seek.calls.mostRecent().args).toEqual([selected + 1000]);
       const date = root.querySelector<HTMLInputElement>(
         'input[type="datetime-local"]',
       )!;

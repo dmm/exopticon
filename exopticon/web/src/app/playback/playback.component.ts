@@ -81,6 +81,11 @@ export class PlaybackComponent implements OnInit, OnDestroy {
   @ViewChild("canvas") canvas?: ElementRef<HTMLCanvasElement>;
   private routeSubscription?: Subscription;
   private rangeRequest?: Subscription;
+  private dragPointer?: number;
+  private dragElement?: HTMLElement;
+  private previewTimer?: ReturnType<typeof setTimeout>;
+  private lastPreviewAt = -Infinity;
+  private readonly previewInterval = 150;
 
   constructor(
     private route: ActivatedRoute,
@@ -105,6 +110,7 @@ export class PlaybackComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.routeSubscription = this.route.paramMap.subscribe((params) => {
+      this.endDrag();
       this.cameraName = params.get("camera_name") ?? "";
       this.controller.setCamera(this.cameraName);
       this.loadRanges();
@@ -186,22 +192,90 @@ export class PlaybackComponent implements OnInit, OnDestroy {
     );
   }
 
+  get frameOffset(): number | null {
+    const { requestedTime, displayedTime } = this.controller.state;
+    return requestedTime === null || displayedTime === null
+      ? null
+      : displayedTime - requestedTime;
+  }
+
+  get significantFrameOffset(): boolean {
+    return this.frameOffset !== null && Math.abs(this.frameOffset) >= 1000;
+  }
+
+  get frameOffsetSeconds(): string {
+    return (Math.abs(this.frameOffset ?? 0) / 1000).toFixed(3);
+  }
+
+  private clampTime(time: number): number {
+    return Math.max(this.windowStart, Math.min(time, this.windowEnd - 1));
+  }
+
   seek(time: number): void {
-    const target = Math.max(
-      this.windowStart,
-      Math.min(time, this.windowEnd - 1),
-    );
-    void this.controller.seek(target);
+    this.endDrag();
+    void this.controller.seek(this.clampTime(time));
   }
 
   seekPointer(event: PointerEvent): void {
-    if (event.button !== 0) return;
-    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    if (bounds.width) {
-      this.seek(
-        this.windowStart +
-          ((event.clientX - bounds.left) / bounds.width) * this.windowDuration,
-      );
+    if (event.button !== 0 || this.dragPointer !== undefined) return;
+    const element = event.currentTarget as HTMLElement;
+    // Preventing the pointer default below also prevents its normal focus action.
+    element.focus({ preventScroll: true });
+    this.dragPointer = event.pointerId;
+    this.dragElement = element;
+    element.setPointerCapture?.(event.pointerId);
+    this.lastPreviewAt = -Infinity;
+    this.updateDrag(event);
+    event.preventDefault?.();
+  }
+
+  movePointer(event: PointerEvent): void {
+    if (this.dragPointer !== undefined && event.pointerId === this.dragPointer)
+      this.updateDrag(event);
+  }
+
+  releasePointer(event: PointerEvent): void {
+    if (this.dragPointer === undefined || event.pointerId !== this.dragPointer)
+      return;
+    if (event.type === "pointerup") this.updateDrag(event, false);
+    const target = this.position;
+    this.endDrag();
+    // Always resolve the released selection, even inside the preview interval.
+    void this.controller.seek(target);
+  }
+
+  private updateDrag(event: PointerEvent, preview = true): void {
+    const bounds = this.dragElement!.getBoundingClientRect();
+    if (!bounds.width) return;
+    const target = this.clampTime(
+      this.windowStart +
+        ((event.clientX - bounds.left) / bounds.width) * this.windowDuration,
+    );
+    this.controller.selectTime(target);
+    if (!preview || this.previewTimer !== undefined) return;
+    const delay = this.previewInterval - (Date.now() - this.lastPreviewAt);
+    if (delay <= 0) this.requestPreview(target);
+    else
+      this.previewTimer = setTimeout(() => {
+        this.previewTimer = undefined;
+        this.requestPreview(this.position);
+      }, delay);
+  }
+
+  private requestPreview(target: number): void {
+    this.lastPreviewAt = Date.now();
+    void this.controller.seek(target);
+  }
+
+  private endDrag(): void {
+    if (this.previewTimer !== undefined) clearTimeout(this.previewTimer);
+    this.previewTimer = undefined;
+    const pointer = this.dragPointer;
+    const element = this.dragElement;
+    this.dragPointer = undefined;
+    this.dragElement = undefined;
+    if (pointer !== undefined && element?.hasPointerCapture?.(pointer)) {
+      element.releasePointerCapture(pointer);
     }
   }
 
@@ -285,6 +359,7 @@ export class PlaybackComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.endDrag();
     this.controller.destroy();
     this.routeSubscription?.unsubscribe();
     this.rangeRequest?.unsubscribe();

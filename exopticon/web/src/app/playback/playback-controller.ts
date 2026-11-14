@@ -84,18 +84,25 @@ export class PlaybackController {
     this.notify(this.state);
   }
 
-  async seek(utcMilliseconds: number): Promise<void> {
-    const frameSource = this.frameSource;
-    if (!frameSource || this.destroyed) return;
-    this.cancelActive();
-    const generation = this.generation;
+  /** Move the selection immediately, invalidating results for older
+      selections. */
+  selectTime(utcMilliseconds: number): void {
+    if (!this.frameSource || this.destroyed) return;
+    this.cancelActive(false);
     this.state = {
+      ...this.state,
       phase: "seeking",
       requestedTime: utcMilliseconds,
-      displayedTime: null,
       error: null,
     };
     this.notify(this.state);
+  }
+
+  async seek(utcMilliseconds: number): Promise<void> {
+    const frameSource = this.frameSource;
+    if (!frameSource || this.destroyed) return;
+    this.selectTime(utcMilliseconds);
+    const generation = this.generation;
     try {
       const result = await frameSource.seek(utcMilliseconds);
       if (!this.current(generation)) return;
@@ -327,14 +334,16 @@ export class PlaybackController {
     this.notify(this.state);
   }
 
-  private cancelActive(): void {
+  private cancelActive(clearDisplayed = true): void {
     this.generation++;
     this.stopClock();
     this.producer = undefined;
     this.nextRecordingTime = null;
-    this.displayed?.sample.close();
-    this.displayed = undefined;
-    this.render(null);
+    if (clearDisplayed) {
+      this.displayed?.sample.close();
+      this.displayed = undefined;
+      this.render(null);
+    }
   }
 
   private current(generation: number): boolean {

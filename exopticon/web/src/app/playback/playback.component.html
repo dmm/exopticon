@@ -1,56 +1,68 @@
 <h2>Playback — {{ cameraName }}</h2>
 @if (cameraName) {
-  <div class="preview">
+  <div class="preview" [attr.aria-busy]="controller.state.phase === 'seeking'">
     <div class="content">
       <div class="canvas-width"></div>
       <div class="canvas-wrapper">
         <canvas #canvas aria-label="Recorded video frame"></canvas>
       </div>
     </div>
-    <div class="frame-details">
-      <time>{{ displayedTime | date: "MMM d, y HH:mm:ss.SSS zzzz" }}</time>
+    <div class="preview-summary">
+      <span class="frame-details">
+        @if (displayedTime !== null) {
+          <time aria-label="Displayed frame time">{{
+            displayedTime | date: "MMM d, y HH:mm:ss.SSS z"
+          }}</time>
+        }
+      </span>
+      <span class="preview-status" aria-live="polite">
+        @switch (controller.state.phase) {
+          @case ("idle") {
+            Select a time to inspect a recording.
+          }
+          @case ("seeking") {
+            Seeking…
+          }
+          @case ("paused") {
+            Paused
+          }
+          @case ("stepping") {
+            Loading next frame…
+          }
+          @case ("playing") {
+            Playing at {{ controller.speed }}×
+          }
+          @case ("buffering") {
+            Buffering…
+          }
+          @case ("gap") {
+            Next recording starts at
+            {{
+              controller.nextRecordingTime | date: "MMM d, y HH:mm:ss.SSS zzzz"
+            }}.
+            <button type="button" (click)="jumpToNext()">
+              Jump to next recording
+            </button>
+          }
+          @case ("unavailable") {
+            No recorded frame at or after the selected time.
+          }
+          @case ("ended") {
+            End of recordings.
+          }
+          @case ("error") {
+            {{ controller.state.error }}
+            <button type="button" (click)="retrySeek()">Retry</button>
+          }
+        }
+      </span>
+      <span class="frame-offset" role="status">
+        @if (significantFrameOffset) {
+          Frame {{ frameOffsetSeconds }}s
+          {{ frameOffset! > 0 ? "after" : "before" }} selection
+        }
+      </span>
     </div>
-    <p class="preview-status" aria-live="polite">
-      @switch (controller.state.phase) {
-        @case ("idle") {
-          Select a time to inspect a recording.
-        }
-        @case ("seeking") {
-          Loading frame…
-        }
-        @case ("paused") {
-          Paused
-        }
-        @case ("stepping") {
-          Loading next frame…
-        }
-        @case ("playing") {
-          Playing at {{ controller.speed }}×
-        }
-        @case ("buffering") {
-          Buffering…
-        }
-        @case ("gap") {
-          Next recording starts at
-          {{
-            controller.nextRecordingTime | date: "MMM d, y HH:mm:ss.SSS zzzz"
-          }}.
-          <button type="button" (click)="jumpToNext()">
-            Jump to next recording
-          </button>
-        }
-        @case ("unavailable") {
-          No recorded frame at or after the selected time.
-        }
-        @case ("ended") {
-          End of recordings.
-        }
-        @case ("error") {
-          {{ controller.state.error }}
-          <button type="button" (click)="retrySeek()">Retry</button>
-        }
-      }
-    </p>
   </div>
   <div class="transport" role="group" aria-label="Playback controls">
     <span class="transport-actions">
@@ -130,6 +142,10 @@
       "
       [attr.aria-busy]="loading || controller.state.phase === 'seeking'"
       (pointerdown)="seekPointer($event)"
+      (pointermove)="movePointer($event)"
+      (pointerup)="releasePointer($event)"
+      (pointercancel)="releasePointer($event)"
+      (lostpointercapture)="releasePointer($event)"
       (keydown)="seekKey($event)"
     >
       @for (range of ranges; track range.begin) {
@@ -139,10 +155,24 @@
           [style.width.%]="percent(range.end) - percent(range.begin)"
         ></span>
       }
+      @if (
+        displayedTime !== null &&
+        displayedTime >= windowStart &&
+        displayedTime < windowEnd
+      ) {
+        <span
+          class="frame-marker"
+          [style.left.%]="percent(displayedTime)"
+          title="Displayed frame time"
+        ></span>
+      }
       @if (playheadVisible) {
         <span class="playhead" [style.left.%]="percent(position)"></span>
       }
     </div>
+    <p class="timeline-legend">
+      White marker: selected time · Amber marker: displayed frame
+    </p>
     <div class="ticks" aria-hidden="true">
       @for (tick of ticks; track $index) {
         <span
@@ -165,8 +195,6 @@
         }
       </span>
     </div>
-
-
 
     <div class="date-navigation">
       <form (submit)="$event.preventDefault(); jumpToTime(jumpTime.value)">

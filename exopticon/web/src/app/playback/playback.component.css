@@ -3,7 +3,6 @@
   margin: 0 auto;
   padding: 0 1rem 2rem;
 }
-.frame-details,
 .scale-controls,
 .date-navigation,
 .date-navigation form,
@@ -38,10 +37,6 @@
   margin-top: 1.5rem;
   padding-top: 1.25rem;
 }
-.frame-details {
-  justify-content: center;
-  margin-top: 0.75rem;
-}
 .speed-controls button[aria-pressed="true"],
 .scale-presets button[aria-pressed="true"] {
   background: #098509;
@@ -71,7 +66,8 @@ input:focus-visible,
   border: 1px solid #080;
   background: #071007;
   margin-bottom: 1rem;
-  padding: 1rem;
+  padding: 0.5rem;
+  container-type: inline-size;
 }
 time {
   min-height: 19px;
@@ -101,9 +97,6 @@ canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-.preview-status {
-  margin-bottom: 0;
 }
 .preview time {
   color: #fff;
@@ -146,7 +139,7 @@ canvas {
   background: #1b241b;
   border: 1px solid #527252;
   cursor: crosshair;
-  touch-action: pan-y;
+  touch-action: none;
 }
 .recording {
   position: absolute;
@@ -219,4 +212,65 @@ canvas {
   .preview {
     min-height: 160px;
   }
+}
+
+.timeline-legend {
+  color: #a9c4a9;
+  font-size: 0.9rem;
+  margin: 0.5rem 0 0;
+}
+.preview-summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 0.75rem;
+  width: 100%;
+  min-height: 1.5rem;
+  padding-top: 0.375rem;
+  font-size: 0.85rem;
+  line-height: 1.5rem;
+  text-align: left;
+}
+.frame-details,
+.preview-status,
+.frame-offset {
+  min-width: 0;
+}
+.frame-details {
+  white-space: nowrap;
+}
+.preview-status {
+  color: #a9c4a9;
+}
+.preview-status button {
+  font-size: inherit;
+  padding: 0 0.5rem;
+}
+.frame-offset {
+  color: #ffd080;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@container (max-width: 650px) {
+  .preview-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(1.5rem, auto) minmax(1.5rem, auto);
+    column-gap: 0.5rem;
+  }
+  .frame-details {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+}
+.frame-marker {
+  position: absolute;
+  top: 8px;
+  bottom: 0;
+  width: 4px;
+  background: #ffd080;
+  transform: translateX(-2px);
+  pointer-events: none;
 }

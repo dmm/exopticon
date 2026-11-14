@@ -78,6 +78,45 @@ describe("PlaybackController inspection", () => {
     expect(controller.state.displayedTime).toBe(1200);
   });
 
+  it("retains the displayed sample during a seek and closes it only on replacement", async () => {
+    const first = frame(1200);
+    const replacement = frame(5000);
+    currentReader.firstAtOrAfter.and.resolveTo(first);
+    await controller.seek(1100);
+    const pending = new Subject<RecordingDescriptor>();
+    recordings.resolveAt.and.returnValue(pending);
+    currentReader = reader();
+    currentReader.firstAtOrAfter.and.resolveTo(replacement);
+    const seeking = controller.seek(3000);
+    expect(controller.state.phase).toBe("seeking");
+    expect(controller.state.requestedTime).toBe(3000);
+    expect(controller.state.displayedTime).toBe(1200);
+    expect(rendered[rendered.length - 1]).toBe(first);
+    expect(first.sample.close).not.toHaveBeenCalled();
+    pending.next(descriptor);
+    pending.complete();
+    await seeking;
+    expect(controller.state.requestedTime).toBe(3000);
+    expect(controller.state.displayedTime).toBe(5000);
+    expect(first.sample.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not display an older preview after the selection moves", async () => {
+    const pending = new Subject<RecordingDescriptor>();
+    recordings.resolveAt.and.returnValue(pending);
+    const obsolete = frame(1200);
+    currentReader.firstAtOrAfter.and.resolveTo(obsolete);
+    const seeking = controller.seek(1100);
+    controller.selectTime(3000);
+    pending.next(descriptor);
+    pending.complete();
+    await seeking;
+    expect(controller.state.phase).toBe("seeking");
+    expect(controller.state.requestedTime).toBe(3000);
+    expect(controller.state.displayedTime).toBeNull();
+    expect(rendered).not.toContain(obsolete);
+  });
+
   it("serializes steps and disables another step while one is pending", async () => {
     const first = frame(1200);
     const second = frame(1300);
@@ -177,7 +216,7 @@ describe("PlaybackController inspection", () => {
     expect(controller.state.displayedTime).toBe(1600);
   });
 
-  it("clears the image when the API reports a recording gap", async () => {
+  it("retains the image and its timestamp when no recording is available", async () => {
     currentReader.firstAtOrAfter.and.returnValue(Promise.resolve(frame(1200)));
     await controller.seek(1100);
     recordings.resolveAt.and.returnValue(
@@ -191,8 +230,8 @@ describe("PlaybackController inspection", () => {
     await controller.seek(3000);
     expect(controller.state.phase).toBe("unavailable");
     expect(controller.state.requestedTime).toBe(3000);
-    expect(controller.state.displayedTime).toBeNull();
-    expect(rendered[rendered.length - 1]).toBeNull();
+    expect(controller.state.displayedTime).toBe(1200);
+    expect(rendered[rendered.length - 1]?.utcMilliseconds).toBe(1200);
   });
 
   it("disposes a reader opened after its seek was canceled", async () => {
