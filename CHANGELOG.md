@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.3
+2026-11-14
+
+### Fixes
+
+- chore(deps): update docker:29-cli docker digest to 5a7af0d (aa71f14be8d9233e6076d7a7c1e4ffc13218f923)
+
 ## 0.52.2
 2026-11-14
 
