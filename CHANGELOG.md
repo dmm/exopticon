@@ -2,6 +2,28 @@
 
 <!--- next entry here -->
 
+## 0.52.0
+2026-11-14
+
+### Features
+
+- **playback:** Add timeline scales (2349eb945fd4427a12a1bf78ff35879e41fe17de)
+- **playback:** Add seeking by dragging the timeline (6776b0b8cad3a45875ae0bf4990dc9b0511ef787)
+- **playback:** Move playback controls to single row (ecacd8e2edc24cd3497792c7e420600b0c58a243)
+- **playback:** Remove Show Recording button (df47d773f4da258e71861939b052be1a8def2afb)
+- Check for updates at start (ae593e009b906abcb7d0a9dc192708318729a754)
+- Log pwa update status (d496f96d7ba8649037e921a4936cfe6017f8f67e)
+- Show banner when update available. (cd7defd864be8b0c23ca71dcda3fdf725b1a02b8)
+- Move export controls to top of playback component (233b2dbe4e30be0c24f24f0154c90a07bc63b371)
+
+### Fixes
+
+- Remove --deploy-url and fix PWA (9cb22a25b4f0613d72d80548f66f362c120361af)
+- Remove zone.js (3e4c65c8dbb4fc338e3ee4e6b8e4432a86eca350)
+- **exserial:** Configure warnings (f5dfee044cb0bc944a729d10f77ce0e80d590df3)
+- **playback:** Fix labels and show timezone (d4503a8fbae3fbb497ef0658f11bd2048e1b4cbf)
+- **playback:** Preserve aspect ratio of playback video (68cda13e1a6c15de3ba5a54b70551ab235c62073)
+
 ## 0.51.22
 2026-11-14
 
