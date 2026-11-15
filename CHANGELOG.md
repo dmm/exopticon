@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.8
+2026-11-15
+
+### Fixes
+
+- chore(deps): update quay.io/almalinuxorg/almalinux:10 docker digest to b98e425 (df43c8302962e397ab378593b46bdcc5c99fb7ed)
+
 ## 0.52.7
 2026-11-14
 
