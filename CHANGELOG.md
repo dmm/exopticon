@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.10
+2026-11-15
+
+### Fixes
+
+- chore(deps): update dependency core-js to v3.51.0 (7957f68a76f7aca95ae352c6d2fff07aec2b3a44)
+
 ## 0.52.9
 2026-11-15
 
