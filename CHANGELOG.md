@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 0.53.0
+2026-11-16
+
+### Features
+
+- **playback:** Show timestamp on timeline drag (9e3b52a4c73fed16053cfa6ccc63f6ff31cf275b)
+- **playback:** Pause playback when page not visible. (a1a3793cd2e1d234bbf30a94767090762bb97215)
+
 ## 0.52.12
 2026-11-16
 
