@@ -240,7 +240,7 @@ canvas {
 }
 .frame-details,
 .preview-status,
-.frame-offset {
+.selected-time {
   min-width: 0;
 }
 .frame-details {
@@ -253,7 +253,7 @@ canvas {
   font-size: inherit;
   padding: 0 0.5rem;
 }
-.frame-offset {
+.selected-time {
   color: #ffd080;
   text-align: right;
   overflow: hidden;

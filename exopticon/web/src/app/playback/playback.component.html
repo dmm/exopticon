@@ -72,10 +72,12 @@
           }
         }
       </span>
-      <span class="frame-offset" role="status">
-        @if (significantFrameOffset) {
-          Frame {{ frameOffsetSeconds }}s
-          {{ frameOffset! > 0 ? "after" : "before" }} selection
+      <span class="selected-time" role="status">
+        @if (controller.state.requestedTime !== null) {
+          Selected:
+          <time aria-label="Selected time">{{
+            position | date: "MMM d, y HH:mm:ss.SSS z"
+          }}</time>
         }
       </span>
     </div>

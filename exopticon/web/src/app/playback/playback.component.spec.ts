@@ -1,3 +1,4 @@
+import { formatDate } from "@angular/common";
 import { ChangeDetectorRef } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, ParamMap } from "@angular/router";
@@ -308,8 +309,10 @@ describe("PlaybackComponent", () => {
       expect(root.querySelector(".preview-status")!.textContent).toContain(
         "Seeking…",
       );
-      expect(root.querySelector(".frame-offset")!.textContent).toContain(
-        "4.000s",
+      const selectedTime = root.querySelector(".selected-time time")!;
+      expect(selectedTime.getAttribute("aria-label")).toBe("Selected time");
+      expect(selectedTime.textContent!.trim()).toBe(
+        formatDate(1000, "MMM d, y HH:mm:ss.SSS z", "en-US"),
       );
       const timeline = root.querySelector<HTMLElement>(".timeline")!;
       const timelineTop =
@@ -318,7 +321,7 @@ describe("PlaybackComponent", () => {
       const summary = root.querySelector<HTMLElement>(".preview-summary")!;
       expect(summary.querySelector("time")).not.toBeNull();
       expect(summary.querySelector(".preview-status")).not.toBeNull();
-      expect(summary.querySelector(".frame-offset")).not.toBeNull();
+      expect(summary.querySelector(".selected-time")).not.toBeNull();
       fixture.componentInstance.controller.state.phase = "paused";
       fixture.componentInstance.setSpeed(1);
       fixture.detectChanges();
@@ -328,7 +331,17 @@ describe("PlaybackComponent", () => {
       fixture.componentInstance.controller.state.displayedTime = 1050;
       fixture.componentInstance.setSpeed(1);
       fixture.detectChanges();
-      expect(root.querySelector(".frame-offset")!.textContent!.trim()).toBe("");
+      expect(selectedTime.textContent!.trim()).toBe(
+        formatDate(1000, "MMM d, y HH:mm:ss.SSS z", "en-US"),
+      );
+      fixture.componentInstance.controller.selectTime(2000);
+      fixture.detectChanges();
+      expect(selectedTime.textContent!.trim()).toBe(
+        formatDate(2000, "MMM d, y HH:mm:ss.SSS z", "en-US"),
+      );
+      expect(times[0].textContent!.trim()).toBe(
+        formatDate(1050, "MMM d, y HH:mm:ss.SSS z", "en-US"),
+      );
       expect(
         timeline.getBoundingClientRect().top - root.getBoundingClientRect().top,
       ).toBe(timelineTop);

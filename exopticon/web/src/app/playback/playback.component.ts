@@ -192,21 +192,6 @@ export class PlaybackComponent implements OnInit, OnDestroy {
     );
   }
 
-  get frameOffset(): number | null {
-    const { requestedTime, displayedTime } = this.controller.state;
-    return requestedTime === null || displayedTime === null
-      ? null
-      : displayedTime - requestedTime;
-  }
-
-  get significantFrameOffset(): boolean {
-    return this.frameOffset !== null && Math.abs(this.frameOffset) >= 1000;
-  }
-
-  get frameOffsetSeconds(): string {
-    return (Math.abs(this.frameOffset ?? 0) / 1000).toFixed(3);
-  }
-
   private clampTime(time: number): number {
     return Math.max(this.windowStart, Math.min(time, this.windowEnd - 1));
   }
