@@ -25,6 +25,9 @@ interface TimelineRange {
   templateUrl: "./playback.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ["./playback.component.css"],
+  host: {
+    "(document:visibilitychange)": "onVisibilityChange()",
+  },
 })
 export class PlaybackComponent implements OnInit, OnDestroy {
   readonly scales = [
@@ -302,6 +305,10 @@ export class PlaybackComponent implements OnInit, OnDestroy {
     )
       this.controller.pause();
     else this.controller.play();
+  }
+
+  onVisibilityChange(): void {
+    if (document.hidden) this.controller.pause();
   }
 
   setSpeed(speed: PlaybackSpeed): void {

@@ -25,6 +25,52 @@ describe("PlaybackComponent", () => {
   });
   afterEach(() => component.ngOnDestroy());
 
+  it("pauses hidden playback and stays paused when visible again", async () => {
+    await TestBed.configureTestingModule({
+      imports: [PlaybackComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: { paramMap: params } },
+        { provide: RecordingService, useValue: recordings },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(PlaybackComponent);
+    const controller = fixture.componentInstance.controller;
+    const hidden = spyOnProperty(document, "hidden", "get");
+    const pause = spyOn(controller, "pause").and.callThrough();
+    const play = spyOn(controller, "play");
+    try {
+      fixture.detectChanges();
+      for (const phase of ["playing", "buffering"] as const) {
+        controller.state = {
+          phase,
+          requestedTime: 1500,
+          displayedTime: 1200,
+          error: null,
+        };
+        hidden.and.returnValue(false);
+        document.dispatchEvent(new Event("visibilitychange"));
+        expect(controller.state.phase).toBe(phase);
+
+        hidden.and.returnValue(true);
+        document.dispatchEvent(new Event("visibilitychange"));
+        expect(controller.state.phase).toBe("paused");
+        expect(controller.state.requestedTime).toBe(1200);
+        expect(controller.state.displayedTime).toBe(1200);
+
+        hidden.and.returnValue(false);
+        document.dispatchEvent(new Event("visibilitychange"));
+        expect(controller.state.phase).toBe("paused");
+        expect(play).not.toHaveBeenCalled();
+      }
+    } finally {
+      fixture.destroy();
+    }
+    pause.calls.reset();
+    hidden.and.returnValue(true);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(pause).not.toHaveBeenCalled();
+  });
+
   it("loads the camera from the URL and releases route work", () => {
     component.ngOnInit();
     params.next(convertToParamMap({ camera_name: "front" }));
