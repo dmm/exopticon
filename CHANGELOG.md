@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.12
+2026-11-16
+
+### Fixes
+
+- chore(deps): update rust crate rand to v0.10.4 (18e5775bf7f288348753d0f8c25097d7cdc0fe66)
+
 ## 0.52.11
 2026-11-16
 
