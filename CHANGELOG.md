@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.52.11
+2026-11-16
+
+### Fixes
+
+- chore(deps): update dependency jasmine-core to ~3.99.0 (c775a19fda15f8bc623c4124c71be58a7b0a9772)
+
 ## 0.52.10
 2026-11-15
 
