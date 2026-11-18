@@ -32,7 +32,7 @@ version:
 
 pre-release:
   stage: build
-  image: docker:29-cli@sha256:5a7af0dcb0e46c803efe9b45371dd21cb500e5b4453250394ac6f06d49b6e6f1
+  image: docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e2509b7d7a7030740d6d
   before_script:
     - mkdir -p ~/.docker
     - printf '%s' "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json
@@ -45,7 +45,7 @@ pre-release:
 
 build-image:
   stage: image
-  image: docker:29-cli@sha256:5a7af0dcb0e46c803efe9b45371dd21cb500e5b4453250394ac6f06d49b6e6f1
+  image: docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e2509b7d7a7030740d6d
   before_script:
     - mkdir -p ~/.docker
     - printf '%s' "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json
