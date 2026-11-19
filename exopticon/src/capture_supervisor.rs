@@ -83,7 +83,7 @@ impl CaptureSupervisor {
         self.command_sender.clone()
     }
 
-    async fn stop_cameras(&mut self) -> anyhow::Result<()> {
+    async fn stop_cameras(&mut self) {
         for (id, ch) in &self.capture_channels {
             info!("Telling camera {} to stop!", id);
             if let Err(_err) = ch.send(capture_actor::Command::Stop).await {
@@ -92,7 +92,6 @@ impl CaptureSupervisor {
         }
 
         self.capture_channels.clear();
-        Ok(())
     }
 
     async fn start_camera(&mut self, c: Camera) -> anyhow::Result<()> {
@@ -125,9 +124,20 @@ impl CaptureSupervisor {
         // fetch cameras
         let db = self.db.clone();
 
-        let all_cameras: Vec<Camera> = spawn_blocking(move || db.fetch_all_camera_rows()).await??;
+        let full_reload = camera_name.is_none();
+        let all_cameras: Vec<Camera> = spawn_blocking(move || {
+            if full_reload {
+                // A full reload starts only after every previous worker has joined.
+                db.release_pending_camera_deletions()?;
+            }
+            db.fetch_all_camera_rows()
+        })
+        .await??;
         {
             let mut statuses = self.camera_status_registry.write().await;
+            if full_reload {
+                statuses.clear();
+            }
             for camera in &all_cameras {
                 if !camera.enabled {
                     statuses.insert(camera.name.clone(), CameraStatus::disabled());
@@ -169,45 +179,48 @@ impl CaptureSupervisor {
         }
     }
 
+    async fn start_all(&mut self) {
+        self.state = match self.start_cameras(None).await {
+            Ok(()) => State::Running,
+            Err(err) => {
+                error!("Error starting cameras: {err}");
+                State::Restarting
+            }
+        };
+    }
+
+    async fn finish_restart_if_drained(&mut self) {
+        if matches!(self.state, State::Draining) && self.capture_handles.is_empty() {
+            self.start_all().await;
+        }
+    }
+
+    async fn restart(&mut self) {
+        self.stop_cameras().await;
+        self.stopped_camera_names.clear();
+        self.state = State::Draining;
+        self.finish_restart_if_drained().await;
+    }
+
     async fn handle_tick(&mut self) {
         debug!(
             "Capture supervisor tick! state: {:?}, # handles: {}",
             self.state,
             self.capture_handles.len()
         );
-
         match self.state {
-            State::Ready => {
-                if let Err(e) = self.start_cameras(None).await {
-                    error!("Error starting cameras! {}", e);
-                    return;
-                }
-                self.state = State::Running;
-            }
+            State::Ready => self.start_all().await,
             State::Running => {
-                // everything is fine
-
-                // check for stopped cameras
-                for name in self.stopped_camera_names.clone() {
-                    if let Err(e) = self.start_cameras(Some(name.clone())).await {
-                        error!("error restarting camera {}, {}. restarting all.", name, e);
-                        self.state = State::Restarting;
+                for name in std::mem::take(&mut self.stopped_camera_names) {
+                    if let Err(err) = self.start_cameras(Some(name.clone())).await {
+                        error!("Error restarting camera {name}: {err}");
+                        self.restart().await;
+                        break;
                     }
                 }
-                self.stopped_camera_names.clear();
             }
-            State::Restarting => {
-                if let Err(e) = self.stop_cameras().await {
-                    error!("Error stopping cameras! {}", e);
-                    return;
-                }
-                self.state = State::Draining;
-            }
-            State::Draining => {
-                if self.capture_handles.is_empty() {
-                    self.state = State::Ready;
-                }
-            }
+            State::Restarting => self.restart().await,
+            State::Draining => self.finish_restart_if_drained().await,
         }
     }
 
@@ -222,12 +235,12 @@ impl CaptureSupervisor {
                 Some(cmd) = self.command_receiver.recv() => match cmd {
                     Command::RestartAll => {
                         info!("Got capture restart all command!");
-                        self.state = State::Restarting;
+                        self.restart().await;
                     }
                     Command::Shutdown => {
                         info!("Shutting down capture supervisor...");
                         self.command_receiver.close();
-                        self.stop_cameras().await?;
+                        self.stop_cameras().await;
                         while let Some(result) = self.capture_handles.next().await {
                             if let Err(error) = result {
                                 error!("Capture actor failed during shutdown: {}", error);
@@ -236,7 +249,10 @@ impl CaptureSupervisor {
                         return Ok(());
                     }
                 },
-                Some(camera_id) = self.capture_handles.next() => self.handle_camera_event(&camera_id),
+                Some(camera_id) = self.capture_handles.next() => {
+                    self.handle_camera_event(&camera_id);
+                    self.finish_restart_if_drained().await;
+                },
                 _inst = tick => self.handle_tick().await,
                 else => break
             }

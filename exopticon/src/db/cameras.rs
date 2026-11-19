@@ -18,7 +18,7 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use diesel::{Connection, QueryDsl, RunQueryDsl};
+use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 
 use crate::{
     api::{
@@ -28,12 +28,13 @@ use crate::{
     schema::cameras,
 };
 
-#[derive(Identifiable, PartialEq, Eq, Debug, Queryable, Insertable, Clone)]
+#[derive(Identifiable, PartialEq, Eq, Debug, Queryable, Insertable, AsChangeset, Clone)]
 #[diesel(primary_key(name))]
-#[diesel(table_name = cameras)]
+#[diesel(table_name = cameras, treat_none_as_null = true)]
 pub struct Camera {
     pub name: String,
     pub display_name: String,
+    #[diesel(skip_update)]
     pub storage_group_name: String,
     pub ip: String,
     pub onvif_port: i32,
@@ -46,6 +47,7 @@ pub struct Camera {
     pub enabled: bool,
     pub ptz_x_step_size: i16,
     pub ptz_y_step_size: i16,
+    pub deletion_state: i32,
 }
 
 impl From<Camera> for crate::api::cameras::Camera {
@@ -77,8 +79,7 @@ impl From<Camera> for crate::api::cameras::Camera {
                     .try_into()
                     .expect("failed to convert onvif_port"),
                 mac: c.mac,
-                username: c.username,
-                rtsp_url: c.rtsp_url,
+                rtsp_url: rtsp_endpoint(&c.rtsp_url),
                 ptz_type: c.ptz_type,
                 onvif_profile_token: c.onvif_profile_token,
                 enabled: c.enabled,
@@ -95,6 +96,7 @@ impl super::Service {
         db_read!(self, "fetch_camera_row", |conn| {
             let c = crate::schema::cameras::dsl::cameras
                 .find(camera_name)
+                .filter(cameras::deletion_state.eq(super::configuration::ACTIVE))
                 .get_result::<Camera>(conn)?;
 
             Ok(c)
@@ -110,7 +112,9 @@ impl super::Service {
 
     pub fn fetch_all_camera_rows(&self) -> Result<Vec<Camera>, super::Error> {
         db_read!(self, "fetch_all_camera_rows", |conn| {
-            let cameras: Vec<Camera> = crate::schema::cameras::dsl::cameras.load(conn)?;
+            let cameras: Vec<Camera> = cameras::table
+                .filter(cameras::deletion_state.eq(super::configuration::ACTIVE))
+                .load(conn)?;
             Ok(cameras)
         })
     }
@@ -122,4 +126,21 @@ impl super::Service {
             .map(std::convert::Into::into)
             .collect())
     }
+}
+
+fn rtsp_endpoint(value: &str) -> String {
+    let Ok(url) = url::Url::parse(value) else {
+        return String::new();
+    };
+    if !matches!(url.scheme(), "rtsp" | "rtsps") {
+        return String::new();
+    }
+    let Some(host) = url.host() else {
+        return String::new();
+    };
+    let scheme = url.scheme();
+    url.port().map_or_else(
+        || format!("{scheme}://{host}"),
+        |port| format!("{scheme}://{host}:{port}"),
+    )
 }

@@ -228,7 +228,6 @@ function buildCamera(
       ip: "127.0.0.1",
       onvifPort: 80,
       mac: "",
-      username: "",
       rtspUrl: "",
       ptzType: "relative",
       onvifProfileToken: null,

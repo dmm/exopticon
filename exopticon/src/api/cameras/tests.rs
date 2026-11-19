@@ -80,6 +80,7 @@ impl TestCamera {
                 enabled: true,
                 ptz_x_step_size: 25,
                 ptz_y_step_size: 40,
+                deletion_state: crate::db::configuration::ACTIVE,
             },
             requests,
             server,

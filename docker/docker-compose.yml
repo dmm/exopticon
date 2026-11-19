@@ -5,6 +5,8 @@ services:
     image: dmattli/exopticon:v${RELEASE_VERSION}
     environment:
       DATABASE_URL: /data/exopticon.sqlite
+      EXOPTICON_BOOTSTRAP_USERNAME: ${EXOPTICON_BOOTSTRAP_USERNAME:-}
+      EXOPTICON_BOOTSTRAP_PASSWORD: ${EXOPTICON_BOOTSTRAP_PASSWORD:-}
       ROOT_URL: "https://${DOMAIN}"
       DOMAIN: ${DOMAIN}
       EXOPTICON_NAME: ${EXOPTICON_NAME}

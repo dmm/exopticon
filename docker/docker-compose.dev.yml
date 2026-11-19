@@ -12,6 +12,8 @@ services:
     userns_mode: "keep-id:uid=1000,gid=1000"
     environment:
       DATABASE_URL: /data/exopticon.sqlite
+      EXOPTICON_BOOTSTRAP_USERNAME: ${EXOPTICON_BOOTSTRAP_USERNAME:-}
+      EXOPTICON_BOOTSTRAP_PASSWORD: ${EXOPTICON_BOOTSTRAP_PASSWORD:-}
       ROOT_URL: "https://${DOMAIN}"
       DOMAIN: ${DOMAIN}
       EXOPTICON_NAME: ${EXOPTICON_NAME}
@@ -31,7 +33,6 @@ services:
     devices: []
 #      - /dev/apex_0:/dev/apex_0
     volumes:
-      - ./exopticon.toml:/etc/exopticon/exopticon.toml:ro,Z
       - ..:/exopticon:Z # map source directory for development
       - ${EXOPTICON_DB_PATH:-./data}:/data:Z
       - ${EXOPTICON_VIDEO_PATH}:/video:Z

@@ -24,8 +24,7 @@ use crate::{api::auth::SlimAccessToken, schema::users};
 
 use super::{Service, datetime_to_micros, micros_to_datetime};
 
-#[derive(Queryable, Identifiable, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Queryable, Identifiable)]
 #[diesel(primary_key(username))]
 #[diesel(table_name = users)]
 pub struct User {

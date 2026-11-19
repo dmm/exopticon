@@ -94,7 +94,6 @@ function buildCamera(name: string): Camera {
       ip: "127.0.0.1",
       onvifPort: 80,
       mac: "",
-      username: "",
       rtspUrl: "",
       ptzType: "none",
       onvifProfileToken: null,

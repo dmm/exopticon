@@ -33,6 +33,7 @@ pub mod auth;
 pub mod basic_auth_middleware;
 pub mod camera_groups;
 pub mod cameras;
+pub mod configuration;
 pub mod recordings;
 pub mod static_files;
 pub mod storage_groups;
@@ -53,6 +54,11 @@ pub enum UserError {
     NotFound,
     /// validation error
     Validation(String),
+    Field {
+        field: &'static str,
+        message: &'static str,
+    },
+    Conflict(&'static str),
     /// internal server error
     InternalError(String),
 }
@@ -69,6 +75,20 @@ impl IntoResponse for UserError {
     fn into_response(self) -> axum::response::Response {
         let (status, message) = match self {
             Self::NotFound => (StatusCode::NOT_FOUND, "not found".to_owned()),
+            Self::Field { field, message } => {
+                return (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    axum::Json(serde_json::json!({ "field": field, "message": message })),
+                )
+                    .into_response();
+            }
+            Self::Conflict(message) => {
+                return (
+                    StatusCode::CONFLICT,
+                    axum::Json(serde_json::json!({ "message": message })),
+                )
+                    .into_response();
+            }
             Self::Validation(err_string) => (StatusCode::UNPROCESSABLE_ENTITY, err_string),
             Self::InternalError(msg) => {
                 error!("Internal Server Error: {}", msg);
@@ -87,6 +107,8 @@ impl From<crate::db::Error> for UserError {
     fn from(err: crate::db::Error) -> Self {
         match err {
             crate::db::Error::NotFound => Self::NotFound,
+            crate::db::Error::Field { field, message } => Self::Field { field, message },
+            crate::db::Error::Conflict(message) => Self::Conflict(message),
             crate::db::Error::Other(other) => {
                 Self::InternalError(format!("other db error: {other}"))
             }

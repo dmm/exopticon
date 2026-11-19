@@ -18,18 +18,27 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { TestBed } from "@angular/core/testing";
+import { HttpClient } from "@angular/common/http";
+import { EMPTY, of } from "rxjs";
 import { AuthService } from "./auth.service";
 
 describe("AuthService", () => {
-  let service: AuthService;
+  it("publishes login after the initial unauthorized request completes without a response", () => {
+    const http = jasmine.createSpyObj<HttpClient>("HttpClient", [
+      "get",
+      "post",
+    ]);
+    http.get.and.returnValue(EMPTY);
+    http.post.and.returnValue(of(null));
+    const service = new AuthService(http);
+    const states: boolean[] = [];
+    const subscription = service.isLoggedIn.subscribe((loggedIn) =>
+      states.push(loggedIn),
+    );
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(AuthService);
-  });
+    service.login("admin", "secret").subscribe();
 
-  it("should be created", () => {
-    expect(service).toBeTruthy();
+    expect(states).toEqual([false, true]);
+    subscription.unsubscribe();
   });
 });

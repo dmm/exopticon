@@ -48,6 +48,7 @@ pub struct Data {
 /// User model without password. This is used as a return value for
 /// user operations.
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct User {
     /// username
     pub username: String,

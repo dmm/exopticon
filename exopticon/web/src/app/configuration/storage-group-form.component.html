@@ -1,0 +1,31 @@
+<app-configuration-form
+  [name]="group()?.metadata?.name ?? ''"
+  [displayName]="group()?.metadata?.displayName ?? ''"
+  [creating]="!group()"
+  [saving]="saving()"
+  [errors]="errors()"
+  [listLink]="listLink()"
+  (submitted)="save($event)"
+>
+  <label for="storagePath">Storage path</label>
+  <input
+    id="storagePath"
+    [(ngModel)]="storagePath"
+    [readOnly]="!!group()"
+    [attr.aria-invalid]="!!(pathError || errors()['storagePath'])"
+  />
+  <app-configuration-field-error
+    [message]="pathError || errors()['storagePath']"
+  />
+
+  <label for="maxStorageSize">Quota (MiB)</label>
+  <input
+    id="maxStorageSize"
+    type="number"
+    [(ngModel)]="maxStorageSize"
+    [attr.aria-invalid]="!!(quotaError || errors()['maxStorageSize'])"
+  />
+  <app-configuration-field-error
+    [message]="quotaError || errors()['maxStorageSize']"
+  />
+</app-configuration-form>

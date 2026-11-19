@@ -1,0 +1,142 @@
+<section class="configuration">
+  <h2>Configuration</h2>
+  <nav aria-label="Configuration">
+    @for (key of resourceKeys; track key) {
+      <a
+        [routerLink]="['/configuration', key]"
+        [attr.aria-current]="key === resource ? 'page' : null"
+        >{{ resources[key].label }}</a
+      >
+    }
+  </nav>
+
+  @if (message) {
+    <p role="alert" class="error">{{ message }}</p>
+  }
+
+  @if (loading) {
+    <p role="status">Loading…</p>
+  } @else if (!loadFailed) {
+    @if (mode === "list") {
+      <div class="list-heading">
+        <h3>{{ resources[resource].label }}</h3>
+        <a [routerLink]="[...listLink, 'new']"
+          >Create {{ resources[resource].singular }}</a
+        >
+      </div>
+      @if (items.length === 0) {
+        <p>No {{ resources[resource].label.toLowerCase() }} yet.</p>
+      } @else {
+        <ul class="resource-list">
+          @for (item of items; track item.name) {
+            <li>
+              <div>
+                @if (resource === "cameras") {
+                  <a [routerLink]="['/cameras', item.name]">{{
+                    item.displayName
+                  }}</a>
+                } @else {
+                  <strong>{{ item.displayName }}</strong>
+                }
+                <span class="detail"
+                  >{{ item.name }}
+                  @if (item.phase) {
+                    · {{ item.phase }}
+                  }
+                </span>
+              </div>
+              <div class="actions">
+                <a
+                  [routerLink]="[...listLink, item.name, 'edit']"
+                  [attr.aria-label]="'Edit ' + item.name"
+                  >Edit</a
+                >
+                @if (resource !== "camera_groups" || item.name !== "all") {
+                  <a
+                    [routerLink]="[...listLink, item.name, 'delete']"
+                    [attr.aria-label]="'Delete ' + item.name"
+                    >Delete</a
+                  >
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    } @else if (mode === "delete") {
+      <h3>Delete {{ resources[resource].singular }} {{ displayName }}</h3>
+      @if (resource === "cameras") {
+        <p>
+          The camera will disappear immediately. Its recordings will be
+          permanently removed in the background.
+        </p>
+      } @else if (resource === "storage_groups") {
+        <p>
+          You can delete this group once its assigned cameras and their
+          recordings have been removed.
+        </p>
+      } @else if (resource === "users") {
+        <p>Deleting this user also removes their sessions and access tokens.</p>
+      }
+      <div class="actions">
+        <button
+          type="button"
+          class="danger"
+          [disabled]="saving"
+          (click)="deleteResource()"
+        >
+          Delete
+        </button>
+        <a [routerLink]="listLink">Cancel</a>
+      </div>
+    } @else if (form; as loadedForm) {
+      <h3>
+        {{ mode === "new" ? "Create" : "Edit" }}
+        {{ resources[resource].singular }}
+      </h3>
+      <!-- Give the editor a new view when the route loads a different resource. -->
+      @for (editor of [loadedForm]; track editor) {
+        @switch (editor.resource) {
+          @case ("cameras") {
+            <app-camera-configuration-form
+              [camera]="editor.camera"
+              [storageGroups]="editor.storageGroups"
+              [listLink]="listLink"
+              [saving]="saving"
+              [errors]="errors"
+              (saved)="save($event)"
+            />
+          }
+          @case ("camera_groups") {
+            <app-camera-group-configuration-form
+              [group]="editor.group"
+              [cameras]="editor.cameras"
+              [listLink]="listLink"
+              [saving]="saving"
+              [errors]="errors"
+              (saved)="save($event)"
+            />
+          }
+          @case ("storage_groups") {
+            <app-storage-group-configuration-form
+              [group]="editor.group"
+              [listLink]="listLink"
+              [saving]="saving"
+              [errors]="errors"
+              (saved)="save($event)"
+            />
+          }
+          @case ("users") {
+            <app-user-configuration-form
+              [user]="editor.user"
+              [listLink]="listLink"
+              [saving]="saving"
+              [errors]="errors"
+              (saved)="save($event)"
+            />
+          }
+        }
+      }
+    }
+  }
+</section>

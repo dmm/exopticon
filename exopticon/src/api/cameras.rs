@@ -29,6 +29,7 @@ use tokio::task::spawn_blocking;
 use crate::AppState;
 use crate::keyframe_requests::device_url as onvif_device_url;
 
+use super::configuration::{create_camera, delete_camera, edit_camera};
 use super::{ResourceMetadata, UserError};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,7 +39,6 @@ pub struct CameraSpec {
     pub ip: String,
     pub onvif_port: u16,
     pub mac: String,
-    pub username: String,
     pub rtsp_url: String,
     pub ptz_type: String,
     pub onvif_profile_token: Option<String>,
@@ -180,8 +180,13 @@ async fn move_camera(
 
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/", axum::routing::get(fetch_all))
-        .route("/{name}", axum::routing::get(fetch))
+        .route("/", axum::routing::get(fetch_all).post(create_camera))
+        .route(
+            "/{name}",
+            axum::routing::get(fetch)
+                .patch(edit_camera)
+                .delete(delete_camera),
+        )
         .route(
             "/{name}/ptz/{direction}",
             axum::routing::post(ptz_relative_move),

@@ -21,9 +21,6 @@
 import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
 import { CameraDetailComponent } from "./camera-detail/camera-detail.component";
-import { CameraGroupDetailComponent } from "./camera-group-detail/camera-group-detail.component";
-import { CameraGroupListComponent } from "./camera-group-list/camera-group-list.component";
-import { CameraListComponent } from "./camera-list/camera-list.component";
 import { CameraPanelComponent } from "./camera-panel/camera-panel.component";
 import { EventListComponent } from "./event-list/event-list.component";
 import { LoginComponent } from "./login/login.component";
@@ -32,14 +29,48 @@ import { WebrtcCodecsComponent } from "./webrtc-codecs/webrtc-codecs.component";
 
 import { PlaybackComponent } from "./playback/playback.component";
 
+import { ConfigurationComponent } from "./configuration/configuration.component";
+
 const routes: Routes = [
+  {
+    path: "configuration",
+    redirectTo: "configuration/storage_groups",
+    pathMatch: "full",
+  },
+  {
+    path: "configuration/:resource/new",
+    component: ConfigurationComponent,
+    data: { mode: "new" },
+  },
+  {
+    path: "configuration/:resource/:name/edit",
+    component: ConfigurationComponent,
+    data: { mode: "edit" },
+  },
+  {
+    path: "configuration/:resource/:name/delete",
+    component: ConfigurationComponent,
+    data: { mode: "delete" },
+  },
+  {
+    path: "configuration/:resource",
+    component: ConfigurationComponent,
+    data: { mode: "list" },
+  },
   { path: "playback/:camera_name", component: PlaybackComponent },
   { path: "login", component: LoginComponent },
   { path: "camera_panel", component: CameraPanelComponent },
-  { path: "cameras", component: CameraListComponent },
+  { path: "cameras", redirectTo: "configuration/cameras", pathMatch: "full" },
   { path: "cameras/:name", component: CameraDetailComponent },
-  { path: "camera_groups", component: CameraGroupListComponent },
-  { path: "camera_groups/:name", component: CameraGroupDetailComponent },
+  {
+    path: "camera_groups",
+    redirectTo: "configuration/camera_groups",
+    pathMatch: "full",
+  },
+  {
+    path: "camera_groups/:name",
+    redirectTo: "configuration/camera_groups/:name/edit",
+  },
   { path: "webrtc_codecs", component: WebrtcCodecsComponent },
   { path: "events", component: EventListComponent },
   { path: "tokens", component: TokenListComponent },

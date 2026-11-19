@@ -166,7 +166,7 @@ async fn resolve_recording(
         .map_err(|err| RecordingError::Internal(err.into()))?
         .map_err(|err| match err {
             crate::db::Error::NotFound => RecordingError::UnknownCamera,
-            err @ crate::db::Error::Other(_) => RecordingError::Internal(err.into()),
+            err => RecordingError::Internal(err.into()),
         })?
         .ok_or(RecordingError::UnavailableTime)?;
     Ok(Json(RecordingDescriptor::new(&camera_name, &file)))
@@ -196,7 +196,7 @@ async fn next_recording(
                 RecordingError::UnknownCamera
             });
         }
-        Err(err @ crate::db::Error::Other(_)) => {
+        Err(err) => {
             return Err(RecordingError::Internal(err.into()));
         }
     };
@@ -215,7 +215,7 @@ async fn recording_content(
         .map_err(|err| RecordingError::Internal(err.into()))?
         .map_err(|err| match err {
             crate::db::Error::NotFound => RecordingError::UnknownCamera,
-            err @ crate::db::Error::Other(_) => RecordingError::Internal(err.into()),
+            err => RecordingError::Internal(err.into()),
         })?
         .ok_or(RecordingError::UnavailableFile)?;
 

@@ -28,6 +28,7 @@ use tokio::task::spawn_blocking;
 
 use crate::AppState;
 
+use super::configuration::{create_camera_group, delete_camera_group, edit_camera_group};
 use super::{ResourceMetadata, UserError};
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -61,6 +62,11 @@ pub async fn fetch_all(State(state): State<AppState>) -> Result<Json<Vec<CameraG
 
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/", get(fetch_all))
-        .route("/{name}", get(fetch))
+        .route("/", get(fetch_all).post(create_camera_group))
+        .route(
+            "/{name}",
+            get(fetch)
+                .patch(edit_camera_group)
+                .delete(delete_camera_group),
+        )
 }

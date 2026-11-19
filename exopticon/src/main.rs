@@ -58,10 +58,6 @@ mod api;
 /// Implements database infrastructure
 mod db;
 
-/// Declarative startup configuration
-#[allow(dead_code)]
-mod config;
-
 /// Error type
 mod errors;
 
@@ -195,14 +191,10 @@ async fn main() {
         .run_pending_migrations(MIGRATIONS)
         .expect("migrations failed");
 
-    let config_path = env::var(crate::config::CONFIG_PATH_ENV)
-        .unwrap_or_else(|_| crate::config::DEFAULT_CONFIG_PATH.to_string());
-    info!("Loading config from {config_path}");
-    let config =
-        crate::config::ValidatedConfig::load_from_path(&config_path).expect("config failed");
+    drop(migration_conn);
     db_service
-        .apply_config(&config)
-        .expect("failed to apply config to database");
+        .bootstrap_user()
+        .unwrap_or_else(|err| panic!("Account bootstrap failed: {err}"));
 
     let buffer_size: usize = env::var("EXOPTICON_WEBRTC_BUFFER_SIZE")
         .unwrap_or_default()
@@ -258,6 +250,7 @@ async fn main() {
 
     let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone());
 
+    let purge_supervisor = FileDeletionSupervisor::new(db_service.clone());
     let state = AppState {
         candidate_ips: parse_candidate_ips(),
         udp_socket,
@@ -271,6 +264,7 @@ async fn main() {
     info!("Launching capture supervisor...");
     let capture_supervisor_task = tokio::spawn(capture_supervisor.supervise());
     tokio::spawn(deletion_supervisor.supervise());
+    tokio::spawn(purge_supervisor.purge_cameras());
 
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
 
@@ -279,6 +273,7 @@ async fn main() {
             "/v1/personal_access_tokens",
             auth::personal_access_token_router(),
         )
+        .nest("/v1/users", crate::api::configuration::users_router())
         .nest("/v1/storage_groups", storage_groups::router())
         .nest("/v1/camera_groups", camera_groups::router())
         .nest("/v1/cameras", cameras::router())

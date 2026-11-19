@@ -18,51 +18,54 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use futures::{StreamExt, stream::FuturesUnordered};
-use tokio::task::{JoinHandle, spawn_blocking};
+use std::time::Duration;
 
-use crate::file_deletion_actor;
+use futures::{StreamExt, stream::FuturesUnordered};
+use tokio::task::spawn_blocking;
+
+use crate::file_deletion_actor::FileDeletionActor;
 
 pub struct FileDeletionSupervisor {
     db: crate::db::Service,
-    delete_handles: FuturesUnordered<JoinHandle<()>>,
 }
 
 impl FileDeletionSupervisor {
-    pub fn new(db: crate::db::Service) -> Self {
-        Self {
-            db,
-            delete_handles: FuturesUnordered::new(),
+    pub const fn new(db: crate::db::Service) -> Self {
+        Self { db }
+    }
+
+    pub async fn supervise(self) {
+        loop {
+            let db = self.db.clone();
+            match spawn_blocking(move || db.fetch_all_storage_groups()).await {
+                Ok(Ok(groups)) => {
+                    let mut passes = FuturesUnordered::new();
+                    for group in groups {
+                        let actor = FileDeletionActor::new(group.metadata.name, self.db.clone());
+                        passes.push(async move { actor.work().await });
+                    }
+                    while let Some(result) = passes.next().await {
+                        if let Err(err) = result {
+                            error!("Retention pass failed: {err}");
+                        }
+                    }
+                }
+                Ok(Err(err)) => error!("Could not refresh retention groups: {err}"),
+                Err(err) => error!("Retention group refresh task failed: {err}"),
+            }
+            tokio::time::sleep(Duration::from_secs(5)).await;
         }
     }
 
-    async fn start_deletors(&self) -> anyhow::Result<()> {
-        let db = self.db.clone();
-        let storage_groups: Vec<crate::api::storage_groups::StorageGroup> =
-            spawn_blocking(move || db.fetch_all_storage_groups()).await??;
-        // start deletion actors
-        for s in storage_groups {
-            debug!(
-                "Starting deletion actor for storage group {}",
-                s.metadata.name
-            );
-            let actor =
-                file_deletion_actor::FileDeletionActor::new(s.metadata.name, self.db.clone());
-
-            let fut = tokio::spawn(actor.run());
-            self.delete_handles.push(fut);
+    pub async fn purge_cameras(self) {
+        loop {
+            let db = self.db.clone();
+            match spawn_blocking(move || db.purge_deleted_cameras()).await {
+                Ok(Ok(())) => {}
+                Ok(Err(err)) => error!("Could not purge cameras: {err}"),
+                Err(err) => error!("Camera purge task failed: {err}"),
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
         }
-
-        Ok(())
-    }
-
-    pub async fn supervise(mut self) -> anyhow::Result<()> {
-        self.start_deletors().await?;
-        if let Some(_storage_group_id) = self.delete_handles.next().await {
-            error!("Deletion Actor died!");
-            return Err(anyhow::anyhow!("Deletion Actor died!"));
-        }
-
-        Ok(())
     }
 }

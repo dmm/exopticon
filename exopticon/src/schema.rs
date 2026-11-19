@@ -32,6 +32,7 @@ diesel::table! {
         enabled -> Bool,
         ptz_x_step_size -> SmallInt,
         ptz_y_step_size -> SmallInt,
+        deletion_state -> Integer,
     }
 }
 

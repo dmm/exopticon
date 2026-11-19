@@ -1,0 +1,91 @@
+.configuration {
+  max-width: 52rem;
+  padding: 1rem;
+  margin-inline: auto;
+}
+
+.actions,
+.list-heading,
+.resource-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+a {
+  color: #a5edaa;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: #e0ffe2;
+}
+
+a:focus-visible {
+  outline: 2px solid #e0ffe2;
+  outline-offset: 3px;
+}
+
+nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+  gap: 0.5rem;
+  padding-block: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #254a2c;
+}
+
+nav a,
+.list-heading > a {
+  display: grid;
+  place-items: center;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #43734c;
+  border-radius: 0.25rem;
+  background: #102515;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+nav a:hover,
+.list-heading > a:hover {
+  border-color: #a5edaa;
+  background: #1d4024;
+}
+
+nav a[aria-current="page"] {
+  color: #102515;
+  background: #a5edaa;
+  border-color: #a5edaa;
+  font-weight: 700;
+}
+
+.list-heading,
+.resource-list li {
+  justify-content: space-between;
+}
+.resource-list {
+  list-style: none;
+  padding: 0;
+}
+.resource-list li {
+  border-top: 1px solid currentColor;
+  padding-block: 0.7rem;
+}
+
+.detail {
+  display: block;
+  font-size: 0.9em;
+  margin-block: 0.2rem;
+}
+.error {
+  color: #d34545;
+}
+
+.danger {
+  font-weight: bold;
+}

@@ -1,0 +1,68 @@
+.configuration-form {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 32rem;
+}
+
+.configuration-form label {
+  margin-top: 0.55rem;
+}
+
+.configuration-form input,
+.configuration-form select {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.configuration-form input[type="checkbox"] {
+  justify-self: start;
+}
+
+.configuration-form .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block: 0.6rem;
+}
+
+.configuration-form fieldset {
+  margin: 0.75rem 0;
+}
+
+.configuration-form fieldset li {
+  padding-block: 0.2rem;
+}
+
+.configuration-form fieldset li .actions {
+  display: inline-flex;
+  margin: 0 0 0 0.5rem;
+}
+
+.configuration-form .detail {
+  display: block;
+  font-size: 0.9em;
+  margin-block: 0.2rem;
+}
+
+.configuration-form a {
+  color: #a5edaa;
+  text-underline-offset: 0.2em;
+}
+
+.configuration-form a:hover {
+  color: #e0ffe2;
+}
+
+.configuration-form a:focus-visible {
+  outline: 2px solid #e0ffe2;
+  outline-offset: 3px;
+}
+
+app-configuration-field-error {
+  display: contents;
+}
+
+.configuration-form .error {
+  color: #d34545;
+}

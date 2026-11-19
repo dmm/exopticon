@@ -1,0 +1,34 @@
+<form class="configuration-form" (ngSubmit)="submit()">
+  <label for="resource-name">{{ nameLabel() }}</label>
+  <input
+    id="resource-name"
+    name="name"
+    [ngModel]="nameInput ?? name()"
+    (ngModelChange)="nameInput = $event"
+    [readOnly]="!creating()"
+    [attr.aria-invalid]="!!(nameError || errors()[nameField()])"
+    autocomplete="off"
+  />
+  <app-configuration-field-error
+    [message]="nameError || errors()[nameField()]"
+  />
+
+  <label for="display-name">Display name</label>
+  <input
+    id="display-name"
+    name="displayName"
+    [ngModel]="displayNameInput ?? displayName()"
+    (ngModelChange)="displayNameInput = $event"
+    [attr.aria-invalid]="!!errors()['displayName']"
+  />
+  <app-configuration-field-error [message]="errors()['displayName']" />
+
+  <ng-content />
+
+  <div class="actions">
+    <button type="submit" [disabled]="saving()">
+      {{ creating() ? "Create" : "Save" }}
+    </button>
+    <a [routerLink]="listLink()">Cancel</a>
+  </div>
+</form>

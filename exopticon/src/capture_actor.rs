@@ -253,10 +253,7 @@ impl CaptureActor {
     }
 
     async fn start_worker(&mut self) -> anyhow::Result<()> {
-        debug!(
-            "Starting worker process for camera: {}, id: {}, stream: {}",
-            self.camera.name, self.camera.name, self.camera.rtsp_url
-        );
+        debug!("Starting worker process for camera {}", self.camera.name);
         let storage_path = Path::new(&self.storage_group.spec.storage_path)
             .join(".staging")
             .join(&self.camera.name);
@@ -476,14 +473,10 @@ impl CaptureActor {
                     }
                     msg = framed_stream.next() => match msg {
                         Some(msg) => self.stream_handler(msg).await?,
-                        None => return Ok(false),
+                        None => anyhow::bail!("Capture worker closed its output"),
                     },
                     _ = child.wait() => {
-                        info!(
-                            "Capture process for {} {} died. Restarting...",
-                            self.camera.name, self.camera.name,
-                        );
-                        return Ok(false);
+                        anyhow::bail!("Capture worker exited");
                     }
                     else => return Ok(false)
                 }

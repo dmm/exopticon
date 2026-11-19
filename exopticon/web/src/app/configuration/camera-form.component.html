@@ -1,0 +1,142 @@
+<app-configuration-form
+  [name]="camera()?.metadata?.name ?? ''"
+  [displayName]="camera()?.metadata?.displayName ?? ''"
+  [creating]="!camera()"
+  [saving]="saving()"
+  [errors]="errors()"
+  [listLink]="listLink()"
+  (submitted)="save($event)"
+>
+  @if (camera()) {
+    <p class="detail">
+      Leave credential fields blank to keep their saved values.
+    </p>
+  }
+
+  <label for="storageGroupName">Storage group</label>
+  @if (camera()) {
+    <input
+      id="storageGroupName"
+      [value]="storageGroupName"
+      readonly
+      aria-describedby="storage-group-help"
+    />
+    <span id="storage-group-help" class="detail"
+      >The storage group is fixed after creation.</span
+    >
+  } @else {
+    <select
+      id="storageGroupName"
+      [(ngModel)]="storageGroupName"
+      [attr.aria-invalid]="!!error('storageGroupName')"
+    >
+      <option value="">Choose a storage group</option>
+      @for (group of storageGroups(); track group.name) {
+        <option [value]="group.name">
+          {{ group.displayName }} ({{ group.name }})
+        </option>
+      }
+    </select>
+    @if (storageGroups().length === 0) {
+      <a [routerLink]="['/configuration', 'storage_groups', 'new']"
+        >Create a storage group first</a
+      >
+    }
+  }
+  <app-configuration-field-error [message]="error('storageGroupName')" />
+
+  <label for="rtspUrl">RTSP URL</label>
+  <input
+    id="rtspUrl"
+    type="password"
+    autocomplete="new-password"
+    [(ngModel)]="rtspUrl"
+    [attr.aria-invalid]="!!error('rtspUrl')"
+  />
+  @if (camera()?.spec?.rtspUrl; as endpoint) {
+    <span class="detail">Current endpoint {{ endpoint }}</span>
+  }
+  <app-configuration-field-error [message]="error('rtspUrl')" />
+
+  <label for="enabled">Capture enabled</label>
+  <input id="enabled" type="checkbox" [(ngModel)]="settings.enabled" />
+
+  <label for="ip">ONVIF host</label>
+  <input
+    id="ip"
+    [(ngModel)]="settings.ip"
+    [attr.aria-invalid]="!!error('ip')"
+  />
+  <app-configuration-field-error [message]="error('ip')" />
+
+  <label for="onvifPort">ONVIF port</label>
+  <input
+    id="onvifPort"
+    type="number"
+    [(ngModel)]="settings.onvifPort"
+    [attr.aria-invalid]="!!error('onvifPort')"
+  />
+  <app-configuration-field-error [message]="error('onvifPort')" />
+
+  <label for="mac">MAC address</label>
+  <input
+    id="mac"
+    [(ngModel)]="settings.mac"
+    [attr.aria-invalid]="!!error('mac')"
+  />
+  <app-configuration-field-error [message]="error('mac')" />
+
+  <label for="username">ONVIF username</label>
+  <input
+    id="username"
+    type="password"
+    autocomplete="new-password"
+    [(ngModel)]="username"
+    [attr.aria-invalid]="!!error('username')"
+  />
+  <app-configuration-field-error [message]="error('username')" />
+
+  <label for="password">ONVIF password</label>
+  <input
+    id="password"
+    type="password"
+    autocomplete="new-password"
+    [(ngModel)]="password"
+    [attr.aria-invalid]="!!error('password')"
+  />
+  <app-configuration-field-error [message]="error('password')" />
+
+  <label for="ptzType">PTZ type</label>
+  <input
+    id="ptzType"
+    [(ngModel)]="settings.ptzType"
+    [attr.aria-invalid]="!!error('ptzType')"
+  />
+  <app-configuration-field-error [message]="error('ptzType')" />
+
+  <label for="onvifProfileToken">ONVIF profile token</label>
+  <input
+    id="onvifProfileToken"
+    [(ngModel)]="settings.onvifProfileToken"
+    [attr.aria-invalid]="!!error('onvifProfileToken')"
+  />
+  <app-configuration-field-error [message]="error('onvifProfileToken')" />
+
+  <label for="ptzXStepSize">PTZ horizontal step size</label>
+  <input
+    id="ptzXStepSize"
+    type="number"
+    [(ngModel)]="settings.ptzXStepSize"
+    [attr.aria-invalid]="!!error('ptzXStepSize')"
+  />
+  <app-configuration-field-error [message]="error('ptzXStepSize')" />
+
+  <label for="ptzYStepSize">PTZ vertical step size</label>
+  <input
+    id="ptzYStepSize"
+    type="number"
+    [(ngModel)]="settings.ptzYStepSize"
+    [attr.aria-invalid]="!!error('ptzYStepSize')"
+  />
+  <app-configuration-field-error [message]="error('ptzYStepSize')" />
+</app-configuration-form>

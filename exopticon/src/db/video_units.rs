@@ -30,7 +30,11 @@ use std::path::Path;
 
 use crate::schema::{cameras, video_files, video_units};
 
-use super::{Service, datetime_to_micros, micros_to_datetime};
+use super::{
+    Error, OtherError, Service,
+    configuration::{ACTIVE, READY_FOR_PURGE},
+    datetime_to_micros, micros_to_datetime,
+};
 
 #[derive(AsExpression, FromSqlRow, Serialize, Clone, Debug)]
 #[diesel(sql_type = Text)]
@@ -219,6 +223,7 @@ impl Service {
         db_read!(self, "recording_camera_exists", |conn| {
             Ok(cameras::table
                 .filter(cameras::name.eq(camera_name))
+                .filter(cameras::deletion_state.eq(ACTIVE))
                 .select(cameras::name)
                 .first::<String>(conn)
                 .optional()?
@@ -232,6 +237,7 @@ impl Service {
     ) -> Result<(), super::Error> {
         let exists = cameras::table
             .filter(cameras::name.eq(camera_name))
+            .filter(cameras::deletion_state.eq(ACTIVE))
             .select(cameras::name)
             .first::<String>(conn)
             .optional()?
@@ -410,53 +416,19 @@ impl Service {
     }
 
     pub fn delete_unopened_video_segments(&self, camera_name: &str) -> Result<usize, super::Error> {
-        let mut deleted_count = 0;
-
-        let unopened_units: Vec<(VideoUnit, VideoFile)> =
-            db_read!(self, "read_unopened_video_segments", |conn| {
-                let unopened_units: Vec<(VideoUnit, VideoFile)> = video_units::table
-                    .inner_join(video_files::table)
-                    .filter(video_units::camera_name.eq(camera_name))
-                    .filter(video_units::state.eq(VideoUnitState::Reserved))
-                    .load(conn)?;
-
-                Ok(unopened_units)
-            })?;
-
-        for (_video_unit, video_file) in &unopened_units {
-            debug!("Deleting unopened video segment: {}", video_file.filename);
-            match std::fs::remove_file(&video_file.filename) {
-                Ok(()) => {}
-                Err(err) => {
-                    if err.kind() != std::io::ErrorKind::NotFound {
-                        error!(
-                            "Failed to delete unopened video segment file {}: {}",
-                            video_file.filename, err
-                        );
-                    }
-                }
-            }
-            deleted_count += 1;
-        }
         db_write!(self, "delete_unopened_video_segments", |conn| {
-            for (video_unit, video_file) in unopened_units {
-                use crate::schema;
-                diesel::delete(
-                    schema::video_files::dsl::video_files
-                        .filter(schema::video_files::columns::id.eq(video_file.id)),
-                )
-                .execute(conn)?;
-
-                diesel::delete(
-                    schema::video_units::dsl::video_units
-                        .filter(schema::video_units::columns::id.eq(video_unit.id)),
-                )
-                .execute(conn)?;
+            let ids = video_units::table
+                .inner_join(cameras::table)
+                .filter(cameras::deletion_state.eq(ACTIVE))
+                .filter(video_units::camera_name.eq(camera_name))
+                .filter(video_units::state.eq(VideoUnitState::Reserved))
+                .select(video_units::id)
+                .load::<i64>(conn)?;
+            for id in &ids {
+                remove_video_unit(conn, *id, None)?;
             }
-            Ok(())
-        })?;
-
-        Ok(deleted_count)
+            Ok(ids.len())
+        })
     }
 
     // Fetch between video unit
@@ -470,6 +442,9 @@ impl Service {
             use crate::schema::video_units::dsl;
             let segments: Vec<(VideoUnit, VideoFile)> = dsl::video_units
                 .inner_join(video_files::table)
+                .inner_join(cameras::table)
+                .filter(cameras::deletion_state.eq(ACTIVE))
+                .select((video_units::all_columns, video_files::all_columns))
                 .filter(dsl::camera_name.eq(camera_name))
                 .filter(dsl::begin_time_us.le(datetime_to_micros(end_time)))
                 .filter(dsl::end_time_us.ge(datetime_to_micros(begin_time)))
@@ -500,6 +475,7 @@ impl Service {
         let merged_micros = db_read!(self, "fetch_recording_ranges", |conn| {
             let camera_exists = cameras::table
                 .filter(cameras::name.eq(camera_name))
+                .filter(cameras::deletion_state.eq(ACTIVE))
                 .select(cameras::name)
                 .first::<String>(conn)
                 .optional()?
@@ -551,60 +527,100 @@ impl Service {
             .collect()
     }
 
-    // Delete Video Units
-    pub fn delete_video_unit(&self, delete_id: i64) -> Result<(), super::Error> {
-        db_write!(self, "delete_video_unit", |conn| {
-            use crate::schema;
-            use crate::schema::{cameras, storage_groups, video_files, video_units};
+    pub fn delete_video_unit_for_file(&self, file_id: i64, group: &str) -> Result<(), Error> {
+        db_write!(self, "delete_video_unit_for_file", |conn| {
+            use crate::schema::storage_groups;
 
-            // Delete VideoFiles associated with VideoUnit
-
-            let storage_root = video_units::table
-                .inner_join(cameras::table.inner_join(storage_groups::table))
-                .filter(video_units::columns::id.eq(delete_id))
-                .select(storage_groups::columns::storage_path)
-                .first::<String>(conn)
+            // Retention candidates can outlive their video-unit IDs. File IDs are never reused.
+            let target = video_files::table
+                .inner_join(
+                    video_units::table.inner_join(cameras::table.inner_join(storage_groups::table)),
+                )
+                .filter(video_files::id.eq(file_id))
+                .filter(video_units::state.eq(VideoUnitState::Finalized))
+                .filter(cameras::deletion_state.eq(ACTIVE))
+                .filter(cameras::storage_group_name.eq(group))
+                .select((video_units::id, storage_groups::storage_path))
+                .first::<(i64, String)>(conn)
                 .optional()?;
-
-            // fetch video files to be deleted
-            let files: Vec<String> = video_files::table
-                .inner_join(video_units::table)
-                .filter(schema::video_files::columns::video_unit_id.eq(&delete_id))
-                .select(video_files::columns::filename)
-                .load(conn)?;
-
-            for f in files {
-                debug!("Deleting file: {}", f);
-                match std::fs::remove_file(&f) {
-                    Ok(()) => {
-                        if let Some(storage_root) = storage_root.as_deref() {
-                            remove_empty_parent_dirs(Path::new(&f), Path::new(storage_root));
-                        }
-                    }
-                    Err(err) => {
-                        if err.kind() == std::io::ErrorKind::NotFound {
-                            // this is arguably a non-error error
-                            error!("Failed to delete file because it is missing: {}", f);
-                        } else {
-                            error!("Failed to delete file for other reasons... {}", err);
-                        }
-                    }
-                }
+            if let Some((unit_id, root)) = target {
+                remove_video_unit(conn, unit_id, Some(Path::new(&root)))?;
             }
-
-            // delete video files owned by VideoUnit
-            diesel::delete(
-                video_files::table
-                    .filter(schema::video_files::columns::video_unit_id.eq(delete_id)),
-            )
-            .execute(conn)?;
-
-            diesel::delete(
-                video_units::table.filter(schema::video_units::columns::id.eq(delete_id)),
-            )
-            .execute(conn)?;
-
             Ok(())
         })
     }
+
+    pub fn purge_deleted_cameras(&self) -> Result<(), Error> {
+        let names = db_read!(self, "list_cameras_ready_for_purge", |conn| {
+            Ok(cameras::table
+                .filter(cameras::deletion_state.eq(READY_FOR_PURGE))
+                .select(cameras::name)
+                .load::<String>(conn)?)
+        })?;
+        for name in names {
+            if let Err(err) = self.purge_camera_batch(&name) {
+                error!(
+                    "Recording cleanup for camera {} will retry: {:#?}",
+                    name, err
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn purge_camera_batch(&self, name: &str) -> Result<(), Error> {
+        let ids = db_read!(self, "list_camera_units_for_purge", |conn| {
+            Ok(video_units::table
+                .filter(video_units::camera_name.eq(name))
+                .select(video_units::id)
+                .order(video_units::id)
+                .limit(100)
+                .load::<i64>(conn)?)
+        })?;
+        if ids.is_empty() {
+            return db_write!(self, "finish_camera_purge", |conn| {
+                diesel::delete(
+                    cameras::table
+                        .find(name)
+                        .filter(cameras::deletion_state.eq(READY_FOR_PURGE)),
+                )
+                .execute(conn)?;
+                Ok(())
+            });
+        }
+        let mut result = Ok(());
+        for id in ids {
+            if let Err(err) = db_write!(self, "purge_camera_unit", |conn| {
+                remove_video_unit(conn, id, None)
+            }) {
+                result = Err(err);
+            }
+        }
+        result
+    }
+}
+
+fn remove_video_unit(
+    conn: &mut diesel::SqliteConnection,
+    id: i64,
+    storage_root: Option<&Path>,
+) -> Result<(), Error> {
+    let files = video_files::table
+        .filter(video_files::video_unit_id.eq(id))
+        .select(video_files::filename)
+        .load::<String>(conn)?;
+    for file in files {
+        match std::fs::remove_file(&file) {
+            Ok(()) => {
+                if let Some(root) = storage_root {
+                    remove_empty_parent_dirs(Path::new(&file), root);
+                }
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(Error::Other(OtherError::RemoveRecording(err))),
+        }
+    }
+    // Foreign keys cascade to the file rows after all filesystem removals succeed.
+    diesel::delete(video_units::table.find(id)).execute(conn)?;
+    Ok(())
 }

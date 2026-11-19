@@ -1,0 +1,65 @@
+<app-configuration-form
+  [name]="group()?.metadata?.name ?? ''"
+  [displayName]="group()?.metadata?.displayName ?? ''"
+  [creating]="!group()"
+  [saving]="saving()"
+  [errors]="errors()"
+  [listLink]="listLink()"
+  (submitted)="save($event)"
+>
+  <fieldset>
+    <legend>Camera order</legend>
+    @if (includesAllCameras) {
+      <p class="detail">The all group automatically includes every camera.</p>
+    }
+    @if (members.length === 0) {
+      <p>No cameras in this group.</p>
+    }
+    <ol>
+      @for (member of members; track member; let index = $index) {
+        <li>
+          {{ member }}
+          <div class="actions">
+            <button
+              type="button"
+              [disabled]="index === 0"
+              (click)="moveMember(index, -1)"
+              [attr.aria-label]="'Move ' + member + ' up'"
+            >
+              Up
+            </button>
+            <button
+              type="button"
+              [disabled]="index === members.length - 1"
+              (click)="moveMember(index, 1)"
+              [attr.aria-label]="'Move ' + member + ' down'"
+            >
+              Down
+            </button>
+            @if (!includesAllCameras) {
+              <button
+                type="button"
+                (click)="members.splice(index, 1)"
+                [attr.aria-label]="'Remove ' + member"
+              >
+                Remove
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ol>
+    @if (!includesAllCameras && availableCameras.length > 0) {
+      <label for="add-camera">Add a camera</label>
+      <select id="add-camera" #camera (change)="addMember(camera)">
+        <option value="" disabled selected>Select camera</option>
+        @for (choice of availableCameras; track choice.name) {
+          <option [value]="choice.name">
+            {{ choice.displayName }} ({{ choice.name }})
+          </option>
+        }
+      </select>
+    }
+    <app-configuration-field-error [message]="errors()['members']" />
+  </fieldset>
+</app-configuration-form>

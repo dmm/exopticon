@@ -31,7 +31,6 @@ export interface CameraSpec {
   ip: string;
   onvifPort: number;
   mac: string;
-  username: string;
   rtspUrl: string;
   ptzType: string;
   onvifProfileToken: string | null;

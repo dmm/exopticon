@@ -27,6 +27,7 @@ use tokio::task::spawn_blocking;
 
 use crate::AppState;
 
+use super::configuration::{create_storage_group, delete_storage_group, edit_storage_group};
 use super::{ResourceMetadata, UserError};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -66,6 +67,14 @@ pub async fn fetch_all(
 
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/", axum::routing::get(fetch_all))
-        .route("/{name}", axum::routing::get(fetch))
+        .route(
+            "/",
+            axum::routing::get(fetch_all).post(create_storage_group),
+        )
+        .route(
+            "/{name}",
+            axum::routing::get(fetch)
+                .patch(edit_storage_group)
+                .delete(delete_storage_group),
+        )
 }

@@ -104,6 +104,7 @@ impl super::Service {
                 .select(diesel::dsl::sum(video_files::size))
                 .inner_join(video_units::table.inner_join(cameras::table))
                 .filter(cameras::storage_group_name.eq(storage_group_name))
+                .filter(cameras::deletion_state.eq(super::configuration::ACTIVE))
                 .filter(video_units::state.eq(crate::db::video_units::VideoUnitState::Finalized))
                 .first::<Option<i64>>(conn)?
                 .unwrap_or(0);
@@ -111,6 +112,7 @@ impl super::Service {
             let c: Vec<(Camera, (VideoUnit, VideoFile))> = cameras::table
                 .inner_join(video_units::table.inner_join(video_files::table))
                 .filter(cameras::storage_group_name.eq(storage_group_name))
+                .filter(cameras::deletion_state.eq(super::configuration::ACTIVE))
                 .filter(video_units::state.eq(crate::db::video_units::VideoUnitState::Finalized))
                 .filter(video_units::begin_time_us.ne(video_units::end_time_us))
                 .order(video_units::begin_time_us.asc())

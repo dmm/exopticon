@@ -42,7 +42,7 @@ macro_rules! db_read {
 pub mod auth;
 pub mod camera_groups;
 pub mod cameras;
-pub mod config;
+pub mod configuration;
 pub mod storage_groups;
 pub mod video_units;
 
@@ -165,6 +165,13 @@ impl Service {
 pub enum Error {
     #[error("not found")]
     NotFound,
+    #[error("{field}: {message}")]
+    Field {
+        field: &'static str,
+        message: &'static str,
+    },
+    #[error("{0}")]
+    Conflict(&'static str),
     #[error("other database error")]
     Other(OtherError),
 }
@@ -181,6 +188,10 @@ pub enum OtherError {
         description: String,
         cause: diesel::result::Error,
     },
+    #[error("recording file removal failed: {0}")]
+    RemoveRecording(std::io::Error),
+    #[error("password hashing failed: {0}")]
+    PasswordHash(bcrypt::BcryptError),
     #[error("invalid timestamp stored in database: {field}={value}")]
     InvalidTimestamp { field: &'static str, value: i64 },
 }
@@ -232,6 +243,10 @@ fn record_db_error(operation: &'static str, err: &Error) {
 fn classify_db_error(err: &Error) -> &'static str {
     match err {
         Error::NotFound => "not_found",
+        Error::Field { .. } => "validation",
+        Error::Conflict(_) => "conflict",
+        Error::Other(OtherError::RemoveRecording(_)) => "filesystem",
+        Error::Other(OtherError::PasswordHash(_)) => "password_hash",
         Error::Other(OtherError::DbPoolError { .. }) => "pool",
         Error::Other(OtherError::DbError { cause, .. }) => classify_diesel_error(cause),
         Error::Other(OtherError::InvalidTimestamp { .. }) => "invalid_timestamp",
@@ -282,6 +297,7 @@ pub mod tests {
     use std::thread;
 
     use chrono::{DateTime, Duration, Utc};
+    use diesel::connection::SimpleConnection;
     use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
     use diesel_migrations::MigrationHarness;
     use tempfile::TempDir;
@@ -290,12 +306,9 @@ pub mod tests {
         Service,
         video_units::{RecordingRange, VideoUnit, VideoUnitState},
     };
-    use crate::{
-        api::{
-            auth::CreateUserSession,
-            video_units::{CreateVideoFile, CreateVideoUnit},
-        },
-        config::{Camera, CameraGroup, StorageGroup, User, ValidatedConfig},
+    use crate::api::{
+        auth::CreateUserSession,
+        video_units::{CreateVideoFile, CreateVideoUnit},
     };
 
     fn migrated_service() -> (TempDir, Service) {
@@ -312,66 +325,6 @@ pub mod tests {
         (temp_dir, service)
     }
 
-    fn sample_config(password: &str, members: Vec<&str>) -> ValidatedConfig {
-        let password_hash = bcrypt::hash(password, 4).expect("password hash created");
-
-        ValidatedConfig {
-            storage_groups: vec![StorageGroup {
-                name: "primary".to_string(),
-                display_name: "Primary".to_string(),
-                storage_path: "/video".to_string(),
-                max_storage_size: 1024,
-            }],
-            cameras: vec![
-                Camera {
-                    name: "front".to_string(),
-                    display_name: "Front".to_string(),
-                    storage_group_name: "primary".to_string(),
-                    ip: "192.0.2.10".to_string(),
-                    onvif_port: 80,
-                    mac: "00:00:00:00:00:01".to_string(),
-                    username: "camera-user".to_string(),
-                    password: "camera-password".to_string(),
-                    rtsp_url: "rtsp://front.example/stream".to_string(),
-                    ptz_type: "none".to_string(),
-                    onvif_profile_token: None,
-                    enabled: true,
-                    ptz_x_step_size: 1,
-                    ptz_y_step_size: 1,
-                },
-                Camera {
-                    name: "back".to_string(),
-                    display_name: "Back".to_string(),
-                    storage_group_name: "primary".to_string(),
-                    ip: "192.0.2.11".to_string(),
-                    onvif_port: 80,
-                    mac: "00:00:00:00:00:02".to_string(),
-                    username: "camera-user".to_string(),
-                    password: "camera-password".to_string(),
-                    rtsp_url: "rtsp://back.example/stream".to_string(),
-                    ptz_type: "none".to_string(),
-                    onvif_profile_token: None,
-                    enabled: true,
-                    ptz_x_step_size: 1,
-                    ptz_y_step_size: 1,
-                },
-            ],
-            camera_groups: vec![CameraGroup {
-                name: "all".to_string(),
-                display_name: "All".to_string(),
-                members: members
-                    .into_iter()
-                    .map(std::string::ToString::to_string)
-                    .collect(),
-            }],
-            users: vec![User {
-                username: "alice".to_string(),
-                display_name: "Alice".to_string(),
-                password_hash,
-            }],
-        }
-    }
-
     fn test_time(timestamp: &str) -> DateTime<Utc> {
         DateTime::parse_from_rfc3339(timestamp)
             .expect("valid timestamp")
@@ -380,10 +333,37 @@ pub mod tests {
 
     pub fn configured_service() -> (TempDir, Service) {
         let (temp_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec!["front", "back"]))
-            .expect("config applied");
+        let mut conn = service.pool.get().expect("fixture connection");
+        conn.batch_execute("
+            INSERT INTO storage_groups VALUES ('primary', 'Primary', '/video', 1024);
+            INSERT INTO cameras (
+                name, display_name, storage_group_name, ip, onvif_port, mac, username, password,
+                rtsp_url, ptz_type, onvif_profile_token, enabled, ptz_x_step_size, ptz_y_step_size
+            ) VALUES
+                ('front', 'Front', 'primary', '192.0.2.10', 80, '00:00:00:00:00:01',
+                 'camera-user', 'camera-password', 'rtsp://front.example/stream', 'none', NULL, 1, 1, 1),
+                ('back', 'Back', 'primary', '192.0.2.11', 80, '00:00:00:00:00:02',
+                 'camera-user', 'camera-password', 'rtsp://back.example/stream', 'none', NULL, 1, 1, 1);
+            INSERT INTO camera_group_memberships (camera_group_name, camera_name, display_order)
+                VALUES ('all', 'front', 0), ('all', 'back', 1);
+        ").expect("camera fixtures");
+        insert_user(
+            &mut conn,
+            &bcrypt::hash("secret", 4).expect("fixture password hash"),
+        );
         (temp_dir, service)
+    }
+
+    fn insert_user(conn: &mut super::DbConnection, hash: &str) {
+        use crate::schema::users;
+        diesel::insert_into(users::table)
+            .values((
+                users::username.eq("alice"),
+                users::display_name.eq("Alice"),
+                users::password.eq(hash),
+            ))
+            .execute(conn)
+            .expect("user fixture");
     }
 
     fn insert_video_unit(
@@ -682,45 +662,199 @@ pub mod tests {
     }
 
     #[test]
-    fn applying_config_persists_camera_group_memberships() {
+    fn bootstrap_requires_credentials_only_for_an_empty_user_table() {
         let (_dir, service) = migrated_service();
-        let config = sample_config("secret", vec!["front", "back"]);
-
-        service.apply_config(&config).expect("config applied");
-
-        let group = service
-            .fetch_camera_group("all")
-            .expect("camera group fetched");
-        assert_eq!(group.spec.members, vec!["front", "back"]);
-    }
-
-    #[test]
-    fn applying_config_replaces_camera_group_memberships() {
-        let (_dir, service) = configured_service();
-        let config = sample_config("secret", vec!["back"]);
-
+        assert!(matches!(
+            service.bootstrap_user_with(|| (None, None)),
+            Err(super::Error::Field {
+                field: "EXOPTICON_BOOTSTRAP_USERNAME",
+                ..
+            })
+        ));
+        assert!(matches!(
+            service.bootstrap_user_with(|| (Some("admin".into()), None)),
+            Err(super::Error::Field {
+                field: "EXOPTICON_BOOTSTRAP_PASSWORD",
+                ..
+            })
+        ));
         service
-            .apply_config(&config)
-            .expect("updated config applied");
-
-        let group = service
-            .fetch_camera_group("all")
-            .expect("camera group fetched");
-        assert_eq!(group.spec.members, vec!["back"]);
+            .bootstrap_user_with(|| (Some("admin".into()), Some("secret".into())))
+            .unwrap();
+        service
+            .bootstrap_user_with(|| panic!("existing installation must skip bootstrap"))
+            .unwrap();
+        assert_eq!(service.login("admin", "secret").unwrap().username, "admin");
+        assert!(matches!(
+            service.delete_user("admin"),
+            Err(super::Error::Conflict(_))
+        ));
+        assert_eq!(service.fetch_user("admin").unwrap().username, "admin");
     }
 
     #[test]
-    fn applying_config_persists_storage_group_metadata() {
-        let (_dir, service) = migrated_service();
-        let mut config = sample_config("secret", vec![]);
-        config.storage_groups[0].display_name = "Archive".to_string();
+    fn camera_storage_group_is_fixed_after_creation() {
+        let (_dir, service) = configured_service();
+        service
+            .save_storage_group(
+                None,
+                serde_json::from_value(serde_json::json!({
+                    "metadata": {"name": "archive"},
+                    "spec": {"storagePath": "/archive", "maxStorageSize": 1024}
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+        let edit = serde_json::from_value(serde_json::json!({
+            "metadata": {"displayName": "Edited"},
+            "spec": {"storageGroupName": "archive"}
+        }))
+        .unwrap();
 
-        service.apply_config(&config).expect("config applied");
+        assert!(matches!(
+            service.save_camera(Some("front".into()), edit),
+            Err(super::Error::Field {
+                field: "storageGroupName",
+                ..
+            })
+        ));
+        let camera = service.fetch_camera_row("front").unwrap();
+        assert_eq!(camera.storage_group_name, "primary");
+        assert_eq!(camera.display_name, "Front");
 
-        let group = service
-            .fetch_storage_group("primary")
-            .expect("storage group fetched");
-        assert_eq!(group.metadata.display_name, "Archive");
+        let edit = serde_json::from_value(serde_json::json!({
+            "metadata": {"displayName": "Edited"}
+        }))
+        .unwrap();
+        service.save_camera(Some("front".into()), edit).unwrap();
+        let camera = service.fetch_camera_row("front").unwrap();
+        assert_eq!(camera.storage_group_name, "primary");
+        assert_eq!(camera.display_name, "Edited");
+    }
+
+    #[test]
+    fn camera_saves_preserve_credentials_and_only_expose_the_rtsp_endpoint() {
+        let (_dir, service) = configured_service();
+        service.save_camera(None, serde_json::from_value(serde_json::json!({
+            "metadata": {"name": "garage"},
+            "spec": {
+                "storageGroupName": "primary", "username": "onvif-user", "password": "onvif-password",
+                "rtspUrl": "rtsps://rtsp-user:rtsp-password@[2001:db8::1]:8554/private?token=secret#fragment"
+            }
+        })).unwrap()).unwrap();
+        service
+            .save_camera(
+                Some("garage".into()),
+                serde_json::from_value(serde_json::json!({
+                    "metadata": {"displayName": "Garage"},
+                    "spec": {"username": "", "password": "", "rtspUrl": ""}
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+
+        let camera = service.fetch_camera_row("garage").unwrap();
+        assert_eq!(camera.username, "onvif-user");
+        assert_eq!(camera.password, "onvif-password");
+        assert!(camera.rtsp_url.contains("token=secret"));
+        let public = serde_json::to_value(service.fetch_camera("garage").unwrap()).unwrap();
+        assert_eq!(public["metadata"]["displayName"], "Garage");
+        assert_eq!(public["spec"]["rtspUrl"], "rtsps://[2001:db8::1]:8554");
+        assert!(public["spec"].get("username").is_none());
+        assert!(public["spec"].get("password").is_none());
+        assert_eq!(
+            service.fetch_camera_group("all").unwrap().spec.members,
+            ["front", "back", "garage"]
+        );
+    }
+
+    #[test]
+    fn editing_all_validates_and_saves_order_atomically() {
+        let (_dir, service) = configured_service();
+        let update = |name, members: &[&str]| {
+            serde_json::from_value(serde_json::json!({
+                "metadata": {"displayName": name}, "spec": {"members": members}
+            }))
+            .unwrap()
+        };
+        service
+            .save_camera_group(
+                Some("all".into()),
+                update("All cameras", &["back", "front"]),
+            )
+            .unwrap();
+        let before = service.fetch_camera_group("all").unwrap();
+        assert_eq!(before.spec.members, ["back", "front"]);
+        assert!(
+            service
+                .save_camera_group(Some("all".into()), update("Invalid", &["front"]))
+                .is_err()
+        );
+        assert_eq!(service.fetch_camera_group("all").unwrap(), before);
+        assert!(matches!(
+            service.delete_camera_group("all"),
+            Err(super::Error::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn pending_camera_purge_waits_for_capture_and_retries_stored_paths_after_reopen() {
+        let (dir, service) = configured_service();
+        let path = dir.path().join("old-storage/recording.mkv");
+        // A directory at the stored file path produces a reliable removal error.
+        std::fs::create_dir_all(&path).unwrap();
+        let filename = path.to_str().unwrap();
+        insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(0),
+            at(5),
+            filename,
+            5,
+        );
+
+        service.request_camera_deletion("front").unwrap();
+        assert!(service.fetch_camera("front").is_err());
+        assert!(!service.recording_camera_exists("front").unwrap());
+        assert!(
+            service
+                .fetch_video_units_between("front", at(0), at(5))
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            service.fetch_camera_group("all").unwrap().spec.members,
+            ["back"]
+        );
+        service.purge_deleted_cameras().unwrap();
+        assert_eq!(remaining_segment_ids(&service).0.len(), 1);
+
+        service.release_pending_camera_deletions().unwrap();
+        service.purge_deleted_cameras().unwrap();
+        assert_eq!(remaining_segment_ids(&service).0.len(), 1);
+        let replacement = || {
+            serde_json::from_value(serde_json::json!({
+                "metadata": {"name": "front"},
+                "spec": {"storageGroupName": "primary", "rtspUrl": "rtsp://front.example/live"}
+            }))
+            .unwrap()
+        };
+        assert!(matches!(
+            service.save_camera(None, replacement()),
+            Err(super::Error::Conflict(_))
+        ));
+
+        drop(service);
+        let service = Service::new(dir.path().join("exopticon.sqlite").to_str().unwrap());
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::write(&path, b"video").unwrap();
+        service.purge_deleted_cameras().unwrap();
+        service.purge_deleted_cameras().unwrap();
+
+        assert!(!path.exists());
+        assert_eq!(remaining_segment_ids(&service), (vec![], vec![]));
+        service.save_camera(None, replacement()).unwrap();
     }
 
     #[test]
@@ -867,7 +1001,7 @@ pub mod tests {
         let (dir, service) = configured_service();
         let filename = dir.path().join("segment.mkv");
         std::fs::write(&filename, b"video").expect("video file written");
-        let (unit_id, _) = insert_segment(
+        let (_, file_id) = insert_segment(
             &service,
             "front",
             VideoUnitState::Finalized,
@@ -878,7 +1012,7 @@ pub mod tests {
         );
 
         service
-            .delete_video_unit(unit_id)
+            .delete_video_unit_for_file(file_id, "primary")
             .expect("video unit deleted");
 
         assert!(!filename.exists());
@@ -888,6 +1022,54 @@ pub mod tests {
             .expect("retention candidates fetched");
         assert!(old.video_units.is_empty());
         assert_eq!(old.storage_group_size, 0);
+    }
+
+    #[test]
+    fn retention_skips_a_reused_video_unit_id_after_camera_purge() {
+        let (dir, service) = configured_service();
+        let old_path = dir.path().join("front.mkv");
+        let new_path = dir.path().join("back.mkv");
+        std::fs::write(&old_path, b"front").unwrap();
+        let (old_unit, old_file) = insert_segment(
+            &service,
+            "front",
+            VideoUnitState::Finalized,
+            at(0),
+            at(5),
+            old_path.to_str().unwrap(),
+            5,
+        );
+        let candidates = service.fetch_storage_group_old_units("primary", 1).unwrap();
+        let (_, _, selected_file) = &candidates.video_units[0];
+        assert_eq!(selected_file.id, old_file);
+
+        service.request_camera_deletion("front").unwrap();
+        service.release_pending_camera_deletions().unwrap();
+        service.purge_deleted_cameras().unwrap();
+        assert!(!old_path.exists());
+
+        std::fs::write(&new_path, b"back").unwrap();
+        let (new_unit, new_file) = insert_segment(
+            &service,
+            "back",
+            VideoUnitState::Finalized,
+            at(10),
+            at(15),
+            new_path.to_str().unwrap(),
+            4,
+        );
+        assert_eq!(new_unit, old_unit);
+        assert_ne!(new_file, old_file);
+
+        service
+            .delete_video_unit_for_file(selected_file.id, "primary")
+            .unwrap();
+
+        assert_eq!(std::fs::read(&new_path).unwrap(), b"back");
+        assert_eq!(
+            remaining_segment_ids(&service),
+            (vec![new_unit], vec![new_file])
+        );
     }
 
     #[test]
@@ -1137,16 +1319,17 @@ pub mod tests {
 
     #[test]
     fn deleting_a_video_unit_removes_empty_parent_directories_within_the_storage_root() {
-        let (dir, service) = migrated_service();
+        let (dir, service) = configured_service();
         let storage_root = dir.path().join("video");
-        let mut config = sample_config("secret", vec!["front"]);
-        config.storage_groups[0].storage_path = storage_root.display().to_string();
-        service.apply_config(&config).expect("config applied");
+        diesel::update(crate::schema::storage_groups::table.find("primary"))
+            .set(crate::schema::storage_groups::storage_path.eq(storage_root.to_str().unwrap()))
+            .execute(&mut service.pool.get().unwrap())
+            .unwrap();
         let segment_dir = storage_root.join("front/2026/09/22/10");
         std::fs::create_dir_all(&segment_dir).expect("segment directory created");
         let filename = segment_dir.join("segment.mkv");
         std::fs::write(&filename, b"video").expect("video file written");
-        let (unit_id, _) = insert_segment(
+        let (_, file_id) = insert_segment(
             &service,
             "front",
             VideoUnitState::Finalized,
@@ -1157,7 +1340,7 @@ pub mod tests {
         );
 
         service
-            .delete_video_unit(unit_id)
+            .delete_video_unit_for_file(file_id, "primary")
             .expect("video unit deleted");
 
         assert!(!filename.exists());
@@ -1169,10 +1352,7 @@ pub mod tests {
 
     #[test]
     fn login_accepts_the_configured_password() {
-        let (_dir, service) = migrated_service();
-        service
-            .apply_config(&sample_config("secret", vec![]))
-            .expect("config applied");
+        let (_dir, service) = configured_service();
 
         let user = service.login("alice", "secret").expect("login succeeds");
 
@@ -1195,9 +1375,7 @@ pub mod tests {
 
         for (password, hash) in fixtures {
             let (_dir, service) = migrated_service();
-            let mut config = sample_config("unused", vec![]);
-            config.users[0].password_hash = hash.to_string();
-            service.apply_config(&config).expect("config applied");
+            insert_user(&mut service.pool.get().unwrap(), hash);
 
             let user = service
                 .login("alice", &password)

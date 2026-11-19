@@ -20,8 +20,8 @@
 
 import { Component, OnInit, ChangeDetectionStrategy } from "@angular/core";
 import { ActivatedRoute, ParamMap } from "@angular/router";
-import { Observable } from "rxjs";
-import { switchMap } from "rxjs/operators";
+import { Observable, of, timer } from "rxjs";
+import { catchError, exhaustMap, switchMap } from "rxjs/operators";
 import { Camera } from "../camera";
 import { CameraService } from "../camera.service";
 import { AsyncPipe } from "@angular/common";
@@ -34,7 +34,7 @@ import { AsyncPipe } from "@angular/common";
   imports: [AsyncPipe],
 })
 export class CameraDetailComponent implements OnInit {
-  public camera$!: Observable<Camera>;
+  public camera$!: Observable<Camera | null>;
 
   constructor(
     public route: ActivatedRoute,
@@ -43,9 +43,15 @@ export class CameraDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.camera$ = this.route.paramMap.pipe(
-      switchMap((params: ParamMap) => {
-        return this.cameraService.getCamera(params.get("name") ?? "");
-      }),
+      switchMap((params: ParamMap) =>
+        timer(0, 2000).pipe(
+          exhaustMap(() =>
+            this.cameraService
+              .getCamera(params.get("name") ?? "")
+              .pipe(catchError(() => of(null))),
+          ),
+        ),
+      ),
     );
   }
 }

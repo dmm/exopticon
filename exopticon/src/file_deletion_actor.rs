@@ -18,8 +18,6 @@
  * along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::time::Duration;
-
 use tokio::task::spawn_blocking;
 
 use crate::db::storage_groups::StorageGroupOldFiles;
@@ -38,9 +36,9 @@ impl FileDeletionActor {
     }
 
     async fn handle_files(&self, files: StorageGroupOldFiles) -> anyhow::Result<()> {
-        let max_size_bytes = files.storage_group_capacity * 1024 * 1024;
-        let mut delete_amount: i64 = files.storage_group_size - max_size_bytes;
-        let mut video_unit_ids = Vec::new();
+        let max_size_bytes = files.storage_group_capacity.saturating_mul(1024 * 1024);
+        let mut delete_amount: i64 = files.storage_group_size.saturating_sub(max_size_bytes);
+        let mut files_to_delete = Vec::new();
 
         debug!(
             "FileDeletionActor {}: Handling {} files, max_size: {}MiB, current_size: {}MiB, \
@@ -52,23 +50,25 @@ impl FileDeletionActor {
             delete_amount / 1024 / 1024
         );
 
-        for (video_unit_size, video_unit, video_file) in files.video_units {
+        for (video_unit_size, _, video_file) in files.video_units {
             if delete_amount <= 0 {
                 break;
             }
             delete_amount -= video_unit_size;
-            video_unit_ids.push((video_unit.id, video_file.filename));
+            files_to_delete.push(video_file);
         }
 
-        for (video_unit_id, filename) in video_unit_ids {
-            // delete video unit
-            let vu_id = video_unit_id;
+        for file in files_to_delete {
+            let file_id = file.id;
             let db = self.db.clone();
-            debug!("Deleting {} {}", video_unit_id, filename);
-            if let Err(e) = spawn_blocking(move || db.delete_video_unit(vu_id)).await? {
+            let group = self.storage_group_name.clone();
+            debug!("Deleting recording file {} {}", file_id, file.filename);
+            if let Err(err) =
+                spawn_blocking(move || db.delete_video_unit_for_file(file_id, &group)).await?
+            {
                 error!(
-                    "error deleting VideoUnit {}, filename {}: {}",
-                    video_unit_id, filename, e
+                    "Error deleting recording file {} {}: {}",
+                    file_id, file.filename, err
                 );
             }
         }
@@ -76,7 +76,7 @@ impl FileDeletionActor {
         Ok(())
     }
 
-    async fn work(&self) -> anyhow::Result<()> {
+    pub async fn work(&self) -> anyhow::Result<()> {
         let db = self.db.clone();
         let storage_group_name = self.storage_group_name.clone();
         let files =
@@ -85,14 +85,5 @@ impl FileDeletionActor {
         self.handle_files(files).await?;
 
         Ok(())
-    }
-
-    pub async fn run(self) {
-        loop {
-            if let Err(e) = self.work().await {
-                error!("Error deleting files! {}", e);
-            }
-            tokio::time::sleep(Duration::from_secs(5)).await;
-        }
     }
 }

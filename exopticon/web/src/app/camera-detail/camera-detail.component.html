@@ -26,7 +26,12 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         <dt>Name</dt>
         <dd>{{ camera.metadata.name }}</dd>
         <dt>Status</dt>
-        <dd>{{ camera.status.phase }}</dd>
+        <dd>
+          {{ camera.status.phase }}
+          @if (camera.status.errorMessage) {
+            <span>{{ camera.status.errorMessage }}</span>
+          }
+        </dd>
         <dt>Video Codec</dt>
         <dd>{{ camera.status.videoCodec ?? "n/a" }}</dd>
         <dt>Audio Codec</dt>
@@ -39,9 +44,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         <dd>{{ camera.spec.onvifPort }}</dd>
         <dt>MAC</dt>
         <dd>{{ camera.spec.mac }}</dd>
-        <dt>Username</dt>
-        <dd>{{ camera.spec.username }}</dd>
-        <dt>RTSP URL</dt>
+        <dt>RTSP endpoint</dt>
         <dd>{{ camera.spec.rtspUrl }}</dd>
         <dt>PTZ Type</dt>
         <dd>{{ camera.spec.ptzType }}</dd>

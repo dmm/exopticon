@@ -21,7 +21,7 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable, of } from "rxjs";
-import { catchError, map, mergeMap } from "rxjs/operators";
+import { catchError, defaultIfEmpty, map, mergeMap } from "rxjs/operators";
 
 @Injectable({
   providedIn: "root",
@@ -33,11 +33,15 @@ export class AuthService {
 
   get isLoggedIn() {
     return this.http.get("/v1/cameras", { observe: "response" }).pipe(
-      mergeMap((response) => {
-        this.loggedIn.next(response.ok);
+      map((response) => response.ok),
+      catchError(() => of(false)),
+      defaultIfEmpty(false),
+      mergeMap((sessionExists) => {
+        if (sessionExists) {
+          this.loggedIn.next(true);
+        }
         return this.loggedIn.asObservable();
       }),
-      catchError(() => this.loggedIn.asObservable()),
     );
   }
 

@@ -1,0 +1,26 @@
+<app-configuration-form
+  [name]="user()?.username ?? ''"
+  [displayName]="user()?.displayName ?? ''"
+  nameLabel="Username"
+  nameField="username"
+  [creating]="!user()"
+  [saving]="saving()"
+  [errors]="errors()"
+  [listLink]="listLink()"
+  (submitted)="save($event)"
+>
+  @if (user()) {
+    <p class="detail">Leave the password blank to keep the saved value.</p>
+  }
+  <label for="password">Password</label>
+  <input
+    id="password"
+    type="password"
+    autocomplete="new-password"
+    [(ngModel)]="password"
+    [attr.aria-invalid]="!!(passwordError || errors()['password'])"
+  />
+  <app-configuration-field-error
+    [message]="passwordError || errors()['password']"
+  />
+</app-configuration-form>
