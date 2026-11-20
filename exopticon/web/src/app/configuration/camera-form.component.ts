@@ -1,4 +1,4 @@
-import { Component, OnInit, input, output } from "@angular/core";
+import { Component, OnInit, input, output, viewChild } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { Camera, ResourceMetadata } from "../camera";
@@ -9,6 +9,7 @@ import {
   MetadataPatch,
   numberError,
 } from "./configuration-form";
+import { ProbedCameraFields } from "./onvif-probe/onvif-probe.component";
 
 const defaultSettings = {
   enabled: false,
@@ -48,6 +49,7 @@ export class CameraFormComponent implements OnInit {
   readonly errors = input.required<FieldErrors>();
   readonly saving = input.required<boolean>();
   readonly saved = output<object>();
+  private readonly form = viewChild.required(ConfigurationForm);
   settings = { ...defaultSettings };
   private originalSettings = { ...defaultSettings };
   storageGroupName = "";
@@ -76,6 +78,21 @@ export class CameraFormComponent implements OnInit {
 
   error(field: string): string {
     return this.validation[field] || this.errors()[field];
+  }
+
+  applyOnvifProfile({
+    rtspUrl,
+    username,
+    password,
+    ...settings
+  }: ProbedCameraFields): void {
+    this.settings = { ...this.settings, ...settings };
+    this.rtspUrl = rtspUrl;
+    this.username = username;
+    this.password = password;
+    delete this.validation.rtspUrl;
+    delete this.validation.onvifPort;
+    this.form().focusName();
   }
 
   save(metadata: MetadataPatch | null): void {

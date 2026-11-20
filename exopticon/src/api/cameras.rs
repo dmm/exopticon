@@ -32,6 +32,8 @@ use crate::keyframe_requests::device_url as onvif_device_url;
 use super::configuration::{create_camera, delete_camera, edit_camera};
 use super::{ResourceMetadata, UserError};
 
+mod onvif_probe;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CameraSpec {
@@ -181,6 +183,7 @@ async fn move_camera(
 pub fn router() -> Router<AppState> {
     Router::<AppState>::new()
         .route("/", axum::routing::get(fetch_all).post(create_camera))
+        .route("/onvif/probe", axum::routing::post(onvif_probe::probe))
         .route(
             "/{name}",
             axum::routing::get(fetch)

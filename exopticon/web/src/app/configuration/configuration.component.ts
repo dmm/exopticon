@@ -17,6 +17,10 @@ import { CameraFormComponent } from "./camera-form.component";
 import { CameraGroupFormComponent } from "./camera-group-form.component";
 import { FieldErrors } from "./configuration-form";
 import {
+  OnvifProbeComponent,
+  ProbedCameraFields,
+} from "./onvif-probe/onvif-probe.component";
+import {
   StorageGroup,
   StorageGroupFormComponent,
 } from "./storage-group-form.component";
@@ -66,6 +70,7 @@ interface PageData {
   imports: [
     RouterLink,
     CameraFormComponent,
+    OnvifProbeComponent,
     CameraGroupFormComponent,
     StorageGroupFormComponent,
     UserFormComponent,
@@ -215,6 +220,18 @@ export class ConfigurationComponent implements OnInit {
               .get<ConfigurationUser>(itemUrl)
               .pipe(map((user) => ({ resource, user })));
     }
+  }
+
+  applyOnvifProfile(
+    form: CameraFormComponent,
+    fields: ProbedCameraFields,
+  ): void {
+    const errors = { ...this.errors };
+    for (const field of Object.keys(fields)) {
+      delete errors[field];
+    }
+    this.errors = errors;
+    form.applyOnvifProfile(fields);
   }
 
   save(body: object): Promise<void> {

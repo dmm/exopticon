@@ -79,7 +79,7 @@ impl From<Camera> for crate::api::cameras::Camera {
                     .try_into()
                     .expect("failed to convert onvif_port"),
                 mac: c.mac,
-                rtsp_url: rtsp_endpoint(&c.rtsp_url),
+                rtsp_url: c.rtsp_url,
                 ptz_type: c.ptz_type,
                 onvif_profile_token: c.onvif_profile_token,
                 enabled: c.enabled,
@@ -126,21 +126,4 @@ impl super::Service {
             .map(std::convert::Into::into)
             .collect())
     }
-}
-
-fn rtsp_endpoint(value: &str) -> String {
-    let Ok(url) = url::Url::parse(value) else {
-        return String::new();
-    };
-    if !matches!(url.scheme(), "rtsp" | "rtsps") {
-        return String::new();
-    }
-    let Some(host) = url.host() else {
-        return String::new();
-    };
-    let scheme = url.scheme();
-    url.port().map_or_else(
-        || format!("{scheme}://{host}"),
-        |port| format!("{scheme}://{host}:{port}"),
-    )
 }

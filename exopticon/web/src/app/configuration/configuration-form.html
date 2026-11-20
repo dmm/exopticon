@@ -1,6 +1,7 @@
 <form class="configuration-form" (ngSubmit)="submit()">
   <label for="resource-name">{{ nameLabel() }}</label>
   <input
+    #nameElement
     id="resource-name"
     name="name"
     [ngModel]="nameInput ?? name()"

@@ -1,4 +1,11 @@
-import { Component, ViewEncapsulation, input, output } from "@angular/core";
+import {
+  Component,
+  ElementRef,
+  ViewEncapsulation,
+  input,
+  output,
+  viewChild,
+} from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { ResourceMetadata } from "../camera";
@@ -45,9 +52,15 @@ export class ConfigurationForm {
   readonly errors = input.required<FieldErrors>();
   readonly listLink = input.required<string[]>();
   readonly submitted = output<MetadataPatch | null>();
+  private readonly nameElement =
+    viewChild.required<ElementRef<HTMLInputElement>>("nameElement");
   nameInput?: string;
   displayNameInput?: string;
   nameError = "";
+
+  focusName(): void {
+    this.nameElement().nativeElement.focus();
+  }
 
   submit(): void {
     if (this.saving()) {

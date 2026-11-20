@@ -1,0 +1,129 @@
+<section aria-labelledby="onvif-probe-heading">
+  <h4 id="onvif-probe-heading">ONVIF probe</h4>
+  <form (ngSubmit)="probe()">
+    <fieldset [disabled]="probing()" aria-label="Camera connection">
+      <label>
+        Hostname or IPv4 address
+        <input
+          name="host"
+          [(ngModel)]="host"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          required
+        />
+      </label>
+      <label>
+        ONVIF fallback port
+        <input
+          type="number"
+          name="port"
+          [(ngModel)]="port"
+          min="1"
+          max="65535"
+          placeholder="80"
+        />
+      </label>
+      <label>
+        ONVIF username
+        <input name="username" [(ngModel)]="username" autocomplete="off" />
+      </label>
+      <label>
+        ONVIF password
+        <input
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          autocomplete="off"
+        />
+      </label>
+      <button type="submit">Probe</button>
+    </fieldset>
+  </form>
+
+  @if (probing()) {
+    <p role="status">Probing camera…</p>
+  }
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+  @if (result(); as camera) {
+    <dl aria-label="Device details">
+      <dt>Device Service URL</dt>
+      <dd>{{ camera.deviceServiceUrl }}</dd>
+      @if (camera.device; as device) {
+        @if (device.manufacturer) {
+          <dt>Manufacturer</dt>
+          <dd>{{ device.manufacturer }}</dd>
+        }
+        @if (device.model) {
+          <dt>Model</dt>
+          <dd>{{ device.model }}</dd>
+        }
+        @if (device.firmwareVersion) {
+          <dt>Firmware</dt>
+          <dd>{{ device.firmwareVersion }}</dd>
+        }
+        @if (device.serialNumber) {
+          <dt>Serial number</dt>
+          <dd>{{ device.serialNumber }}</dd>
+        }
+        @if (device.hardwareId) {
+          <dt>Hardware ID</dt>
+          <dd>{{ device.hardwareId }}</dd>
+        }
+      }
+    </dl>
+    @if (camera.profileError) {
+      <p class="error" role="alert">{{ camera.profileError }}</p>
+    } @else if (camera.profiles.length === 0) {
+      <p role="status">The camera reported no media profiles.</p>
+    } @else {
+      <ul aria-label="Media profiles">
+        @for (profile of camera.profiles; track profile.token) {
+          <li>
+            <h5>{{ profile.name || profile.token }}</h5>
+            <dl>
+              <dt>Profile token</dt>
+              <dd>{{ profile.token }}</dd>
+              <dt>RTSP URL</dt>
+              <dd>
+                @if (profile.rtspUrl; as rtspUrl) {
+                  {{ visibleRtspUrl(rtspUrl) }}
+                } @else {
+                  Unavailable
+                }
+              </dd>
+              @if (profile.video; as video) {
+                <dt>Codec</dt>
+                <dd>{{ video.codec }}</dd>
+                <dt>Resolution</dt>
+                <dd>{{ video.width }} × {{ video.height }}</dd>
+                @if (video.frameRate !== null) {
+                  <dt>Frame rate limit</dt>
+                  <dd>{{ video.frameRate }} fps</dd>
+                }
+              }
+              <dt>PTZ support</dt>
+              <dd>{{ profile.ptzSupported ? "Yes" : "No" }}</dd>
+              @if (profile.snapshotUrl; as snapshotUrl) {
+                <dt>Snapshot URL</dt>
+                <dd>{{ snapshotUrl }}</dd>
+              }
+            </dl>
+            <button
+              type="button"
+              [disabled]="!profile.rtspUrl"
+              [attr.aria-label]="
+                'Add profile ' + (profile.name || profile.token)
+              "
+              (click)="selectProfile(profile)"
+            >
+              Add this profile
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

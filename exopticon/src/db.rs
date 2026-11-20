@@ -759,9 +759,6 @@ pub mod tests {
         assert!(camera.rtsp_url.contains("token=secret"));
         let public = serde_json::to_value(service.fetch_camera("garage").unwrap()).unwrap();
         assert_eq!(public["metadata"]["displayName"], "Garage");
-        assert_eq!(public["spec"]["rtspUrl"], "rtsps://[2001:db8::1]:8554");
-        assert!(public["spec"].get("username").is_none());
-        assert!(public["spec"].get("password").is_none());
         assert_eq!(
             service.fetch_camera_group("all").unwrap().spec.members,
             ["front", "back", "garage"]

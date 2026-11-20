@@ -22,6 +22,7 @@ axum-extra = { version = "0.12", features = ["cookie", "typed-header"]}
 axum-macros = "0.5"
 axum-prometheus = "0.10.0"
 anyhow = "1.0"
+async-trait = "0.1"
 base64 = "0.23"
 bcrypt = "0.19"
 bytes = "^1.7"
@@ -31,6 +32,7 @@ chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 diesel = { version = "2.3", features = ["sqlite", "r2d2", "chrono", "returning_clauses_for_sqlite_3_35"] }
 diesel_migrations = { version = "2.3", features = ["sqlite"] }
+diqwest = "3.2"
 dotenv = "0.15"
 env_logger = "0.11"
 futures-util = "0.3.31"
@@ -43,6 +45,7 @@ mime_guess = "2"
 rand = "0.10"
 futures = "0.3"
 r2d2 = "0.8"
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 rust-embed = { version = "8.5", features = ["interpolate-folder-path"] }
 tempfile = "3"
 time = { version = "0.3", default-features = false, features = ["std"] }

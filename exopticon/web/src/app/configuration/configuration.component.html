@@ -98,7 +98,13 @@
       @for (editor of [loadedForm]; track editor) {
         @switch (editor.resource) {
           @case ("cameras") {
+            @if (!editor.camera) {
+              <app-onvif-probe
+                (profileSelected)="applyOnvifProfile(cameraForm, $event)"
+              />
+            }
             <app-camera-configuration-form
+              #cameraForm
               [camera]="editor.camera"
               [storageGroups]="editor.storageGroups"
               [listLink]="listLink"
