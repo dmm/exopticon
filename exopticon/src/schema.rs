@@ -21,18 +21,18 @@ diesel::table! {
         name -> Text,
         display_name -> Text,
         storage_group_name -> Text,
-        ip -> Text,
-        onvif_port -> Integer,
-        mac -> Text,
         username -> Text,
         password -> Text,
         rtsp_url -> Text,
-        ptz_type -> Text,
         onvif_profile_token -> Nullable<Text>,
         enabled -> Bool,
         ptz_x_step_size -> SmallInt,
         ptz_y_step_size -> SmallInt,
         deletion_state -> Integer,
+        onvif_device_url -> Nullable<Text>,
+        ptz_enabled -> Bool,
+        ptz_device_url -> Nullable<Text>,
+        ptz_profile_token -> Nullable<Text>,
     }
 }
 

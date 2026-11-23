@@ -4,11 +4,16 @@ use axum::{
     http::StatusCode,
     routing::get,
 };
+use serde::{Deserialize, Deserializer};
 use tokio::task::spawn_blocking;
 
 use crate::{AppState, capture_supervisor::Command, db::Service};
 
-use super::{UserError, auth::User};
+use super::{
+    UserError,
+    auth::User,
+    cameras::{PtzSettings, StreamSource},
+};
 
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -30,17 +35,19 @@ pub struct ResourceInput<S> {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CameraInput {
     pub storage_group_name: Option<String>,
-    pub ip: Option<String>,
-    pub onvif_port: Option<u16>,
-    pub mac: Option<String>,
     pub username: Option<String>,
     pub password: Option<String>,
-    pub rtsp_url: Option<String>,
-    pub ptz_type: Option<String>,
-    pub onvif_profile_token: Option<String>,
+    pub stream_source: Option<StreamSource>,
+    #[serde(default, deserialize_with = "nullable_ptz")]
+    pub ptz: Option<Option<PtzSettings>>,
     pub enabled: Option<bool>,
-    pub ptz_x_step_size: Option<i16>,
-    pub ptz_y_step_size: Option<i16>,
+}
+
+// A missing field keeps the previous PTZ settings. Explicit null disables PTZ.
+fn nullable_ptz<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Option<PtzSettings>>, D::Error> {
+    Option::deserialize(deserializer).map(Some)
 }
 
 #[derive(Default, Deserialize)]

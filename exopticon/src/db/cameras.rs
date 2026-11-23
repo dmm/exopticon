@@ -23,7 +23,7 @@ use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use crate::{
     api::{
         ResourceMetadata,
-        cameras::{CameraSpec, CameraStatus},
+        cameras::{CameraSpec, CameraStatus, PtzSettings, StreamSource},
     },
     schema::cameras,
 };
@@ -36,18 +36,47 @@ pub struct Camera {
     pub display_name: String,
     #[diesel(skip_update)]
     pub storage_group_name: String,
-    pub ip: String,
-    pub onvif_port: i32,
-    pub mac: String,
     pub username: String,
     pub password: String,
     pub rtsp_url: String,
-    pub ptz_type: String,
     pub onvif_profile_token: Option<String>,
     pub enabled: bool,
     pub ptz_x_step_size: i16,
     pub ptz_y_step_size: i16,
     pub deletion_state: i32,
+    pub onvif_device_url: Option<String>,
+    pub ptz_enabled: bool,
+    pub ptz_device_url: Option<String>,
+    pub ptz_profile_token: Option<String>,
+}
+
+impl Camera {
+    pub fn stream_source(&self) -> StreamSource {
+        match &self.onvif_device_url {
+            Some(device_url) => StreamSource::Onvif {
+                device_url: device_url.clone(),
+                profile_token: self
+                    .onvif_profile_token
+                    .clone()
+                    .expect("ONVIF stream has a profile token"),
+            },
+            None => StreamSource::StaticRtsp {
+                url: self.rtsp_url.clone(),
+            },
+        }
+    }
+
+    pub fn ptz_target(&self) -> Option<(&str, &str)> {
+        let device_url = self
+            .ptz_device_url
+            .as_deref()
+            .or(self.onvif_device_url.as_deref())?;
+        let profile_token = self
+            .ptz_profile_token
+            .as_deref()
+            .or(self.onvif_profile_token.as_deref())?;
+        Some((device_url, profile_token))
+    }
 }
 
 impl From<Camera> for crate::api::cameras::Camera {
@@ -66,6 +95,7 @@ impl From<Camera> for crate::api::cameras::Camera {
             CameraStatus::disabled()
         };
 
+        let stream_source = c.stream_source();
         Self {
             metadata: ResourceMetadata {
                 name: c.name,
@@ -73,18 +103,14 @@ impl From<Camera> for crate::api::cameras::Camera {
             },
             spec: CameraSpec {
                 storage_group_name: c.storage_group_name,
-                ip: c.ip,
-                onvif_port: c
-                    .onvif_port
-                    .try_into()
-                    .expect("failed to convert onvif_port"),
-                mac: c.mac,
-                rtsp_url: c.rtsp_url,
-                ptz_type: c.ptz_type,
-                onvif_profile_token: c.onvif_profile_token,
+                stream_source,
+                ptz: c.ptz_enabled.then_some(PtzSettings {
+                    device_url: c.ptz_device_url,
+                    profile_token: c.ptz_profile_token,
+                    x_step_size: c.ptz_x_step_size,
+                    y_step_size: c.ptz_y_step_size,
+                }),
                 enabled: c.enabled,
-                ptz_x_step_size: c.ptz_x_step_size,
-                ptz_y_step_size: c.ptz_y_step_size,
             },
             status,
         }

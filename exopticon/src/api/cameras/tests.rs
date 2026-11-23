@@ -13,7 +13,8 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::{UserError, move_camera, onvif_device_url};
+use super::{UserError, move_camera};
+use crate::onvif_client::device_url;
 
 struct RecordedRequest {
     headers: HeaderMap,
@@ -69,18 +70,18 @@ impl TestCamera {
                 name: "test-camera".to_string(),
                 display_name: "Test Camera".to_string(),
                 storage_group_name: "default".to_string(),
-                ip: "127.0.0.1".to_string(),
-                onvif_port: i32::from(port),
-                mac: String::new(),
                 username: "camera<&user".to_string(),
                 password: "camera-password".to_string(),
                 rtsp_url: "rtsp://capture.example/live".to_string(),
-                ptz_type: "onvif_relative".to_string(),
-                onvif_profile_token: Some("profile<&token".to_string()),
+                onvif_profile_token: None,
                 enabled: true,
                 ptz_x_step_size: 25,
                 ptz_y_step_size: 40,
                 deletion_state: crate::db::configuration::ACTIVE,
+                onvif_device_url: None,
+                ptz_enabled: true,
+                ptz_device_url: Some(device_url("127.0.0.1", port)),
+                ptz_profile_token: Some("profile<&token".to_string()),
             },
             requests,
             server,
@@ -97,7 +98,7 @@ fn device_url_preserves_host_port_and_ipv6_support() {
         ("[2001:db8::1]", "[2001:db8::1]"),
     ] {
         assert_eq!(
-            onvif_device_url(host, 8899),
+            device_url(host, 8899),
             format!("http://{expected_host}:8899/onvif/device_service")
         );
     }
@@ -125,7 +126,7 @@ async fn relative_moves_preserve_directions_profile_and_credentials() {
         let movement = request.body.path(&["Body", "RelativeMove"]).unwrap();
         assert_eq!(
             movement.child("ProfileToken").unwrap().text(),
-            fixture.camera.onvif_profile_token.as_deref().unwrap()
+            fixture.camera.ptz_profile_token.as_deref().unwrap()
         );
         let pan_tilt = movement.path(&["Translation", "PanTilt"]).unwrap();
         assert_eq!(pan_tilt.attr("x"), Some(x));

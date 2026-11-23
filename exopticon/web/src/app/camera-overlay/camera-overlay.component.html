@@ -57,7 +57,7 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
       FOCUS
     </div>
   }
-  @if (camera.spec.ptzType !== "none") {
+  @if (camera.spec.ptz) {
     <div class="ptz-overlay">
       <div
         (pointerdown)="ptz($event, directions.left)"

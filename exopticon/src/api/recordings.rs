@@ -318,13 +318,11 @@ mod tests {
             VALUES ('primary', 'Primary', '/video', 1024);
 
             INSERT INTO cameras
-                (name, display_name, storage_group_name, ip, onvif_port, mac,
-                 username, password, rtsp_url, ptz_type, onvif_profile_token,
+                (name, display_name, storage_group_name, username, password, rtsp_url,
                  enabled, ptz_x_step_size, ptz_y_step_size)
             VALUES
-                ('front', 'Front', 'primary', '192.0.2.10', 80,
-                 '00:00:00:00:00:01', 'camera-user', 'camera-password',
-                 'rtsp://front.example/stream', 'none', NULL, 1, 1, 1);
+                ('front', 'Front', 'primary', 'camera-user', 'camera-password',
+                 'rtsp://front.example/stream', 1, 1, 1);
             ",
         )
         .expect("camera inserted");
@@ -821,7 +819,7 @@ mod tests {
             json!({"error":"unknown_camera"})
         );
         let mut conn = service.pool.get().unwrap();
-        conn.batch_execute("INSERT INTO cameras (name, display_name, storage_group_name, ip, onvif_port, mac, username, password, rtsp_url, ptz_type, onvif_profile_token, enabled, ptz_x_step_size, ptz_y_step_size) VALUES ('rear', 'Rear', 'primary', '192.0.2.11', 80, '00:00:00:00:00:02', 'u', 'p', 'rtsp://rear.example/stream', 'none', NULL, 1, 1, 1)").unwrap();
+        conn.batch_execute("INSERT INTO cameras (name, display_name, storage_group_name, username, password, rtsp_url, enabled, ptz_x_step_size, ptz_y_step_size) VALUES ('rear', 'Rear', 'primary', 'u', 'p', 'rtsp://rear.example/stream', 1, 1, 1)").unwrap();
         drop(conn);
         assert_eq!(
             json_body(get(&app, &format!("/rear/files/{file}/content")).await).await,

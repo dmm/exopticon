@@ -35,7 +35,7 @@ use regex::Regex;
 use tokio::{
     process::{self, Child, ChildStdin, ChildStdout},
     sync::mpsc,
-    task::{JoinSet, spawn_blocking},
+    task::spawn_blocking,
 };
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
 use uuid::Uuid;
@@ -44,6 +44,7 @@ use crate::{
     CameraStatusRegistry,
     api::{cameras::CameraStatus, storage_groups::StorageGroup},
     db::cameras::Camera,
+    onvif_actor,
     video_router::VideoRouter,
 };
 use exserial::models::{CaptureMessage, PacketEncoding};
@@ -59,14 +60,13 @@ pub struct VideoPacket {
     pub duration: i64,
 }
 
-pub enum Command {
-    Stop,
+pub enum Stream {
+    StaticRtsp(String),
+    Onvif(onvif_actor::Handle),
 }
 
-#[derive(Clone, PartialEq, Eq)]
-enum State {
-    Ready,
-    Started,
+pub enum Command {
+    Stop,
 }
 
 fn uuid_to_filename(parent_path: &Path, uuid: Uuid) -> PathBuf {
@@ -204,7 +204,6 @@ fn cleanup_staged_recordings(staging_path: &Path) -> anyhow::Result<()> {
 }
 
 pub struct CaptureActor {
-    state: State,
     db: crate::db::Service,
     camera: Camera,
     storage_group: StorageGroup,
@@ -236,7 +235,6 @@ impl CaptureActor {
     ) -> Self {
         let camera_name = camera.name.clone();
         Self {
-            state: State::Ready,
             db,
             camera,
             storage_group,
@@ -252,7 +250,7 @@ impl CaptureActor {
         }
     }
 
-    async fn start_worker(&mut self) -> anyhow::Result<()> {
+    async fn start_worker(&mut self, stream_uri: &str) -> anyhow::Result<()> {
         debug!("Starting worker process for camera {}", self.camera.name);
         let storage_path = Path::new(&self.storage_group.spec.storage_path)
             .join(".staging")
@@ -265,7 +263,7 @@ impl CaptureActor {
         let hwaccel_method =
             env::var("EXOPTICON_HWACCEL_METHOD").unwrap_or_else(|_| "none".to_string());
         let mut cmd = process::Command::new(executable_path);
-        cmd.arg(&self.camera.rtsp_url);
+        cmd.arg(stream_uri);
         cmd.arg(&storage_path);
         cmd.arg(hwaccel_method);
         cmd.stdout(Stdio::piped());
@@ -289,7 +287,6 @@ impl CaptureActor {
         let framed_stream = length_delimited::Builder::new().new_read(stdout);
 
         self.child = Some((child, framed_stream));
-        self.state = State::Started;
         Ok(())
     }
 
@@ -492,49 +489,50 @@ impl CaptureActor {
         Ok(true)
     }
 
-    pub async fn run(mut self) -> String {
-        // JoinSet aborts the ONVIF task if this actor is dropped or panics.
-        let mut keyframe_tasks = JoinSet::new();
-        if self.camera.onvif_profile_token.is_some() {
-            let requests = Arc::new(crate::keyframe_requests::KeyframeRequestGate::new());
-            self.video_router
-                .register_keyframe_requests(self.camera.name.clone(), Arc::clone(&requests))
-                .await;
-            keyframe_tasks.spawn(crate::keyframe_requests::run(self.camera.clone(), requests));
+    async fn start(&mut self, stream: Stream) -> Result<bool, &'static str> {
+        if let Err(e) = self.cleanup_unopened_video_segments().await {
+            error!("error cleaning unopened video segments: {}", e);
         }
-        let mut had_error = false;
-        loop {
-            if self.state == State::Ready {
-                if let Err(e) = self.cleanup_unopened_video_segments().await {
-                    error!("error cleaning unopened video segments: {}", e);
+        let stream_uri = match stream {
+            Stream::StaticRtsp(url) => url,
+            Stream::Onvif(onvif) => tokio::select! {
+                biased;
+                _ = self.command_receiver.recv() => return Ok(false),
+                result = onvif.stream_uri() => {
+                    result.map_err(|_| "Could not resolve the ONVIF stream URI")?.into()
                 }
-                if let Err(e) = self.start_worker().await {
-                    error!("error starting capture worker: {}", e);
-                    had_error = true;
-                    break;
-                }
-            }
-            let res = self.select_next().await;
-            match res {
-                Ok(true) => {}
-                Ok(false) => break,
-                Err(e) => {
-                    error!("Error {}", e);
-                    had_error = true;
-                    break;
-                }
-            }
+            },
+        };
+        if let Err(error) = self.start_worker(&stream_uri).await {
+            error!("error starting capture worker: {}", error);
+            return Err("Could not start the capture worker");
         }
+        Ok(true)
+    }
+
+    pub async fn run(mut self, stream: Stream) -> String {
+        let mut error_message = match self.start(stream).await {
+            Ok(true) => loop {
+                match self.select_next().await {
+                    Ok(true) => {}
+                    Ok(false) => break None,
+                    Err(e) => {
+                        error!("Error {}", e);
+                        break Some("capture actor exited after error");
+                    }
+                }
+            },
+            Ok(false) => None,
+            Err(message) => {
+                error!("{} for {}", message, self.camera.name);
+                Some(message)
+            }
+        };
 
         // EOF requests a graceful shutdown. Keep reading stdout until
         // the worker closes it so final messages are published before
         // cleanup.
         drop(self.child_stdin.take());
-
-        self.video_router
-            .unregister_keyframe_requests(&self.camera.name)
-            .await;
-        keyframe_tasks.shutdown().await;
 
         if let Some((mut child, mut framed_stream)) = self.child.take() {
             while let Some(msg) = framed_stream.next().await {
@@ -543,12 +541,12 @@ impl CaptureActor {
                         "Error handling capture worker message during shutdown: {}",
                         e
                     );
-                    had_error = true;
+                    error_message = Some("capture actor exited after error");
                 }
             }
             if let Err(e) = child.wait().await {
                 error!("error waiting for child exit: {}", e);
-                had_error = true;
+                error_message = Some("capture actor exited after error");
             }
         }
 
@@ -557,26 +555,19 @@ impl CaptureActor {
         }
         self.camera_status_registry.write().await.insert(
             self.camera.name.clone(),
-            if had_error {
-                CameraStatus {
-                    phase: "error".to_string(),
-                    active: false,
-                    last_started_at: None,
-                    video_codec: self.video_codec.clone(),
-                    audio_codec: self.audio_codec.clone(),
-                    average_bitrate: None,
-                    error_message: Some("capture actor exited after error".to_string()),
+            CameraStatus {
+                phase: if error_message.is_some() {
+                    "error"
+                } else {
+                    "stopped"
                 }
-            } else {
-                CameraStatus {
-                    phase: "stopped".to_string(),
-                    active: false,
-                    last_started_at: None,
-                    video_codec: self.video_codec.clone(),
-                    audio_codec: self.audio_codec.clone(),
-                    average_bitrate: None,
-                    error_message: None,
-                }
+                .to_string(),
+                active: false,
+                last_started_at: None,
+                video_codec: self.video_codec.clone(),
+                audio_codec: self.audio_codec.clone(),
+                average_bitrate: None,
+                error_message: error_message.map(str::to_owned),
             },
         );
         self.camera.name

@@ -7,7 +7,6 @@ interface ProbeProfile {
   name: string;
   token: string;
   rtspUrl: string | null;
-  reuseCredentials: boolean;
   snapshotUrl: string | null;
   ptzSupported: boolean;
   video: {
@@ -19,8 +18,6 @@ interface ProbeProfile {
 }
 
 interface ProbeResult {
-  host: string;
-  port: number;
   deviceServiceUrl: string;
   device: {
     manufacturer: string;
@@ -34,12 +31,10 @@ interface ProbeResult {
 }
 
 export interface ProbedCameraFields {
-  ip: string;
-  onvifPort: number;
   onvifProfileToken: string;
+  onvifDeviceUrl: string;
   username: string;
   password: string;
-  rtspUrl: string;
 }
 
 @Component({
@@ -112,27 +107,13 @@ export class OnvifProbeComponent {
 
   selectProfile(profile: ProbeProfile): void {
     const result = this.result();
-    if (!result || !profile.rtspUrl) {
+    if (!result) {
       return;
     }
-    const { username, password } = this.credentials;
-    const rtsp = new URL(profile.rtspUrl);
-    if (
-      profile.reuseCredentials &&
-      !rtsp.username &&
-      !rtsp.password &&
-      (username || password)
-    ) {
-      rtsp.username = encodeURIComponent(username);
-      rtsp.password = encodeURIComponent(password);
-    }
     this.profileSelected.emit({
-      ip: result.host,
-      onvifPort: result.port,
+      onvifDeviceUrl: result.deviceServiceUrl,
       onvifProfileToken: profile.token,
-      username,
-      password,
-      rtspUrl: rtsp.href,
+      ...this.credentials,
     });
   }
 

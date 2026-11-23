@@ -334,19 +334,22 @@ pub mod tests {
     pub fn configured_service() -> (TempDir, Service) {
         let (temp_dir, service) = migrated_service();
         let mut conn = service.pool.get().expect("fixture connection");
-        conn.batch_execute("
+        conn.batch_execute(
+            "
             INSERT INTO storage_groups VALUES ('primary', 'Primary', '/video', 1024);
             INSERT INTO cameras (
-                name, display_name, storage_group_name, ip, onvif_port, mac, username, password,
-                rtsp_url, ptz_type, onvif_profile_token, enabled, ptz_x_step_size, ptz_y_step_size
+                name, display_name, storage_group_name, username, password,
+                rtsp_url, enabled, ptz_x_step_size, ptz_y_step_size
             ) VALUES
-                ('front', 'Front', 'primary', '192.0.2.10', 80, '00:00:00:00:00:01',
-                 'camera-user', 'camera-password', 'rtsp://front.example/stream', 'none', NULL, 1, 1, 1),
-                ('back', 'Back', 'primary', '192.0.2.11', 80, '00:00:00:00:00:02',
-                 'camera-user', 'camera-password', 'rtsp://back.example/stream', 'none', NULL, 1, 1, 1);
+                ('front', 'Front', 'primary',
+                 'camera-user', 'camera-password', 'rtsp://front.example/stream', 1, 1, 1),
+                ('back', 'Back', 'primary',
+                 'camera-user', 'camera-password', 'rtsp://back.example/stream', 1, 1, 1);
             INSERT INTO camera_group_memberships (camera_group_name, camera_name, display_order)
                 VALUES ('all', 'front', 0), ('all', 'back', 1);
-        ").expect("camera fixtures");
+        ",
+        )
+        .expect("camera fixtures");
         insert_user(
             &mut conn,
             &bcrypt::hash("secret", 4).expect("fixture password hash"),
@@ -739,7 +742,7 @@ pub mod tests {
             "metadata": {"name": "garage"},
             "spec": {
                 "storageGroupName": "primary", "username": "onvif-user", "password": "onvif-password",
-                "rtspUrl": "rtsps://rtsp-user:rtsp-password@[2001:db8::1]:8554/private?token=secret#fragment"
+                "streamSource": {"type": "staticRtsp", "url": "rtsps://rtsp-user:rtsp-password@[2001:db8::1]:8554/private?token=secret#fragment"}
             }
         })).unwrap()).unwrap();
         service
@@ -747,7 +750,7 @@ pub mod tests {
                 Some("garage".into()),
                 serde_json::from_value(serde_json::json!({
                     "metadata": {"displayName": "Garage"},
-                    "spec": {"username": "", "password": "", "rtspUrl": ""}
+                    "spec": {"username": "", "password": "", "streamSource": {"type": "staticRtsp", "url": ""}}
                 }))
                 .unwrap(),
             )
@@ -763,6 +766,132 @@ pub mod tests {
             service.fetch_camera_group("all").unwrap().spec.members,
             ["front", "back", "garage"]
         );
+    }
+
+    #[test]
+    fn onvif_camera_configuration_saves_offline_and_preserves_static_urls() {
+        let (_dir, service) = configured_service();
+        let save = |name: &str, spec| {
+            service.save_camera(
+                Some(name.into()),
+                serde_json::from_value(serde_json::json!({ "spec": spec })).unwrap(),
+            )
+        };
+
+        let endpoint = "https://offline-camera.invalid/custom/device";
+        let onvif = |url, token| {
+            serde_json::json!({
+                "streamSource": {"type": "onvif", "deviceUrl": url, "profileToken": token}
+            })
+        };
+        let static_source =
+            serde_json::json!({ "streamSource": {"type": "staticRtsp", "url": ""} });
+        assert!(matches!(
+            save("back", onvif(endpoint, "")),
+            Err(super::Error::Field {
+                field: "onvifProfileToken",
+                ..
+            })
+        ));
+        assert!(matches!(
+            save("front", onvif("rtsp://camera.invalid", "main")),
+            Err(super::Error::Field {
+                field: "onvifDeviceUrl",
+                ..
+            })
+        ));
+        save("front", onvif(endpoint, "main")).unwrap();
+        let camera = service.fetch_camera("front").unwrap();
+        assert_eq!(
+            serde_json::to_value(camera.spec.stream_source).unwrap(),
+            onvif(endpoint, "main")["streamSource"]
+        );
+
+        save("front", static_source.clone()).unwrap();
+        assert_eq!(
+            service.fetch_camera_row("front").unwrap().stream_source(),
+            crate::api::cameras::StreamSource::StaticRtsp {
+                url: "rtsp://front.example/stream".into()
+            }
+        );
+
+        service
+            .save_camera(
+                None,
+                serde_json::from_value(serde_json::json!({
+                    "metadata": { "name": "garage" },
+                    "spec": {
+                        "storageGroupName": "primary",
+                        "streamSource": onvif(endpoint, "manual")["streamSource"]
+                    }
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+        assert!(matches!(
+            save("garage", static_source),
+            Err(super::Error::Field {
+                field: "rtspUrl",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn camera_settings_migration_preserves_legacy_ptz_and_static_capture() {
+        use crate::api::cameras::StreamSource;
+
+        let (_dir, service) = migrated_service();
+        let mut conn = service.pool.get().unwrap();
+        conn.revert_last_migration(crate::MIGRATIONS).unwrap();
+        conn.batch_execute(
+            "
+            INSERT INTO storage_groups VALUES ('primary', 'Primary', '/video', 1024);
+            INSERT INTO cameras (
+                name, display_name, storage_group_name, ip, onvif_port, mac, username, password,
+                rtsp_url, ptz_type, onvif_profile_token, enabled, ptz_x_step_size, ptz_y_step_size
+            ) VALUES (
+                'legacy', 'Legacy', 'primary', '2001:db8::1', 8899, '00:00:00:00:00:01',
+                'camera-user', 'camera-password', 'rtsp://stream.example/live',
+                'onvif_relative', 'ptz-token', 1, 25, 40
+            );
+        ",
+        )
+        .unwrap();
+        conn.run_pending_migrations(crate::MIGRATIONS).unwrap();
+        drop(conn);
+
+        let row = service.fetch_camera_row("legacy").unwrap();
+        let endpoint = "http://[2001:db8::1]:8899/onvif/device_service";
+        assert_eq!(row.ptz_target(), Some((endpoint, "ptz-token")));
+        let camera = service.fetch_camera("legacy").unwrap();
+        assert_eq!(
+            camera.spec.stream_source,
+            StreamSource::StaticRtsp {
+                url: "rtsp://stream.example/live".into()
+            }
+        );
+        let ptz = camera.spec.ptz.unwrap();
+        assert_eq!((ptz.x_step_size, ptz.y_step_size), (25, 40));
+
+        let patch = |spec| serde_json::from_value(serde_json::json!({ "spec": spec })).unwrap();
+        service
+            .save_camera(
+                Some("legacy".into()),
+                patch(serde_json::json!({ "enabled": false })),
+            )
+            .unwrap();
+        assert_eq!(
+            service.fetch_camera_row("legacy").unwrap().ptz_target(),
+            Some((endpoint, "ptz-token"))
+        );
+        service
+            .save_camera(
+                Some("legacy".into()),
+                patch(serde_json::json!({ "ptz": null })),
+            )
+            .unwrap();
+        assert!(service.fetch_camera("legacy").unwrap().spec.ptz.is_none());
     }
 
     #[test]
@@ -833,7 +962,7 @@ pub mod tests {
         let replacement = || {
             serde_json::from_value(serde_json::json!({
                 "metadata": {"name": "front"},
-                "spec": {"storageGroupName": "primary", "rtspUrl": "rtsp://front.example/live"}
+                "spec": {"storageGroupName": "primary", "streamSource": {"type": "staticRtsp", "url": "rtsp://front.example/live"}}
             }))
             .unwrap()
         };

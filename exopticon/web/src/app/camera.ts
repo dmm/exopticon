@@ -26,16 +26,21 @@ export interface ResourceMetadata {
   displayName: string;
 }
 
+export type StreamSource =
+  | { type: "staticRtsp"; url: string }
+  | { type: "onvif"; deviceUrl: string; profileToken: string };
+
+export interface PtzSettings {
+  deviceUrl: string | null;
+  profileToken: string | null;
+  xStepSize: number;
+  yStepSize: number;
+}
+
 export interface CameraSpec {
   storageGroupName: string;
-  ip: string;
-  onvifPort: number;
-  mac: string;
-  rtspUrl: string;
-  ptzType: string;
-  onvifProfileToken: string | null;
-  ptzXStepSize: number;
-  ptzYStepSize: number;
+  streamSource: StreamSource;
+  ptz: PtzSettings | null;
   enabled: boolean;
 }
 

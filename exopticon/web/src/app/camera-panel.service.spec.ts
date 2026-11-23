@@ -225,14 +225,8 @@ function buildCamera(
     metadata: { name, displayName },
     spec: {
       storageGroupName: "default",
-      ip: "127.0.0.1",
-      onvifPort: 80,
-      mac: "",
-      rtspUrl: "",
-      ptzType: "relative",
-      onvifProfileToken: null,
-      ptzXStepSize: 0,
-      ptzYStepSize: 0,
+      streamSource: { type: "staticRtsp", url: "" },
+      ptz: { deviceUrl: null, profileToken: null, xStepSize: 0, yStepSize: 0 },
       enabled,
     },
     status: {

@@ -93,11 +93,6 @@ describe("Configuration request lifecycle", () => {
 
     expect(page.textContent).toContain("http://camera.example/snapshot");
     expect(page.querySelector("app-onvif-probe img")).toBeNull();
-    expect(
-      page.querySelector<HTMLButtonElement>(
-        'button[aria-label="Add profile Sub"]',
-      )!.disabled,
-    ).toBeTrue();
     page
       .querySelector<HTMLButtonElement>(
         'button[aria-label="Add profile Main"]',
@@ -107,14 +102,9 @@ describe("Configuration request lifecycle", () => {
     harness.detectChanges();
     await harness.fixture.whenStable();
 
-    const rtspUrl =
-      "rtsp://camera%40user:pass%25word%3A%2F@camera.example/main";
-    expect(page.querySelector<HTMLInputElement>("#rtspUrl")!.value).toBe(
-      rtspUrl,
-    );
-    expect(page.textContent).not.toContain(rtspUrl);
-    expect(page.querySelector<HTMLInputElement>("#onvifPort")!.value).toBe(
-      "8080",
+    expect(page.querySelector("#rtspUrl")).toBeNull();
+    expect(page.querySelector<HTMLInputElement>("#onvifDeviceUrl")!.value).toBe(
+      "http://camera.example:8080/onvif/device_service",
     );
     expect(page.ownerDocument.activeElement?.id).toBe("resource-name");
 
@@ -132,14 +122,16 @@ describe("Configuration request lifecycle", () => {
     expect(save.request.body.spec).toEqual(
       jasmine.objectContaining({
         storageGroupName: "primary",
-        ip: "camera.example",
-        onvifPort: 8080,
-        onvifProfileToken: "main",
+        streamSource: {
+          type: "onvif",
+          deviceUrl: "http://camera.example:8080/onvif/device_service",
+          profileToken: "main",
+        },
         username: "camera@user",
         password: "pass%word:/",
-        rtspUrl,
       }),
     );
+    expect(save.request.body.spec.rtspUrl).toBeUndefined();
     const router = TestBed.inject(Router);
     const navigation = router.events
       .pipe(

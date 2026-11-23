@@ -8,6 +8,7 @@ use regex::Regex;
 use crate::{
     api::{
         auth::User,
+        cameras::StreamSource,
         configuration::{
             CameraGroupInput, CameraInput, MetadataInput, ResourceInput, StorageGroupInput,
             UserInput,
@@ -73,6 +74,16 @@ fn set<T>(value: &mut T, input: Option<T>) {
 
 fn nonempty(value: Option<String>) -> Option<String> {
     value.filter(|value| !value.is_empty())
+}
+
+fn validate_device_url(url: &str, key: &'static str) -> Result<(), Error> {
+    if !url::Url::parse(url).is_ok_and(|url| crate::onvif_client::is_device_url(&url)) {
+        return Err(field(
+            key,
+            "Enter an HTTP or HTTPS device service URL without credentials.",
+        ));
+    }
+    Ok(())
 }
 
 fn hash_password(password: &str) -> Result<String, Error> {
@@ -299,15 +310,6 @@ impl Service {
                 "The storage group is fixed after camera creation.",
             ));
         }
-        if let Some(url) = nonempty(spec.rtsp_url.clone())
-            && !url::Url::parse(&url)
-                .is_ok_and(|url| matches!(url.scheme(), "rtsp" | "rtsps") && url.has_host())
-        {
-            return Err(field("rtspUrl", "Enter an RTSP or RTSPS URL with a host."));
-        }
-        if spec.onvif_port == Some(0) {
-            return Err(field("onvifPort", "Enter a port."));
-        }
         db_write!(self, "save_camera", |conn| {
             let target = cameras::table.find(&name);
             let mut camera = if create {
@@ -327,18 +329,18 @@ impl Service {
                     name: name.clone(),
                     display_name: name.clone(),
                     storage_group_name: required(spec.storage_group_name, "storageGroupName")?,
-                    rtsp_url: required(spec.rtsp_url.clone(), "rtspUrl")?,
-                    ip: String::new(),
-                    mac: String::new(),
-                    onvif_port: 80,
+                    rtsp_url: String::new(),
                     username: String::new(),
                     password: String::new(),
-                    ptz_type: "none".to_string(),
                     onvif_profile_token: None,
                     enabled: false,
                     ptz_x_step_size: 1,
                     ptz_y_step_size: 1,
                     deletion_state: ACTIVE,
+                    onvif_device_url: None,
+                    ptz_enabled: false,
+                    ptz_device_url: None,
+                    ptz_profile_token: None,
                 }
             } else {
                 target
@@ -347,19 +349,79 @@ impl Service {
             };
 
             set(&mut camera.display_name, display);
-            set(&mut camera.ip, spec.ip);
-            set(&mut camera.mac, spec.mac);
-            set(&mut camera.onvif_port, spec.onvif_port.map(i32::from));
             set(&mut camera.username, nonempty(spec.username));
             set(&mut camera.password, nonempty(spec.password));
-            set(&mut camera.rtsp_url, nonempty(spec.rtsp_url));
-            set(&mut camera.ptz_type, spec.ptz_type);
-            if let Some(token) = spec.onvif_profile_token {
-                camera.onvif_profile_token = nonempty(Some(token));
-            }
             set(&mut camera.enabled, spec.enabled);
-            set(&mut camera.ptz_x_step_size, spec.ptz_x_step_size);
-            set(&mut camera.ptz_y_step_size, spec.ptz_y_step_size);
+
+            let source_changed = spec.stream_source.is_some();
+            if let Some(source) = spec.stream_source {
+                match source {
+                    StreamSource::StaticRtsp { url } => {
+                        if !url.trim().is_empty() {
+                            if !url::Url::parse(&url).is_ok_and(|url| {
+                                matches!(url.scheme(), "rtsp" | "rtsps") && url.has_host()
+                            }) {
+                                return Err(field(
+                                    "rtspUrl",
+                                    "Enter an RTSP or RTSPS URL with a host.",
+                                ));
+                            }
+                            camera.rtsp_url = url;
+                        }
+                        camera.onvif_device_url = None;
+                        camera.onvif_profile_token = None;
+                    }
+                    StreamSource::Onvif {
+                        device_url,
+                        profile_token,
+                    } => {
+                        validate_device_url(&device_url, "onvifDeviceUrl")?;
+                        if profile_token.trim().is_empty() {
+                            return Err(field("onvifProfileToken", "Enter a profile token."));
+                        }
+                        camera.onvif_device_url = Some(device_url);
+                        camera.onvif_profile_token = Some(profile_token);
+                    }
+                }
+            }
+            if camera.onvif_device_url.is_none() && camera.rtsp_url.trim().is_empty() {
+                return Err(field("rtspUrl", "Enter an RTSP URL."));
+            }
+
+            let ptz_changed = spec.ptz.is_some();
+            if let Some(ptz) = spec.ptz {
+                camera.ptz_enabled = ptz.is_some();
+                if let Some(ptz) = ptz {
+                    if let Some(url) = &ptz.device_url {
+                        validate_device_url(url, "ptzDeviceUrl")?;
+                    }
+                    if ptz
+                        .profile_token
+                        .as_ref()
+                        .is_some_and(|token| token.trim().is_empty())
+                    {
+                        return Err(field("ptzProfileToken", "Enter a profile token."));
+                    }
+                    camera.ptz_device_url = ptz.device_url;
+                    camera.ptz_profile_token = ptz.profile_token;
+                    camera.ptz_x_step_size = ptz.x_step_size;
+                    camera.ptz_y_step_size = ptz.y_step_size;
+                } else {
+                    camera.ptz_device_url = None;
+                    camera.ptz_profile_token = None;
+                }
+            }
+            if camera.ptz_enabled
+                && (source_changed || ptz_changed)
+                && camera.onvif_device_url.is_none()
+            {
+                if camera.ptz_device_url.is_none() {
+                    return Err(field("ptzDeviceUrl", "Enter a PTZ device service URL."));
+                }
+                if camera.ptz_profile_token.is_none() {
+                    return Err(field("ptzProfileToken", "Enter a PTZ profile token."));
+                }
+            }
 
             if create
                 && storage_groups::table

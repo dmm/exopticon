@@ -1,3 +1,8 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
+
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -7,7 +12,7 @@ use axum::{
     routing::post,
 };
 use oxvif::soap::XmlNode;
-use tokio::{net::TcpListener, task::JoinHandle};
+use tokio::{net::TcpListener, sync::Notify, task::JoinHandle};
 use tower::ServiceExt;
 
 use super::*;
@@ -16,6 +21,7 @@ struct CameraFixture {
     base: String,
     port: u16,
     server: JoinHandle<()>,
+    keyframe_requested: Arc<Notify>,
 }
 
 impl CameraFixture {
@@ -23,15 +29,23 @@ impl CameraFixture {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let base = format!("http://{address}");
+        let keyframe_requested = Arc::new(Notify::new());
         let app = Router::new()
             .route("/onvif/device_service", post(camera_reply))
+            .route("/custom/device", post(camera_reply))
             .route("/onvif/media", post(camera_reply))
-            .with_state((base.clone(), media2));
+            .with_state((
+                base.clone(),
+                media2,
+                Arc::new(AtomicUsize::new(0)),
+                Arc::clone(&keyframe_requested),
+            ));
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         Self {
             base,
             port: address.port(),
             server,
+            keyframe_requested,
         }
     }
 }
@@ -43,7 +57,12 @@ impl Drop for CameraFixture {
 }
 
 async fn camera_reply(
-    State((base, media2)): State<(String, bool)>,
+    State((base, media2, stream_requests, keyframe_requested)): State<(
+        String,
+        bool,
+        Arc<AtomicUsize>,
+        Arc<Notify>,
+    )>,
     uri: Uri,
     headers: HeaderMap,
     request: String,
@@ -72,7 +91,9 @@ async fn camera_reply(
     }
     let action = &soap.child("Body").unwrap().children[0];
     let body = match (uri.path(), action.local_name.as_str()) {
-        ("/onvif/device_service", "GetCapabilities") => {
+        ("/custom/device", "GetSystemDateAndTime") =>
+            "<GetSystemDateAndTimeResponse><SystemDateAndTime/></GetSystemDateAndTimeResponse>".into(),
+        ("/onvif/device_service" | "/custom/device", "GetCapabilities") => {
             let media = if media2 {
                 String::new()
             } else {
@@ -80,7 +101,7 @@ async fn camera_reply(
             };
             format!("<GetCapabilitiesResponse><Capabilities>{media}</Capabilities></GetCapabilitiesResponse>")
         }
-        ("/onvif/device_service", "GetServices") if media2 => format!(
+        ("/onvif/device_service" | "/custom/device", "GetServices") if media2 => format!(
             "<GetServicesResponse><Service><Namespace>http://www.onvif.org/ver20/media/wsdl</Namespace><XAddr>{base}/onvif/media</XAddr></Service></GetServicesResponse>"
         ),
         ("/onvif/device_service", "GetDeviceInformation") => String::from(
@@ -101,12 +122,22 @@ async fn camera_reply(
             )
         }
         ("/onvif/media", "GetStreamUri") if action.child("ProfileToken").unwrap().text() == "main" => {
-            let uri = "<Uri>rtsp://127.0.0.1:554/main</Uri>";
+            let uri = match stream_requests.fetch_add(1, Ordering::Relaxed) {
+                0 => "<Uri>rtsp://127.0.0.1:554/main</Uri>",
+                1 => return StatusCode::SERVICE_UNAVAILABLE.into_response(),
+                _ => "<Uri>rtsp://stream.example:8554/fresh</Uri>",
+            };
             let media_uri = if media2 { uri.to_string() } else { format!("<MediaUri>{uri}</MediaUri>") };
             format!("<GetStreamUriResponse>{media_uri}</GetStreamUriResponse>")
         }
         ("/onvif/media", "GetSnapshotUri") if !media2 && action.child("ProfileToken").unwrap().text() == "main" => {
             "<GetSnapshotUriResponse><MediaUri><Uri>http://camera-user:camera-password@127.0.0.1/snapshot</Uri></MediaUri></GetSnapshotUriResponse>".into()
+        }
+        ("/onvif/media", "SetSynchronizationPoint") => {
+            assert_eq!(action.child("ProfileToken").unwrap().text(), "main");
+            assert!(request.contains(if media2 { "/ver20/media/wsdl" } else { "/ver10/media/wsdl" }));
+            keyframe_requested.notify_one();
+            "<SetSynchronizationPointResponse/>".into()
         }
         ("/onvif/media", "GetVideoEncoderConfiguration") => {
             assert_eq!(action.child("ConfigurationToken").unwrap().text(), "video");
@@ -138,7 +169,7 @@ async fn probe_prefers_the_advertised_endpoint_and_keeps_partial_profile_results
         username: "probe-user".into(),
         password: "probe-password".into(),
     };
-    let target = Target::resolve(&request.host).await.unwrap();
+    let target = resolve_target(&request.host).await.unwrap();
     let advertised = format!("{}/onvif/device_service", camera.base);
     let result = probe_endpoints(
         &request,
@@ -205,4 +236,40 @@ async fn probe_api_uses_fallback_port_and_reads_media2_profiles() {
     assert_eq!(body["profiles"][0]["rtspUrl"], "rtsp://127.0.0.1:554/main");
     assert!(body["profiles"][0]["snapshotUrl"].is_null());
     assert!(body["profiles"][1]["rtspUrl"].is_null());
+}
+
+#[tokio::test]
+async fn capture_actor_resolves_a_fresh_uri_and_requests_keyframes_for_the_same_profile() {
+    for media2 in [false, true] {
+        let fixture = CameraFixture::start(media2).await;
+        let (_dir, db) = crate::db::tests::configured_service();
+        let mut camera = db.fetch_camera_row("front").unwrap();
+        camera.username = "probe-user".into();
+        camera.password = "pass%:/word".into();
+        let (handle, actor) = crate::onvif_actor::actor(
+            camera,
+            format!("{}/custom/device", fixture.base),
+            "main".into(),
+        );
+        let task = tokio::spawn(actor);
+
+        let first = handle.stream_uri().await.unwrap();
+        assert_eq!(first.host_str(), Some("127.0.0.1"));
+        assert!(handle.stream_uri().await.is_err());
+        let next = handle.stream_uri().await.unwrap();
+        assert_eq!(
+            next.as_str(),
+            "rtsp://probe-user:pass%25%3A%2Fword@stream.example:8554/fresh"
+        );
+
+        handle.keyframe_requests.request();
+        timeout(
+            Duration::from_secs(1),
+            fixture.keyframe_requested.notified(),
+        )
+        .await
+        .unwrap();
+        drop(handle);
+        task.await.unwrap();
+    }
 }

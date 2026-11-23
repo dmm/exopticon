@@ -27,7 +27,6 @@ use serde::{Deserialize, Serialize};
 use tokio::task::spawn_blocking;
 
 use crate::AppState;
-use crate::keyframe_requests::device_url as onvif_device_url;
 
 use super::configuration::{create_camera, delete_camera, edit_camera};
 use super::{ResourceMetadata, UserError};
@@ -38,15 +37,35 @@ mod onvif_probe;
 #[serde(rename_all = "camelCase")]
 pub struct CameraSpec {
     pub storage_group_name: String,
-    pub ip: String,
-    pub onvif_port: u16,
-    pub mac: String,
-    pub rtsp_url: String,
-    pub ptz_type: String,
-    pub onvif_profile_token: Option<String>,
+    pub stream_source: StreamSource,
+    pub ptz: Option<PtzSettings>,
     pub enabled: bool,
-    pub ptz_x_step_size: i16,
-    pub ptz_y_step_size: i16,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum StreamSource {
+    StaticRtsp {
+        url: String,
+    },
+    Onvif {
+        device_url: String,
+        profile_token: String,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PtzSettings {
+    pub device_url: Option<String>,
+    pub profile_token: Option<String>,
+    pub x_step_size: i16,
+    pub y_step_size: i16,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -143,6 +162,11 @@ async fn move_camera(
     camera: &crate::db::cameras::Camera,
     direction: &str,
 ) -> Result<(), UserError> {
+    if !camera.ptz_enabled {
+        return Err(UserError::Validation(
+            "PTZ is disabled for this camera".to_string(),
+        ));
+    }
     let zoom = 0.0;
     let x_step = f32::from(camera.ptz_x_step_size);
     let y_step = f32::from(camera.ptz_y_step_size);
@@ -158,19 +182,13 @@ async fn move_camera(
         }
     };
 
-    let endpoint = onvif_device_url(
-        &camera.ip,
-        camera.onvif_port.try_into().expect("invalid port number"),
-    );
-    let onvif_cam =
-        OnvifClient::new(&endpoint).with_credentials(&camera.username, &camera.password);
-
-    let profile_token = camera.onvif_profile_token.as_deref().ok_or_else(|| {
-        UserError::Validation("ONVIF profile token is not configured".to_string())
+    let (endpoint, profile_token) = camera.ptz_target().ok_or_else(|| {
+        UserError::Validation("PTZ device service URL and profile token are required".to_string())
     })?;
+    let onvif_cam = OnvifClient::new(endpoint).with_credentials(&camera.username, &camera.password);
 
     if onvif_cam
-        .ptz_relative_move(&endpoint, profile_token, x, y, zoom)
+        .ptz_relative_move(endpoint, profile_token, x, y, zoom)
         .await
         .is_err()
     {

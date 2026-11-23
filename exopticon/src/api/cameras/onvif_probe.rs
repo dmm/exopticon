@@ -1,7 +1,6 @@
 use std::{
     collections::HashSet,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
+    net::{IpAddr, SocketAddr},
     time::Duration,
 };
 
@@ -18,11 +17,10 @@ use tokio::time::timeout;
 use tracing::instrument::WithSubscriber;
 use url::{Host, Url};
 
-use crate::{api::UserError, keyframe_requests::device_url};
-
-use self::transport::CameraTransport;
-
-mod transport;
+use crate::{
+    api::UserError,
+    onvif_client::{Target, device_url},
+};
 
 const DISCOVERY_TIMEOUT: Duration = Duration::from_millis(900);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -36,13 +34,6 @@ pub(super) struct ProbeRequest {
     username: String,
     #[serde(default)]
     password: String,
-}
-
-impl ProbeRequest {
-    fn credentials(&self) -> Option<(&str, &str)> {
-        (!self.username.is_empty() || !self.password.is_empty())
-            .then_some((&self.username, &self.password))
-    }
 }
 
 #[derive(Serialize)]
@@ -110,54 +101,22 @@ impl VideoDetails {
     }
 }
 
-#[derive(Clone)]
-struct Target {
-    host: String,
-    addresses: Vec<SocketAddr>,
-}
-
-impl Target {
-    async fn resolve(input: &str) -> Result<Self, UserError> {
-        let host = Host::parse(input.trim())
-            .map_err(|_| invalid_host())?
-            .to_string();
-        let addresses = tokio::net::lookup_host((host.as_str(), 0))
-            .await
-            .map_err(|_| invalid_host())?
-            .filter(|addr| match addr.ip() {
-                IpAddr::V4(ip) => !ip.is_multicast() && !ip.is_unspecified() && !ip.is_broadcast(),
-                _ => false,
-            })
-            .collect::<Vec<_>>();
-        if addresses.is_empty() {
-            return Err(invalid_host());
-        }
-        Ok(Self { host, addresses })
-    }
-
-    fn matches(&self, url: &Url) -> bool {
-        match url.host() {
-            Some(Host::Domain(host)) => {
-                host.eq_ignore_ascii_case(&self.host)
-                    || host.parse::<Ipv4Addr>().is_ok_and(|ip| self.has_ip(ip))
-            }
-            Some(Host::Ipv4(ip)) => self.has_ip(ip),
+async fn resolve_target(input: &str) -> Result<Target, UserError> {
+    let host = Host::parse(input.trim())
+        .map_err(|_| invalid_host())?
+        .to_string();
+    let addresses = tokio::net::lookup_host((host.as_str(), 0))
+        .await
+        .map_err(|_| invalid_host())?
+        .filter(|addr| match addr.ip() {
+            IpAddr::V4(ip) => !ip.is_multicast() && !ip.is_unspecified() && !ip.is_broadcast(),
             _ => false,
-        }
+        })
+        .collect::<Vec<_>>();
+    if addresses.is_empty() {
+        return Err(invalid_host());
     }
-
-    fn has_ip(&self, ip: Ipv4Addr) -> bool {
-        self.addresses
-            .iter()
-            .any(|addr| addr.ip() == IpAddr::V4(ip))
-    }
-
-    fn allows_soap(&self, url: &Url) -> bool {
-        matches!(url.scheme(), "http" | "https")
-            && url.username().is_empty()
-            && url.password().is_none()
-            && self.matches(url)
-    }
+    Ok(Target { host, addresses })
 }
 
 fn invalid_host() -> UserError {
@@ -190,7 +149,7 @@ pub(super) async fn probe(
 }
 
 async fn probe_camera(request: ProbeRequest, port: u16) -> Result<ProbeResult, UserError> {
-    let target = Target::resolve(&request.host).await?;
+    let target = resolve_target(&request.host).await?;
     let mut seen = HashSet::new();
     let addresses = target
         .addresses
@@ -221,13 +180,9 @@ async fn probe_endpoints(
 
     let mut partial_result = None;
     for endpoint in endpoints {
-        let transport = CameraTransport::new(target.clone(), request.credentials())
+        let builder = target
+            .session(&endpoint, &request.username, &request.password)
             .map_err(|_| UserError::InternalError("camera probe transport setup failed".into()))?;
-        let mut builder =
-            OnvifSession::builder(endpoint.as_str()).with_transport(Arc::new(transport));
-        if let Some((username, password)) = request.credentials() {
-            builder = builder.with_credentials(username, password);
-        }
         let session = match builder.build().await {
             Ok(session) => session,
             Err(error) if is_auth_error(&error) => return Err(authentication_error()),

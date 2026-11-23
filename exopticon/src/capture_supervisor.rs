@@ -25,13 +25,11 @@ use std::time::Duration;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
-use tokio::task::{JoinError, spawn_blocking};
+use tokio::task::{JoinError, JoinHandle, JoinSet, spawn_blocking};
 
-use crate::api::cameras::CameraStatus;
-use crate::capture_actor;
+use crate::api::cameras::{CameraStatus, StreamSource};
 use crate::video_router::VideoRouter;
-use crate::{CameraStatusRegistry, db::cameras::Camera};
+use crate::{CameraStatusRegistry, capture_actor, db::cameras::Camera, onvif_actor};
 
 pub enum Command {
     RestartAll,
@@ -54,6 +52,8 @@ pub struct CaptureSupervisor {
     command_receiver: mpsc::Receiver<Command>,
     capture_channels: HashMap<String, mpsc::Sender<capture_actor::Command>>,
     capture_handles: FuturesUnordered<JoinHandle<String>>,
+    onvif_handles: HashMap<String, onvif_actor::Handle>,
+    onvif_tasks: JoinSet<()>,
     video_router: Arc<VideoRouter>,
     camera_status_registry: CameraStatusRegistry,
 }
@@ -74,6 +74,8 @@ impl CaptureSupervisor {
             command_receiver,
             capture_channels: HashMap::new(),
             capture_handles: FuturesUnordered::new(),
+            onvif_handles: HashMap::new(),
+            onvif_tasks: JoinSet::new(),
             video_router,
             camera_status_registry,
         }
@@ -92,6 +94,11 @@ impl CaptureSupervisor {
         }
 
         self.capture_channels.clear();
+        for name in self.onvif_handles.keys() {
+            self.video_router.unregister_keyframe_requests(name).await;
+        }
+        self.onvif_handles.clear();
+        self.onvif_tasks.shutdown().await;
     }
 
     async fn start_camera(&mut self, c: Camera) -> anyhow::Result<()> {
@@ -100,6 +107,29 @@ impl CaptureSupervisor {
         let storage_group =
             spawn_blocking(move || db.fetch_storage_group(&storage_group_name)).await??;
         let name = c.name.clone();
+        let stream = match c.stream_source() {
+            StreamSource::StaticRtsp { url } => capture_actor::Stream::StaticRtsp(url),
+            StreamSource::Onvif {
+                device_url,
+                profile_token,
+            } => {
+                let handle = if let Some(handle) = self.onvif_handles.get(&name) {
+                    handle.clone()
+                } else {
+                    let (handle, task) = onvif_actor::actor(c.clone(), device_url, profile_token);
+                    self.video_router
+                        .register_keyframe_requests(
+                            name.clone(),
+                            Arc::clone(&handle.keyframe_requests),
+                        )
+                        .await;
+                    self.onvif_handles.insert(name.clone(), handle.clone());
+                    self.onvif_tasks.spawn(task);
+                    handle
+                };
+                capture_actor::Stream::Onvif(handle)
+            }
+        };
         let (command_sender, command_receiver) = mpsc::channel(1);
         let actor = capture_actor::CaptureActor::new(
             self.db.clone(),
@@ -114,7 +144,7 @@ impl CaptureSupervisor {
             .await
             .insert(name.clone(), CameraStatus::starting());
         self.capture_channels.insert(name, command_sender);
-        let fut = tokio::spawn(actor.run());
+        let fut = tokio::spawn(actor.run(stream));
         self.capture_handles.push(fut);
         Ok(())
     }

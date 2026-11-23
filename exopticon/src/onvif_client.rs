@@ -1,26 +1,84 @@
-use std::time::Duration;
+use std::{
+    net::{IpAddr, Ipv6Addr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use diqwest::{DigestAuthSession, WithDigestAuth};
-use oxvif::transport::{Transport, TransportError};
-use url::Url;
-
-use super::Target;
+use oxvif::{
+    OnvifSession, OnvifSessionBuilder,
+    transport::{Transport, TransportError},
+};
+use url::{Host, Url};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(4);
 const MAX_SOAP_BYTES: usize = 2 * 1024 * 1024;
 
-pub(super) struct CameraTransport {
+pub fn device_url(host: &str, port: u16) -> String {
+    let host = if host.parse::<Ipv6Addr>().is_ok() {
+        format!("[{host}]")
+    } else {
+        host.to_string()
+    };
+    format!("http://{host}:{port}/onvif/device_service")
+}
+
+pub fn is_device_url(url: &Url) -> bool {
+    matches!(url.scheme(), "http" | "https")
+        && url.has_host()
+        && url.username().is_empty()
+        && url.password().is_none()
+}
+
+#[derive(Clone)]
+pub struct Target {
+    pub host: String,
+    pub addresses: Vec<SocketAddr>,
+}
+
+impl Target {
+    pub fn matches(&self, url: &Url) -> bool {
+        let ip = match url.host() {
+            Some(Host::Domain(host)) if host.eq_ignore_ascii_case(&self.host) => return true,
+            Some(Host::Domain(host)) => host.parse().ok(),
+            Some(Host::Ipv4(ip)) => Some(IpAddr::V4(ip)),
+            Some(Host::Ipv6(ip)) => Some(IpAddr::V6(ip)),
+            None => None,
+        };
+        ip.is_some_and(|ip| self.addresses.iter().any(|addr| addr.ip() == ip))
+    }
+
+    pub fn allows_soap(&self, url: &Url) -> bool {
+        is_device_url(url) && self.matches(url)
+    }
+
+    pub fn session(
+        &self,
+        endpoint: &Url,
+        username: &str,
+        password: &str,
+    ) -> Result<OnvifSessionBuilder, reqwest::Error> {
+        let credentials =
+            (!username.is_empty() || !password.is_empty()).then_some((username, password));
+        let transport = CameraTransport::new(self.clone(), credentials)?;
+        let builder = OnvifSession::builder(endpoint.as_str()).with_transport(Arc::new(transport));
+        Ok(if let Some((username, password)) = credentials {
+            builder.with_credentials(username, password)
+        } else {
+            builder
+        })
+    }
+}
+
+struct CameraTransport {
     target: Target,
     client: reqwest::Client,
     digest: Option<DigestAuthSession>,
 }
 
 impl CameraTransport {
-    pub(super) fn new(
-        target: Target,
-        credentials: Option<(&str, &str)>,
-    ) -> Result<Self, reqwest::Error> {
+    fn new(target: Target, credentials: Option<(&str, &str)>) -> Result<Self, reqwest::Error> {
         // Pin the requested hostname to the same addresses used for discovery.
         // Device-provided service URLs and redirects can otherwise forward the
         // SOAP credentials to a different machine.

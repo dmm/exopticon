@@ -38,16 +38,18 @@ along with Exopticon.  If not, see <http://www.gnu.org/licenses/>.
         <dd>{{ camera.status.audioCodec ?? "n/a" }}</dd>
         <dt>Storage Group</dt>
         <dd>{{ camera.spec.storageGroupName }}</dd>
-        <dt>IP</dt>
-        <dd>{{ camera.spec.ip }}</dd>
-        <dt>ONVIF Port</dt>
-        <dd>{{ camera.spec.onvifPort }}</dd>
-        <dt>MAC</dt>
-        <dd>{{ camera.spec.mac }}</dd>
-        <dt>RTSP endpoint</dt>
-        <dd>{{ camera.spec.rtspUrl }}</dd>
-        <dt>PTZ Type</dt>
-        <dd>{{ camera.spec.ptzType }}</dd>
+        @let stream = camera.spec.streamSource;
+        @if (stream.type === "onvif") {
+          <dt>ONVIF device service URL</dt>
+          <dd>{{ stream.deviceUrl }}</dd>
+          <dt>ONVIF profile token</dt>
+          <dd>{{ stream.profileToken }}</dd>
+        } @else {
+          <dt>RTSP endpoint</dt>
+          <dd>{{ stream.url }}</dd>
+        }
+        <dt>PTZ controls</dt>
+        <dd>{{ camera.spec.ptz ? "Enabled" : "Disabled" }}</dd>
         <dt>Enabled</dt>
         <dd>{{ camera.spec.enabled }}</dd>
       </dl>

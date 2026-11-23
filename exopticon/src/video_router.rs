@@ -20,7 +20,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use crate::keyframe_requests::KeyframeRequestGate;
+use crate::onvif_actor::KeyframeRequestGate;
 use tokio::sync::{RwLock, mpsc};
 
 use crate::{capture_actor::VideoPacket, webrtc_client::ClientId};

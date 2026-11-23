@@ -83,14 +83,8 @@ function buildCamera(name: string): Camera {
     metadata: { name, displayName: "Front Door" },
     spec: {
       storageGroupName: "default",
-      ip: "127.0.0.1",
-      onvifPort: 80,
-      mac: "",
-      rtspUrl: "",
-      ptzType: "none",
-      onvifProfileToken: null,
-      ptzXStepSize: 0,
-      ptzYStepSize: 0,
+      streamSource: { type: "staticRtsp", url: "" },
+      ptz: null,
       enabled: true,
     },
     status: {
