@@ -231,7 +231,6 @@ function buildCamera(
     },
     status: {
       phase: enabled ? "running" : "disabled",
-      active: enabled,
     },
   };
 }

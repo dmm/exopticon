@@ -72,7 +72,6 @@ pub struct PtzSettings {
 #[serde(rename_all = "camelCase")]
 pub struct CameraStatus {
     pub phase: String,
-    pub active: bool,
     pub last_started_at: Option<chrono::DateTime<chrono::Utc>>,
     pub video_codec: Option<String>,
     pub audio_codec: Option<String>,
@@ -84,7 +83,6 @@ impl CameraStatus {
     pub fn disabled() -> Self {
         Self {
             phase: "disabled".to_string(),
-            active: false,
             last_started_at: None,
             video_codec: None,
             audio_codec: None,
@@ -96,7 +94,6 @@ impl CameraStatus {
     pub fn starting() -> Self {
         Self {
             phase: "starting".to_string(),
-            active: true,
             last_started_at: Some(chrono::Utc::now()),
             video_codec: None,
             audio_codec: None,

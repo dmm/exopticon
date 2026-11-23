@@ -46,7 +46,6 @@ export interface CameraSpec {
 
 export interface CameraStatus {
   phase: "disabled" | "starting" | "running" | "stopped" | "error";
-  active: boolean;
   lastStartedAt?: string;
   videoCodec?: string;
   audioCodec?: string;

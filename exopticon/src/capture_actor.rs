@@ -361,7 +361,6 @@ impl CaptureActor {
             self.camera.name.clone(),
             CameraStatus {
                 phase: "running".to_string(),
-                active: true,
                 last_started_at,
                 video_codec: self.video_codec.clone(),
                 audio_codec: self.audio_codec.clone(),
@@ -562,7 +561,6 @@ impl CaptureActor {
                     "stopped"
                 }
                 .to_string(),
-                active: false,
                 last_started_at: None,
                 video_codec: self.video_codec.clone(),
                 audio_codec: self.audio_codec.clone(),

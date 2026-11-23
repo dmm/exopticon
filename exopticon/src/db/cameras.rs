@@ -84,7 +84,6 @@ impl From<Camera> for crate::api::cameras::Camera {
         let status = if c.enabled {
             CameraStatus {
                 phase: "stopped".to_string(),
-                active: false,
                 last_started_at: None,
                 video_codec: None,
                 audio_codec: None,

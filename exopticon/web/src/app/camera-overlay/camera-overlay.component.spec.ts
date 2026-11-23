@@ -89,7 +89,6 @@ function buildCamera(name: string): Camera {
     },
     status: {
       phase: "running",
-      active: true,
     },
   };
 }
