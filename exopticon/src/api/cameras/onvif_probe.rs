@@ -91,9 +91,9 @@ struct VideoDetails {
 }
 
 impl VideoDetails {
-    fn new(codec: impl ToString, resolution: Resolution, frame_rate: Option<f32>) -> Self {
+    const fn new(codec: String, resolution: Resolution, frame_rate: Option<f32>) -> Self {
         Self {
-            codec: codec.to_string(),
+            codec,
             width: resolution.width,
             height: resolution.height,
             frame_rate,
@@ -110,7 +110,7 @@ async fn resolve_target(input: &str) -> Result<Target, UserError> {
         .map_err(|_| invalid_host())?
         .filter(|addr| match addr.ip() {
             IpAddr::V4(ip) => !ip.is_multicast() && !ip.is_unspecified() && !ip.is_broadcast(),
-            _ => false,
+            IpAddr::V6(_) => false,
         })
         .collect::<Vec<_>>();
     if addresses.is_empty() {
@@ -119,7 +119,7 @@ async fn resolve_target(input: &str) -> Result<Target, UserError> {
     Ok(Target { host, addresses })
 }
 
-fn invalid_host() -> UserError {
+const fn invalid_host() -> UserError {
     UserError::Field {
         field: "host",
         message: "Enter an IPv4 address or a hostname that resolves to one.",
@@ -288,10 +288,15 @@ async fn probe_profile(
                         .get_video_encoder_configuration(encoder)
                         .await
                         .ok()?;
+                    #[expect(
+                        clippy::cast_precision_loss,
+                        reason = "Preserve the probe response's f32 frame rate across Media1 and Media2"
+                    )]
+                    let frame_rate = config.rate_control.map(|rate| rate.frame_rate_limit as f32);
                     Some(VideoDetails::new(
-                        config.encoding,
+                        config.encoding.to_string(),
                         config.resolution,
-                        config.rate_control.map(|rate| rate.frame_rate_limit as f32),
+                        frame_rate,
                     ))
                 },
             );
@@ -315,7 +320,7 @@ async fn probe_profile(
                         .await
                         .ok()?;
                     Some(VideoDetails::new(
-                        config.encoding,
+                        config.encoding.to_string(),
                         config.resolution,
                         config.rate_control.map(|rate| rate.frame_rate_limit),
                     ))

@@ -39,15 +39,21 @@ pub struct CameraInput {
     pub password: Option<String>,
     pub stream_source: Option<StreamSource>,
     #[serde(default, deserialize_with = "nullable_ptz")]
-    pub ptz: Option<Option<PtzSettings>>,
+    pub ptz: PtzUpdate,
     pub enabled: Option<bool>,
 }
 
+#[derive(Default)]
+pub enum PtzUpdate {
+    #[default]
+    Unchanged,
+    Disable,
+    Set(PtzSettings),
+}
+
 // A missing field keeps the previous PTZ settings. Explicit null disables PTZ.
-fn nullable_ptz<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<Option<PtzSettings>>, D::Error> {
-    Option::deserialize(deserializer).map(Some)
+fn nullable_ptz<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PtzUpdate, D::Error> {
+    Option::deserialize(deserializer).map(|ptz| ptz.map_or(PtzUpdate::Disable, PtzUpdate::Set))
 }
 
 #[derive(Default, Deserialize)]

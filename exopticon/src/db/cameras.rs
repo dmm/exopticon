@@ -52,18 +52,18 @@ pub struct Camera {
 
 impl Camera {
     pub fn stream_source(&self) -> StreamSource {
-        match &self.onvif_device_url {
-            Some(device_url) => StreamSource::Onvif {
+        self.onvif_device_url.as_ref().map_or_else(
+            || StreamSource::StaticRtsp {
+                url: self.rtsp_url.clone(),
+            },
+            |device_url| StreamSource::Onvif {
                 device_url: device_url.clone(),
                 profile_token: self
                     .onvif_profile_token
                     .clone()
                     .expect("ONVIF stream has a profile token"),
             },
-            None => StreamSource::StaticRtsp {
-                url: self.rtsp_url.clone(),
-            },
-        }
+        )
     }
 
     pub fn ptz_target(&self) -> Option<(&str, &str)> {

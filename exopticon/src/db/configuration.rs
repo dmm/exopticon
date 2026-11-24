@@ -10,8 +10,8 @@ use crate::{
         auth::User,
         cameras::StreamSource,
         configuration::{
-            CameraGroupInput, CameraInput, MetadataInput, ResourceInput, StorageGroupInput,
-            UserInput,
+            CameraGroupInput, CameraInput, MetadataInput, PtzUpdate, ResourceInput,
+            StorageGroupInput, UserInput,
         },
     },
     schema::{
@@ -388,10 +388,15 @@ impl Service {
                 return Err(field("rtspUrl", "Enter an RTSP URL."));
             }
 
-            let ptz_changed = spec.ptz.is_some();
-            if let Some(ptz) = spec.ptz {
-                camera.ptz_enabled = ptz.is_some();
-                if let Some(ptz) = ptz {
+            let ptz_changed = !matches!(spec.ptz, PtzUpdate::Unchanged);
+            match spec.ptz {
+                PtzUpdate::Unchanged => {}
+                PtzUpdate::Disable => {
+                    camera.ptz_enabled = false;
+                    camera.ptz_device_url = None;
+                    camera.ptz_profile_token = None;
+                }
+                PtzUpdate::Set(ptz) => {
                     if let Some(url) = &ptz.device_url {
                         validate_device_url(url, "ptzDeviceUrl")?;
                     }
@@ -402,13 +407,11 @@ impl Service {
                     {
                         return Err(field("ptzProfileToken", "Enter a profile token."));
                     }
+                    camera.ptz_enabled = true;
                     camera.ptz_device_url = ptz.device_url;
                     camera.ptz_profile_token = ptz.profile_token;
                     camera.ptz_x_step_size = ptz.x_step_size;
                     camera.ptz_y_step_size = ptz.y_step_size;
-                } else {
-                    camera.ptz_device_url = None;
-                    camera.ptz_profile_token = None;
                 }
             }
             if camera.ptz_enabled
