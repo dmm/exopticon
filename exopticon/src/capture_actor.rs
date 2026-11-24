@@ -36,6 +36,7 @@ use tokio::{
     process::{self, Child, ChildStdin, ChildStdout},
     sync::mpsc,
     task::spawn_blocking,
+    time::{self, sleep_until, timeout_at},
 };
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec, length_delimited};
 use uuid::Uuid;
@@ -50,6 +51,7 @@ use crate::{
 use exserial::models::{CaptureMessage, PacketEncoding};
 
 const PACKET_STATUS_UPDATE_INTERVAL: Duration = Duration::from_secs(1);
+const CAPTURE_WORKER_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 pub struct VideoPacket {
@@ -201,6 +203,19 @@ fn cleanup_staged_recordings(staging_path: &Path) -> anyhow::Result<()> {
         );
     }
     Ok(())
+}
+
+async fn wait_for_capture_worker(child: &mut Child, deadline: time::Instant) -> anyhow::Result<()> {
+    if let Ok(result) = timeout_at(deadline, child.wait()).await {
+        result.context("waiting for capture worker exit")?;
+        return Ok(());
+    }
+
+    child
+        .kill()
+        .await
+        .context("killing and reaping capture worker after shutdown timed out")?;
+    anyhow::bail!("capture worker exceeded its shutdown deadline and was killed");
 }
 
 pub struct CaptureActor {
@@ -528,24 +543,42 @@ impl CaptureActor {
             }
         };
 
-        // EOF requests a graceful shutdown. Keep reading stdout until
-        // the worker closes it so final messages are published before
-        // cleanup.
+        // EOF signals a shutdown. Wait for final messages to arrive
+        // until the shutdown deadline.
+        let deadline = time::Instant::now() + CAPTURE_WORKER_SHUTDOWN_TIMEOUT;
         drop(self.child_stdin.take());
 
         if let Some((mut child, mut framed_stream)) = self.child.take() {
-            while let Some(msg) = framed_stream.next().await {
-                if let Err(e) = self.stream_handler(msg).await {
-                    error!(
-                        "Error handling capture worker message during shutdown: {}",
-                        e
-                    );
-                    error_message = Some("capture actor exited after error");
+            let pid = child.id();
+            let drain = async {
+                let deadline = sleep_until(deadline);
+                tokio::pin!(deadline);
+                loop {
+                    let message = tokio::select! {
+                        biased;
+                        () = &mut deadline => break,
+                        message = framed_stream.next() => message,
+                    };
+                    let Some(message) = message else { break };
+                    // Allow publication to finish, even if the worker
+                    // is killed.
+                    if let Err(e) = self.stream_handler(message).await {
+                        error!(
+                            "Error handling capture worker message during shutdown: {}",
+                            e
+                        );
+                        error_message = Some("capture actor exited after error");
+                    }
                 }
-            }
-            if let Err(e) = child.wait().await {
-                error!("error waiting for child exit: {}", e);
-                error_message = Some("capture actor exited after error");
+            };
+            let ((), exit_result) =
+                tokio::join!(drain, wait_for_capture_worker(&mut child, deadline));
+            if let Err(error) = exit_result {
+                error!(
+                    "Capture worker shutdown failed for {} (PID {pid:?}): {error:#}",
+                    self.camera.name,
+                );
+                error_message = Some("capture worker shutdown failed");
             }
         }
 
@@ -575,6 +608,30 @@ impl CaptureActor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn worker_past_shutdown_deadline_is_killed_and_reaped() {
+        use std::os::unix::process::ExitStatusExt;
+
+        let mut child = process::Command::new("sleep")
+            .arg("60")
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let deadline = time::Instant::now() + Duration::from_millis(25);
+        let error = time::timeout(
+            Duration::from_secs(5),
+            wait_for_capture_worker(&mut child, deadline),
+        )
+        .await
+        .expect("shutdown deadline did not stop the worker")
+        .unwrap_err();
+
+        assert!(error.to_string().contains("exceeded its shutdown deadline"));
+        assert_eq!(child.try_wait().unwrap().unwrap().signal(), Some(9));
+        assert_eq!(child.id(), None);
+    }
 
     #[test]
     fn staging_cleanup_removes_only_this_cameras_abandoned_recordings() {
