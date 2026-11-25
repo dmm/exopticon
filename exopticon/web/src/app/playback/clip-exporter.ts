@@ -398,6 +398,9 @@ export async function exportClip(
     let firstAudioWritten = false;
     let videoPacketCount = 0;
     let audioPacketCount = 0;
+    let maxVideoRebasedSec: number | undefined;
+    let minAllowedVideoRebasedSec = 0;
+    let lastAudioRebasedSec: number | undefined;
     let previousFragmentMaxVideoUtcNs: bigint | undefined;
     let previousFragmentMaxAudioUtcNs: bigint | undefined;
     let maxEmittedVideoUtcNs: bigint | undefined;
@@ -544,7 +547,9 @@ export async function exportClip(
           }
         }
 
-        const videoIter = videoSink.packets(startVideoPacket);
+        const videoIter = videoSink.packets(startVideoPacket, undefined, {
+          verifyKeyPackets: true,
+        });
         let fragmentMaxVideoUtcNs = previousFragmentMaxVideoUtcNs;
         const pendingBeyondEnd: Array<{
           packet: EncodedPacket;
@@ -555,7 +560,15 @@ export async function exportClip(
           packet: EncodedPacket,
           utcNs: bigint,
         ) => {
-          const rebasedSec = Math.max(0, Number(utcNs - anchorUtcNs!) / 1e9);
+          if (
+            firstVideoWritten &&
+            packet.type === "key" &&
+            maxVideoRebasedSec !== undefined
+          ) {
+            minAllowedVideoRebasedSec = maxVideoRebasedSec;
+          }
+          const rawRebasedSec = Math.max(0, Number(utcNs - anchorUtcNs!) / 1e9);
+          const rebasedSec = Math.max(rawRebasedSec, minAllowedVideoRebasedSec);
           const cloned = packet.clone({ timestamp: rebasedSec });
           await videoSource!.add(
             cloned,
@@ -565,6 +578,10 @@ export async function exportClip(
           );
           firstVideoWritten = true;
           videoPacketCount++;
+          maxVideoRebasedSec =
+            maxVideoRebasedSec === undefined
+              ? rebasedSec
+              : Math.max(maxVideoRebasedSec, rebasedSec);
           if (
             fragmentMaxVideoUtcNs === undefined ||
             utcNs > fragmentMaxVideoUtcNs
@@ -662,7 +679,12 @@ export async function exportClip(
                 if (utcNs > audioEndNs) {
                   break;
                 }
-                const rebasedSec = Number(utcNs - anchorUtcNs!) / 1e9;
+                const rawRebasedSec = Number(utcNs - anchorUtcNs!) / 1e9;
+                const rebasedSec =
+                  lastAudioRebasedSec !== undefined &&
+                  rawRebasedSec < lastAudioRebasedSec
+                    ? lastAudioRebasedSec
+                    : rawRebasedSec;
                 const cloned = packet.clone({ timestamp: rebasedSec });
                 await audioMode!.source.add(
                   cloned,
@@ -672,6 +694,7 @@ export async function exportClip(
                 );
                 firstAudioWritten = true;
                 audioPacketCount++;
+                lastAudioRebasedSec = rebasedSec;
                 if (
                   fragmentMaxAudioUtcNs === undefined ||
                   utcNs > fragmentMaxAudioUtcNs

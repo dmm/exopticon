@@ -42,6 +42,89 @@ function makeDescriptor(
   };
 }
 
+function readEbmlVint(
+  bytes: Uint8Array,
+  offset: number,
+): { value: number; length: number } {
+  const first = bytes[offset];
+  let length = 1;
+  let mask = 0x80;
+  while (length <= 8 && (first & mask) === 0) {
+    mask >>= 1;
+    length++;
+  }
+  let value = first & (mask - 1);
+  for (let i = 1; i < length; i++) {
+    value = value * 256 + bytes[offset + i];
+  }
+  return { value, length };
+}
+
+/** Walk Matroska SimpleBlocks inside Clusters and mutate their header fields in-place. */
+async function patchMkvSimpleBlocks(
+  blob: Blob,
+  mutate: (block: {
+    trackNumber: number;
+    indexForTrack: number;
+    timecode: number;
+    flags: number;
+    setTimecode: (value: number) => void;
+    setFlags: (value: number) => void;
+  }) => void,
+): Promise<Blob> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  const trackCounts = new Map<number, number>();
+
+  for (let i = 0; i + 4 < bytes.length; i++) {
+    // Cluster ID: 0x1F 0x43 0xB6 0x75
+    if (
+      bytes[i] !== 0x1f ||
+      bytes[i + 1] !== 0x43 ||
+      bytes[i + 2] !== 0xb6 ||
+      bytes[i + 3] !== 0x75
+    ) {
+      continue;
+    }
+    const clusterSize = readEbmlVint(bytes, i + 4);
+    let pos = i + 4 + clusterSize.length;
+    const clusterEnd = Math.min(bytes.length, pos + clusterSize.value);
+    while (pos < clusterEnd) {
+      const idFirst = bytes[pos];
+      let idLen = 1;
+      let idMask = 0x80;
+      while (idLen <= 4 && (idFirst & idMask) === 0) {
+        idMask >>= 1;
+        idLen++;
+      }
+      const isSimpleBlock = idLen === 1 && idFirst === 0xa3;
+      const elemSize = readEbmlVint(bytes, pos + idLen);
+      const dataStart = pos + idLen + elemSize.length;
+      if (isSimpleBlock && dataStart + 4 <= clusterEnd) {
+        const trackVint = readEbmlVint(bytes, dataStart);
+        const tcOffset = dataStart + trackVint.length;
+        const flagsOffset = tcOffset + 2;
+        const indexForTrack = trackCounts.get(trackVint.value) ?? 0;
+        trackCounts.set(trackVint.value, indexForTrack + 1);
+        mutate({
+          trackNumber: trackVint.value,
+          indexForTrack,
+          timecode: view.getInt16(tcOffset, false),
+          flags: bytes[flagsOffset],
+          setTimecode: (value) => view.setInt16(tcOffset, value, false),
+          setFlags: (value) => {
+            bytes[flagsOffset] = value;
+          },
+        });
+      }
+      pos = dataStart + elemSize.value;
+    }
+    i = clusterEnd - 1;
+  }
+
+  return new Blob([bytes], { type: blob.type });
+}
+
 describe("exportClip", () => {
   const baseMs = Date.parse("2026-09-23T10:00:00.123Z");
 
@@ -519,5 +602,111 @@ describe("exportClip", () => {
       }),
     ).toBeRejectedWithError(ClipExportError, /overlapping recordings/);
     expect(recordings.download).not.toHaveBeenCalled();
+  });
+
+  it("verifies keyframe flags during packet iteration when MKV marks delta B-frames as keyframes", async () => {
+    const rawBlob = await loadFixtureBlob("capture-session-a");
+    let patchedBlocks = 0;
+    const falseKeyBlob = await patchMkvSimpleBlocks(rawBlob, (block) => {
+      if (block.trackNumber === 1) {
+        block.setFlags(block.flags | 0x80);
+        patchedBlocks++;
+      }
+    });
+    expect(patchedBlocks).toBe(18);
+
+    const descriptor = makeDescriptor(
+      60,
+      baseMs,
+      baseMs + 1800,
+      falseKeyBlob.size,
+    );
+    const recordings = createRecordingsSpy();
+    recordings.resolveAt.and.returnValue(of(descriptor));
+    recordings.download.and.returnValue(of(falseKeyBlob));
+    recordings.getNext.and.returnValue(of({ recording: null }));
+
+    const result = await exportClip({
+      cameraName: "front",
+      startTimeMs: baseMs,
+      endTimeMs: baseMs + 1500,
+      recordings,
+    });
+
+    const outputInput = new Input({
+      formats: [MP4],
+      source: new BlobSource(result.blob),
+    });
+    try {
+      const videoTrack = await outputInput.getPrimaryVideoTrack();
+      const sink = new VideoSampleSink(videoTrack!);
+      const timestamps: number[] = [];
+      for await (const sample of sink.samples()) {
+        timestamps.push(Math.round(sample.timestamp * 1000));
+        sample.close();
+      }
+      expect(timestamps.length).toBeGreaterThanOrEqual(15);
+      expect(timestamps[0]).toBe(0);
+      for (let i = 1; i < timestamps.length; i++) {
+        expect(timestamps[i] - timestamps[i - 1]).toBe(100);
+      }
+    } finally {
+      outputInput.dispose();
+    }
+  });
+
+  it("handles backward timestamp jitter on audio packets and video GOP boundaries", async () => {
+    const rawBlob = await loadFixtureBlob("capture-av-part1");
+    let audioPatched = false;
+    let videoKeyPatched = false;
+    const jitteredBlob = await patchMkvSimpleBlocks(rawBlob, (block) => {
+      // Push audio packet #6 backward by 30 ms below packet #5 (simulating RTSP clock jitter).
+      if (block.trackNumber === 2 && block.indexForTrack === 6) {
+        block.setTimecode(block.timecode - 30);
+        audioPatched = true;
+      }
+      // Push the second video keyframe (packet #10, originally at +1000 ms) backward below +900 ms.
+      if (block.trackNumber === 1 && block.indexForTrack === 10) {
+        block.setTimecode(block.timecode - 150);
+        videoKeyPatched = true;
+      }
+    });
+    expect(audioPatched).toBe(true);
+    expect(videoKeyPatched).toBe(true);
+
+    const descriptor = makeDescriptor(
+      61,
+      baseMs,
+      baseMs + 1800,
+      jitteredBlob.size,
+    );
+    const recordings = createRecordingsSpy();
+    recordings.resolveAt.and.returnValue(of(descriptor));
+    recordings.download.and.returnValue(of(jitteredBlob));
+    recordings.getNext.and.returnValue(of({ recording: null }));
+
+    const result = await exportClip({
+      cameraName: "front",
+      startTimeMs: baseMs,
+      endTimeMs: baseMs + 1500,
+      recordings,
+    });
+
+    expect(result.videoPacketCount).toBeGreaterThanOrEqual(14);
+    expect(result.audioPacketCount).toBeGreaterThan(20);
+
+    const outputInput = new Input({
+      formats: [MP4],
+      source: new BlobSource(result.blob),
+    });
+    try {
+      expect(await outputInput.canRead()).toBe(true);
+      const videoTrack = await outputInput.getPrimaryVideoTrack();
+      const audioTrack = await outputInput.getPrimaryAudioTrack();
+      expect(videoTrack?.codec).toBe("avc");
+      expect(audioTrack?.codec).toBe("opus");
+    } finally {
+      outputInput.dispose();
+    }
   });
 });
