@@ -1,19 +1,109 @@
 <h2>Playback — {{ cameraName }}</h2>
 @if (cameraName) {
-  <section class="export-controls" aria-label="Frame export">
-    <button
-      type="button"
-      (click)="exportPng()"
-      [disabled]="
-        controller.state.phase !== 'paused' &&
-        controller.state.phase !== 'playing' &&
-        controller.state.phase !== 'ended' &&
-        controller.state.phase !== 'gap' &&
-        controller.state.phase !== 'buffering'
-      "
-    >
-      Export PNG
-    </button>
+  <section class="export-controls" aria-label="Export controls">
+    <div class="export-buttons">
+      <button
+        type="button"
+        (click)="exportPng()"
+        [disabled]="
+          controller.state.phase !== 'paused' &&
+          controller.state.phase !== 'playing' &&
+          controller.state.phase !== 'ended' &&
+          controller.state.phase !== 'gap' &&
+          controller.state.phase !== 'buffering'
+        "
+      >
+        Export PNG
+      </button>
+      <button
+        type="button"
+        class="export-clip-toggle"
+        (click)="toggleExportMode()"
+        [attr.aria-pressed]="exportMode"
+      >
+        {{ exportMode ? "Close Clip Export" : "Export Clip" }}
+      </button>
+    </div>
+
+    @if (exportMode) {
+      <div class="clip-export-panel" aria-label="Clip export settings">
+        <div class="clip-export-fields">
+          <div class="clip-boundary-field">
+            <label for="clip-export-start">Start (local)</label>
+            <input
+              #clipStartInput
+              id="clip-export-start"
+              type="datetime-local"
+              step="1"
+              [value]="exportStartInputValue"
+              [disabled]="exportRunning"
+              (change)="setExportStartInput(clipStartInput.value)"
+            />
+            <button
+              type="button"
+              (click)="setExportStartFromPlayhead()"
+              [disabled]="
+                exportRunning || controller.state.requestedTime === null
+              "
+            >
+              Set start to playhead
+            </button>
+          </div>
+          <div class="clip-boundary-field">
+            <label for="clip-export-end">End (local)</label>
+            <input
+              #clipEndInput
+              id="clip-export-end"
+              type="datetime-local"
+              step="1"
+              [value]="exportEndInputValue"
+              [disabled]="exportRunning"
+              (change)="setExportEndInput(clipEndInput.value)"
+            />
+            <button
+              type="button"
+              (click)="setExportEndFromPlayhead()"
+              [disabled]="
+                exportRunning || controller.state.requestedTime === null
+              "
+            >
+              Set end to playhead
+            </button>
+          </div>
+        </div>
+        <div class="clip-export-actions">
+          <span class="clip-duration">Duration: {{ exportDurationLabel }}</span>
+          <button
+            type="button"
+            class="export-mp4-button"
+            (click)="exportMp4()"
+            [disabled]="exportRunning || exportValidationError !== null"
+          >
+            Export MP4
+          </button>
+          @if (exportRunning) {
+            <button
+              type="button"
+              class="export-cancel-button"
+              (click)="cancelExport()"
+            >
+              Cancel
+            </button>
+          }
+        </div>
+        <div class="clip-export-status" aria-live="polite">
+          @if (exportRunning && exportProgressText) {
+            <p class="clip-export-progress">{{ exportProgressText }}</p>
+          } @else if (exportError) {
+            <p class="clip-export-error" role="alert">{{ exportError }}</p>
+          } @else if (exportValidationError) {
+            <p class="clip-export-warning">{{ exportValidationError }}</p>
+          } @else if (exportNotice) {
+            <p class="clip-export-warning">{{ exportNotice }}</p>
+          }
+        </div>
+      </div>
+    }
   </section>
 
   <div class="preview" [attr.aria-busy]="controller.state.phase === 'seeking'">
@@ -155,6 +245,7 @@
       </button>
     </div>
     <div
+      #timeline
       class="timeline"
       role="slider"
       tabindex="0"
@@ -181,6 +272,43 @@
           [style.left.%]="percent(range.begin)"
           [style.width.%]="percent(range.end) - percent(range.begin)"
         ></span>
+      }
+      @if (exportSelectionVisible) {
+        <span
+          class="export-selection"
+          [style.left.%]="exportSelectionLeftPercent"
+          [style.width.%]="exportSelectionWidthPercent"
+        ></span>
+      }
+      @if (exportStartVisible && exportStart !== null) {
+        <button
+          type="button"
+          class="export-handle export-handle-start"
+          aria-label="Clip export start time"
+          [attr.aria-valuetext]="exportStart | date: 'MMM d, y HH:mm:ss zzzz'"
+          [style.left.%]="percent(exportStart)"
+          (pointerdown)="startExportHandlePointer('start', $event)"
+          (pointermove)="moveExportHandlePointer($event)"
+          (pointerup)="releaseExportHandlePointer($event)"
+          (pointercancel)="releaseExportHandlePointer($event)"
+          (lostpointercapture)="releaseExportHandlePointer($event)"
+          (keydown)="exportHandleKey('start', $event)"
+        ></button>
+      }
+      @if (exportEndVisible && exportEnd !== null) {
+        <button
+          type="button"
+          class="export-handle export-handle-end"
+          aria-label="Clip export end time"
+          [attr.aria-valuetext]="exportEnd | date: 'MMM d, y HH:mm:ss zzzz'"
+          [style.left.%]="percent(exportEnd)"
+          (pointerdown)="startExportHandlePointer('end', $event)"
+          (pointermove)="moveExportHandlePointer($event)"
+          (pointerup)="releaseExportHandlePointer($event)"
+          (pointercancel)="releaseExportHandlePointer($event)"
+          (lostpointercapture)="releaseExportHandlePointer($event)"
+          (keydown)="exportHandleKey('end', $event)"
+        ></button>
       }
       @if (
         displayedTime !== null &&

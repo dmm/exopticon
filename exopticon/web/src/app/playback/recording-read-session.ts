@@ -2,7 +2,13 @@ import { from } from "rxjs";
 import { RecordingStore } from "./recording-store";
 import { HttpErrorResponse } from "@angular/common/http";
 import { RecordingDescriptor, RecordingService } from "../recording.service";
-import { DecodedFrame, FrameReader, MkvReader } from "./mkv-reader";
+import {
+  ceilMilliseconds,
+  DecodedFrame,
+  FrameReader,
+  MkvReader,
+  parseRecordingTimeNanoseconds,
+} from "./mkv-reader";
 import { RecordingResourceScope } from "./recording-resource-scope";
 
 export type FrameSourceStatus =
@@ -16,30 +22,6 @@ export { ObsoleteFrameOperation } from "./recording-resource-scope";
 const MAX_QUEUED_FRAMES = 6;
 const MAX_PREFETCH_BYTES = 32 * 1024 * 1024;
 const NANOSECONDS_PER_MILLISECOND = 1_000_000n;
-
-function recordingTimeNanoseconds(value: string): bigint {
-  const match =
-    /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)$/.exec(
-      value,
-    );
-  if (!match) {
-    throw new Error("Invalid recording interval time");
-  }
-  const seconds = Date.parse(`${match[1]}${match[3]}`);
-  if (!Number.isFinite(seconds)) {
-    throw new Error("Invalid recording interval time");
-  }
-  return (
-    BigInt(seconds) * NANOSECONDS_PER_MILLISECOND +
-    BigInt((match[2] ?? "").padEnd(9, "0"))
-  );
-}
-
-function ceilMilliseconds(nanoseconds: bigint): number {
-  const quotient = nanoseconds / NANOSECONDS_PER_MILLISECOND;
-  const remainder = nanoseconds % NANOSECONDS_PER_MILLISECOND;
-  return Number(quotient + (remainder > 0n ? 1n : 0n));
-}
 
 type PrefetchResult =
   | { kind: "missing" }
@@ -290,8 +272,8 @@ export class RecordingReadSession {
       return;
     }
     const successor = result.descriptor;
-    const nextStart = recordingTimeNanoseconds(successor.beginTime);
-    if (nextStart > recordingTimeNanoseconds(current.descriptor.endTime)) {
+    const nextStart = parseRecordingTimeNanoseconds(successor.beginTime);
+    if (nextStart > parseRecordingTimeNanoseconds(current.descriptor.endTime)) {
       // Round upward to satisfy the backend's microsecond availability check.
       this.transition({
         kind: "gap",

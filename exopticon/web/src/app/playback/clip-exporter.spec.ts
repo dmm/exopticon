@@ -1,5 +1,11 @@
 import { HttpErrorResponse } from "@angular/common/http";
-import { BlobSource, Input, MP4, VideoSampleSink } from "mediabunny";
+import {
+  BlobSource,
+  EncodedPacketSink,
+  Input,
+  MP4,
+  VideoSampleSink,
+} from "mediabunny";
 import { of, Subject, throwError } from "rxjs";
 import { RecordingDescriptor, RecordingService } from "../recording.service";
 import {
@@ -289,6 +295,31 @@ describe("exportClip", () => {
         const duration = await outputInput.computeDuration();
         expect(duration).toBeGreaterThan(1.4);
         expect(duration).toBeLessThan(2.2);
+
+        // Verify multi-fragment MP4 decodes cleanly across the fragment join
+        // and that Opus audio starts aligned with video and spans the clip.
+        const videoSink = new VideoSampleSink(videoTrack!);
+        const decodedVideoMs: number[] = [];
+        for await (const sample of videoSink.samples()) {
+          decodedVideoMs.push(Math.round(sample.timestamp * 1000));
+          sample.close();
+        }
+        expect(decodedVideoMs.length).toBeGreaterThanOrEqual(15);
+        expect(decodedVideoMs[0]).toBe(0);
+        for (let i = 1; i < decodedVideoMs.length; i++) {
+          expect(decodedVideoMs[i]).toBeGreaterThanOrEqual(
+            decodedVideoMs[i - 1],
+          );
+        }
+
+        const audioSink = new EncodedPacketSink(audioTrack!);
+        const firstAudio = await audioSink.getFirstPacket();
+        const lastAudio = await audioSink.getPacket(Infinity);
+        expect(firstAudio).not.toBeNull();
+        expect(lastAudio).not.toBeNull();
+        expect(firstAudio!.timestamp).toBeGreaterThanOrEqual(0);
+        expect(firstAudio!.timestamp).toBeLessThan(0.05);
+        expect(lastAudio!.timestamp).toBeGreaterThan(1.4);
       } finally {
         outputInput.dispose();
       }

@@ -4,6 +4,13 @@ import { TestBed } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, ParamMap } from "@angular/router";
 import { of, Subject } from "rxjs";
 import { RecordingRange, RecordingService } from "../recording.service";
+import {
+  ClipExportCancelledError,
+  ClipExportError,
+  ClipExportOptions,
+  ClipExportResult,
+  MAX_CLIP_DURATION_MS,
+} from "./clip-exporter";
 import { PlaybackComponent } from "./playback.component";
 
 describe("PlaybackComponent", () => {
@@ -479,5 +486,317 @@ describe("PlaybackComponent", () => {
     } finally {
       fixture.destroy();
     }
+  });
+
+  it("initializes clip export mode around the playhead and clamps to the enclosing range", () => {
+    component.ranges = [{ begin: 100_000, end: 120_000 }];
+    component.controller.state = {
+      phase: "paused",
+      requestedTime: 105_400,
+      displayedTime: 105_400,
+      error: null,
+    };
+
+    component.toggleExportMode();
+    expect(component.exportMode).toBe(true);
+    expect(component.exportStart).toBe(105_000);
+    expect(component.exportEnd).toBe(120_000);
+    expect(component.exportValidationError).toBeNull();
+    expect(component.exportDurationLabel).toBe("0:15 / 5:00 max");
+
+    component.toggleExportMode();
+    expect(component.exportMode).toBe(false);
+    expect(component.exportStart).toBeNull();
+    expect(component.exportEnd).toBeNull();
+  });
+
+  it("sets start/end from playhead with 5-minute clamping and detects gaps inline", () => {
+    component.ranges = [
+      { begin: 100_000, end: 500_000 },
+      { begin: 600_000, end: 900_000 },
+    ];
+    component.toggleExportMode();
+
+    component.controller.state.requestedTime = 120_000;
+    component.setExportStartFromPlayhead();
+    component.controller.state.requestedTime = 500_000;
+    component.setExportEndFromPlayhead();
+    // 500_000 - 120_000 = 380s > 300s -> clamped to 5 minutes ending at 500_000.
+    expect(component.exportEnd).toBe(500_000);
+    expect(component.exportStart).toBe(500_000 - MAX_CLIP_DURATION_MS);
+    expect(component.exportValidationError).toBeNull();
+
+    // Crossing the gap between 500_000 and 600_000 triggers inline validation error.
+    component.exportStart = 450_000;
+    component.exportEnd = 650_000;
+    expect(component.exportValidationError).toContain("gap");
+
+    // Exceeding 5 minutes via direct input triggers duration error.
+    component.exportStart = 100_000;
+    component.exportEnd = 100_000 + MAX_CLIP_DURATION_MS + 1000;
+    expect(component.exportValidationError).toContain("5 minutes");
+  });
+
+  it("drags export handles with throttled boundary frame previews and enforces 5-minute cap", () => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(10_000));
+    try {
+      component.ranges = [{ begin: 0, end: 1_800_000 }];
+      component.controller.state = {
+        phase: "paused",
+        requestedTime: 600_000,
+        displayedTime: 600_000,
+        error: null,
+      };
+      component.toggleExportMode();
+      expect(component.exportStart).toBe(600_000);
+      expect(component.exportEnd).toBe(630_000);
+
+      const seek = spyOn(component.controller, "seek").and.resolveTo();
+      const selectTime = spyOn(component.controller, "selectTime").and.callFake(
+        (time) => {
+          component.controller.state.requestedTime = time;
+        },
+      );
+      const timeline = {
+        getBoundingClientRect: () => ({ left: 0, width: 1800 }),
+      } as HTMLElement;
+      const handleEl = {
+        parentElement: timeline,
+        focus: () => {},
+        setPointerCapture: jasmine.createSpy(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: jasmine.createSpy(),
+      } as unknown as HTMLElement;
+      const pointer = (x: number, type = "pointermove", pointerId = 7) =>
+        ({
+          button: 0,
+          clientX: x,
+          pointerId,
+          type,
+          currentTarget: handleEl,
+          stopPropagation: jasmine.createSpy(),
+          preventDefault: jasmine.createSpy(),
+        }) as unknown as PointerEvent;
+
+      // Drag end handle past 5 minutes (1200s = 1_200_000 ms -> clamped to 600_000 + 300_000 = 900_000).
+      component.startExportHandlePointer("end", pointer(1200, "pointerdown"));
+      expect(component.exportEnd).toBe(900_000);
+      expect(selectTime).toHaveBeenCalledWith(900_000);
+      expect(seek).toHaveBeenCalledTimes(1);
+      expect(seek).toHaveBeenCalledWith(900_000);
+
+      // Drag within throttle window queues preview.
+      component.moveExportHandlePointer(pointer(700));
+      expect(component.exportEnd).toBe(700_000);
+      expect(seek).toHaveBeenCalledTimes(1);
+      jasmine.clock().tick(150);
+      expect(seek).toHaveBeenCalledWith(700_000);
+
+      // Release resolves final boundary frame.
+      component.releaseExportHandlePointer(pointer(750, "pointerup"));
+      expect(component.exportEnd).toBe(750_000);
+      expect(seek.calls.mostRecent().args).toEqual([750_000]);
+      expect(handleEl.releasePointerCapture).toHaveBeenCalledWith(7);
+
+      // Keyboard step on start handle moves by 10s with Shift and previews.
+      component.exportHandleKey(
+        "start",
+        new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true }),
+      );
+      expect(component.exportStart).toBe(590_000);
+      expect(seek.calls.mostRecent().args).toEqual([590_000]);
+    } finally {
+      jasmine.clock().uninstall();
+    }
+  });
+
+  it("runs MP4 export with progress, downloads result, handles errors, and cancels on destroy or cancel", async () => {
+    component.ranges = [{ begin: 100_000, end: 200_000 }];
+    component.toggleExportMode();
+    component.exportStart = 110_000;
+    component.exportEnd = 140_000;
+
+    const downloadSpy = spyOn(component, "downloadBlob");
+    let capturedOptions: ClipExportOptions | undefined;
+    component.runClipExport = async (options) => {
+      capturedOptions = options;
+      options.onProgress?.({
+        stage: "downloading",
+        completedFragments: 0,
+        totalFragments: 2,
+      });
+      expect(component.exportRunning).toBe(true);
+      expect(component.exportProgressText).toBe("Downloading fragment 1 of 2…");
+      return {
+        blob: new Blob(["mp4"], { type: "video/mp4" }),
+        filename: "front-clip.mp4",
+        actualStartMs: 110_000,
+        actualEndMs: 140_000,
+        videoPacketCount: 10,
+        audioPacketCount: 0,
+        audioOmittedReason: "Legacy audio skipped",
+      } as ClipExportResult;
+    };
+
+    await component.exportMp4();
+    expect(capturedOptions?.cameraName).toBe("front");
+    expect(capturedOptions?.startTimeMs).toBe(110_000);
+    expect(capturedOptions?.endTimeMs).toBe(140_000);
+    expect(downloadSpy).toHaveBeenCalledWith(
+      jasmine.any(Blob),
+      "front-clip.mp4",
+    );
+    expect(component.exportRunning).toBe(false);
+    expect(component.exportError).toBeNull();
+    expect(component.exportNotice).toBe("Legacy audio skipped");
+
+    // Error handling displays message without triggering download.
+    downloadSpy.calls.reset();
+    component.runClipExport = async () => {
+      throw new ClipExportError("Selected range contains a recording gap.");
+    };
+    await component.exportMp4();
+    expect(downloadSpy).not.toHaveBeenCalled();
+    expect(component.exportError).toBe(
+      "Selected range contains a recording gap.",
+    );
+
+    // Cancellation aborts the signal and clears running state without showing an error.
+    let aborted = false;
+    component.runClipExport = (options) =>
+      new Promise<ClipExportResult>((_resolve, reject) => {
+        options.signal?.addEventListener("abort", () => {
+          aborted = true;
+          reject(new ClipExportCancelledError());
+        });
+      });
+    const pending = component.exportMp4();
+    expect(component.exportRunning).toBe(true);
+    component.cancelExport();
+    await pending;
+    expect(aborted).toBe(true);
+    expect(component.exportRunning).toBe(false);
+    expect(component.exportError).toBeNull();
+  });
+
+  it("renders clip export controls and timeline handles when Export Clip is toggled", async () => {
+    recordings.getRanges.and.returnValue(
+      of({
+        ranges: [
+          {
+            beginTime: new Date(Date.now() - 120_000).toISOString(),
+            endTime: new Date(Date.now() - 10_000).toISOString(),
+          },
+        ],
+      }),
+    );
+    await TestBed.configureTestingModule({
+      imports: [PlaybackComponent],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            paramMap: of(convertToParamMap({ camera_name: "front" })),
+          },
+        },
+        { provide: RecordingService, useValue: recordings },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(PlaybackComponent);
+    try {
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector(".clip-export-panel")).toBeNull();
+      expect(root.querySelector(".export-selection")).toBeNull();
+
+      const toggle = root.querySelector<HTMLButtonElement>(
+        ".export-clip-toggle",
+      )!;
+      toggle.click();
+      fixture.detectChanges();
+
+      expect(toggle.getAttribute("aria-pressed")).toBe("true");
+      expect(root.querySelector(".clip-export-panel")).not.toBeNull();
+      expect(root.querySelector(".export-selection")).not.toBeNull();
+      expect(root.querySelector(".export-handle-start")).not.toBeNull();
+      expect(root.querySelector(".export-handle-end")).not.toBeNull();
+      const exportButton =
+        root.querySelector<HTMLButtonElement>(".export-mp4-button")!;
+      expect(exportButton.disabled).toBe(false);
+    } finally {
+      fixture.destroy();
+    }
+  });
+
+  it("rounds sub-millisecond range begin times upward while flooring end times", () => {
+    recordings.getRanges.and.returnValue(
+      of({
+        ranges: [
+          {
+            beginTime: "1970-01-01T00:00:00.123456Z",
+            endTime: "1970-01-01T00:00:10.789456Z",
+          },
+          {
+            beginTime: "1970-01-01T00:00:20.000000Z",
+            endTime: "1970-01-01T00:00:30.000000Z",
+          },
+        ],
+      }),
+    );
+
+    component.loadRanges();
+
+    expect(component.ranges).toEqual([
+      { begin: 124, end: 10789 },
+      { begin: 20000, end: 30000 },
+    ]);
+  });
+
+  it("aborts in-flight exports on camera switch and component destroy", async () => {
+    component.ngOnInit();
+    params.next(convertToParamMap({ camera_name: "front" }));
+    component.ranges = [{ begin: 100_000, end: 200_000 }];
+    component.toggleExportMode();
+    component.exportStart = 110_000;
+    component.exportEnd = 140_000;
+
+    let cameraSwitchAborted = false;
+    component.runClipExport = (options) =>
+      new Promise<ClipExportResult>((_resolve, reject) => {
+        options.signal?.addEventListener("abort", () => {
+          cameraSwitchAborted = true;
+          reject(new ClipExportCancelledError());
+        });
+      });
+
+    const firstExport = component.exportMp4();
+    expect(component.exportRunning).toBe(true);
+    params.next(convertToParamMap({ camera_name: "back" }));
+    await firstExport;
+    expect(cameraSwitchAborted).toBe(true);
+    expect(component.exportMode).toBe(false);
+    expect(component.exportRunning).toBe(false);
+
+    // Start another export on the new camera and destroy the component.
+    component.ranges = [{ begin: 100_000, end: 200_000 }];
+    component.toggleExportMode();
+    component.exportStart = 110_000;
+    component.exportEnd = 140_000;
+    let destroyAborted = false;
+    component.runClipExport = (options) =>
+      new Promise<ClipExportResult>((_resolve, reject) => {
+        options.signal?.addEventListener("abort", () => {
+          destroyAborted = true;
+          reject(new ClipExportCancelledError());
+        });
+      });
+
+    const secondExport = component.exportMp4();
+    expect(component.exportRunning).toBe(true);
+    component.ngOnDestroy();
+    await secondExport;
+    expect(destroyAborted).toBe(true);
+    expect(component.exportRunning).toBe(false);
   });
 });

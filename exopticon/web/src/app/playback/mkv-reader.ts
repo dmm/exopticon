@@ -41,6 +41,12 @@ export function parseRecordingTimeNanoseconds(value: string): bigint {
   return BigInt(seconds) * 1_000_000n + BigInt((match[2] ?? "").padEnd(9, "0"));
 }
 
+export function ceilMilliseconds(nanoseconds: bigint): number {
+  const quotient = nanoseconds / 1_000_000n;
+  const remainder = nanoseconds % 1_000_000n;
+  return Number(quotient + (remainder > 0n ? 1n : 0n));
+}
+
 function parseUtcNanoseconds(value: string): bigint {
   const match = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$/.exec(
     value,

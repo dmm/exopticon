@@ -48,6 +48,73 @@
 .export-controls {
   margin-bottom: 1.5rem;
 }
+.export-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.export-clip-toggle[aria-pressed="true"],
+.export-mp4-button:not(:disabled) {
+  background: #098509;
+  color: #fff;
+}
+.clip-export-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #527252;
+  background: #071007;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.clip-export-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-end;
+}
+.clip-boundary-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.clip-boundary-field label {
+  color: #a9c4a9;
+  font-size: 0.9rem;
+}
+.clip-boundary-field input {
+  color-scheme: dark;
+  font: inherit;
+  min-height: 44px;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+.clip-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.clip-duration {
+  color: #ffd080;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+.clip-export-status p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.clip-export-progress {
+  color: #a9c4a9;
+}
+.clip-export-warning {
+  color: #ffd080;
+}
+.clip-export-error {
+  color: #ff8a8a;
+}
 .scale-presets button[aria-pressed="true"] {
   background: #098509;
   color: #fff;
@@ -280,4 +347,37 @@ canvas {
   background: #ffd080;
   transform: translateX(-2px);
   pointer-events: none;
+}
+.export-selection {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  background: rgba(255, 208, 128, 0.28);
+  border-top: 2px solid #ffd080;
+  border-bottom: 2px solid #ffd080;
+  pointer-events: none;
+}
+.export-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid #071007;
+  background: #ffd080;
+  cursor: ew-resize;
+  transform: translateX(-50%);
+  touch-action: none;
+  z-index: 2;
+}
+.export-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 18px;
+  background: #071007;
+  transform: translate(-50%, -50%);
 }
