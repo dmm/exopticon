@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.55.1
+2026-11-25
+
+### Fixes
+
+- don't let pts jitter upset mediabunny (7979c814b9126cbb6ced0e3ba555558b64361e6c)
+
 ## 0.55.0
 2026-11-25
 
