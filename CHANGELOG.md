@@ -2,6 +2,21 @@
 
 <!--- next entry here -->
 
+## 0.54.0
+2026-11-25
+
+### Features
+
+- Implement live configuration (5c2570d4e113b95c3eaf331fe549c30cc492fc22)
+- Add unicast ONVIF probe on creation (6d62dcfe2816b599d6c49753f1b53eb4776f7dac)
+- Refactor camera data model and pull rtsp streams with ONVIF (8fcd7e565f28dfa1d7bedbaa63b5e92c6d4625cd)
+- Kill worker if it exceeds a timeout (013efc5498e222326e15153d63069655556f9d0e)
+
+### Fixes
+
+- Remove CameraStatus.active flag (a244c2bff5d66ec70b4efd94cbd92ad88b39a5e1)
+- appease clippy (5e9de6cc70b5ba92902cd103bf671138bbabe449)
+
 ## 0.53.0
 2026-11-16
 
