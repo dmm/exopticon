@@ -561,11 +561,11 @@ fn create_video_branch(depay_name: &str, parser_name: &str) -> Bin {
     bin
 }
 
-fn create_audio_branch(depay_name: &str, parser_name: Option<&str>) -> Bin {
+fn create_audio_branch(codec: AudioCodec) -> Bin {
     let bin = gst::Bin::with_name("audio_sink_bin");
 
-    let depay = gst::ElementFactory::make(depay_name)
-        .name(depay_name)
+    let depay = gst::ElementFactory::make(codec.depayloader)
+        .name(codec.depayloader)
         .build()
         .expect("Failed to build depay element.");
 
@@ -597,7 +597,7 @@ fn create_audio_branch(depay_name: &str, parser_name: Option<&str>) -> Bin {
     bin.add_many([&tee, &mkv_queue, &app_queue])
         .expect("Failed to add elements to bin");
 
-    if let Some(parser_name) = parser_name {
+    if let Some(parser_name) = codec.parser {
         let tee_parser = gst::ElementFactory::make(parser_name)
             .name("audio_tee_parser")
             .build()
@@ -645,9 +645,47 @@ fn create_audio_branch(depay_name: &str, parser_name: Option<&str>) -> Bin {
 
     add_ghost_pad(&bin, "sink", &depay_sink_pad);
 
-    let mkv_src = mkv_queue
-        .static_pad("src")
-        .expect("failed to get mkv parser src pad");
+    let mkv_src = codec.mkv_pcm_decoder.map_or_else(
+        || {
+            mkv_queue
+                .static_pad("src")
+                .expect("failed to get mkv audio queue src pad")
+        },
+        |decoder_name| {
+            let decoder = gst::ElementFactory::make(decoder_name)
+                .name("mkv_audio_decoder")
+                .build()
+                .expect("failed to build mkv audio decoder");
+            let audio_convert = gst::ElementFactory::make("audioconvert")
+                .name("mkv_audio_convert")
+                .build()
+                .expect("failed to build mkv audioconvert");
+            let audio_resample = gst::ElementFactory::make("audioresample")
+                .name("mkv_audio_resample")
+                .build()
+                .expect("failed to build mkv audioresample");
+            let opus_enc = gst::ElementFactory::make("opusenc")
+                .name("mkv_audio_opusenc")
+                .build()
+                .expect("failed to build mkv opusenc");
+
+            bin.add_many([&decoder, &audio_convert, &audio_resample, &opus_enc])
+                .expect("failed to add mkv audio transcoding elements");
+
+            gst::Element::link_many([
+                &mkv_queue,
+                &decoder,
+                &audio_convert,
+                &audio_resample,
+                &opus_enc,
+            ])
+            .expect("failed to link mkv audio transcoding branch");
+
+            opus_enc
+                .static_pad("src")
+                .expect("failed to get mkv opusenc src pad")
+        },
+    );
 
     add_ghost_pad(&bin, "mkv_src", &mkv_src);
 
@@ -924,6 +962,7 @@ struct VideoCodec {
 struct AudioCodec {
     depayloader: &'static str,
     parser: Option<&'static str>,
+    mkv_pcm_decoder: Option<&'static str>,
 }
 
 enum RtpCodec {
@@ -940,18 +979,22 @@ fn select_rtp_codec(media: &str, encoding: &str) -> Option<RtpCodec> {
         ("audio", "OPUS") => Some(RtpCodec::Audio(AudioCodec {
             depayloader: "rtpopusdepay",
             parser: Some("opusparse"),
+            mkv_pcm_decoder: None,
         })),
         ("audio", "MPEG4-GENERIC" | "AAC") => Some(RtpCodec::Audio(AudioCodec {
             depayloader: "rtpmp4gdepay",
             parser: Some("aacparse"),
+            mkv_pcm_decoder: None,
         })),
         ("audio", "PCMU") => Some(RtpCodec::Audio(AudioCodec {
             depayloader: "rtppcmudepay",
             parser: None,
+            mkv_pcm_decoder: Some("mulawdec"),
         })),
         ("audio", "PCMA") => Some(RtpCodec::Audio(AudioCodec {
             depayloader: "rtppcmadepay",
             parser: None,
+            mkv_pcm_decoder: Some("alawdec"),
         })),
         _ => None,
     }
@@ -1031,7 +1074,7 @@ fn attach_audio_branch(
     codec: AudioCodec,
     mkv_sink: &Element,
 ) {
-    let bin = create_audio_branch(codec.depayloader, codec.parser);
+    let bin = create_audio_branch(codec);
     pipeline.add_many([&bin]).expect("Failed to add bin");
 
     let bin_sink_pad = bin.static_pad("sink").expect("failed to get bin sink pad");
@@ -1547,6 +1590,23 @@ mod tests {
                     .unwrap()
                     .is_linked()
             );
+            let audio_bin = fixture
+                .pipeline
+                .by_name("audio_sink_bin")
+                .unwrap()
+                .downcast::<gst::Bin>()
+                .unwrap();
+            let expects_transcoder = matches!(encoding, "PCMU" | "PCMA");
+            assert_eq!(
+                audio_bin.by_name("mkv_audio_opusenc").is_some(),
+                expects_transcoder,
+                "{encoding}"
+            );
+            assert_eq!(
+                audio_bin.by_name("mkv_audio_decoder").is_some(),
+                expects_transcoder,
+                "{encoding}"
+            );
             fixture
                 .setup
                 .lock()
@@ -1722,5 +1782,286 @@ mod tests {
             assert!(gap.abs() <= TimeDelta::nanoseconds(1));
         }
         assert_eq!(std::fs::read(abandoned).unwrap(), b"interrupted recording");
+    }
+
+    type TrackBufferCounts = Arc<Mutex<Vec<(String, Arc<Mutex<usize>>)>>>;
+
+    fn inspect_mkv_tracks(path: &Path) -> Vec<(String, usize)> {
+        let pipeline = gst::Pipeline::new();
+        let src = gst::ElementFactory::make("filesrc")
+            .property("location", path.to_str().unwrap())
+            .build()
+            .unwrap();
+        let demux = gst::ElementFactory::make("matroskademux").build().unwrap();
+        pipeline.add_many([&src, &demux]).unwrap();
+        src.link(&demux).unwrap();
+
+        let tracks: TrackBufferCounts = Arc::new(Mutex::new(Vec::new()));
+        let tracks_cb = Arc::clone(&tracks);
+        let pipeline_weak = pipeline.downgrade();
+        demux.connect_pad_added(move |_, src_pad| {
+            let Some(pipeline) = pipeline_weak.upgrade() else {
+                return;
+            };
+            let media_type = src_pad
+                .current_caps()
+                .unwrap()
+                .structure(0)
+                .unwrap()
+                .name()
+                .to_string();
+            let buffer_count = Arc::new(Mutex::new(0usize));
+            tracks_cb
+                .lock()
+                .unwrap()
+                .push((media_type, Arc::clone(&buffer_count)));
+            let appsink = AppSink::builder().sync(false).build();
+            appsink.set_callbacks(
+                AppSinkCallbacks::builder()
+                    .new_sample(move |sink| {
+                        let _ = sink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
+                        *buffer_count.lock().unwrap() += 1;
+                        Ok(gst::FlowSuccess::Ok)
+                    })
+                    .build(),
+            );
+            pipeline.add(appsink.upcast_ref::<gst::Element>()).unwrap();
+            src_pad.link(&appsink.static_pad("sink").unwrap()).unwrap();
+            appsink.sync_state_with_parent().unwrap();
+        });
+
+        pipeline.set_state(gst::State::Playing).unwrap();
+        let bus = pipeline.bus().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut saw_eos = false;
+        while Instant::now() < deadline {
+            let Some(message) = bus.timed_pop(gst::ClockTime::from_seconds(1)) else {
+                continue;
+            };
+            match message.view() {
+                gst::MessageView::Eos(_) => {
+                    saw_eos = true;
+                    break;
+                }
+                gst::MessageView::Error(err) => {
+                    pipeline.set_state(gst::State::Null).unwrap();
+                    panic!("demux failed: {} {:?}", err.error(), err.debug());
+                }
+                _ => {}
+            }
+        }
+        pipeline.set_state(gst::State::Null).unwrap();
+        assert!(saw_eos, "demux timed out");
+        tracks
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(media_type, count)| (media_type.clone(), *count.lock().unwrap()))
+            .collect()
+    }
+
+    #[test]
+    fn pcm_audio_records_as_opus_in_mkv_while_preserving_appsink_format() {
+        gst::init().unwrap();
+        for (encoding, encoder, payloader, expected_app_caps) in [
+            ("PCMU", "mulawenc", "rtppcmupay", "audio/x-mulaw"),
+            ("PCMA", "alawenc", "rtppcmapay", "audio/x-alaw"),
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let staging_path = directory.path().join("staging");
+            std::fs::create_dir_all(&staging_path).unwrap();
+
+            let recording = Arc::new(Mutex::new(RecordingState::default()));
+            let sink = create_recording_sink();
+            let pipeline = gst::Pipeline::new();
+
+            let video_fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../exopticon/web/src/test-fixtures/capture-session-a.mkv");
+            let video_src = gst::parse::bin_from_description(
+                &format!(
+                    "filesrc location=\"{}\" ! matroskademux ! h264parse ! \
+                     rtph264pay name=vpay config-interval=-1",
+                    video_fixture.display()
+                ),
+                false,
+            )
+            .expect("test needs filesrc, matroskademux, h264parse, and rtph264pay");
+            let vpay_src = video_src
+                .by_name("vpay")
+                .unwrap()
+                .static_pad("src")
+                .unwrap();
+            add_ghost_pad(&video_src, "src", &vpay_src);
+            let audio_src = gst::parse::bin_from_description(
+                &format!(
+                    "audiotestsrc is-live=true num-buffers=25 samplesperbuffer=160 ! \
+                     audio/x-raw,format=S16LE,rate=8000,channels=1 ! \
+                     {encoder} ! {payloader}"
+                ),
+                true,
+            )
+            .expect("test needs audiotestsrc and PCM RTP payloader");
+
+            let Some(RtpCodec::Video(video_codec)) = select_rtp_codec("video", "H264") else {
+                unreachable!();
+            };
+            let Some(RtpCodec::Audio(audio_codec)) = select_rtp_codec("audio", encoding) else {
+                unreachable!();
+            };
+
+            let video_branch = create_video_branch(video_codec.depayloader, video_codec.parser);
+            let audio_branch = create_audio_branch(audio_codec);
+            let video_fakesink = gst::ElementFactory::make("fakesink")
+                .property("sync", false)
+                .build()
+                .unwrap();
+
+            let seen_app_caps: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+            let seen_app_caps_cb = Arc::clone(&seen_app_caps);
+            let audio_appsink = AppSink::builder()
+                .name("test_audio_appsink")
+                .sync(false)
+                .build();
+            audio_appsink.set_callbacks(
+                AppSinkCallbacks::builder()
+                    .new_sample(move |appsink| {
+                        let sample = appsink.pull_sample().map_err(|_| gst::FlowError::Eos)?;
+                        let media_type = sample
+                            .caps()
+                            .unwrap()
+                            .structure(0)
+                            .unwrap()
+                            .name()
+                            .to_string();
+                        seen_app_caps_cb.lock().unwrap().push(media_type);
+                        Ok(gst::FlowSuccess::Ok)
+                    })
+                    .build(),
+            );
+
+            pipeline
+                .add_many([
+                    video_src.upcast_ref(),
+                    audio_src.upcast_ref(),
+                    video_branch.upcast_ref(),
+                    audio_branch.upcast_ref(),
+                    &sink,
+                    &video_fakesink,
+                    audio_appsink.upcast_ref(),
+                ])
+                .unwrap();
+
+            let video_sink_pad = connect_recording_sink(&sink, staging_path.clone(), &recording);
+            let audio_sink_pad = sink.request_pad_simple("audio_%u").unwrap();
+
+            video_src
+                .static_pad("src")
+                .unwrap()
+                .link(&video_branch.static_pad("sink").unwrap())
+                .unwrap();
+            video_branch
+                .static_pad("mkv_src")
+                .unwrap()
+                .link(&video_sink_pad)
+                .unwrap();
+            video_branch
+                .static_pad("app_src")
+                .unwrap()
+                .link(&video_fakesink.static_pad("sink").unwrap())
+                .unwrap();
+
+            audio_src
+                .static_pad("src")
+                .unwrap()
+                .link(&audio_branch.static_pad("sink").unwrap())
+                .unwrap();
+            audio_branch
+                .static_pad("mkv_src")
+                .unwrap()
+                .link(&audio_sink_pad)
+                .unwrap();
+            audio_branch
+                .static_pad("app_src")
+                .unwrap()
+                .link(&audio_appsink.static_pad("sink").unwrap())
+                .unwrap();
+
+            pipeline.set_state(gst::State::Playing).unwrap();
+            let bus = pipeline.bus().unwrap();
+            let deadline = Instant::now() + Duration::from_secs(20);
+            let weak = Arc::downgrade(&recording);
+            let mut filenames = Vec::new();
+            let mut saw_eos = false;
+            while Instant::now() < deadline {
+                let Some(message) = bus.timed_pop(gst::ClockTime::from_seconds(1)) else {
+                    continue;
+                };
+                match message.view() {
+                    gst::MessageView::Element(element) => {
+                        let Some(structure) = element.structure() else {
+                            continue;
+                        };
+                        if structure.name() == "splitmuxsink-fragment-closed"
+                            && let CaptureMessage::EndFile { filename, .. } =
+                                closed_fragment_message(structure, &weak)
+                        {
+                            filenames.push(filename);
+                        }
+                    }
+                    gst::MessageView::Eos(_) => {
+                        saw_eos = true;
+                        break;
+                    }
+                    gst::MessageView::Error(err) => {
+                        pipeline.set_state(gst::State::Null).unwrap();
+                        panic!(
+                            "{encoding} capture failed: {} {:?}",
+                            err.error(),
+                            err.debug()
+                        );
+                    }
+                    _ => {}
+                }
+            }
+            pipeline.set_state(gst::State::Null).unwrap();
+
+            assert!(saw_eos, "{encoding} test timed out");
+            assert!(!filenames.is_empty(), "{encoding} produced no MKV files");
+
+            let app_caps = seen_app_caps.lock().unwrap().clone();
+            assert!(
+                !app_caps.is_empty(),
+                "{encoding} received no appsink samples"
+            );
+            assert!(
+                app_caps.iter().all(|caps| caps == expected_app_caps),
+                "{encoding} appsink caps changed: {app_caps:?}"
+            );
+
+            let mkv_path = staging_path.join(&filenames[0]);
+            let mkv_bytes = std::fs::read(&mkv_path).unwrap();
+            assert!(
+                mkv_bytes.windows(6).any(|window| window == b"A_OPUS"),
+                "{encoding} MKV missing A_OPUS codec ID"
+            );
+            assert!(
+                !mkv_bytes.windows(8).any(|window| window == b"A_MS/ACM"),
+                "{encoding} MKV unexpectedly contains A_MS/ACM"
+            );
+
+            let tracks = inspect_mkv_tracks(&mkv_path);
+            assert!(
+                tracks
+                    .iter()
+                    .any(|(media_type, count)| media_type == "video/x-h264" && *count > 0),
+                "{encoding} MKV missing H.264 video packets: {tracks:?}"
+            );
+            assert!(
+                tracks
+                    .iter()
+                    .any(|(media_type, count)| media_type == "audio/x-opus" && *count > 0),
+                "{encoding} MKV missing Opus audio packets: {tracks:?}"
+            );
+        }
     }
 }
