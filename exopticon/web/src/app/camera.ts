@@ -58,15 +58,3 @@ export interface Camera {
   spec: CameraSpec;
   status: CameraStatus;
 }
-
-export class AnalysisConfiguration {
-  camera_id!: number;
-  analysisConfig!: AnalysisType;
-}
-
-export enum AnalysisType {
-  None = "none",
-  Motion = "motion",
-  Yolo = "yolo",
-  Coral = "coral",
-}

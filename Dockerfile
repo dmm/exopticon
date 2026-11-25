@@ -93,7 +93,6 @@ RUN dnf install -y \
     gstreamer1-plugins-good \
     gstreamer1-plugins-ugly-free \
     sqlite-devel \
-    python3-pip \
     # for Rust openssl crate:
     pkgconf \
     perl-FindBin \
@@ -131,12 +130,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && /cargo/bin/rustup component add clippy
 
 ENV EXOPTICONWORKERS=/target/debug/
-#ENV PYTHONPATH=$EXOPTICONWORKERS:/opt/opencv/lib/python3.7/dist-packages
 ENV CUDA_HOME=/usr/local/cuda-13.0
 ENV CUDA_PATH=/usr/local/cuda-13.0/bin
 ENV CUDA_TOOLKIT_DIR=/usr/local/cuda-13.0
 ENV CUDACXX=/usr/local/cuda-13.0/bin/nvcc
-ENV PATH=$CUDA_PATH:/exopticon/target/debug:$CARGO_HOME/bin:/exopticon/exopticon/workers:/home/exopticon/.local/bin/:$PATH
+ENV PATH=$CUDA_PATH:/exopticon/target/debug:$CARGO_HOME/bin:/home/exopticon/.local/bin/:$PATH
 
 FROM exopticon-build AS exopticon-development
 

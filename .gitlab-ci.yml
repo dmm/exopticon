@@ -3,7 +3,6 @@ image: rust:1.47.0-buster@sha256:48f4b36c3f3492b82a5e14b2fc991d3163c1d2ce18ac1f0
 # Set any required environment variables here
 variables:
   RUST_BACKTRACE: FULL
-  GIT_SUBMODULE_STRATEGY: recursive
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   DOCKER_BUILDKIT: 1
   DOCKER_CLI_EXPERIMENTAL: enabled
