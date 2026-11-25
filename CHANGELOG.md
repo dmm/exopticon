@@ -2,6 +2,15 @@
 
 <!--- next entry here -->
 
+## 0.55.0
+2026-11-25
+
+### Features
+
+- **capture_worker:** Encode pcma/pcmu streams as opus for mkv (4b3ce3d1243a51dac86075cd72fb2971e954b50f)
+- Implement mkv timeline metadata and client mp4 exporter (3d203c8876e7eacdf34fb5752269f6922ce8ce4c)
+- Implement video export interface (1074e0ff07836e801c2c7c3e17d311120356c2bd)
+
 ## 0.54.1
 2026-11-25
 
