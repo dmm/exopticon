@@ -19,6 +19,7 @@ export {
  */
 export class RecordingFrameSource {
   private readonly store: RecordingStore;
+  private readonly ownsStore: boolean;
   private session?: RecordingReadSession;
   private opening?: RecordingSessionOpening;
   private disposed = false;
@@ -27,8 +28,10 @@ export class RecordingFrameSource {
     private readonly cameraName: string,
     private recordings: RecordingService,
     private openReader: (blob: Blob) => Promise<FrameReader> = MkvReader.open,
+    store?: RecordingStore,
   ) {
-    this.store = new RecordingStore(recordings);
+    this.ownsStore = !store;
+    this.store = store ?? new RecordingStore(recordings);
   }
 
   get hasFrames(): boolean {
@@ -94,7 +97,9 @@ export class RecordingFrameSource {
     this.disposed = true;
     this.opening?.dispose();
     this.opening = undefined;
-    this.store.dispose();
+    if (this.ownsStore) {
+      this.store.dispose();
+    }
     this.session = undefined;
   }
 }

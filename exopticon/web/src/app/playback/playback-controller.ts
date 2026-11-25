@@ -5,6 +5,7 @@ import {
   ObsoleteFrameOperation,
   RecordingFrameSource,
 } from "./recording-frame-source";
+import { RecordingStore } from "./recording-store";
 
 export type PlaybackPhase =
   | "idle"
@@ -50,6 +51,7 @@ export class PlaybackController {
 
   private generation = 0;
   private cameraName = "";
+  private store?: RecordingStore;
   private frameSource?: RecordingFrameSource;
   private displayed?: DecodedFrame;
   private producer?: Promise<void>;
@@ -67,13 +69,24 @@ export class PlaybackController {
     private clock: PlaybackClock = browserClock,
   ) {}
 
+  get recordingStore(): RecordingStore | undefined {
+    return this.store;
+  }
+
   setCamera(cameraName: string): void {
     if (this.destroyed || this.cameraName === cameraName) return;
     this.cancelActive();
     this.cameraName = cameraName;
     this.frameSource?.dispose();
+    this.store?.dispose();
+    this.store = cameraName ? new RecordingStore(this.recordings) : undefined;
     this.frameSource = cameraName
-      ? new RecordingFrameSource(cameraName, this.recordings, this.openReader)
+      ? new RecordingFrameSource(
+          cameraName,
+          this.recordings,
+          this.openReader,
+          this.store,
+        )
       : undefined;
     this.state = {
       phase: "idle",
@@ -192,6 +205,8 @@ export class PlaybackController {
     this.cancelActive();
     this.frameSource?.dispose();
     this.frameSource = undefined;
+    this.store?.dispose();
+    this.store = undefined;
   }
 
   private desiredMediaTime(): number {
