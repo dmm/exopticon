@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 0.54.1
+2026-11-25
+
+### Fixes
+
+- Remove unused submodules and dvc (1a136dfdd87177863a894f118fe359f2f40fcaa1)
+
 ## 0.54.0
 2026-11-25
 
