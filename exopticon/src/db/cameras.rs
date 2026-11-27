@@ -119,7 +119,7 @@ impl From<Camera> for crate::api::cameras::Camera {
 
 impl super::Service {
     pub fn fetch_camera_row(&self, camera_name: &str) -> Result<Camera, super::Error> {
-        db_read!(self, "fetch_camera_row", |conn| {
+        db_read!(self, |conn| {
             let c = crate::schema::cameras::dsl::cameras
                 .find(camera_name)
                 .filter(cameras::deletion_state.eq(super::configuration::ACTIVE))
@@ -137,7 +137,7 @@ impl super::Service {
     }
 
     pub fn fetch_all_camera_rows(&self) -> Result<Vec<Camera>, super::Error> {
-        db_read!(self, "fetch_all_camera_rows", |conn| {
+        db_read!(self, |conn| {
             let cameras: Vec<Camera> = cameras::table
                 .filter(cameras::deletion_state.eq(super::configuration::ACTIVE))
                 .load(conn)?;

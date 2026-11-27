@@ -66,7 +66,7 @@ impl super::Service {
         &self,
         storage_group_name: &str,
     ) -> Result<crate::api::storage_groups::StorageGroup, super::Error> {
-        db_read!(self, "fetch_storage_group", |conn| {
+        db_read!(self, |conn| {
             use crate::schema::storage_groups::dsl;
             let group = dsl::storage_groups
                 .find(storage_group_name)
@@ -79,7 +79,7 @@ impl super::Service {
     pub fn fetch_all_storage_groups(
         &self,
     ) -> Result<Vec<crate::api::storage_groups::StorageGroup>, super::Error> {
-        db_read!(self, "fetch_all_storage_groups", |conn| {
+        db_read!(self, |conn| {
             use crate::schema::storage_groups::dsl;
             let groups = dsl::storage_groups.load::<StorageGroup>(conn)?;
 
@@ -92,7 +92,7 @@ impl super::Service {
         storage_group_name: &str,
         count: i64,
     ) -> Result<StorageGroupOldFiles, super::Error> {
-        db_read!(self, "fetch_storage_group_old_units", |conn| {
+        db_read!(self, |conn| {
             use crate::schema::{cameras, video_files, video_units};
 
             let storage_group_capacity = storage_groups::dsl::storage_groups

@@ -72,7 +72,7 @@ impl Service {
         username: &str,
         password: &str,
     ) -> Result<crate::api::auth::User, super::Error> {
-        let u = db_read!(self, "login", |conn| {
+        let u = db_read!(self, |conn| {
             use crate::schema::users::dsl;
             let u = dsl::users
                 .filter(dsl::username.eq(username))
@@ -93,7 +93,7 @@ impl Service {
         &self,
         session: &crate::api::auth::CreateUserSession,
     ) -> Result<String, super::Error> {
-        db_write!(self, "create_user_session", |conn| {
+        db_write!(self, |conn| {
             use crate::schema::user_sessions::dsl;
             diesel::insert_into(dsl::user_sessions)
                 .values((
@@ -109,7 +109,7 @@ impl Service {
     }
 
     pub fn delete_user_session(&self, session_id: i64) -> Result<(), super::Error> {
-        db_write!(self, "delete_user_session", |conn| {
+        db_write!(self, |conn| {
             use crate::schema::user_sessions::dsl::*;
             diesel::delete(user_sessions.filter(id.eq(session_id))).execute(conn)?;
             Ok(())
@@ -120,7 +120,7 @@ impl Service {
         &self,
         session_key_text: &str,
     ) -> Result<crate::api::auth::User, super::Error> {
-        db_write!(self, "validate_user_session", |conn| {
+        db_write!(self, |conn| {
             use crate::schema::user_sessions::dsl::*;
 
             diesel::delete(user_sessions.filter(expiration_us.lt(datetime_to_micros(Utc::now()))))
@@ -142,7 +142,7 @@ impl Service {
         &self,
         user_name2: &str,
     ) -> Result<Vec<SlimAccessToken>, super::Error> {
-        db_read!(self, "fetch_users_tokens", |conn| {
+        db_read!(self, |conn| {
             use crate::schema::user_sessions::dsl::*;
 
             let sessions = user_sessions

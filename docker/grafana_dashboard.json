@@ -63,7 +63,7 @@
       }
     ]
   },
-  "description": "Alert-oriented operational dashboard for Exopticon covering camera stream liveness, MKV recording persistence, storage retention health, SQLite latency, and HTTP/WebRTC activity.",
+  "description": "Alert-oriented operational dashboard for Exopticon covering camera stream liveness, MKV recording persistence, storage retention health, and HTTP/WebRTC activity.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -793,12 +793,12 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
       "id": 19,
       "panels": [],
-      "title": "SQLite & HTTP",
+      "title": "HTTP",
       "type": "row"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "SQLite read and write transaction latency percentiles.",
+      "description": "HTTP request rate grouped by status code.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -806,116 +806,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": false
-          },
-          "min": 0,
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 33 },
-      "id": 20,
-      "options": {
-        "legend": {
-          "calcs": ["mean", "max"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(exopticon_db_operation_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "{{kind}} p95",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le, kind) (rate(exopticon_db_operation_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "{{kind}} p99",
-          "refId": "B"
-        }
-      ],
-      "title": "SQLite Operation Latency (p95 / p99)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "r2d2 SQLite connection checkout wait p99 and non-NotFound database errors by class (e.g. sqlite_busy, sqlite_locked).",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": false
-          },
-          "min": 0,
-          "unit": "s"
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byRegexp", "options": "^error: .*" },
-            "properties": [
-              { "id": "custom.drawStyle", "value": "bars" },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "unit", "value": "ops" }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 33 },
-      "id": 21,
-      "options": {
-        "legend": {
-          "calcs": ["mean", "max"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(exopticon_db_pool_checkout_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
-          "legendFormat": "pool checkout p99",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "editorMode": "code",
-          "expr": "sum by (error_class) (rate(exopticon_db_errors_total{instance=~\"$instance\", error_class!=\"not_found\"}[$__rate_interval]))",
-          "legendFormat": "error: {{error_class}}",
-          "refId": "B"
-        }
-      ],
-      "title": "SQLite Pool Checkout p99 & DB Errors",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "HTTP request rate grouped by status code, overlaid with p95 request latency and in-flight requests.",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "drawStyle": "line",
-            "fillOpacity": 12,
+            "fillOpacity": 15,
             "lineWidth": 2,
             "showPoints": "never",
             "spanNulls": false
@@ -925,24 +816,15 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Latency p95" },
+            "matcher": { "id": "byRegexp", "options": "^HTTP 5..$" },
             "properties": [
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.fillOpacity", "value": 0 },
-              { "id": "unit", "value": "s" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Pending requests" },
-            "properties": [
-              { "id": "custom.fillOpacity", "value": 0 },
-              { "id": "unit", "value": "short" }
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
             ]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 33 },
-      "id": 22,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "id": 20,
       "options": {
         "legend": {
           "calcs": ["mean", "max"],
@@ -959,6 +841,58 @@
           "expr": "sum by (status) (rate(exopticon_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "HTTP {{status}}",
           "refId": "A"
+        }
+      ],
+      "title": "HTTP Requests / sec by Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "HTTP request duration percentiles and in-flight requests.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Pending requests" },
+            "properties": [
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "unit", "value": "short" }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(exopticon_http_requests_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "Latency p50",
+          "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
@@ -970,12 +904,19 @@
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(exopticon_http_requests_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "Latency p99",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "editorMode": "code",
           "expr": "sum(exopticon_http_requests_pending{instance=~\"$instance\"})",
           "legendFormat": "Pending requests",
-          "refId": "C"
+          "refId": "D"
         }
       ],
-      "title": "HTTP Requests / sec & Latency p95",
+      "title": "HTTP Request Latency (p50 / p95 / p99) & Pending",
       "type": "timeseries"
     }
   ],

@@ -19,23 +19,31 @@
  */
 
 macro_rules! db_write {
-    ($service:expr, $operation:literal, |$conn:ident| $body:block) => {
-        super::Service::measure_db_operation($operation, super::DbOperationKind::Write, || {
-            let mut conn = $service.connection($operation)?;
-            diesel::SqliteConnection::immediate_transaction::<_, super::Error, _>(
-                &mut conn,
-                |$conn| $body,
-            )
-        })
+    ($service:expr, |$conn:ident| $body:expr) => {
+        $service
+            .pool
+            .get()
+            .map_err(super::Error::from)
+            .and_then(|mut conn| {
+                diesel::SqliteConnection::immediate_transaction::<_, super::Error, _>(
+                    &mut conn,
+                    |$conn| $body,
+                )
+            })
     };
 }
 
 macro_rules! db_read {
-    ($service:expr, $operation:literal, |$conn:ident| $body:block) => {
-        super::Service::measure_db_operation($operation, super::DbOperationKind::Read, || {
-            let mut conn = $service.connection($operation)?;
-            diesel::SqliteConnection::transaction::<_, super::Error, _>(&mut conn, |$conn| $body)
-        })
+    ($service:expr, |$conn:ident| $body:expr) => {
+        $service
+            .pool
+            .get()
+            .map_err(super::Error::from)
+            .and_then(|mut conn| {
+                diesel::SqliteConnection::transaction::<_, super::Error, _>(&mut conn, |$conn| {
+                    $body
+                })
+            })
     };
 }
 
@@ -50,32 +58,10 @@ use chrono::{DateTime, Utc};
 use diesel::SqliteConnection;
 use diesel::connection::SimpleConnection;
 use diesel::r2d2::ConnectionManager;
-use metrics::{counter, histogram};
-use std::time::Instant;
 use thiserror::Error;
-
-use crate::metrics::{
-    DB_ERRORS_TOTAL, DB_OPERATION_DURATION_SECONDS, DB_POOL_CHECKOUT_DURATION_SECONDS,
-};
 
 pub type DbConnection = SqliteConnection;
 pub type DbPool = r2d2::Pool<ConnectionManager<DbConnection>>;
-type DbPooledConnection = r2d2::PooledConnection<ConnectionManager<DbConnection>>;
-
-#[derive(Clone, Copy)]
-enum DbOperationKind {
-    Read,
-    Write,
-}
-
-impl DbOperationKind {
-    const fn as_label(self) -> &'static str {
-        match self {
-            Self::Read => "read",
-            Self::Write => "write",
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct Service {
@@ -117,47 +103,6 @@ impl Service {
         Self {
             pool: build_pool(database_url),
         }
-    }
-
-    fn connection(&self, operation: &'static str) -> Result<DbPooledConnection, Error> {
-        let start = Instant::now();
-        let result = self.pool.get();
-        let outcome = if result.is_ok() { "success" } else { "error" };
-        histogram!(
-            DB_POOL_CHECKOUT_DURATION_SECONDS,
-            "operation" => operation,
-            "outcome" => outcome,
-        )
-        .record(start.elapsed().as_secs_f64());
-
-        result.map_err(Error::from)
-    }
-
-    fn measure_db_operation<T, F>(
-        operation: &'static str,
-        kind: DbOperationKind,
-        f: F,
-    ) -> Result<T, Error>
-    where
-        F: FnOnce() -> Result<T, Error>,
-    {
-        let start = Instant::now();
-        let result = f();
-        let outcome = if result.is_ok() { "success" } else { "error" };
-
-        histogram!(
-            DB_OPERATION_DURATION_SECONDS,
-            "operation" => operation,
-            "kind" => kind.as_label(),
-            "outcome" => outcome,
-        )
-        .record(start.elapsed().as_secs_f64());
-
-        if let Err(err) = &result {
-            record_db_error(operation, err);
-        }
-
-        result
     }
 }
 
@@ -228,67 +173,6 @@ impl From<diesel::result::Error> for Error {
                 cause: err,
             })
         }
-    }
-}
-
-fn record_db_error(operation: &'static str, err: &Error) {
-    counter!(
-        DB_ERRORS_TOTAL,
-        "operation" => operation,
-        "error_class" => classify_db_error(err),
-    )
-    .increment(1);
-}
-
-fn classify_db_error(err: &Error) -> &'static str {
-    match err {
-        Error::NotFound => "not_found",
-        Error::Field { .. } => "validation",
-        Error::Conflict(_) => "conflict",
-        Error::Other(OtherError::RemoveRecording(_)) => "filesystem",
-        Error::Other(OtherError::PasswordHash(_)) => "password_hash",
-        Error::Other(OtherError::DbPoolError { .. }) => "pool",
-        Error::Other(OtherError::DbError { cause, .. }) => classify_diesel_error(cause),
-        Error::Other(OtherError::InvalidTimestamp { .. }) => "invalid_timestamp",
-    }
-}
-
-fn classify_diesel_error(err: &diesel::result::Error) -> &'static str {
-    match err {
-        diesel::result::Error::DatabaseError(kind, info) => {
-            let message = info.message().to_ascii_lowercase();
-            if message.contains("database is locked") || message.contains("sqlite_locked") {
-                "sqlite_locked"
-            } else if message.contains("database is busy") || message.contains("sqlite_busy") {
-                "sqlite_busy"
-            } else {
-                classify_database_error_kind(*kind)
-            }
-        }
-        diesel::result::Error::NotFound => "not_found",
-        diesel::result::Error::QueryBuilderError(_) => "query_builder",
-        diesel::result::Error::DeserializationError(_) => "deserialization",
-        diesel::result::Error::SerializationError(_) => "serialization",
-        diesel::result::Error::RollbackErrorOnCommit { .. } => "rollback_on_commit",
-        diesel::result::Error::RollbackTransaction => "rollback",
-        diesel::result::Error::AlreadyInTransaction => "already_in_transaction",
-        diesel::result::Error::NotInTransaction => "not_in_transaction",
-        diesel::result::Error::BrokenTransactionManager => "broken_transaction_manager",
-        _ => "other",
-    }
-}
-
-const fn classify_database_error_kind(kind: diesel::result::DatabaseErrorKind) -> &'static str {
-    match kind {
-        diesel::result::DatabaseErrorKind::UniqueViolation => "unique_violation",
-        diesel::result::DatabaseErrorKind::ForeignKeyViolation => "foreign_key_violation",
-        diesel::result::DatabaseErrorKind::UnableToSendCommand => "unable_to_send_command",
-        diesel::result::DatabaseErrorKind::SerializationFailure => "serialization_failure",
-        diesel::result::DatabaseErrorKind::ReadOnlyTransaction => "read_only_transaction",
-        diesel::result::DatabaseErrorKind::NotNullViolation => "not_null_violation",
-        diesel::result::DatabaseErrorKind::CheckViolation => "check_violation",
-        diesel::result::DatabaseErrorKind::ClosedConnection => "closed_connection",
-        _ => "database_error",
     }
 }
 

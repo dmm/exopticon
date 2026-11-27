@@ -220,7 +220,7 @@ fn remove_empty_parent_dirs(file_path: &Path, storage_root: &Path) {
 
 impl Service {
     pub fn recording_camera_exists(&self, camera_name: &str) -> Result<bool, super::Error> {
-        db_read!(self, "recording_camera_exists", |conn| {
+        db_read!(self, |conn| {
             Ok(cameras::table
                 .filter(cameras::name.eq(camera_name))
                 .filter(cameras::deletion_state.eq(ACTIVE))
@@ -256,7 +256,7 @@ impl Service {
         at: DateTime<Utc>,
     ) -> Result<Option<RecordingFile>, super::Error> {
         let at_us = datetime_to_micros(at);
-        let row = db_read!(self, "resolve_recording_file", |conn| {
+        let row = db_read!(self, |conn| {
             Self::ensure_camera_exists(conn, camera_name)?;
             let row = video_units::table
                 .inner_join(video_files::table)
@@ -280,7 +280,7 @@ impl Service {
         camera_name: &str,
         file_id: i64,
     ) -> Result<Option<RecordingFile>, super::Error> {
-        let row = db_read!(self, "get_recording_file", |conn| {
+        let row = db_read!(self, |conn| {
             Self::ensure_camera_exists(conn, camera_name)?;
             let row = video_units::table
                 .inner_join(video_files::table)
@@ -302,7 +302,7 @@ impl Service {
         camera_name: &str,
         file_id: i64,
     ) -> Result<Option<RecordingFile>, super::Error> {
-        let row = db_read!(self, "next_recording_file", |conn| {
+        let row = db_read!(self, |conn| {
             Self::ensure_camera_exists(conn, camera_name)?;
             let reference = video_units::table
                 .inner_join(video_files::table)
@@ -340,7 +340,7 @@ impl Service {
         video_file: crate::api::video_units::CreateVideoFile,
     ) -> Result<VideoSegment, super::Error> {
         let state = VideoUnitState::Reserved;
-        db_write!(self, "create_video_segment", |conn| {
+        db_write!(self, |conn| {
             let res: (VideoUnit, VideoFile) = conn.transaction::<_, super::Error, _>(|conn| {
                 let video_unit = diesel::insert_into(video_units::dsl::video_units)
                     .values(NewVideoUnit {
@@ -371,7 +371,7 @@ impl Service {
 
     /// Drop pending publication rows without touching the destination file.
     pub fn discard_unpublished_video_segment(&self, unit_id: i64) -> Result<(), super::Error> {
-        db_write!(self, "discard_unpublished_video_segment", |conn| {
+        db_write!(self, |conn| {
             let unit = video_units::table
                 .filter(video_units::id.eq(unit_id))
                 .filter(video_units::state.eq(VideoUnitState::Reserved))
@@ -391,7 +391,7 @@ impl Service {
         end_time: DateTime<Utc>,
         file_size: i32,
     ) -> Result<VideoSegment, super::Error> {
-        let res = db_write!(self, "close_video_segment", |conn| {
+        let res = db_write!(self, |conn| {
             let video_unit = diesel::update(
                 video_units::dsl::video_units
                     .filter(crate::schema::video_units::columns::id.eq(video_unit_id)),
@@ -416,7 +416,7 @@ impl Service {
     }
 
     pub fn delete_unopened_video_segments(&self, camera_name: &str) -> Result<usize, super::Error> {
-        db_write!(self, "delete_unopened_video_segments", |conn| {
+        db_write!(self, |conn| {
             let ids = video_units::table
                 .inner_join(cameras::table)
                 .filter(cameras::deletion_state.eq(ACTIVE))
@@ -438,7 +438,7 @@ impl Service {
         begin_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<Vec<VideoSegment>, super::Error> {
-        let res = db_read!(self, "fetch_video_units_between", |conn| {
+        let res = db_read!(self, |conn| {
             use crate::schema::video_units::dsl;
             let segments: Vec<(VideoUnit, VideoFile)> = dsl::video_units
                 .inner_join(video_files::table)
@@ -472,7 +472,7 @@ impl Service {
         let requested_begin_us = datetime_to_micros(requested_begin);
         let requested_end_us = datetime_to_micros(requested_end);
 
-        let merged_micros = db_read!(self, "fetch_recording_ranges", |conn| {
+        let merged_micros = db_read!(self, |conn| {
             let camera_exists = cameras::table
                 .filter(cameras::name.eq(camera_name))
                 .filter(cameras::deletion_state.eq(ACTIVE))
@@ -528,7 +528,7 @@ impl Service {
     }
 
     pub fn delete_video_unit_for_file(&self, file_id: i64, group: &str) -> Result<(), Error> {
-        db_write!(self, "delete_video_unit_for_file", |conn| {
+        db_write!(self, |conn| {
             use crate::schema::storage_groups;
 
             // Retention candidates can outlive their video-unit IDs. File IDs are never reused.
@@ -551,7 +551,7 @@ impl Service {
     }
 
     pub fn purge_deleted_cameras(&self) -> Result<(), Error> {
-        let names = db_read!(self, "list_cameras_ready_for_purge", |conn| {
+        let names = db_read!(self, |conn| {
             Ok(cameras::table
                 .filter(cameras::deletion_state.eq(READY_FOR_PURGE))
                 .select(cameras::name)
@@ -570,7 +570,7 @@ impl Service {
     }
 
     fn purge_camera_batch(&self, name: &str) -> Result<(), Error> {
-        let ids = db_read!(self, "list_camera_units_for_purge", |conn| {
+        let ids = db_read!(self, |conn| {
             Ok(video_units::table
                 .filter(video_units::camera_name.eq(name))
                 .select(video_units::id)
@@ -579,7 +579,7 @@ impl Service {
                 .load::<i64>(conn)?)
         })?;
         if ids.is_empty() {
-            return db_write!(self, "finish_camera_purge", |conn| {
+            return db_write!(self, |conn| {
                 diesel::delete(
                     cameras::table
                         .find(name)
@@ -591,9 +591,7 @@ impl Service {
         }
         let mut result = Ok(());
         for id in ids {
-            if let Err(err) = db_write!(self, "purge_camera_unit", |conn| {
-                remove_video_unit(conn, id, None)
-            }) {
+            if let Err(err) = db_write!(self, |conn| remove_video_unit(conn, id, None)) {
                 result = Err(err);
             }
         }

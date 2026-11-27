@@ -328,45 +328,6 @@ groups:
           summary: "Storage retention loop is stalled on {{ $labels.instance }}"
           description: "FileDeletionSupervisor on {{ $labels.instance }} has not completed a retention pass in over 60 seconds."
 
-      - uid: exopticon_database_contention
-        title: ExopticonDatabaseContention
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              expr: sum by (instance, error_class) (increase(exopticon_db_errors_total{error_class=~"sqlite_busy|sqlite_locked|pool"}[5m]))
-              instant: true
-              refId: A
-          - refId: B
-            datasourceUid: __expr__
-            model:
-              expression: A
-              reducer: last
-              refId: B
-              type: reduce
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator: { params: [0], type: gt }
-                  operator: { type: and }
-                  query: { params: [C] }
-                  type: query
-              expression: B
-              refId: C
-              type: threshold
-        noDataState: OK
-        execErrState: Error
-        for: 0s
-        labels:
-          severity: warning
-        annotations:
-          summary: "SQLite {{ $labels.error_class }} errors on {{ $labels.instance }}"
-          description: "Exopticon recorded SQLite {{ $labels.error_class }} errors exceeding the 2s busy_timeout in the last 5 minutes."
-
       - uid: exopticon_http_5xx_spike
         title: ExopticonHttp5xxSpike
         condition: C

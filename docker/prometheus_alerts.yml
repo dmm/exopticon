@@ -102,20 +102,8 @@ groups:
           description: "FileDeletionSupervisor on {{ $labels.instance }} has not completed a retention pass in {{ $value | humanizeDuration }} (expected every 5s)."
 
       # -----------------------------------------------------------------------
-      # Supporting Infrastructure: SQLite & HTTP
+      # Supporting Infrastructure: HTTP
       # -----------------------------------------------------------------------
-      - alert: ExopticonDatabaseContention
-        # SQLite connections already wait up to busy_timeout = 2000ms before failing.
-        expr: |
-          sum by (instance, error_class) (
-            increase(exopticon_db_errors_total{error_class=~"sqlite_busy|sqlite_locked|pool"}[5m])
-          ) > 0
-        labels:
-          severity: warning
-        annotations:
-          summary: "SQLite {{ $labels.error_class }} errors on {{ $labels.instance }}"
-          description: "Exopticon recorded SQLite {{ $labels.error_class }} errors exceeding the 2s busy_timeout in the last 5 minutes."
-
       - alert: ExopticonHttp5xxSpike
         # Count-based threshold avoids false positives on low-traffic homelab instances.
         expr: |

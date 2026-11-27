@@ -127,7 +127,7 @@ impl Service {
         &self,
         credentials: impl FnOnce() -> (Option<String>, Option<String>),
     ) -> Result<(), Error> {
-        db_write!(self, "bootstrap_user", |conn| {
+        db_write!(self, |conn| {
             if users::table.count().get_result::<i64>(conn)? != 0 {
                 return Ok(());
             }
@@ -156,7 +156,7 @@ impl Service {
     }
 
     pub fn list_users(&self) -> Result<Vec<User>, Error> {
-        db_read!(self, "list_users", |conn| {
+        db_read!(self, |conn| {
             let rows = users::table
                 .order(users::username)
                 .load::<super::auth::User>(conn)?;
@@ -165,7 +165,7 @@ impl Service {
     }
 
     pub fn fetch_user(&self, username: &str) -> Result<User, Error> {
-        db_read!(self, "fetch_user", |conn| {
+        db_read!(self, |conn| {
             Ok(users::table
                 .find(username)
                 .first::<super::auth::User>(conn)?
@@ -181,7 +181,7 @@ impl Service {
             return Err(field("password", "Password must be provided."));
         }
         let hash = password.as_deref().map(hash_password).transpose()?;
-        db_write!(self, "save_user", |conn| {
+        db_write!(self, |conn| {
             let target = users::table.find(&name);
             if create {
                 let inserted = diesel::insert_into(users::table)
@@ -210,7 +210,7 @@ impl Service {
     }
 
     pub fn delete_user(&self, username: &str) -> Result<(), Error> {
-        db_write!(self, "delete_user", |conn| {
+        db_write!(self, |conn| {
             if diesel::delete(users::table.find(username)).execute(conn)? == 0 {
                 return Err(Error::NotFound);
             }
@@ -235,7 +235,7 @@ impl Service {
         if max_storage_size.is_some_and(|size| !(0..=i64::MAX / (1024 * 1024)).contains(&size)) {
             return Err(field("maxStorageSize", "Enter a nonnegative quota in MiB."));
         }
-        db_write!(self, "save_storage_group", |conn| {
+        db_write!(self, |conn| {
             let target = storage_groups::table.find(&name);
             if create {
                 let path = required(storage_path, "storagePath")?;
@@ -278,7 +278,7 @@ impl Service {
     }
 
     pub fn delete_storage_group(&self, name: &str) -> Result<(), Error> {
-        db_write!(self, "delete_storage_group", |conn| {
+        db_write!(self, |conn| {
             if cameras::table
                 .filter(cameras::storage_group_name.eq(name))
                 .count()
@@ -310,7 +310,7 @@ impl Service {
                 "The storage group is fixed after camera creation.",
             ));
         }
-        db_write!(self, "save_camera", |conn| {
+        db_write!(self, |conn| {
             let target = cameras::table.find(&name);
             let mut camera = if create {
                 if let Some(state) = target
@@ -457,7 +457,7 @@ impl Service {
     }
 
     pub fn request_camera_deletion(&self, name: &str) -> Result<(), Error> {
-        db_write!(self, "request_camera_deletion", |conn| {
+        db_write!(self, |conn| {
             let target = cameras::table.find(name);
             if target.select(cameras::deletion_state).first::<i32>(conn)? == ACTIVE {
                 diesel::update(target)
@@ -471,7 +471,7 @@ impl Service {
     }
 
     pub fn release_pending_camera_deletions(&self) -> Result<(), Error> {
-        db_write!(self, "release_pending_camera_deletions", |conn| {
+        db_write!(self, |conn| {
             diesel::update(
                 cameras::table.filter(cameras::deletion_state.eq(AWAITING_CAPTURE_STOP)),
             )
@@ -496,7 +496,7 @@ impl Service {
         } = input;
         let (name, create) = resource_name(existing, name, "name")?;
         let display = display_name(display)?;
-        db_write!(self, "save_camera_group", |conn| {
+        db_write!(self, |conn| {
             let target = camera_groups::table.find(&name);
             if create {
                 let inserted = diesel::insert_into(camera_groups::table)
@@ -554,7 +554,7 @@ impl Service {
     }
 
     pub fn delete_camera_group(&self, name: &str) -> Result<(), Error> {
-        db_write!(self, "delete_camera_group", |conn| {
+        db_write!(self, |conn| {
             if name == "all" {
                 return Err(Error::Conflict("The all camera group cannot be deleted."));
             }

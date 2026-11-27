@@ -31,16 +31,13 @@ use axum_prometheus::{
         Matcher, PrometheusBuilder, PrometheusHandle, PrometheusRecorder,
     },
 };
-use metrics::{Gauge, Unit, counter, describe_counter, describe_gauge, describe_histogram, gauge};
+use metrics::{Gauge, Unit, counter, describe_counter, describe_gauge, gauge};
 use tokio::sync::RwLock;
 
 use crate::{CameraStatusRegistry, api::cameras::CameraStatus};
 
 pub const HTTP_PREFIX: &str = "exopticon";
 pub const HTTP_REQUESTS_DURATION_SECONDS: &str = "exopticon_http_requests_duration_seconds";
-pub const DB_OPERATION_DURATION_SECONDS: &str = "exopticon_db_operation_duration_seconds";
-pub const DB_POOL_CHECKOUT_DURATION_SECONDS: &str = "exopticon_db_pool_checkout_duration_seconds";
-pub const DB_ERRORS_TOTAL: &str = "exopticon_db_errors_total";
 pub const WEBRTC_SESSIONS: &str = "exopticon_webrtc_sessions";
 
 pub const CAMERA_UP: &str = "exopticon_camera_up";
@@ -57,9 +54,6 @@ pub const RETENTION_LAST_RUN_TIMESTAMP_SECONDS: &str =
 
 const HTTP_DURATION_BUCKETS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0,
-];
-const DB_DURATION_BUCKETS: &[f64] = &[
-    0.0001, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5,
 ];
 const UPKEEP_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -235,35 +229,10 @@ pub fn build_recorder() -> PrometheusRecorder {
             HTTP_DURATION_BUCKETS,
         )
         .expect("valid HTTP duration buckets")
-        .set_buckets_for_metric(
-            Matcher::Full(DB_OPERATION_DURATION_SECONDS.to_string()),
-            DB_DURATION_BUCKETS,
-        )
-        .expect("valid DB operation duration buckets")
-        .set_buckets_for_metric(
-            Matcher::Full(DB_POOL_CHECKOUT_DURATION_SECONDS.to_string()),
-            DB_DURATION_BUCKETS,
-        )
-        .expect("valid DB pool checkout duration buckets")
         .build_recorder()
 }
 
 pub fn describe_custom_metrics() {
-    describe_histogram!(
-        DB_OPERATION_DURATION_SECONDS,
-        Unit::Seconds,
-        "Duration of SQLite database operations in seconds."
-    );
-    describe_histogram!(
-        DB_POOL_CHECKOUT_DURATION_SECONDS,
-        Unit::Seconds,
-        "Duration spent waiting for a SQLite connection from the r2d2 pool in seconds."
-    );
-    describe_counter!(
-        DB_ERRORS_TOTAL,
-        Unit::Count,
-        "Total number of SQLite database errors by operation and error class."
-    );
     describe_gauge!(
         WEBRTC_SESSIONS,
         Unit::Count,
@@ -354,8 +323,6 @@ impl Drop for WebRtcSessionGuard {
 
 #[cfg(test)]
 mod tests {
-    use metrics::histogram;
-
     use super::*;
 
     #[test]
@@ -409,13 +376,6 @@ mod tests {
             record_recording_publish_error("porch");
             record_retention_error();
             record_retention_run_at(UNIX_EPOCH + Duration::from_secs(1_700_000_000));
-            histogram!(
-                DB_OPERATION_DURATION_SECONDS,
-                "operation" => "fetch_all_camera_rows",
-                "kind" => "read",
-                "outcome" => "success"
-            )
-            .record(0.002);
             let _session = WebRtcSessionGuard::new();
         });
 
