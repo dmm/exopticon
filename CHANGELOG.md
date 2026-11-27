@@ -2,6 +2,17 @@
 
 <!--- next entry here -->
 
+## 0.56.0
+2026-11-27
+
+### Features
+
+- Add camera and recording metrics and example dashboard (4c2fdc749b2c5e54ad43d5d970ccd19f37ad5d2d)
+
+### Fixes
+
+- Remove db metrics (106905ca193d7db30a6d918d9528e94e2e9ace7e)
+
 ## 0.55.1
 2026-11-25
 
