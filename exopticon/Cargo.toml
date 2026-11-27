@@ -34,7 +34,6 @@ diesel = { version = "2.3", features = ["sqlite", "r2d2", "chrono", "returning_c
 diesel_migrations = { version = "2.3", features = ["sqlite"] }
 diqwest = "3.2"
 dotenv = "0.15"
-env_logger = "0.11"
 futures-util = "0.3.31"
 lazy_static = "1.5"
 libsqlite3-sys = { version = "0.38", features = ["bundled"] }
@@ -56,7 +55,9 @@ serde_derive="1.0"
 serde_repr = "0.1"
 serde_json="1.0"
 serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
 str0m = { version = "0.24" }
+subtle = "2.6"
 socket2 = "0.6"
 url = "^2.5"
 uuid = { version = "^1", features = ["serde", "v4", "v7"] }

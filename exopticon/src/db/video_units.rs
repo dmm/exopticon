@@ -559,6 +559,7 @@ impl Service {
         })?;
         for name in names {
             if let Err(err) = self.purge_camera_batch(&name) {
+                crate::metrics::record_retention_error();
                 error!(
                     "Recording cleanup for camera {} will retry: {:#?}",
                     name, err

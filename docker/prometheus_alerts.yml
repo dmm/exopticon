@@ -1,0 +1,130 @@
+# Prometheus alerting rules for Exopticon.
+#
+# Compatible with:
+#   1. Grafana UI: Alerting -> Alert rules -> More -> Import alert rules ("Prometheus YAML file")
+#   2. Prometheus / VictoriaMetrics / Mimir (`rule_files:` in prometheus.yml)
+
+groups:
+  - name: exopticon.rules
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # Prerequisite: Scrape Target Health
+      # All exopticon_* rules evaluate to empty (no alert) if the process dies.
+      # -----------------------------------------------------------------------
+      - alert: ExopticonDown
+        expr: up{job=~".*exopticon.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Exopticon target {{ $labels.instance }} is unreachable"
+          description: "Prometheus has failed to scrape {{ $labels.instance }} (job {{ $labels.job }}) for over 1 minute."
+
+      # -----------------------------------------------------------------------
+      # Invariant 1: Camera Stream Liveness
+      # -----------------------------------------------------------------------
+      - alert: ExopticonCameraDown
+        expr: exopticon_camera_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Camera {{ $labels.camera_name }} is not streaming"
+          description: "Enabled camera {{ $labels.camera_name }} on {{ $labels.instance }} has been out of the running state for more than 2 minutes."
+
+      - alert: ExopticonCameraFlapping
+        # Guard with max_over_time(camera_up[5m]) == 1 so an offline camera does
+        # not double-page alongside ExopticonCameraDown while the supervisor retries.
+        expr: |
+          increase(exopticon_capture_restarts_total[15m]) >= 3
+          and max_over_time(exopticon_camera_up[5m]) == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Camera {{ $labels.camera_name }} is crash-looping"
+          description: "Camera {{ $labels.camera_name }} on {{ $labels.instance }} had {{ $value | printf \"%.0f\" }} unplanned restarts in the last 15 minutes."
+
+      # -----------------------------------------------------------------------
+      # Invariant 2: Recording Persistence
+      # -----------------------------------------------------------------------
+      - alert: ExopticonRecordingPublishFailed
+        expr: increase(exopticon_recording_publish_errors_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recording segment publication failed for {{ $labels.camera_name }}"
+          description: "Camera {{ $labels.camera_name }} on {{ $labels.instance }} failed to publish closed MKV segment(s) to archive storage."
+
+      - alert: ExopticonRecordingMuxWedged
+        # splitmuxsink rotates at 15 MB on keyframes; > 50 MB means live packets
+        # are arriving without MKV segments closing (bitrate-invariant day or night).
+        expr: exopticon_recording_unpublished_bytes > 50000000
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recording muxer appears wedged for {{ $labels.camera_name }}"
+          description: "Camera {{ $labels.camera_name }} on {{ $labels.instance }} has accumulated {{ $value | humanize1024 }}B of stream data without publishing a closed MKV segment."
+
+      # -----------------------------------------------------------------------
+      # Invariant 3: Storage & Retention Health
+      # -----------------------------------------------------------------------
+      - alert: ExopticonStorageGroupOverQuota
+        # Steady-state NVR usage normally sits near 100% of max_storage_size as
+        # old segments roll off; sustained > 105% means retention is falling behind.
+        expr: |
+          exopticon_storage_group_used_bytes
+          / clamp_min(exopticon_storage_group_max_bytes, 1) > 1.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Storage group {{ $labels.storage_group }} exceeds configured quota"
+          description: "Storage group {{ $labels.storage_group }} on {{ $labels.instance }} is at {{ $value | humanizePercentage }} of max_storage_size for over 10 minutes."
+
+      - alert: ExopticonRetentionErrors
+        expr: increase(exopticon_retention_errors_total[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Storage retention or camera purge errors on {{ $labels.instance }}"
+          description: "Exopticon encountered {{ $value | printf \"%.0f\" }} error(s) deleting expired recordings or purging deleted cameras in the last 5 minutes."
+
+      - alert: ExopticonRetentionStalled
+        expr: time() - exopticon_retention_last_run_timestamp_seconds > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Storage retention loop is stalled on {{ $labels.instance }}"
+          description: "FileDeletionSupervisor on {{ $labels.instance }} has not completed a retention pass in {{ $value | humanizeDuration }} (expected every 5s)."
+
+      # -----------------------------------------------------------------------
+      # Supporting Infrastructure: SQLite & HTTP
+      # -----------------------------------------------------------------------
+      - alert: ExopticonDatabaseContention
+        # SQLite connections already wait up to busy_timeout = 2000ms before failing.
+        expr: |
+          sum by (instance, error_class) (
+            increase(exopticon_db_errors_total{error_class=~"sqlite_busy|sqlite_locked|pool"}[5m])
+          ) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "SQLite {{ $labels.error_class }} errors on {{ $labels.instance }}"
+          description: "Exopticon recorded SQLite {{ $labels.error_class }} errors exceeding the 2s busy_timeout in the last 5 minutes."
+
+      - alert: ExopticonHttp5xxSpike
+        # Count-based threshold avoids false positives on low-traffic homelab instances.
+        expr: |
+          sum by (instance, endpoint) (
+            increase(exopticon_http_requests_total{status=~"5.."}[5m])
+          ) >= 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP 5xx errors on {{ $labels.endpoint }} ({{ $labels.instance }})"
+          description: "Endpoint {{ $labels.endpoint }} on {{ $labels.instance }} returned {{ $value | printf \"%.0f\" }} 5xx responses in the last 5 minutes."

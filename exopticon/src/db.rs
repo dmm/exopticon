@@ -54,13 +54,13 @@ use metrics::{counter, histogram};
 use std::time::Instant;
 use thiserror::Error;
 
+use crate::metrics::{
+    DB_ERRORS_TOTAL, DB_OPERATION_DURATION_SECONDS, DB_POOL_CHECKOUT_DURATION_SECONDS,
+};
+
 pub type DbConnection = SqliteConnection;
 pub type DbPool = r2d2::Pool<ConnectionManager<DbConnection>>;
 type DbPooledConnection = r2d2::PooledConnection<ConnectionManager<DbConnection>>;
-
-const DB_OPERATION_DURATION_SECONDS: &str = "exopticon_db_operation_duration_seconds";
-const DB_POOL_CHECKOUT_DURATION_SECONDS: &str = "exopticon_db_pool_checkout_duration_seconds";
-const DB_ERRORS_TOTAL: &str = "exopticon_db_errors_total";
 
 #[derive(Clone, Copy)]
 enum DbOperationKind {

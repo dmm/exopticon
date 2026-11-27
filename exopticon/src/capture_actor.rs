@@ -30,8 +30,6 @@ use anyhow::Context;
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
-use metrics::{Counter, counter};
-use regex::Regex;
 use tokio::{
     process::{self, Child, ChildStdin, ChildStdout},
     sync::mpsc,
@@ -45,6 +43,7 @@ use crate::{
     CameraStatusRegistry,
     api::{cameras::CameraStatus, storage_groups::StorageGroup},
     db::cameras::Camera,
+    metrics::{record_recording_publish_error, record_recording_published},
     onvif_actor,
     video_router::VideoRouter,
 };
@@ -232,15 +231,14 @@ pub struct CaptureActor {
     /// Supervisor command channel
     command_receiver: mpsc::Receiver<Command>,
     camera_status_registry: CameraStatusRegistry,
-    /// counter to track lost packets
-    lost_packet_counter: Counter,
+    unpublished_bytes: u64,
     video_codec: Option<String>,
     audio_codec: Option<String>,
     last_packet_status_update_at: Option<Instant>,
 }
 
 impl CaptureActor {
-    pub fn new(
+    pub const fn new(
         db: crate::db::Service,
         camera: Camera,
         storage_group: StorageGroup,
@@ -248,7 +246,6 @@ impl CaptureActor {
         video_router: Arc<VideoRouter>,
         camera_status_registry: CameraStatusRegistry,
     ) -> Self {
-        let camera_name = camera.name.clone();
         Self {
             db,
             camera,
@@ -258,7 +255,7 @@ impl CaptureActor {
             command_receiver,
             video_router,
             camera_status_registry,
-            lost_packet_counter: counter!("lost_packet_count", "camera_name" => camera_name),
+            unpublished_bytes: 0,
             video_codec: None,
             audio_codec: None,
             last_packet_status_update_at: None,
@@ -381,6 +378,7 @@ impl CaptureActor {
                 audio_codec: self.audio_codec.clone(),
                 average_bitrate,
                 error_message: None,
+                unpublished_bytes: self.unpublished_bytes,
             },
         );
         drop(statuses);
@@ -394,6 +392,8 @@ impl CaptureActor {
         timestamp: i64,
         duration: i64,
     ) {
+        let packet_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        self.unpublished_bytes = self.unpublished_bytes.saturating_add(packet_bytes);
         let packet = VideoPacket {
             camera_name: self.camera.name.clone(),
             encoding,
@@ -405,31 +405,15 @@ impl CaptureActor {
         self.video_router.send_video(packet).await;
     }
 
-    fn check_log_for_lost_packets(log: &str) -> Option<u32> {
-        static RE: std::sync::LazyLock<Regex> =
-            std::sync::LazyLock::new(|| Regex::new(r"RTP: missed ([0-9]+) packets").unwrap());
-        let caps = RE.captures(log)?;
-
-        caps[1]
-            .trim()
-            .parse::<u32>()
-            .as_ref()
-            .map_or(None, |num| Some(*num))
-    }
     async fn message_to_action(&mut self, msg: CaptureMessage) -> anyhow::Result<()> {
         match msg {
             CaptureMessage::Log { level, message } => {
                 log!(
                     level,
-                    "capture worker {} {} log: {}",
-                    self.camera.name,
+                    "capture worker {} log: {}",
                     self.camera.name,
                     message
                 );
-
-                if let Some(packet_count) = Self::check_log_for_lost_packets(&message) {
-                    self.lost_packet_counter.increment(packet_count.into());
-                }
             }
             CaptureMessage::Packet {
                 encoding,
@@ -445,14 +429,30 @@ impl CaptureActor {
                 begin_time,
                 end_time,
             } => {
-                self.handle_close_file(filename, begin_time.parse()?, end_time.parse()?)
-                    .await?;
-            }
-            CaptureMessage::Metric {
-                label: _,
-                values: _,
-            } => {
-                debug!("got capture metrics");
+                let close_result = async {
+                    let begin = begin_time.parse()?;
+                    let end = end_time.parse()?;
+                    self.handle_close_file(filename, begin, end).await
+                }
+                .await;
+                match close_result {
+                    Ok(()) => {
+                        self.unpublished_bytes = 0;
+                        record_recording_published(&self.camera.name);
+                        if let Some(status) = self
+                            .camera_status_registry
+                            .write()
+                            .await
+                            .get_mut(&self.camera.name)
+                        {
+                            status.unpublished_bytes = 0;
+                        }
+                    }
+                    Err(err) => {
+                        record_recording_publish_error(&self.camera.name);
+                        return Err(err);
+                    }
+                }
             }
         }
         Ok(())
@@ -477,9 +477,7 @@ impl CaptureActor {
                 tokio::select! {
                     biased;
                     Some(Command::Stop) = self.command_receiver.recv() => {
-                        info!("Received stop command for {} {}.",
-                              self.camera.name, self.camera.name,
-                        );
+                        info!("Received stop command for {}.", self.camera.name);
                         return Ok(false)
                     }
                     msg = framed_stream.next() => match msg {
@@ -599,6 +597,7 @@ impl CaptureActor {
                 audio_codec: self.audio_codec.clone(),
                 average_bitrate: None,
                 error_message: error_message.map(str::to_owned),
+                unpublished_bytes: 0,
             },
         );
         self.camera.name
@@ -681,5 +680,88 @@ mod tests {
 
         assert!(std::fs::symlink_metadata(link).unwrap().is_symlink());
         assert_eq!(std::fs::read(target).unwrap(), b"keep");
+    }
+
+    #[test]
+    fn unpublished_bytes_reset_on_publish_and_errors_increment_counter() {
+        use std::collections::HashMap;
+        use tokio::sync::RwLock;
+
+        let (dir, db) = crate::db::tests::configured_service();
+        let camera = db.fetch_camera_row("front").unwrap();
+        let storage_group = crate::api::storage_groups::StorageGroup {
+            metadata: crate::api::ResourceMetadata {
+                name: "primary".to_string(),
+                display_name: "Primary".to_string(),
+            },
+            spec: crate::api::storage_groups::StorageGroupSpec {
+                storage_path: dir.path().display().to_string(),
+                max_storage_size: 1024,
+            },
+            status: serde_json::json!({}),
+        };
+        let staging = dir.path().join(".staging/front");
+        std::fs::create_dir_all(&staging).unwrap();
+        let filename = "019a2c8e-7200-7000-8000-000000000001.mkv";
+        std::fs::write(staging.join(filename), b"mkvdata").unwrap();
+
+        let statuses: CameraStatusRegistry = Arc::new(RwLock::new(HashMap::new()));
+        let (_tx, rx) = mpsc::channel(1);
+        let mut actor = CaptureActor::new(
+            db,
+            camera,
+            storage_group,
+            rx,
+            Arc::new(VideoRouter::new()),
+            Arc::clone(&statuses),
+        );
+
+        let recorder = crate::metrics::build_recorder();
+        let handle = recorder.handle();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        metrics::with_local_recorder(&recorder, || {
+            runtime.block_on(async {
+                actor
+                    .message_to_action(CaptureMessage::Packet {
+                        encoding: PacketEncoding::H264,
+                        data: vec![1; 2048],
+                        timestamp: 90_000,
+                        duration: 33_333,
+                    })
+                    .await
+                    .unwrap();
+                assert_eq!(statuses.read().await["front"].unpublished_bytes, 2048);
+
+                actor
+                    .message_to_action(CaptureMessage::EndFile {
+                        filename: filename.to_string(),
+                        begin_time: "2026-11-03T21:00:00Z".to_string(),
+                        end_time: "2026-11-03T21:00:10Z".to_string(),
+                    })
+                    .await
+                    .unwrap();
+                assert_eq!(statuses.read().await["front"].unpublished_bytes, 0);
+
+                // Missing staged file fails publication and increments error counter.
+                let err = actor
+                    .message_to_action(CaptureMessage::EndFile {
+                        filename: "019a2c8e-7200-7000-8000-000000000099.mkv".to_string(),
+                        begin_time: "2026-11-03T21:00:10Z".to_string(),
+                        end_time: "2026-11-03T21:00:20Z".to_string(),
+                    })
+                    .await;
+                assert!(err.is_err());
+            });
+        });
+
+        let output = handle.render();
+        assert!(output.contains(r#"exopticon_recordings_published_total{camera_name="front"} 1"#));
+        assert!(
+            output.contains(r#"exopticon_recording_publish_errors_total{camera_name="front"} 1"#)
+        );
     }
 }

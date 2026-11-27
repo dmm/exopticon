@@ -89,6 +89,7 @@ impl From<Camera> for crate::api::cameras::Camera {
                 audio_codec: None,
                 average_bitrate: None,
                 error_message: None,
+                unpublished_bytes: 0,
             }
         } else {
             CameraStatus::disabled()

@@ -90,6 +90,4 @@ pub enum CaptureMessage {
         /// segment end time
         end_time: String,
     },
-    /// metric report
-    Metric { label: String, values: Vec<f64> },
 }

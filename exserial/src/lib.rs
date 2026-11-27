@@ -158,10 +158,6 @@ mod tests {
                 begin_time: "2026-10-27T00:00:00.123456789Z".to_string(),
                 end_time: "2026-10-27T00:01:00.987654321Z".to_string(),
             },
-            CaptureMessage::Metric {
-                label: "capture".to_string(),
-                values: vec![0.0, -1.5, 123.25],
-            },
         ];
 
         for message in messages {

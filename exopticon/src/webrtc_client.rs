@@ -27,7 +27,6 @@ use std::{
 
 use axum::extract::ws::{self, WebSocket};
 use exserial::models::PacketEncoding;
-use metrics::gauge;
 use str0m::{
     Candidate, Input, Rtc,
     change::SdpOffer,
@@ -40,7 +39,7 @@ use tokio::{
 };
 use uuid::Uuid;
 
-use crate::{capture_actor::VideoPacket, video_router::VideoRouter};
+use crate::{capture_actor::VideoPacket, metrics::WebRtcSessionGuard, video_router::VideoRouter};
 
 pub type ClientId = Uuid;
 
@@ -371,8 +370,7 @@ impl Client {
     }
 
     pub async fn run(mut self) {
-        let gauge = gauge!("webrtc_sessions");
-        gauge.increment(1);
+        let _session_guard = WebRtcSessionGuard::new();
         let mut timeout = Duration::from_millis(200);
         self.parse_candidates().await;
 
@@ -460,8 +458,6 @@ impl Client {
         }
 
         self.video_router.unsubscribe(self.id).await;
-
-        gauge.decrement(1);
     }
 }
 

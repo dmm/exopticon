@@ -20,7 +20,10 @@
 
 use tokio::task::spawn_blocking;
 
-use crate::db::storage_groups::StorageGroupOldFiles;
+use crate::{
+    db::storage_groups::StorageGroupOldFiles,
+    metrics::{StorageGroupUsage, record_retention_error},
+};
 
 pub struct FileDeletionActor {
     storage_group_name: String,
@@ -35,7 +38,7 @@ impl FileDeletionActor {
         }
     }
 
-    async fn handle_files(&self, files: StorageGroupOldFiles) -> anyhow::Result<()> {
+    async fn handle_files(&self, files: StorageGroupOldFiles) -> anyhow::Result<StorageGroupUsage> {
         let max_size_bytes = files.storage_group_capacity.saturating_mul(1024 * 1024);
         let mut delete_amount: i64 = files.storage_group_size.saturating_sub(max_size_bytes);
         let mut files_to_delete = Vec::new();
@@ -55,35 +58,42 @@ impl FileDeletionActor {
                 break;
             }
             delete_amount -= video_unit_size;
-            files_to_delete.push(video_file);
+            files_to_delete.push((video_unit_size, video_file));
         }
 
-        for file in files_to_delete {
+        let mut deleted_bytes: i64 = 0;
+        for (unit_size, file) in files_to_delete {
             let file_id = file.id;
             let db = self.db.clone();
             let group = self.storage_group_name.clone();
             debug!("Deleting recording file {} {}", file_id, file.filename);
-            if let Err(err) =
-                spawn_blocking(move || db.delete_video_unit_for_file(file_id, &group)).await?
-            {
-                error!(
-                    "Error deleting recording file {} {}: {}",
-                    file_id, file.filename, err
-                );
+            match spawn_blocking(move || db.delete_video_unit_for_file(file_id, &group)).await? {
+                Ok(()) => {
+                    deleted_bytes = deleted_bytes.saturating_add(unit_size);
+                }
+                Err(err) => {
+                    record_retention_error();
+                    error!(
+                        "Error deleting recording file {} {}: {}",
+                        file_id, file.filename, err
+                    );
+                }
             }
         }
 
-        Ok(())
+        let remaining_bytes = files.storage_group_size.saturating_sub(deleted_bytes);
+        Ok(StorageGroupUsage {
+            used_bytes: u64::try_from(remaining_bytes).unwrap_or(0),
+            max_bytes: u64::try_from(max_size_bytes).unwrap_or(0),
+        })
     }
 
-    pub async fn work(&self) -> anyhow::Result<()> {
+    pub async fn work(&self) -> anyhow::Result<StorageGroupUsage> {
         let db = self.db.clone();
         let storage_group_name = self.storage_group_name.clone();
         let files =
             spawn_blocking(move || db.fetch_storage_group_old_units(&storage_group_name, 100))
                 .await??;
-        self.handle_files(files).await?;
-
-        Ok(())
+        self.handle_files(files).await
     }
 }

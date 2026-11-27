@@ -28,6 +28,7 @@ use tokio::sync::mpsc;
 use tokio::task::{JoinError, JoinHandle, JoinSet, spawn_blocking};
 
 use crate::api::cameras::{CameraStatus, StreamSource};
+use crate::metrics::{init_camera_counters, record_capture_restart};
 use crate::video_router::VideoRouter;
 use crate::{CameraStatusRegistry, capture_actor, db::cameras::Camera, onvif_actor};
 
@@ -131,6 +132,7 @@ impl CaptureSupervisor {
             }
         };
         let (command_sender, command_receiver) = mpsc::channel(1);
+        init_camera_counters(&name);
         let actor = capture_actor::CaptureActor::new(
             self.db.clone(),
             c,
@@ -196,6 +198,7 @@ impl CaptureSupervisor {
                         "Capture task died but we're supposed to be running. camera name {}",
                         name
                     );
+                    self.capture_channels.remove(name);
                     self.stopped_camera_names.push(name.clone());
                 } else {
                     error!("Capture task died, restart all cameras..");
@@ -232,6 +235,17 @@ impl CaptureSupervisor {
         self.finish_restart_if_drained().await;
     }
 
+    async fn restart_unplanned(&mut self) {
+        for name in self
+            .capture_channels
+            .keys()
+            .chain(&self.stopped_camera_names)
+        {
+            record_capture_restart(name);
+        }
+        self.restart().await;
+    }
+
     async fn handle_tick(&mut self) {
         debug!(
             "Capture supervisor tick! state: {:?}, # handles: {}",
@@ -242,14 +256,15 @@ impl CaptureSupervisor {
             State::Ready => self.start_all().await,
             State::Running => {
                 for name in std::mem::take(&mut self.stopped_camera_names) {
+                    record_capture_restart(&name);
                     if let Err(err) = self.start_cameras(Some(name.clone())).await {
                         error!("Error restarting camera {name}: {err}");
-                        self.restart().await;
+                        self.restart_unplanned().await;
                         break;
                     }
                 }
             }
-            State::Restarting => self.restart().await,
+            State::Restarting => self.restart_unplanned().await,
             State::Draining => self.finish_restart_if_drained().await,
         }
     }
@@ -362,5 +377,58 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(commands.is_closed());
+    }
+
+    #[test]
+    fn unplanned_restarts_increment_counter_while_config_reloads_do_not() {
+        use diesel::connection::SimpleConnection;
+
+        let (_dir, db) = crate::db::tests::configured_service();
+        {
+            let mut conn = db.pool.get().unwrap();
+            conn.batch_execute("UPDATE cameras SET enabled = 0;")
+                .unwrap();
+        }
+        let recorder = crate::metrics::build_recorder();
+        let handle = recorder.handle();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        metrics::with_local_recorder(&recorder, || {
+            runtime.block_on(async {
+                let mut supervisor = CaptureSupervisor::new(
+                    db,
+                    Arc::new(VideoRouter::new()),
+                    Arc::new(RwLock::new(HashMap::new())),
+                );
+                supervisor.state = State::Running;
+
+                let (front_tx, _front_rx) = mpsc::channel(1);
+                let (back_tx, _back_rx) = mpsc::channel(1);
+                supervisor
+                    .capture_channels
+                    .insert("front".to_string(), front_tx);
+                supervisor
+                    .capture_channels
+                    .insert("back".to_string(), back_tx);
+
+                // Crash of `front` removes its channel and records 1 unplanned restart on tick.
+                supervisor.handle_camera_event(&Ok("front".to_string()));
+                assert!(!supervisor.capture_channels.contains_key("front"));
+                supervisor.handle_tick().await;
+
+                // Planned config reload stops `back` without incrementing capture_restarts_total.
+                supervisor
+                    .capture_handles
+                    .push(tokio::spawn(std::future::pending()));
+                supervisor.restart().await;
+            });
+        });
+
+        let output = handle.render();
+        assert!(output.contains(r#"exopticon_capture_restarts_total{camera_name="front"} 1"#));
+        assert!(!output.contains(r#"camera_name="back""#));
     }
 }

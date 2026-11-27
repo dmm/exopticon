@@ -77,6 +77,8 @@ pub struct CameraStatus {
     pub audio_codec: Option<String>,
     pub average_bitrate: Option<i64>,
     pub error_message: Option<String>,
+    #[serde(skip)]
+    pub unpublished_bytes: u64,
 }
 
 impl CameraStatus {
@@ -88,6 +90,7 @@ impl CameraStatus {
             audio_codec: None,
             average_bitrate: None,
             error_message: None,
+            unpublished_bytes: 0,
         }
     }
 
@@ -99,6 +102,7 @@ impl CameraStatus {
             audio_codec: None,
             average_bitrate: None,
             error_message: None,
+            unpublished_bytes: 0,
         }
     }
 }

@@ -1,0 +1,407 @@
+# Grafana Unified Alerting file-provisioning config for Exopticon.
+#
+# IMPORTANT: This file uses Grafana's disk-provisioning schema (`apiVersion: 1`)
+# for mounting into `/etc/grafana/provisioning/alerting/`.
+# If you are importing rules through the Grafana web UI ("Import alert rules" ->
+# "Prometheus YAML file"), upload `prometheus_alerts.yml` instead!
+#
+# Note: Replace `datasourceUid: prometheus` below if your Prometheus datasource
+# in Grafana uses a different UID (visible in Connections -> Data sources -> URL).
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: exopticon-operations
+    folder: Exopticon
+    interval: 1m
+    rules:
+      - uid: exopticon_down
+        title: ExopticonDown
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: up{job=~".*exopticon.*"}
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [1], type: lt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Exopticon scrape target {{ $labels.instance }} is down"
+          description: "Prometheus cannot scrape Exopticon on {{ $labels.instance }}."
+
+      - uid: exopticon_camera_down
+        title: ExopticonCameraDown
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: exopticon_camera_up
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [1], type: lt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Camera {{ $labels.camera_name }} is not streaming"
+          description: "Enabled camera {{ $labels.camera_name }} on {{ $labels.instance }} has been down for more than 2 minutes."
+
+      - uid: exopticon_camera_flapping
+        title: ExopticonCameraFlapping
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: increase(exopticon_capture_restarts_total[15m]) and max_over_time(exopticon_camera_up[5m]) == 1
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [2.5], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Camera {{ $labels.camera_name }} is crash-looping"
+          description: "Camera {{ $labels.camera_name }} on {{ $labels.instance }} had >= 3 unplanned restarts in the last 15 minutes."
+
+      - uid: exopticon_recording_publish_failed
+        title: ExopticonRecordingPublishFailed
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: increase(exopticon_recording_publish_errors_total[5m])
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recording segment publication failed for {{ $labels.camera_name }}"
+          description: "Camera {{ $labels.camera_name }} on {{ $labels.instance }} failed to publish closed MKV segment(s)."
+
+      - uid: exopticon_recording_mux_wedged
+        title: ExopticonRecordingMuxWedged
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: exopticon_recording_unpublished_bytes
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [50000000], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recording muxer appears wedged for {{ $labels.camera_name }}"
+          description: "Camera {{ $labels.camera_name }} on {{ $labels.instance }} has streamed over 50 MB without closing an MKV segment."
+
+      - uid: exopticon_storage_group_over_quota
+        title: ExopticonStorageGroupOverQuota
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: exopticon_storage_group_used_bytes / clamp_min(exopticon_storage_group_max_bytes, 1)
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [1.05], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Storage group {{ $labels.storage_group }} exceeds configured quota"
+          description: "Storage group {{ $labels.storage_group }} on {{ $labels.instance }} has exceeded 105% of max_storage_size for over 10 minutes."
+
+      - uid: exopticon_retention_errors
+        title: ExopticonRetentionErrors
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: increase(exopticon_retention_errors_total[5m])
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Storage retention or camera purge errors on {{ $labels.instance }}"
+          description: "Exopticon encountered error(s) deleting expired recordings or purging deleted cameras in the last 5 minutes."
+
+      - uid: exopticon_retention_stalled
+        title: ExopticonRetentionStalled
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: time() - exopticon_retention_last_run_timestamp_seconds
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [60], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Storage retention loop is stalled on {{ $labels.instance }}"
+          description: "FileDeletionSupervisor on {{ $labels.instance }} has not completed a retention pass in over 60 seconds."
+
+      - uid: exopticon_database_contention
+        title: ExopticonDatabaseContention
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by (instance, error_class) (increase(exopticon_db_errors_total{error_class=~"sqlite_busy|sqlite_locked|pool"}[5m]))
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "SQLite {{ $labels.error_class }} errors on {{ $labels.instance }}"
+          description: "Exopticon recorded SQLite {{ $labels.error_class }} errors exceeding the 2s busy_timeout in the last 5 minutes."
+
+      - uid: exopticon_http_5xx_spike
+        title: ExopticonHttp5xxSpike
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by (instance, endpoint) (increase(exopticon_http_requests_total{status=~"5.."}[5m]))
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: { params: [2.5], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP 5xx errors on {{ $labels.endpoint }} ({{ $labels.instance }})"
+          description: "Endpoint {{ $labels.endpoint }} on {{ $labels.instance }} returned >= 3 HTTP 5xx responses in the last 5 minutes."

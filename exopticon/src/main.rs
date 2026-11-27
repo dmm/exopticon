@@ -71,6 +71,7 @@ mod capture_actor;
 mod capture_supervisor;
 mod file_deletion_actor;
 mod file_deletion_supervisor;
+mod metrics;
 mod onvif_actor;
 mod onvif_client;
 mod video_router;
@@ -83,7 +84,6 @@ use crate::file_deletion_supervisor::FileDeletionSupervisor;
 
 use axum::routing::{get, post};
 use axum::{Router, middleware};
-use axum_prometheus::PrometheusMetricLayer;
 use capture_supervisor::Command;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenv::dotenv;
@@ -241,6 +241,14 @@ async fn main() {
     // Start capture supervisor
     let video_router = Arc::new(VideoRouter::new());
     let camera_status_registry: CameraStatusRegistry = Arc::new(RwLock::new(HashMap::new()));
+    let storage_group_usage = crate::metrics::new_storage_group_usage_registry();
+    let metrics_setup =
+        crate::api::basic_auth_middleware::MetricsCredentials::from_env().map(|credentials| {
+            let (layer, handle) =
+                crate::metrics::init(camera_status_registry.clone(), storage_group_usage.clone());
+            (credentials, layer, handle)
+        });
+
     let capture_supervisor = capture_supervisor::CaptureSupervisor::new(
         db_service.clone(),
         video_router.clone(),
@@ -249,9 +257,8 @@ async fn main() {
     let capture_channel = capture_supervisor.get_command_channel();
     let shutdown_channel = capture_channel.clone();
 
-    let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone());
-
-    let purge_supervisor = FileDeletionSupervisor::new(db_service.clone());
+    let deletion_supervisor = FileDeletionSupervisor::new(db_service.clone(), storage_group_usage);
+    let purge_db = db_service.clone();
     let state = AppState {
         candidate_ips: parse_candidate_ips(),
         udp_socket,
@@ -265,11 +272,32 @@ async fn main() {
     info!("Launching capture supervisor...");
     let capture_supervisor_task = tokio::spawn(capture_supervisor.supervise());
     tokio::spawn(deletion_supervisor.supervise());
-    tokio::spawn(purge_supervisor.purge_cameras());
+    tokio::spawn(FileDeletionSupervisor::purge_cameras(purge_db));
 
-    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+    let (metrics_route, prometheus_layer) =
+        if let Some((credentials, layer, metric_handle)) = metrics_setup {
+            let route = get(move || {
+                let metric_handle = metric_handle.clone();
+                async move {
+                    (
+                        [(
+                            axum::http::header::CONTENT_TYPE,
+                            "text/plain; version=0.0.4; charset=utf-8",
+                        )],
+                        metric_handle.render().await,
+                    )
+                }
+            })
+            .layer(middleware::from_fn_with_state(
+                credentials,
+                crate::api::basic_auth_middleware::metrics_auth_middleware,
+            ));
+            (route, Some(layer))
+        } else {
+            (get(|| async { axum::http::StatusCode::NOT_FOUND }), None)
+        };
 
-    let app = Router::new()
+    let mut app = Router::new()
         .nest(
             "/v1/personal_access_tokens",
             auth::personal_access_token_router(),
@@ -286,12 +314,7 @@ async fn main() {
             auth::middleware,
         ))
         // metrics
-        .route(
-            "/metrics",
-            get(|| async move { metric_handle.render() }).layer(middleware::from_fn(
-                crate::api::basic_auth_middleware::metrics_auth_middleware,
-            )),
-        )
+        .route("/metrics", metrics_route)
         // public routes
         .route("/auth", post(auth::login))
         .merge(static_files::router())
@@ -300,8 +323,10 @@ async fn main() {
             TraceLayer::new_for_http()
                 .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
-        )
-        .layer(prometheus_layer);
+        );
+    if let Some(prometheus_layer) = prometheus_layer {
+        app = app.layer(prometheus_layer);
+    }
 
     let signal_shutdown_channel = shutdown_channel.clone();
     let server_result = axum::serve(listener, app.into_make_service())
